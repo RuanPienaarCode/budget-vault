@@ -3,6 +3,87 @@
 All notable changes to Budget Vault. Versions match the plugin version in
 `manifest.json` and the release tag exactly (no `v` prefix).
 
+## 1.53.0 — 2026-10-15
+
+A full audit of 1.52.0 — figures, saves, exports, security, iOS and the
+running app — found about eighty issues. Every one is fixed with a guard test,
+and written down as a rule in ADR-0007 where it is one, except a rule that
+matches a whole description exactly, which is a new feature for a later
+release. Adding up the raw files still matched to
+the cent; what changed are the rules where two figures meet: a period boundary,
+a multi-period report, a save racing another device, a mistyped amount.
+
+### Changed
+
+- **A save never overwrites what another device wrote.** If a file changed
+  since the page loaded — on your phone through iCloud, in the markdown view,
+  or by a rename — Save refuses, says which file and that nothing was written,
+  and reloads. A change that lands just after one of the plugin's own saves is
+  no longer missed.
+- **"Actually free" holds what is still coming at a period boundary.** A monthly
+  service whose last imported charge is a cycle behind is stepped forward into
+  the new period instead of being dropped, and debit orders that leave a cash
+  account on about the same day every month (medical aid, insurance, a transfer
+  into an investment) are held like services until they land. A fixed payment
+  to a card is left to the card. Days left counts today.
+- **The Score waits for complete periods.** A period whose in-budget accounts
+  are not imported to its last day is left out of the averages, so the score no
+  longer jumps when a half-imported period joins them.
+- **The Report compares like for like.** Over several periods, "% of spending
+  budget used", Budget vs Actual and "saved so far" use only the periods that
+  have a budget, and the Report names the periods it left out.
+- **The PDF's "Spent" is the Budget page's Total spent** — money moved into
+  savings and investments is no longer counted as spending there. The
+  transaction listing flags every row the figures leave out (transfers,
+  accounts outside the budget, scheduled rows), and the summary marks each type
+  with a heading row.
+- **An amount the plugin can't read is said, not guessed.** "7,000,00" or a
+  letter O typed for a zero is refused instead of being read as R 700 000 or
+  R 15; the row shows the text with a "Could not read" chip, and the Dashboard
+  says how many amounts count as 0. A Settings.md, account file or table file
+  that can't be read is named in a banner instead of silently falling back to
+  defaults.
+- **One rule per figure.** "Budgeted beyond income" is measured against planned
+  income on both the Budget page and the Score; the Score's flow bands add up to
+  income; the Budget page's tile reads "Planned income"; the refunds line says
+  refunds were not taken off the figure beside it.
+- **Exchange rates name their source.** The README, the setting and the setup
+  wizard name open.er-api.com (ExchangeRate-API) and carry its attribution.
+- **Faster.** The Dashboard and Score draw about five times faster on a large
+  vault.
+
+### Fixed
+
+- Saves: a rules file saved by a spreadsheet with semicolons is read, not
+  emptied; Plans and Tax keep paragraphs, extra columns, rows without a name and
+  headings that merely start with a section's name; a nested plan saves in
+  place; a note with a byte-order mark keeps its properties; a YAML block list
+  of mutes is kept; a small table above the plugin's own is left alone; CRLF
+  files stay CRLF; your own top heading is kept.
+- Figures: the debt "usual payment day" no longer jumps a week early after one
+  late payment; Savings growth names the opening amount and says when it may be
+  overstated, and its yearly rate stops at the balance date; foreign holdings
+  name which reading they print; decimals use your locale everywhere; rounded
+  figures add up and never print "0" beside "Over".
+- Tax: the 2027 capital-gains annual exclusion is R50 000 (SARS).
+- Import: a month-first statement is no longer read day-first; zero-amount rows
+  are not "unparseable"; no account is pre-selected when the file doesn't say;
+  rule patterns ending " ZA" match.
+- Services: a typed negative counts as 0, on the page and in "actually free".
+- Exports: dates are never cut in the image PDF; the workbook marks the running
+  period; repeated period names carry their dates; the Transactions export
+  handles a file whose name differs only in case and keeps English file names.
+- Desktop: the Accounts and Budget tables fit the page; small text is at least
+  11px; the settled-debt pill and three badges meet contrast.
+- Phone and iPad: the type floor and tap targets hold in landscape; Obsidian's
+  iPad button padding no longer overrides the plugin's; loan sliders are thin
+  tracks; text can be selected and copied.
+- Security: a hostile currency symbol is escaped in generated notes; very long
+  quote or space runs no longer slow the CSV and amount parsers; a 309-digit
+  amount is refused.
+- Translations: the Transactions dialogs, shell messages and Dashboard labels
+  are translated in all twelve languages.
+
 ## 1.52.0 — 2026-10-14
 
 Budget Vault is now comfortable on a small phone (an iPhone 6s, 7, 8 or SE —
