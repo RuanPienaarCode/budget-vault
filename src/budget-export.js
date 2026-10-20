@@ -705,7 +705,7 @@ function modelToDoc(model, { money, rowMoney, plainMoney, labels } = {}) {
      and CSV keep their Type column - a spreadsheet is filtered and pivoted on
      it, and its width is free. A group of one still needs no subtotal. */
   const head = [L.category, ...cols.map(p => p.name), L.total, L.average, L.budgeted];
-  const rows = [], boldRows = [];
+  const rows = [], boldRows = [], keepWithNext = [];
   const blank = head.slice(1).map(() => '');
   let lastType;
   /* The month-by-month table is up to fifteen money columns wide, and "R " in
@@ -717,7 +717,10 @@ function modelToDoc(model, { money, rowMoney, plainMoney, labels } = {}) {
     const x = g.row || g.sub;
     if (g.row && (lastType === undefined || (x.type || '') !== lastType)) {
       lastType = x.type || '';
+      /* Bold, and kept with the first row of its group: a heading left alone
+         at the foot of a page names nothing on the page it is on. */
       boldRows.push(rows.length);
+      keepWithNext.push(rows.length);
       rows.push([lastType || '-', ...blank]);
     }
     if (g.sub) boldRows.push(rows.length);
@@ -727,7 +730,7 @@ function modelToDoc(model, { money, rowMoney, plainMoney, labels } = {}) {
   if (hasPeriods) {
     blocks.push({ type: 'heading', text: L.summaryHeading });
     if (plainMoney && model.currency) blocks.push({ type: 'note', text: fill(L.amountsIn, { currency: model.currency }) });
-    blocks.push({ type: 'table', head, rows, boldRows, align: head.map((h, i) => (i === 0 ? 'left' : 'right')) });
+    blocks.push({ type: 'table', head, rows, boldRows, keepWithNext, align: head.map((h, i) => (i === 0 ? 'left' : 'right')) });
   }
 
   for (const b of model.budgets) {

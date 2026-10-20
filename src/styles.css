@@ -1594,6 +1594,26 @@ body.is-tablet .budget-app-root button:where(.sav-worth-btn) { padding: 8px 2px;
 /* Owed Money — how long the money has been out, and the per-row actions. */
 .budget-app-root .owed-age { font-size: 11px; font-weight: 500; color: var(--ink-faint); margin-top: 2px; }
 .budget-app-root .owed-acts { display: inline-flex; gap: 4px; }
+/* THE OWED MONEY TABLE FITS THE CARD (left over from the 14 Oct 2026 audit's
+   L6-01 pass, measured 15 Oct 2026 in the preview harness). Seven columns were
+   1062px in the 902px card at a 1024px window, the remove button outside it:
+   16px cell padding, a Description input fixed at 220px and an Amount input
+   at 110px. Now 10px padding, an Amount field of 6rem (a figure of nine
+   characters takes ~63px of text), and a Description field that fills its
+   column from a 7rem floor, so it is narrow only when the card is: 144px at
+   1024, 202px at 1280 instead of 220 at every width. The two dates keep their
+   140px floor (a narrower date input clips its own value in some locales'
+   formats), and the "counts as 0 in the totals" note may wrap under its
+   figure (td.num is nowrap). The table's narrowest is 856px, which fits from a
+   ~980px window. Not on a phone: a landscape iPhone (.is-phone) stacks these
+   rows into cards (phone-tables.css) whose fields fill their cell. */
+@media (min-width: 601px) {
+  body:not(.is-phone) .budget-app-root #owedTable th,
+  body:not(.is-phone) .budget-app-root #owedTable td { padding-inline: 10px; }
+  body:not(.is-phone) .budget-app-root #owedTable td:nth-child(2) > input { width: 100%; min-width: 7rem; }
+  body:not(.is-phone) .budget-app-root #owedTable td:nth-child(3) > input { max-width: 6rem; }
+  body:not(.is-phone) .budget-app-root #owedTable td.num .fine-note { white-space: normal; }
+}
 
 /* Assets — how old the valuation under each item's name is. Warning-coloured
    past a year rather than hidden: an out-of-date figure is still the best one

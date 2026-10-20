@@ -693,7 +693,23 @@ module.exports = function registerImport(ctx) {
        who can say which account a hand-saved export belongs to, so the select
        opens on a placeholder, p.label stays empty, and the button below stays
        off until they pick. The placeholder goes once a label is set (a
-       re-render follows every pick), so it is never offered as a destination. */
+       re-render follows every pick), so it is never offered as a destination.
+
+       A label that is SET but is no option fell through both halves of that:
+       no placeholder (it is not empty) and no option marked (none is equal),
+       so the select showed the first account while p.label, which commitImport
+       writes under, still named another. It happens when the account it was
+       detected for is deleted or re-pointed on the Accounts page while this
+       review is open, and the next render rebuilds the options without it;
+       the rows would then land in a folder no account claims. So a label is
+       settled to the option it MEANS (accountForLabel folds case and safeSegs,
+       as the writer does, and an account's option is always tx_label || name),
+       and one that means no account is not settled at all: it goes back to
+       the question above. Either way the select shows what p.label holds. */
+    if (p.label && !labels.includes(p.label)) {
+      const acct = accountForLabel(p.label);
+      p.label = acct ? (acct.tx_label || acct.name) : '';
+    }
     if (!p.label) accSel.append(el('option', { value: '', selected: '' }, 'Choose an account…'));
     for (const l of labels) accSel.append(el('option', { value: l, ...(l === p.label ? { selected: '' } : {}) }, l));
     accSel.onchange = () => { p.label = accSel.value; renderImportReview(); };

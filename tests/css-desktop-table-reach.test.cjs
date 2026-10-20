@@ -25,6 +25,26 @@
      Debts     eleven columns, nine of them fixed-width controls inside 16px cell
                padding.
 
+   Two more were left over from that pass and measured the same way on
+   15 Oct 2026, in the same harness over the same household (whole history):
+
+     Transactions  1076px in an 887px scroller at 1024 (902px card, less its
+                   own vertical scrollbar); 1076 in 1078 at 1280, two pixels
+                   from scrolling. Row actions past the card edge at 1024.
+     Owed Money    1062px in 902 at 1024, the remove button outside it; 1062
+                   in 1078 at 1280.
+
+   Causes:
+
+     Transactions  16px cell padding on eight columns; the Account and
+                   Category cells nowrap (the category button is nowrap for
+                   its ellipsis, inside a 130px min-width wrapper), so the
+                   longest account name and "Debt Repayments" each fixed a
+                   column; the "Excl. budget" heading held a 107px column for
+                   a checkbox; and the Note input carries style="width:130px".
+     Owed Money    16px padding on seven columns, a 220px Description input
+                   and a 110px Amount input.
+
    The rules pinned here let each table give up room before it gives up a
    column, in this order: wrap what can wrap, narrow what can narrow, and only
    then drop the columns the Accounts drawer already repeats (the phone has
@@ -139,5 +159,48 @@ want(`${D} td`, 'padding-inline', WIDE, v => px(v) === 10, 'tighten the Debts bo
 want(`${D} .debt-prog`, 'min-width', WIDE, v => px(v) === 92, 'lower the progress cell floor (it was 120px)');
 want(`${D} .debt-prog .cat-bar`, 'min-width', WIDE, v => px(v) === 52, 'lower the progress bar floor (it was 70px) so the cell can reach it');
 
+/* ---- 4. TRANSACTIONS: wrap the names, tighten the padding, cap the note ----
+   Scoped like Debts: a landscape iPhone (.is-phone, 601-932px) stacks these
+   rows into cards (phone.css), and nothing written for the table may follow
+   them in. Measured: min-content 1076 -> 852px, so the table fits the 887px
+   scroller at 1024 with 35px to spare and fills 1078 at 1280. */
+const T = `body:not(.is-phone) ${R} #txTable`;
+want(`${T} th`, 'padding-inline', WIDE, v => px(v) === 10, 'tighten the Transactions cell padding to 10px (16px x 16 sides was 256px of an 887px scroller)');
+want(`${T} td`, 'padding-inline', WIDE, v => px(v) === 10, 'tighten the Transactions body cell padding to 10px');
+want(`${T} tbody td:nth-child(3)`, 'white-space', WIDE, v => v === 'normal',
+  'let the account name wrap (the nowrap cell was 148px for "FNB Cheque" and grows with every longer account name)');
+want(`${T} tbody td:nth-child(4)`, 'white-space', WIDE, v => v === 'normal', 'let the category cell wrap');
+want(`${T} .cat-cell-btn`, 'white-space', WIDE, v => v === 'normal',
+  'let the category name wrap at its spaces ("Debt Repayments" on one nowrap line fixed the column at 176px)');
+want(`${T} .cat-cell`, 'min-width', WIDE, v => px(v) === 0,
+  'drop the 130px floor of the category wrapper, so a short name does not hold the column wider than its longest word');
+want(`${T} thead th:nth-child(6)`, 'white-space', WIDE, v => v === 'normal',
+  'let the "Excl. budget" heading wrap (it held a 107px column for a 20px checkbox; "Fora do orçamento" is longer still)');
+{
+  const d = want(`${T} td:nth-child(7) input`, 'max-width', WIDE, v => px(v) > 0 && px(v) <= 112,
+    'cap the Note input: it carries an inline width:130px that only a max-width can lower');
+  ok(d && px(d.value) >= 96, `the cap keeps a usable note field (>= 6rem), found ${d && d.value}`);
+}
+
+/* ---- 5. OWED MONEY: a description that flexes, an amount sized to a figure ----
+   Measured: min-content 1062 -> 856px, which fits the 902px card at 1024; at
+   1280 the Description field takes the spare room (202px) instead of a fixed
+   220. Dates keep their 140px floor: a date input narrower than that clips
+   its own value in some locales' formats. */
+const O = `body:not(.is-phone) ${R} #owedTable`;
+want(`${O} th`, 'padding-inline', WIDE, v => px(v) === 10, 'tighten the Owed Money cell padding to 10px (7 columns x 32px)');
+want(`${O} td`, 'padding-inline', WIDE, v => px(v) === 10, 'tighten the Owed Money body cell padding to 10px');
+want(`${O} td:nth-child(2) > input`, 'width', WIDE, v => v === '100%',
+  'let the Description field take the column rather than a fixed 220px');
+{
+  const d = want(`${O} td:nth-child(2) > input`, 'min-width', WIDE, v => px(v) >= 96 && px(v) <= 128,
+    'keep a floor under the Description field that still fits the card at 1024');
+  ok(d, 'the Description floor is set');
+}
+want(`${O} td:nth-child(3) > input`, 'max-width', WIDE, v => px(v) > 0 && px(v) <= 96,
+  'cap the Amount field at 6rem (it was 110px; "150000.00" takes ~63px of text)');
+want(`${O} td.num .fine-note`, 'white-space', WIDE, v => v === 'normal',
+  'let "counts as 0 in the totals" wrap (td.num is nowrap, so the note would fix the Amount column at its own length)');
+
 if (failures.length) { console.error(`FAIL — css-desktop-table-reach: ${failures.length} of ${checks} checks\n  ` + failures.join('\n  ')); process.exit(1); }
-console.log(`PASS — css-desktop-table-reach: Accounts state cell wraps at every width and drops its repeated columns in two steps, Budget and Debts give up room before columns (${checks} checks).`);
+console.log(`PASS — css-desktop-table-reach: Accounts state cell wraps at every width and drops its repeated columns in two steps, Budget, Debts, Transactions and Owed Money give up room before columns (${checks} checks).`);

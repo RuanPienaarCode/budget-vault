@@ -384,7 +384,8 @@ function layoutDocument(doc, opts) {
     let size = TABLE_FONT_START;
     while (size > TABLE_FONT_FLOOR && !fitsAtSize(size)) size--;
     const colWidths = computeColWidths(head, rows, align, weights, size, whole);
-    const plan = { head, rows, align, colWidths, size, boldRows, whole, width: colWidths.reduce((a, b) => a + b, 0) };
+    const keepWithNext = new Set(block.keepWithNext || []);
+    const plan = { head, rows, align, colWidths, size, boldRows, keepWithNext, whole, width: colWidths.reduce((a, b) => a + b, 0) };
     plans.set(block, plan);
     return plan;
   }
@@ -425,13 +426,32 @@ function layoutDocument(doc, opts) {
     return headH(plan.size) + rowH(plan.size) * Math.min(2, Math.max(1, plan.rows.length));
   }
 
+  /* A ROW THAT HEADS THE ROWS UNDER IT KEEPS WITH THE FIRST OF THEM — the
+     table-row twin of layoutHeading's lookahead below. `keepWithNext: [i, …]`
+     names such rows; budget-export.js names the type heading rows of its
+     summary (the type name, bold, figure cells blank). Each row used to ask
+     only "do I fit?", so a heading that fell on the last line of a page was
+     drawn there alone and its rows opened the next page under a repeated
+     column header with nothing naming their type. The room a row needs is
+     now itself plus, while it keeps with the next, the next one: a run of
+     keep-with-next rows travels with the first row that is not one. Never
+     past the last row (a keep-with-next last row asks for nothing), and never
+     more than a fresh page holds under its header, so a run longer than a
+     page breaks where it must rather than pushing a page break forever. */
+  function roomFor(plan, r) {
+    const rH = rowH(plan.size);
+    let n = 1;
+    while (r + n < plan.rows.length && plan.keepWithNext.has(r + n - 1)) n++;
+    return n * rH <= contentBottom - MARGIN - headH(plan.size) ? n * rH : rH;
+  }
+
   function layoutTable(block) {
     const plan = planTable(block);
     const rH = rowH(plan.size);
-    if (y + headH(plan.size) + rH > contentBottom) newPage();
+    if (y + headH(plan.size) + roomFor(plan, 0) > contentBottom) newPage();
     drawHeaderRow(plan);
     for (let r = 0; r < plan.rows.length; r++) {
-      if (y + rH > contentBottom) { newPage(); drawHeaderRow(plan); }
+      if (y + roomFor(plan, r) > contentBottom) { newPage(); drawHeaderRow(plan); }
       const isBold = plan.boldRows.has(r);
       if (isBold) {
         cur.ops.push({ op: 'line', x1: contentLeft, y1: y, x2: contentLeft + plan.width, y2: y, width: 0.75, gray: 0.3 });

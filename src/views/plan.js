@@ -239,11 +239,24 @@ module.exports = function registerPlan(ctx) {
          three unlabelled divs, and the visual key below repeats it in text.
          The overspend closes the sentence when there is one — a screen-reader
          user must not have to infer it from two figures that happen to
-         disagree. */
+         disagree.
+
+         `free` and `left` both go below zero (buckets holding more than the
+         plan; more gone than it ever held), and the sentence used to speak
+         them as they were: "R -500,00 not yet allocated". The key beside the
+         bar prints the same figure in danger red, and the colour says which
+         way it points; a screen reader has no colour, only a minus read in the
+         voice of a number that is fine. Each is worded as what it is instead,
+         the first as the loud card below words it. */
       el('div', { class: 'plan-split', role: 'img',
         'aria-label': `Of ${money(sum.pot)}: ${money(sum.spent)} already spent, ` +
-          `${money(sum.committed)} allocated but unspent, ${money(sum.free)} not yet allocated. ` +
-          `${money(sum.left)} still left, ${money(Math.max(0, sum.placeable))} of it still placeable.` +
+          `${money(sum.committed)} allocated but unspent, ` +
+          (sum.free < -0.005
+            ? `${money(-sum.free)} more allocated than this plan holds. `
+            : `${money(Math.max(0, sum.free))} not yet allocated. `) +
+          (sum.left < -0.005
+            ? `${money(-sum.left)} more spent than this plan holds.`
+            : `${money(Math.max(0, sum.left))} still left, ${money(Math.max(0, sum.placeable))} of it still placeable.`) +
           (sum.overspend > 0.005 ? ` ${money(sum.overspend)} was spent past what its bucket held.` : '') },
         el('i', { class: 's-spent', style: `width:${pct(seg.spent)}%` }),
         el('i', { class: 's-alloc', style: `width:${pct(seg.committed)}%` }),
