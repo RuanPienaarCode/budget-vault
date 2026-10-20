@@ -71,13 +71,13 @@ const SHELL_HTML = `
       <span class="di"><span class="ico" data-ico="landmark"></span></span><span data-i18n="nav.accounts">Accounts</span>
     </button>
     <button class="drawer-link" data-view="savings">
-      <span class="di"><span class="ico" data-ico="piggy-bank"></span></span><span data-i18n="nav.savings">Savings &amp; Investments</span>
+      <span class="di"><span class="ico" data-ico="piggy-bank"></span></span><span data-i18n="nav.savings">Savings &amp; investments</span>
     </button>
     <button class="drawer-link" data-view="assets">
       <span class="di"><span class="ico" data-ico="gem|diamond"></span></span><span data-i18n="nav.assets">Assets</span>
     </button>
     <button class="drawer-link" data-view="owed">
-      <span class="di"><span class="ico" data-ico="users"></span></span><span data-i18n="nav.owed">Owed Money</span>
+      <span class="di"><span class="ico" data-ico="users"></span></span><span data-i18n="nav.owed">Owed money</span>
     </button>
     <button class="drawer-link" data-view="debts">
       <span class="di"><span class="ico" data-ico="credit-card"></span></span><span data-i18n="nav.debts">Debt</span>
@@ -93,7 +93,7 @@ const SHELL_HTML = `
       <span class="di"><span class="ico" data-ico="file-text|file"></span></span><span data-i18n="nav.report">Report</span>
     </button>
     <button class="drawer-link" data-view="loans">
-      <span class="di"><span class="ico" data-ico="calculator"></span></span><span data-i18n="nav.loans">Loan Calculators</span>
+      <span class="di"><span class="ico" data-ico="calculator"></span></span><span data-i18n="nav.loans">Loan calculators</span>
     </button>
     <button class="drawer-link" data-view="tax">
       <span class="di"><span class="ico" data-ico="receipt-text|receipt|file-check"></span></span><span data-i18n="nav.tax">Tax</span>
@@ -195,7 +195,7 @@ const SHELL_HTML = `
         <div class="card mb-4">
           <div class="card-h">
             <div>
-              <h2 data-i18n="shell.dash.trend">Spending Trend</h2>
+              <h2 data-i18n="shell.dash.trend">Spending trend</h2>
               <div class="sub" id="trendSub" data-i18n="shell.dash.trendSub">Spent vs spending budget</div>
             </div>
             <div class="card-h-controls">
@@ -203,7 +203,7 @@ const SHELL_HTML = `
                 <span><i style="background:var(--color-success)"></i><span data-i18n="shell.legend.spent">Spent</span></span>
                 <span><i style="background:var(--color-danger)"></i><span data-i18n="shell.legend.over">Over budget</span></span>
                 <span><i style="background:var(--color-info)"></i><span data-i18n="shell.legend.income">Income</span></span>
-                <span><i class="legend-dash"></i><span data-i18n="shell.legend.budget">Budget</span></span>
+                <span><i class="legend-dash"></i><span data-i18n="shell.legend.budget">Spending budget</span></span>
               </div>
               <div id="trendRange"></div>
             </div>
@@ -223,7 +223,7 @@ const SHELL_HTML = `
         <div class="card mb-4">
           <div class="card-h">
             <div>
-              <h2 data-i18n="shell.dash.vsActual">Budget vs Actual</h2>
+              <h2 data-i18n="shell.dash.vsActual">Budget vs actual</h2>
               <div class="sub" id="dashBudgetSub"></div>
             </div>
           </div>
@@ -255,7 +255,7 @@ const SHELL_HTML = `
       <section id="view-score" class="hidden">
         <div class="financial-period-banner">
           <h1 class="financial-period-banner-title" data-i18n="nav.score">Score</h1>
-          <div class="sub-note" data-i18n="score.subNote">How your financial score is worked out, what is going well, and what would move it</div>
+          <div class="sub-note" data-i18n="score.subNote">How your score is worked out, what is going well, and what would move it</div>
         </div>
         <div class="card mb-4" id="scoreHeroCard">
           <div class="body-pad" id="scoreHero"></div>
@@ -267,7 +267,7 @@ const SHELL_HTML = `
         </div>
         <div class="card mb-4 hidden" id="scoreWorkCard">
           <div class="card-h"><div><h2 data-i18n="score.work.title">What would move it most</h2>
-            <div class="sub" data-i18n="score.work.sub">Biggest gap first — each one shows where you are, what to aim for, and how to get there</div></div></div>
+            <div class="sub" data-i18n="score.work.sub">Biggest gap first — each shows where you are, what to aim for, and how to get there</div></div></div>
           <div class="body-pad" id="scoreWork"></div>
         </div>
       </section>
@@ -351,7 +351,7 @@ const SHELL_HTML = `
         </div>
 
         <div class="card hidden" id="planEmptyCard">
-          <div class="card-h" style="justify-content:center"><h2>No plan yet</h2></div>
+          <div class="card-h"><h2>No plan yet</h2></div>
           <div class="body-pad">
             <p>A plan is for money that arrives once — a payout, a refund, a bonus, next month's
               salary surplus, something you sold — and answers one question: where does every rand
@@ -516,7 +516,7 @@ const SHELL_HTML = `
         </div>
 
         <div class="card hidden" id="taxEmptyCard">
-          <div class="card-h" style="justify-content:center"><h2>No tax year yet</h2></div>
+          <div class="card-h"><h2>No tax year yet</h2></div>
           <div class="body-pad">
             <p id="taxEmptyIntro">Track a tax return season here — progress steps, the documents
               you need and the files themselves, stored in the vault.</p>
@@ -587,7 +587,7 @@ const SHELL_HTML = `
 
       <section id="view-savings" class="hidden">
         <div class="financial-period-banner">
-          <h1 class="financial-period-banner-title" data-i18n="nav.savings">Savings &amp; Investments</h1>
+          <h1 class="financial-period-banner-title" data-i18n="nav.savings">Savings &amp; investments</h1>
           <div class="sub-note">Growth, allocation, and goals across every account</div>
         </div>
         <!-- Tiles and the caveat that qualifies them are ONE block, and the
@@ -742,7 +742,7 @@ const SHELL_HTML = `
 
       <section id="view-owed" class="hidden">
         <div class="financial-period-banner">
-          <h1 class="financial-period-banner-title" data-i18n="nav.owed">Owed Money</h1>
+          <h1 class="financial-period-banner-title" data-i18n="nav.owed">Owed money</h1>
           <div class="sub-note">Money owed to the household · saved to <code>Owed Money.md</code></div>
         </div>
         <div class="mini-grid mini-kpis-3 mb-4" id="owedKpis"></div>
@@ -782,7 +782,7 @@ const SHELL_HTML = `
 
       <section id="view-loans" class="hidden">
         <div class="financial-period-banner">
-          <h1 class="financial-period-banner-title" data-i18n="nav.loans">Loan Calculators</h1>
+          <h1 class="financial-period-banner-title" data-i18n="nav.loans">Loan calculators</h1>
           <div class="sub-note" id="loansSubNote"></div>
         </div>
 

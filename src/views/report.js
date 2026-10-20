@@ -54,7 +54,9 @@ const { rangePills } = require('../chart');
    disclosed the ACCOUNTS half only (splitByCurrency's `others`). So a euro
    flat and a euro bond left the Net Worth section with nothing said. See
    that function's own header in src/worth.js. */
-const { worth, otherCurrencyNet } = require('../worth');
+/* cardOverlap — the Dashboard's and the Savings page's "counted twice"
+   disclosure under the same net worth (2026-10-20 audit, M2-05). */
+const { worth, otherCurrencyNet, cardOverlap } = require('../worth');
 const { symbolOf, splitByCurrency, isForeign } = require('../currency');
 const { poolCatType, growthTotals } = require('../savings-math');
 const { monthlyInterest } = require('../debt-math');
@@ -67,7 +69,7 @@ const { debtInterestCoverage } = require('../health-math');
 const { todayIso, nowLocalMinute } = require('../dates');
 const { typeOrder, typeRank } = require('../groups');
 const {
-  REPORT_DIR, reportPaths, mergeCategoryRows, mergeSpendByCategory, budgetComparison,
+  REPORT_DIR, reportPaths, mergeSpendByCategory, budgetComparison, budgetRowsCompared,
   financialReportMarkdown, financialReportJson, copyBody,
 } = require('../report');
 /* Namespace import: see views/dashboard.js's own comment on why every view
@@ -608,6 +610,16 @@ module.exports = function registerReport(ctx) {
     };
   }
 
+  /* The Markdown for a `data` object — the ONE call both buttons make. The
+     formatter every page prints another currency through, and the household's
+     own decimal mark, are the two things a pure module cannot know
+     (src/report.js, financialReportMarkdown's `fmt`). Create handed them in and
+     "Copy report" on the options card did not, so the copy printed every
+     foreign amount ungrouped ("$ 1000" beside the file's "$ 1 000") and every
+     non-money decimal with a point (2026-10-20 audit, D2-26): one `data`, two
+     documents. Spelled once here, so the two buttons cannot drift again. */
+  const markdownOf = data => financialReportMarkdown(data, money, { moneyIn, decimal: locale().decimal });
+
   /* The one place `data` is assembled — see this file's header for why it is
      built exactly ONCE per click and handed unchanged to both serialisers. */
   function buildReportData() {
@@ -673,6 +685,14 @@ module.exports = function registerReport(ctx) {
     const figs = periods.map(p => ({ p, F: periodFigures(p) }));
     const cmp = budgetComparison(figs.map(({ p, F }) => ({ name: periodMonthName(p), budgeted: F.used.budgeted })));
     const compared = new Set(cmp.use);
+    /* M1-04 (2026-10-20 audit) — the same rule for income, over the periods
+       compared above: which of them plan any income at all. Several budget
+       files in a row with no income row set a whole year's pay against a few
+       months of plan on the vault this was found on. The periods that plan none are
+       named, as the spend side names its own; "Budgeted income" is summed over
+       the compared periods, and each income row of Budget vs Actual over the
+       periods that plan it (src/report.js, budgetRowsCompared). */
+    const icmp = budgetComparison(cmp.use.map(i => ({ name: periodMonthName(periods[i]), budgeted: figs[i].F.plan.income })));
     for (const [i, { p, F }] of figs.entries()) {
       /* ADR-0006 Phase 3 · The period snapshot, read rather than re-composed.
          ISSUE 84 — this loop asked six seams for one period; periodFigures is
@@ -692,7 +712,8 @@ module.exports = function registerReport(ctx) {
          and the table of one file, disagreeing, with no caveat between them.
          The table lists every envelope, so the total states every envelope. */
       const plan = F.plan;
-      budgetIncome += plan.income; budgetSpend += plan.total;
+      budgetSpend += plan.total;
+      if (compared.has(i)) budgetIncome += plan.income;
       /* `bu.budgeted` IS bt.spend; read off budgetUsed rather than bt so the
          numerator and its denominator can never come from two calls. */
       const bu = F.used;
@@ -729,7 +750,9 @@ module.exports = function registerReport(ctx) {
        and silently absent from the other. See mergeCategoryRows' own header
        and this file's buildReportData/financialReportMarkdown for why a real
        MERGE across the rename is not attempted: see R5's note there. */
-    const categories = mergeCategoryRows(cmp.use.map(i => budgetVsActualRows(periods[i])), ['budget', 'actual'])
+    /* M1-04 — an income row is merged only over the compared periods whose
+       budget plans it; every other row over every compared period, as before. */
+    const categories = budgetRowsCompared(periods.map((p, i) => (compared.has(i) ? budgetVsActualRows(p) : [])), cmp.use)
       .sort((a, b) => typeRank(a.type, order) - typeRank(b.type, order) || a.cat.localeCompare(b.cat))
       .map(r => ({ ...r, orphaned: !catKnown(r.cat) }));
     /* `orphaned` — catKnown() is the SAME predicate period.js's own catType()
@@ -823,13 +846,17 @@ module.exports = function registerReport(ctx) {
       },
       /* L2b-01 — what the three budget comparisons cover. */
       budgetPeriods: { compared: cmp.withBudget, total: cmp.total, leftOut: cmp.leftOut },
+      /* M1-04 — of those compared, which plan any income. */
+      incomePeriods: { compared: icmp.withBudget, total: icmp.total, leftOut: icmp.leftOut },
       categories, spendByCategory,
       categoryGap: merged.gap,
       fundedFromSavings: { spend: fundedSpend, count: fundedCount },
       scheduled: { income: aheadIncome, spend: aheadSpend, count: aheadCount },
       savings: savingsSummary(),
       debts: debtsSummary(w),
-      netWorth: { net: w.net, assets: w.assets, liabilities: w.liabilities, stale },
+      /* `overlap` — M2-05: the same cardOverlap(S.accounts, S.debts) call the
+         Dashboard's #dashPositionNote and the Savings page make. */
+      netWorth: { net: w.net, assets: w.assets, liabilities: w.liabilities, stale, overlap: cardOverlap(S.accounts, S.debts) },
       health: healthSummary(),
       /* Each row stamped with the symbol of the account whose folder it lives
          in, so neither the markdown table nor the JSON can print a euro
@@ -903,10 +930,7 @@ module.exports = function registerReport(ctx) {
          "Re-create (overwrite)" means modifying it, not a create that throws
          "File already exists." beside it. */
       if (formats.has('md')) {
-        /* The formatter every page prints another currency through, and the
-           household's own decimal mark — the two things a pure module cannot
-           know (src/report.js, financialReportMarkdown's `fmt`). */
-        const md = financialReportMarkdown(data, money, { moneyIn, decimal: locale().decimal });
+        const md = markdownOf(data);
         try {
           written.md = { path: await writeVaultFile(onDisk(paths.mdPath), md), text: md };
         } catch (e) { errors.push(e.message || String(e)); }
@@ -1071,7 +1095,7 @@ module.exports = function registerReport(ctx) {
   async function copyReportNow() {
     try {
       const data = buildReportData();
-      const md = financialReportMarkdown(data, money);
+      const md = markdownOf(data);
       await navigator.clipboard.writeText(copyBody(md));
       toast(i18n.t('report.copied'));
     } catch (e) {

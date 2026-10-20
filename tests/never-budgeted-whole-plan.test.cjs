@@ -34,7 +34,9 @@ const { mountFor, pinClock } = require('./helpers/figures.cjs');
 const { descend } = require('./helpers/dom-stub.cjs');
 const { SEED, PERIOD, TODAY, B } = require('./figures/household.cjs');
 const { periodFlow } = require('../src/money-flow');
-const i18n = require('../src/i18n');
+/* Sentences spelled through t() are compared in reading form — see
+   readingI18n in tests/helpers/dom-stub.cjs (U+00A0 glue, 20 Oct 2026). */
+const i18n = require('./helpers/dom-stub.cjs').readingI18n(require('../src/i18n'));
 
 let checks = 0;
 const ok = (c, m) => { assert.ok(c, m); checks++; };
@@ -131,7 +133,11 @@ async function render(files) {
       [i18n.t('score.flow.chip.neverBudgeted'), ctx.money(12500, 0)],
       [i18n.t('score.flow.chip.together'), ctx.money(15900, 0)],
     ], 'left 3 400 + still to move 0 + never budgeted 12 500 (30 000 − 17 500) = together 15 900');
-    eq(notYetSub(root), i18n.t('score.flow.sub.notYetSpent', { inBudget: ctx.money(3400, 0), neverBudgeted: ctx.money(12500, 0) }),
+    /* Since 2026-10-20 (audit M1-07) the sentence also names the 500 the
+       assume-spent envelope holds, so it adds up to the band (16 400), not to
+       Together (15 900): tests/score-flow-caption-adds-up.test.cjs. */
+    eq(notYetSub(root), i18n.t('score.flow.sub.notYetSpent', { inBudget: ctx.money(3400, 0), neverBudgeted: ctx.money(12500, 0) })
+      + ' · ' + i18n.t('score.flow.sub.alreadySpent', { amount: ctx.money(500, 0) }),
       'the sentence under "Not yet spent" carries the corrected figure, and no set-aside part when nothing is still to move');
   }
 
@@ -150,7 +156,8 @@ async function render(files) {
       [i18n.t('score.flow.chip.together'), ctx.money(15900, 0)],
     ], 'over-allocated: the row says so, keeps its sign so the column still adds up, and together does not move');
     eq(notYetSub(root), i18n.t('score.flow.sub.overAllocated', { inBudget: ctx.money(3400, 0), beyond: ctx.money(5500, 0) })
-      + ' · ' + i18n.t('score.flow.sub.setAsideToMove', { amount: ctx.money(18000, 0) }),
+      + ' · ' + i18n.t('score.flow.sub.setAsideToMove', { amount: ctx.money(18000, 0) })
+      + ' · ' + i18n.t('score.flow.sub.alreadySpent', { amount: ctx.money(500, 0) }),
     'and the sentence under "Not yet spent" names the over-allocation in words and the set-aside still to move');
   }
 

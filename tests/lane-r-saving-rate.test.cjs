@@ -87,7 +87,9 @@ const FILES_HEALTH = { ...FILES,
       const S = await mountFor(FILES_HEALTH, { period: '2026-09' });
       S.ctx.renderScore();
       const text = [...S.nodes.values()].map(n => textOf(n)).join(' \n ');
-      ok(/Averaging 3% of income saved/.test(text.replace(/\u00a0/g, ' ')),
+      /* "of budget income" since 2026-10-20 (audit M1-05): the line names the
+         base it divides by, the one this suite pins. */
+      ok(/Averaging 3% of budget income saved/.test(text.replace(/\u00a0/g, ' ')),
         `the Score page's saving line says 3% (found: ${(text.match(/Averaging[^\n]{0,60}/) || ['nothing'])[0]})`);
     } finally { unpin(); }
   }

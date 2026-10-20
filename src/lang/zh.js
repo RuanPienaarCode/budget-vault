@@ -456,7 +456,7 @@ module.exports = {
   'tx.delete.parent': {
     other: '它拆分出的 {count} 行也会一并删除。',
   },
-  'tx.delete.part': '这是一次拆分中的一行：其余各行将不再等于原始金额，差额会离开账户合计。取消原始行的“排除”勾选即可恢复。',
+  'tx.delete.part': '这是一次拆分中的一行：其余各行将不再等于原始金额，差额会离开账户合计。在原始行上选择“取消拆分”即可恢复。',
   'tx.delete.confirm': '删除该行',
   'tx.deleted': {
     other: '已移除 {count} 行 — 点“保存更改”写入文件',
@@ -1060,6 +1060,8 @@ module.exports = {
   'dash.stale.line': '{line} — {age}。',
   'dash.stale.driftUp': ' 此后的交易合计多出 {amount}。',
   'dash.stale.driftDown': ' 此后的交易合计少了 {amount}。',
+  'dash.stale.driftUpIncluded': ' 此后的交易增加了 {amount}，已计入这些数字。',
+  'dash.stale.driftDownIncluded': ' 此后的交易减少了 {amount}，已计入这些数字。',
   'dash.stale.btn': '查看余额',
   'dash.stale.aria': '在账户页面查看账户余额',
 
@@ -1600,4 +1602,43 @@ module.exports = {
   'settings.exchangeRates.source': '汇率来源',
   'settings.exchangeRates.sourceDesc': '开启后，汇率来自 open.er-api.com，这是 ExchangeRate-API（exchangerate-api.com）运营的免费服务。发送的只有请求地址中的三位字母货币代码；与任何互联网请求一样，对方也会看到你的 IP 地址。',
 
+  /* 2026-10-20 audit, Score lane (M1-05, M1-06, M1-07): which income each
+     figure divides by, "all spending" for the inclusive measure, and every
+     part of "Not yet spent" named under it. Machine-assisted, added
+     2026-10-20; not yet read by a first-language reader. */
+  'score.now.wealthBase': '现在：净资产 {amount} · 相当于 {times} 年预算收入（每月 {income}）',
+  'score.now.allSpendHousehold': '全部支出（含固定支出）占家庭收入 {pct}',
+  'score.gap.fixMonthly': '每月多存 {amount}，就能达到预算收入的 {pct}%。',
+  'score.gap.fixBuild': '存款、投资或房产再增加 {amount}，或还掉同样金额的债务，就能达到 {times} 年预算收入。',
+  'score.gap.fixTrim': '包括固定支出在内，每月总共少花 {amount}，支出就能低于家庭收入的 {pct}%。',
+  'score.flow.sub.incomeToCome': '计划中的收入还有 {amount} 未到账',
+  'score.flow.sub.incomeAbovePlan': '收入比计划多 {amount}',
+  'score.flow.sub.setAsideOver': '转入储蓄的钱比计划预留的多 {amount}',
+  'score.flow.sub.alreadySpent': '{amount} 预算已计为支出',
+  'score.flow.chip.alreadySpentNote': '上方的“尚未花掉”比“合计”多 {amount}：这笔钱还在手上，但预算已把它计为支出。',
+  /* 2026-10-20 audit, L3 (Report + exports) — M1-04, M1-08, M2-04.
+     Machine-assisted, added 2026-10-20; not native-reviewed. */
+  'report.budget.incomeLeftOut': {
+    other: '参与比较的 {total} 个周期中有 {count} 个的预算没有收入：{names}。预算收入，以及预算与实际中的每一行收入，只涵盖预算中计划了该收入的周期；上方的收入涵盖所有周期。',
+  },
+  'report.health.noteParts': '由评分页面所示各部分（{parts}）构成的单一数字 — 只是根据此保险库数字得出的粗略参考，并非专业评估。',
+  'bx.doc.headlineHeading': '各周期的收入与支出',
+  'bx.doc.income': '收入',
+  'bx.doc.spent': '支出',
+  'bx.doc.uncategorised': '未分类',
+  'bx.doc.refunds': '未扣除的退款',
+  /* 2026-10-20 audit fix wave, lane L4 (Accounts) — machine-assisted, not
+     native-reviewed. acct.where.subStop: the ring caption with its closing
+     stop, for when the other-currency sentence follows it (D1-15).
+     acct.overlap: the Accounts page's own card-overlap sentence — its hero
+     leaves Debt-page rows out, so the double count is in net worth on the
+     Savings page and the Dashboard, not "above" (M2-06). */
+  'acct.where.subStop': '这些账户各自所占的比例。',
+  'acct.overlap': '已记录的信用卡账户：{accounts} · 信用卡债务：{debts} — 如果同一张卡两边都有，它会在“储蓄与投资”页面和仪表板的净资产中被重复计算。',
+  /* 2026-10-20 audit fix wave, lane L6 (Transactions, Plan, Onboarding) —
+     machine-assisted, not native-reviewed. plan.env.sub: the line over the
+     Plan's spending buckets, through t() so its figures are glued (D1-05). */
+  'plan.env.sub': {
+    other: '{count} 个支出信封 · 已分配 {placed}，共 {pot}',
+  },
 };

@@ -15,11 +15,11 @@
           difference of the two PRINTED figures (+R1 262). The 2026-10-14 audit
           reversed it (L2a-N08): that rule invented a "+R 1" for a category that
           cost exactly what it always costs, because the allocation lifted its
-          Spent by a unit. The change is now the category's own unrounded
-          amount, rounded as printed, less the rounded baseline (R3 774 against
-          R2 513, +R1 261); this section pins that, and
-          tests/donut-change-from-unrounded.test.cjs pins the invented-unit
-          case itself.
+          Spent by a unit. The 2026-10-20 audit (M1-01) restored the printed
+          rule — the reconciliation failed real rows on the unrounded one, and
+          the lifted unit now shows identically in both columns and reads as
+          flat — so this section pins +R1 262 again, and
+          tests/donut-change-from-printed.test.cjs pins the one-unit case.
      9    A period with no budget file read "Over budget this period" with a figure
           and "0% of the R 0 income this budget plans for": an over-budget
           verdict against a plan that does not exist, and a percentage of
@@ -82,7 +82,12 @@ const signed = s => (/^\s*[−-]/.test(s) ? -1 : 1) * Math.abs(digits(s.replace(
     eq(sel.value, 'Groceries', 'a category with an option is still selected (control)');
   }
 
-  /* ---- 8. the Change column is the rounded difference of the unrounded figures ---- */
+  /* ---- 8. the Change column is the difference of the two PRINTED figures ----
+     The 2026-09-29 rule, restored by the 2026-10-20 audit (M1-01) after the
+     2026-10-14 audit had replaced it with "the rounded true movement": a
+     reader checks the Change with the two figures beside it, and so does the
+     repo's own reconciliation. The one unit the allocation lifts a row by
+     shows in both columns. */
   {
     const files = {
       ...base(),
@@ -112,20 +117,21 @@ const signed = s => (/^\s*[−-]/.test(s) ? -1 : 1) * Math.abs(digits(s.replace(
     ok(groceries, 'the Groceries legend row is rendered');
     eq(digits(cell(groceries, 'dl-val')), 3775, 'Spent prints the allocated figure');
     eq(digits(cell(groceries, 'dl-base')), 2513, 'the baseline prints 2 513');
-    /* The change is what the category really did: 3774,45 against 2513. It
-       is NOT the 1 262 the allocated 3 775 would give. */
-    eq(signed(cell(groceries, 'dl-delta')), 1261,
-      `so the change is the true movement, rounded once: ${cell(groceries, 'dl-delta')}`);
+    /* The change is the sum the reader does: 3 775 − 2 513. */
+    eq(signed(cell(groceries, 'dl-delta')), 1262,
+      `so the change is printed Spent − printed baseline: ${cell(groceries, 'dl-delta')}`);
 
-    /* And for every row that has a comparison at all: the unrounded difference. */
-    const truth = { Groceries: 3774.45 - 2513, Phone: 100.40 - 100, 'Car loan': 100.30 - 100 };
+    /* And for every row that has a comparison at all: the same sum. */
+    let compared = 0;
     for (const li of rows) {
       const base_ = cell(li, 'dl-base'), delta = cell(li, 'dl-delta');
       if (!/\d/.test(base_) || !/\d/.test(delta)) continue;
       const name = cell(li, 'dl-name');
-      eq(signed(delta), Math.round(truth[name]),
-        `${name}: change ${delta} is the unrounded movement (${truth[name].toFixed(2)})`);
+      eq(signed(delta), digits(cell(li, 'dl-val')) - digits(base_),
+        `${name}: change ${delta} is ${cell(li, 'dl-val')} − ${base_}`);
+      compared++;
     }
+    eq(compared, 3, 'every row with a baseline was compared');
   }
 
   /* ---- 9. a period with no budget does not claim to be over one --------------- */

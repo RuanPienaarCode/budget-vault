@@ -23,8 +23,10 @@
    REAL loader and views:
 
      1. CONTROL: the Dashboard really does print a staleness sentence here;
-     2. the Report's Net Worth section carries that exact sentence, built
-        from the same seams (bookFigures().stale / .drift) and the same keys;
+     2. the Report's Net Worth section carries that sentence — to the cent
+        where the Dashboard rounds to the rand (2026-10-20 audit, D2-03) —
+        built from the same seams (bookFigures().stale / .drift) and the same
+        keys, which since M2-02 say the rows are "already counted";
      3. the JSON sibling carries the same facts as data, and every figure
         the Markdown sentence prints equals its JSON field;
      4. the Health section carries the Dashboard health card's own window
@@ -36,7 +38,7 @@
 const assert = require('assert');
 const { stubObsidian } = require('./helpers/harness.cjs');
 stubObsidian();
-const { pinClock } = require('./helpers/figures.cjs');
+const { pinClock, readable } = require('./helpers/figures.cjs');
 const { mountFor, createReport, section, kids } = require('./helpers/report-page.cjs');
 const { SEED, B } = require('./figures/household.cjs');
 
@@ -55,7 +57,7 @@ async function run(files) {
     M.ctx.renderDashboard();
     const caveat = kids(M.nodes.get('#dashStale'), n => n.classList && n.classList.contains('kpi-caveat-txt'))[0];
     return {
-      M, ...out, i18n: require('../src/i18n'),
+      M, ...out, i18n: require('./helpers/dom-stub.cjs').readingI18n(require('../src/i18n')),   // reading form, as `md` is read
       dashStale: raw(caveat), healthSub: raw(M.nodes.get('#healthSub')),
       book: M.ctx.bookFigures(), snap: M.ctx.healthSnapshot(),
     };
@@ -76,7 +78,17 @@ async function run(files) {
   ok(r.dashStale.length > 0, 'CONTROL: the Dashboard prints a staleness sentence under its net worth');
 
   /* ---- 2. the twin's own sentence ---------------------------------------- */
-  ok(nw.includes(r.dashStale), `the Net Worth section carries the Dashboard's sentence — expected "${r.dashStale}" in:\n${nw}`);
+  /* The same sentence, to the cent: the Dashboard prints the distance in whole
+     rands because its tile is a whole-rand figure, and the Report prints it
+     in cents because every figure above it is in cents (2026-10-20 audit,
+     D2-03). Keys, operands and words are one; only the precision is each
+     surface's own. Both say "already counted" — the two print IMPLIED
+     balances (M2-02). */
+  const moved = r.book.drift.drift;
+  const atCents = r.dashStale.replace(readable(ctx.money(Math.abs(moved), 0)), readable(ctx.money(Math.abs(moved))));
+  ok(atCents !== r.dashStale, `fixture: the Dashboard's sentence carries the distance in whole rands — "${r.dashStale}"`);
+  ok(nw.includes(atCents), `the Net Worth section carries the Dashboard's sentence, to the cent — expected "${atCents}" in:\n${nw}`);
+  ok(/already counted/.test(nw), 'and says the rows since are already in the figure');
 
   /* ---- 3. the JSON says the same, figure for figure ---------------------- */
   const ub = r.json.net_worth.unconfirmed_balances;
@@ -92,7 +104,7 @@ async function run(files) {
   ok(nw.includes(line), `the Markdown's count is the JSON's (${line})`);
   ok(nw.includes(i18n.t('dash.stale.oldest', { days: ub.oldest_days, count: ub.oldest_days })), 'the Markdown\'s age is the JSON\'s');
   ok(Math.abs(ub.moved_since) >= 1, 'fixture: the rows since then moved the balances by more than a rand');
-  ok(nw.includes(i18n.t(ub.moved_since > 0 ? 'dash.stale.driftUp' : 'dash.stale.driftDown', { amount: ctx.money(Math.abs(ub.moved_since), 0) })),
+  ok(nw.includes(i18n.t(ub.moved_since > 0 ? 'dash.stale.driftUpIncluded' : 'dash.stale.driftDownIncluded', { amount: ctx.money(Math.abs(ub.moved_since)) })),
     'and the Markdown\'s amount and direction are the JSON\'s');
 
   /* ---- 4. the averaging window ------------------------------------------- */

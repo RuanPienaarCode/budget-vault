@@ -108,7 +108,9 @@ async function heroOf(files, today) {
     ok(/^Rp 14,2/.test(h.conv.replace(/[^\d,.RpA-Za-z ]/g, '').replace(/^\D*/, 'Rp ')) || /14,2/.test(h.conv),
       `and the converted total is stated separately, labelled as converted — got ${h.conv}`);
     ok(/CNY 3,956/.test(h.sub), 'the ORIGINAL amount is still stated, in its own currency');
-    ok(/2026-08-27/.test(h.sub),
+    /* The date in prose, "rates for Aug 27" (ctx.dateText — 2026-10-20 audit,
+       D2-11); still the rate table's own day. */
+    ok(/rates for Aug 27/.test(h.sub),
       'and never without the date its rates are for — currency.js refused conversion because a rate is a fact about a DAY, so the day travels with the number');
   }
 

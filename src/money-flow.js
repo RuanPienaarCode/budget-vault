@@ -244,6 +244,15 @@ function periodFlow({
   const neverBudgeted = incomeBase - (bud + setAside);
   const incomeToCome = inc - incomeBase;
   const together = leftInBudget + setAsideToMove + neverBudgeted + incomeToCome;
+  /* The one part of "Not yet spent" Together leaves out (2026-10-20 audit,
+     M1-07). The band is income less what really went out; Together also takes
+     off the assume-spent provision, money the budget counts as spent that has
+     not left yet. So band = Together + this, exactly, whenever the band is
+     drawn (gross spend never exceeds income there, and set-aside is a slice
+     of gross spend: ledger.js tally). Named so the caption under the band can
+     say it — on the committed household it was the R 500 between a band of
+     16 400 and a caption and Together of 15 900, with nothing naming it. */
+  const alreadySpent = Math.max(0, Number(assumedSpent) || 0);
 
   /* Against the income the PLAN states, via the shared rule above — NOT
      against `inc`, which is what has landed so far. Dividing by `inc` made
@@ -273,13 +282,8 @@ function periodFlow({
     ? (rawSum <= 100.0001 ? largestRemainder(rawPercents, 100) : rawPercents.map(v => Math.round(v)))
     : bandAmounts.map(() => 0);
 
-  /* ADR-0007 · Display bands partition the headline: largest remainder against
-     the rounded income, on the surplus branch only (R 40 241 under R 40 240
-     before); `roundRand` mirrors formatMoney's sign-then-abs order. */
+  /* `roundRand` mirrors formatMoney's sign-then-abs order. */
   const roundRand = v => (v < 0 ? -1 : 1) * Math.round(Math.abs(v));
-  const displayBands = inc > 0 && rawSum <= 100.0001
-    ? largestRemainder(bandAmounts, roundRand(inc))
-    : bandAmounts.map(roundRand);
 
   /* ADR-0007 · Together is derived from the printed parts, so the chip's
      "38 730 − 653 = 38 078" adds up; the raw identity is untouched. */
@@ -288,9 +292,35 @@ function periodFlow({
     setAsideToMove: roundRand(setAsideToMove),
     neverBudgeted: roundRand(neverBudgeted),
     incomeToCome: roundRand(incomeToCome),
+    alreadySpent: roundRand(alreadySpent),
   };
   displayLefts.together = displayLefts.leftInBudget + displayLefts.setAsideToMove + displayLefts.neverBudgeted
     + displayLefts.incomeToCome;
+
+  /* ADR-0007 · Display bands partition the headline: largest remainder against
+     the rounded income, on the surplus branch only (bands once summed to a rand
+     above the income they sat under). Since 2026-10-20 (audit M1-07) the printed "Not yet spent" is
+     DERIVED from the printed parts its caption names — Together's four lefts
+     and the assume-spent provision — the way Together is derived from the
+     chip's rows, and the three spent bands are allocated around it against the
+     printed income. Rounded alone, the band and the sum of its printed parts
+     could sit a rand or two apart. Only where the raw identity holds (it
+     always does on real data: band = Together + provision); anything else
+     keeps the plain allocation rather than print a sum that is not one. */
+  let displayBands;
+  if (inc > 0 && rawSum <= 100.0001) {
+    displayBands = largestRemainder(bandAmounts, roundRand(inc));
+    const partsHold = Math.abs(notYetSpent - (together + alreadySpent)) < 0.005;
+    const printedRest = displayLefts.together + displayLefts.alreadySpent;
+    if (partsHold && printedRest >= 0) {
+      const spentBands = allocateWhole(bandAmounts.slice(0, 3), roundRand(inc) - printedRest);
+      if (spentBands[0] + spentBands[1] + spentBands[2] + printedRest === roundRand(inc)) {
+        displayBands = [...spentBands, printedRest];
+      }
+    }
+  } else {
+    displayBands = bandAmounts.map(roundRand);
+  }
 
   /* The Overspent row, printed so that the printed bands less it still equal the
      printed income: the sum of the three rounded bands less the rounded income,
@@ -317,8 +347,38 @@ function periodFlow({
     },
     committedDetail: { debtRepayments, interest, housing, subscriptions, other },
     budget: { budgeted: bud + setAside, budgetSpend: bud, setAside, spentTotal: spent, spent: spentByRule, allocatedOfIncome, budgetUsed },
-    lefts: { leftInBudget, setAsideToMove, neverBudgeted, incomeToCome, together, display: displayLefts },
+    lefts: { leftInBudget, setAsideToMove, neverBudgeted, incomeToCome, together, alreadySpent, display: displayLefts },
   };
+}
+
+/* Whole rands for non-negative parts that must sum to a whole-rand target.
+   Starts where largestRemainder starts (each part floored, then the leftover
+   rands to the biggest remainders first, ties to the earlier part), so where
+   largestRemainder can reach the target the result is identical. Unlike it,
+   the leftover may be negative or larger than the number of parts: the target
+   here is a printed figure derived elsewhere (the printed income less the
+   printed "Not yet spent"), which can sit a rand or two either side of the
+   parts' own sum. A part that is nothing is never given a rand (a band of R 0
+   must not print R 1), and no part is taken below zero. Pure. */
+function allocateWhole(values, target) {
+  const out = values.map(v => Math.floor(v));
+  let left = Math.round(target) - out.reduce((s, v) => s + v, 0);
+  const live = values.map((v, i) => i).filter(i => values[i] > 0.005);
+  while (left !== 0) {
+    const step = left > 0 ? 1 : -1;
+    let best = -1;
+    for (const i of live) {
+      if (out[i] + step < 0) { continue; }
+      /* How far the printed part sits below its truth: give to the most
+         short-changed, take from the most over-paid. Strict comparison, so a
+         tie goes to the earlier part, as largestRemainder breaks it. */
+      if (best < 0 || step * (values[i] - out[i]) > step * (values[best] - out[best])) { best = i; }
+    }
+    if (best < 0) { break; }
+    out[best] += step;
+    left -= step;
+  }
+  return out;
 }
 
 /* ADR-0007 · Rail segments: PILLARS' weight order, width = shownMax, fill =

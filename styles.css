@@ -250,9 +250,12 @@
    order, without !important. Nothing in src/ sets display inline, so
    specificity alone decides. */
 .budget-app-root .hidden.hidden { display: none; }
-.budget-app-root .text-success { color: var(--color-success); }
-.budget-app-root .text-danger { color: var(--color-danger-ink); }
-.budget-app-root .text-warning { color: var(--color-warning-ink); }
+/* .text-success / .text-danger / .text-warning live in statement/foundation.css
+   ("THE TONE CLASSES"), doubled and after this whole sheet, so a component's own
+   colour rule cannot out-rank the meaning a view put on an element. Here they
+   were (0,2,0) at line 231 and lost to every later (0,2,0) colour rule
+   (2026-10-20 audit, D1-11). .text-muted stays: it is a default, not a tone,
+   and a tone on the same element is meant to beat it. */
 .budget-app-root .text-muted { color: var(--text-muted); }
 /* The small note under a figure (raised to --st-micro on phone). */
 .budget-app-root .fine-note { font-size: 11.5px; }
@@ -807,6 +810,19 @@ body.is-tablet .budget-app-root button:where(.sav-worth-btn) { padding: 8px 2px;
   padding: 2rem 2.5rem 4rem;
   overflow-x: hidden;
 }
+/* The banner's base rule sits ABOVE the 768px block below, not after it. It
+   used to come second, and an @media rule adds no specificity: the base
+   `padding: 0.25rem 0 1.25rem` won the tie on source order and the 20px side
+   inset never applied, so between 601 and 768px a desktop window put the page
+   title on its edge (phone.css patched only the body.is-phone half). Found by
+   the 2026-10-20 audit's cascade-order sweep (D1-01); the general rule is
+   pinned by tests/css-media-after-base.test.cjs. */
+.budget-app-root .financial-period-banner {
+  background: transparent;
+  color: var(--text-primary);
+  padding: 0.25rem 0 1.25rem;
+  margin-bottom: 0.5rem;
+}
 @media (max-width: 768px) {
   /* Full-bleed on mobile: drop the side gutters so cards run edge-to-edge.
      Cards keep their own inner padding; page-title banners get a side inset
@@ -820,12 +836,6 @@ body.is-tablet .budget-app-root button:where(.sav-worth-btn) { padding: 8px 2px;
   .budget-app-root .section-h { padding-left: 20px; padding-right: 20px; }
 }
 
-.budget-app-root .financial-period-banner {
-  background: transparent;
-  color: var(--text-primary);
-  padding: 0.25rem 0 1.25rem;
-  margin-bottom: 0.5rem;
-}
 .budget-app-root .financial-period-banner-title { font-size: 1.25rem; font-weight: 600; line-height: 1.4; margin: 0; }
 .budget-app-root .financial-period-banner .sub-note { font-size: 0.88rem; color: var(--text-muted); }
 
@@ -1315,7 +1325,13 @@ body.is-tablet .budget-app-root button:where(.sav-worth-btn) { padding: 8px 2px;
 }
 .budget-app-root .badge-income      { background: var(--color-info-light); color: var(--color-info); }
 .budget-app-root .badge-expense     { background: var(--color-danger-light); color: var(--color-danger-ink); }
-.budget-app-root .badge-debt        { background: color-mix(in srgb, #f97316 14%, transparent); color: #fb923c; }
+/* Debt is the WARNING family, like the Budget table's group dot for it
+   (statement/budget.css, --bud-g: var(--color-warning)) and like insurance
+   beside it. It was an orange of its own (#f97316 tint, #fb923c / #9a3412
+   ink), so one Budget row showed the debt type in two colours, an amber dot
+   and an orange chip (2026-10-20 audit, D2-23). The ink token already clears
+   AA on its fill in both themes (5.18:1 light). */
+.budget-app-root .badge-debt        { background: var(--color-warning-light); color: var(--color-warning-ink); }
 .budget-app-root .badge-services    { background: var(--color-info-light); color: var(--color-info); }
 .budget-app-root .badge-insurance   { background: var(--color-warning-light); color: var(--color-warning-ink); }
 .budget-app-root .badge-giving      { background: color-mix(in srgb, var(--color-giving) 14%, transparent); color: var(--color-giving); }
@@ -1336,12 +1352,11 @@ body.is-tablet .budget-app-root button:where(.sav-worth-btn) { padding: 8px 2px;
    --color-warning-light, better than the #a16207 it replaces) and to the raw
    fill in dark mode. Keeping both here would have been two mechanisms doing
    the same job.
-   .badge-debt is one step darker than its siblings (orange-800, not -700):
-   #c2410c measured 4.13:1 on its own 14% orange tint over the pale tile of a
-   real light-theme render (audit L5-04); #9a3412 is 5.8:1 there. */
+   .badge-debt had an entry here too (#9a3412, after #c2410c measured 4.13:1 on
+   its old orange tint, audit L5-04). It went the same way as the two above
+   once debt moved to the warning tokens (2026-10-20 audit, D2-23). */
 .budget-app-root:not(.bud-dark) .badge-income,
 .budget-app-root:not(.bud-dark) .badge-services   { color: #0369a1; }
-.budget-app-root:not(.bud-dark) .badge-debt       { color: #9a3412; }
 .budget-app-root:not(.bud-dark) .badge-savings    { color: #15803d; }
 .budget-app-root:not(.bud-dark) .badge-giving     { color: #be185d; }
 .budget-app-root:not(.bud-dark) .badge-luxuries   { color: #0f766e; }
@@ -1392,34 +1407,12 @@ body.is-tablet .budget-app-root button:where(.sav-worth-btn) { padding: 8px 2px;
    first second of the import. It has its own 0.12s transition below. */
 .budget-app-root .import-progress .cat-bar-fill { animation: none; }
 
-@media (prefers-reduced-motion: reduce) {
-  .budget-app-root .score-confetti-bit,
-  .budget-app-root .score-win.is-maxed .score-win-badge,
-  .budget-app-root .score-meter-fill,
-  .budget-app-root .score-ring-fill { animation: none; }
-  /* The fill is scaled by its animation, so switching the animation off has to
-     put the bar back — otherwise reduced motion would show an empty meter. */
-  .budget-app-root .score-meter-fill { transform: scaleX(1); }
-  /* Same idea for the ring: its resting stroke-dashoffset IS the animation's
-     `to` value, so pinning it there directly is what an un-animated arc looks
-     like — not a blank ring. */
-  .budget-app-root .score-ring-fill { stroke-dashoffset: var(--seg-to); }
-  .budget-app-root .score-confetti { display: none; }
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .budget-app-root .cat-bar-fill,
-  .budget-app-root .hero-meter i,
-  .budget-app-root .app-drawer,
-  .budget-app-root .drawer-overlay,
-  .budget-app-root .card,
-  .budget-app-root .upload-area,
-  .budget-app-root #toast,
-  .budget-app-root .table tbody tr { transition: none; }
-  /* The grow animations are decoration — the bar reads identically at rest. */
-  .budget-app-root .cat-bar-fill,
-  .budget-app-root .hero-meter i { animation: none; }
-}
+/* The reduced-motion blocks that used to sit here now sit after the rules they
+   switch off: the Score page's at the end of the Score section, the shared one
+   after the toast. Here, above those rules, they tied them on specificity and
+   lost on source order, so the meter filled, the ring drew, the confetti flew
+   and the drop zone and toast faded for a reader who had asked the system for
+   no motion (2026-10-20 audit, D1-01 cascade-order sweep). */
 .budget-app-root .cat-bar-fill.bg-warning { background: linear-gradient(90deg, var(--color-warning), var(--grad-warning-end)); }
 .budget-app-root .cat-bar-fill.bg-danger { background: linear-gradient(90deg, var(--color-danger), var(--grad-danger-end)); }
 
@@ -1466,6 +1459,18 @@ body.is-tablet .budget-app-root button:where(.sav-worth-btn) { padding: 8px 2px;
 @media (max-width: 800px) { .budget-app-root .mini-kpis-3 { grid-template-columns: repeat(2, 1fr); } }
 @media (max-width: 900px) { .budget-app-root .mini-kpis-4, .budget-app-root .mini-kpis-5 { grid-template-columns: repeat(2, 1fr); } }
 @media (max-width: 640px) { .budget-app-root .mini-kpis-4, .budget-app-root .mini-kpis-5, .budget-app-root .mini-kpis-3 { grid-template-columns: 1fr; } }
+/* Where the 5-up row sits in one line (above its 1100px step), it lays out the
+   tiles it HAS: one equal column per tile, by flowing them into implicit
+   columns instead of five fixed ones. Savings carries four (its debt tile was
+   removed on purpose) and three on a vault with no measurable growth, and in
+   five fixed columns they filled four fifths of the row at 210px each with
+   the right fifth empty (2026-10-20 audit, D1-16, 1280px). Tax's five are
+   unchanged. Keeps the row's small figure size (statement/foundation.css),
+   which is what lets a seven-digit balance with cents fit a tile; the 3- and
+   2-column steps below 1100px are untouched (they apply only there). */
+@media (min-width: 1101px) {
+  .budget-app-root .mini-kpis-5 { grid-template-columns: none; grid-auto-flow: column; grid-auto-columns: 1fr; }
+}
 
 /* ------------------------------------------------------------
    ACCOUNTS PAGE — summary ring, the decision queue, the ledger.
@@ -1692,7 +1697,16 @@ body.is-tablet .budget-app-root button:where(.sav-worth-btn) { padding: 8px 2px;
 /* Band 1 — the figure and the ring, side by side on a wide pane. */
 .budget-app-root .top-grid { display: grid; grid-template-columns: 1.15fr 1fr; gap: 22px; align-items: stretch; }
 .budget-app-root .acct-hero { padding: 34px 34px 30px; display: flex; flex-direction: column; justify-content: center; }
-.budget-app-root .acct-hero .hero-num { font-size: clamp(38px, 5.4vw, 62px); }
+/* (The hero figure's size lives in statement/foundation.css with its symbol
+   tokens, beside .hero-num: here it out-ranked the foundation's figure rule and
+   left the symbol on the fallback ratio. 2026-10-20 audit, D2-22.) */
+/* A caveat in this band (the card-overlap note, accounts.js overlapNote) is a
+   full-width row UNDER the two cards, the way the Dashboard's sits under its
+   tiles, never a grid cell of its own. As a cell it took the second column of
+   the row "Where it sits" was in, stretched to that card's 351px height, with
+   its text at the top and its button 186px lower and no card around either
+   (2026-10-20 audit, D1-03, measured at 1280px). */
+.budget-app-root .top-grid > .kpi-caveat { grid-column: 1 / -1; align-self: start; margin-top: 0; }
 .budget-app-root .acct-hero-facts {
   display: flex; gap: 26px; flex-wrap: wrap;
   margin-top: 22px; padding-top: 18px; border-top: 1px solid var(--border-color);
@@ -1894,10 +1908,15 @@ body.is-tablet .budget-app-root button:where(.sav-worth-btn) { padding: 8px 2px;
 }
 .budget-app-root .acct-dot { width: 9px; height: 9px; border-radius: 3px; flex: none; }
 .budget-app-root .acct-cell-sub { display: block; font-size: 11.5px; color: var(--ink-faint); margin-top: 1px; }
+/* justify-content, not only text-align: this is a <button>, which Obsidian
+   (and the reset above) lays out as inline-flex with the host's
+   `justify-content: center`, so text-align moved nothing and every balance sat
+   centred in its column with the decimals at different x (2026-10-20 audit,
+   D1-02; tests/css-button-text-align.test.cjs holds it for every button). */
 .budget-app-root .acct-bal {
   background: none; border: 0; padding: 0; cursor: pointer; font: inherit;
   font-size: 15px; font-weight: 700; letter-spacing: -.01em; color: var(--text-primary);
-  font-variant-numeric: tabular-nums; text-align: right; width: 100%;
+  font-variant-numeric: tabular-nums; text-align: right; justify-content: flex-end; width: 100%;
 }
 .budget-app-root .acct-bal:hover { text-decoration: underline; }
 .budget-app-root .acct-bal:focus-visible { outline: 2px solid var(--color-primary); outline-offset: 3px; border-radius: 6px; }
@@ -1944,7 +1963,12 @@ body.is-tablet .budget-app-root button:where(.sav-worth-btn) { padding: 8px 2px;
 .budget-app-root .acct-mbar--split i.seg-growth.neg { background: var(--color-danger); }
 .budget-app-root .acct-when { font-size: 12px; color: var(--text-muted); white-space: nowrap; }
 .budget-app-root .acct-dash { color: var(--ink-faint); }
-.budget-app-root .acct-caret { opacity: .4; font-size: 11px; }
+/* The unsorted column's "↕" is quiet through its INK, not through opacity: at
+   .4 on the muted heading ink it measured 1.91:1 on the light card and 2.51:1
+   on the dark one, under the 3:1 a meaningful non-text glyph needs (WCAG 1.4.11;
+   2026-10-20 audit, D1-23). --ink-faint is the faintest ink the palette gates
+   at AA, and the sorted column still stands out in the primary ink below. */
+.budget-app-root .acct-caret { font-size: 11px; color: var(--ink-faint); }
 .budget-app-root .table thead th.is-sorted button { color: var(--text-primary); }
 .budget-app-root .table thead th.is-sorted .acct-caret { opacity: 1; color: var(--color-primary); }
 .budget-app-root .table thead th button {
@@ -2188,14 +2212,59 @@ body.is-tablet .budget-app-root button:where(.sav-worth-btn) { padding: 8px 2px;
    eleven-column editing table has no further column it can drop without
    hiding a figure. Not on a phone: a landscape iPhone (601-932px, .is-phone)
    stacks these rows into cards whose controls fill their cell, and a max-width
-   or a padding written for the table would follow them in. */
+   or a padding written for the table would follow them in.
+
+   SECOND PASS (2026-10-20 audit, D1-18). Fitting 1078px left the table
+   cramped where it mattered: the Debt column was 74px, so every name broke per
+   word ("Visa / Gold") and its lender line ran to five; the Category select,
+   capped at 8rem, clipped its own value ("Debt Repayme"); "Interest still to
+   pay" took three lines over a 62px column. Same order as before: what can
+   wrap wraps, what can narrow narrows, nothing is dropped.
+     - Headings wrap ("Extra / month", "Interest still to pay"), and the
+       Interest heading gets the 7rem it needs to do it in two lines.
+     - The name column has a 7.5rem floor: a two-word name stays on one line
+       (its note chip may drop under a long one).
+     - Rate and Extra flex between a floor that still shows "22.25" and
+       "1500.00" and the widths they had; the Category select between 8.5rem
+       (a two-word category, unclipped) and 11rem.
+     - Cell padding 8px; the progress cell's floors 80/40px.
+   Measured at 1280px over the harness household: min-content 1068px in the
+   1078px card, every name on one line, the select 137px showing "Debt
+   Repayments" whole, the heading two lines. Below ~1190px the table still
+   scrolls sideways (1068 in 902 at 1024): eleven editing columns do not fit
+   902px without dropping or restacking one, which is a decision for the page,
+   not the stylesheet. */
 @media (min-width: 601px) {
   body:not(.is-phone) .budget-app-root #debtTable th,
-  body:not(.is-phone) .budget-app-root #debtTable td { padding-inline: 10px; }
-  body:not(.is-phone) .budget-app-root #debtTable td:nth-child(6) > select { max-width: 8rem; }
-  body:not(.is-phone) .budget-app-root #debtTable .debt-prog { min-width: 92px; }
-  body:not(.is-phone) .budget-app-root #debtTable .debt-prog .cat-bar { min-width: 52px; }
+  body:not(.is-phone) .budget-app-root #debtTable td { padding-inline: 8px; }
+  body:not(.is-phone) .budget-app-root #debtTable thead th { white-space: normal; }
+  body:not(.is-phone) .budget-app-root #debtTable thead th:first-child { min-width: 7.5rem; }
+  body:not(.is-phone) .budget-app-root #debtTable thead th:nth-child(9) { min-width: 7rem; }
+  body:not(.is-phone) .budget-app-root #debtTable td:nth-child(3) > input { width: 100%; min-width: 56px; max-width: 68px; }
+  body:not(.is-phone) .budget-app-root #debtTable td:nth-child(5) > input { width: 100%; min-width: 68px; max-width: 84px; }
+  body:not(.is-phone) .budget-app-root #debtTable td:nth-child(6) > select { width: 100%; min-width: 8.5rem; max-width: 11rem; }
+  body:not(.is-phone) .budget-app-root #debtTable .debt-prog { min-width: 80px; }
+  body:not(.is-phone) .budget-app-root #debtTable .debt-prog .cat-bar { min-width: 40px; }
 }
+
+/* The card-overlap note above the Debts table (debts.js renderDebtOverlap): a
+   sentence and a "Review accounts" button laid out like every .kpi-caveat,
+   text and button apart, the button to the right; and inset to the card
+   title's edge, not the table's. As a bare block the two touched (0px apart)
+   and the line started 24px left of the "Debts" heading above it (2026-10-20
+   audit, D1-17). The inset is the card header's side padding less the table
+   body's (.card-h vs .body-pad-tight): 44 - 20 on a desktop, 20 - 20 under
+   768px, 14 - 5 on a phone. */
+.budget-app-root .debt-card-overlap {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px 12px;
+  padding-inline: 24px;
+}
+@media (max-width: 768px) { .budget-app-root .debt-card-overlap { padding-inline: 0; } }
+@media (max-width: 600px) { .budget-app-root .debt-card-overlap { padding-inline: 9px; } }
 /* A settled debt is quieter than a live one, but NOT through opacity on its
    cells: opacity multiplies the ink, and the row's whole job is still to be
    read. At .55/.75 the "Settled" pill measured 3.09:1 (3.13:1 on the dark
@@ -2506,6 +2575,25 @@ body.is-tablet .budget-app-root button:where(.sav-worth-btn) { padding: 8px 2px;
 .budget-app-root #toast.bad { border-left: 4px solid var(--color-danger); }
 .budget-app-root #toast.good { border-left: 4px solid var(--color-primary); }
 
+/* Reduced motion for the shared transitions. Placed AFTER the last of the rules
+   it switches off (the drop zone and the toast, above), because an @media
+   block adds no specificity and an earlier copy loses the tie: it sat near the
+   bars until the 2026-10-20 audit, where the toast and the drop zone kept
+   animating (D1-01 sweep, tests/css-media-after-base.test.cjs). */
+@media (prefers-reduced-motion: reduce) {
+  .budget-app-root .cat-bar-fill,
+  .budget-app-root .hero-meter i,
+  .budget-app-root .app-drawer,
+  .budget-app-root .drawer-overlay,
+  .budget-app-root .card,
+  .budget-app-root .upload-area,
+  .budget-app-root #toast,
+  .budget-app-root .table tbody tr { transition: none; }
+  /* The grow animations are decoration — the bar reads identically at rest. */
+  .budget-app-root .cat-bar-fill,
+  .budget-app-root .hero-meter i { animation: none; }
+}
+
 /* misc layout helpers */
 .budget-app-root .row { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
 .budget-app-root .count-note { font-size: 13px; color: var(--text-muted); }
@@ -2752,9 +2840,14 @@ body.is-tablet .budget-app-root button:where(.sav-worth-btn) { padding: 8px 2px;
      between the swatch and the last figure are the only slack left, and the
      category name is what would otherwise pay. */
   .budget-app-root .donut-legend .dl-delta { width: 76px; }
-  .budget-app-root .donut-legend li,
-  .budget-app-root .donut-legend .dl-link { gap: 7px; }
-  .budget-app-root .donut-legend .dl-note { margin-left: 0; }
+  .budget-app-root .donut-legend li { gap: 7px; }
+  /* Two declarations used to sit here that never applied: `.dl-link { gap }`
+     and `.dl-note { margin-left: 0 }`. Each lost the source-order tie to its
+     own base rule further down the file. The gap is carried by the
+     one-class-heavier `li .dl-link` twin below; the note button's inline
+     margins under 600px belong to statement/phone.css (its 44px tap target
+     pulls them negative), which wins over anything here. Removed rather than
+     left dead (2026-10-20 audit, D1-01 cascade-order sweep). */
   /* The name is the one column that can afford to be taller instead of
      narrower: at this width it gets ~74px, and "Debt Repayments" (107px) was
      cut to "Debt Repa…" with nothing on the row to say what it was. Let it
@@ -3214,7 +3307,10 @@ body.is-tablet .budget-app-root button:where(.sav-worth-btn) { padding: 8px 2px;
      column doesn't read as touching the bezel (cell padding adds the rest).
      Overrides the desktop .body-pad-tight side gutters above. */
   .budget-app-root .body-pad-tight { padding-left: 5px; padding-right: 5px; }
-  .budget-app-root .card-h h2 { font-size: 17px; }
+  /* No phone size for the card title or the table heading here any more: the
+     statement foundation (a later file) sets both at every width, so the 17px
+     title and the 0.68rem tracked heading this block once carried could never
+     win and only misled (2026-10-20 audit, D1-01 cascade-order sweep). */
   .budget-app-root .hero { padding: 24px 16px; }
 
   /* Banners sit loose in the now-gutterless main-content, so they carry
@@ -3223,7 +3319,7 @@ body.is-tablet .budget-app-root button:where(.sav-worth-btn) { padding: 8px 2px;
   .budget-app-root .section-h { padding-left: 14px; padding-right: 14px; }
 
   /* Table cells are the biggest win — 1rem each side across every column. */
-  .budget-app-root .table thead th { padding: 0.6rem 0.5rem; font-size: 0.68rem; letter-spacing: 0.04em; }
+  .budget-app-root .table thead th { padding: 0.6rem 0.5rem; }
   .budget-app-root .table tbody td { padding: 0.6rem 0.5rem; }
   .budget-app-root .table thead th:first-child,
   .budget-app-root .table tbody td:first-child { padding-left: 0.25rem; }
@@ -3418,10 +3514,16 @@ body.is-tablet .budget-app-root button:where(.sav-worth-btn) { padding: 8px 2px;
    regression) in light mode and to the raw fill in dark mode. Two mechanisms
    doing the same job; this one is now redundant.
    .status-paid / .tax-done / .tax-uploaded still need this override — their
-   base rules use --color-success directly, not an -ink token. */
+   base rules use --color-success directly, not an -ink token. It reads the
+   same token the statement foundation re-inks every other success text to
+   (--color-primary, light theme only; foundation.css section 7) rather than
+   the #15803d it used to carry, which was a third green beside the primary
+   ink and the fill, and did not follow the palette (2026-10-20 audit, D2-23).
+   Primary on the pale success fill is 7.5:1 on Vault Green and darker on the
+   other palettes. */
 .budget-app-root:not(.bud-dark) .status-paid,
 .budget-app-root:not(.bud-dark) .tax-done,
-.budget-app-root:not(.bud-dark) .tax-uploaded  { color: #15803d; }
+.budget-app-root:not(.bud-dark) .tax-uploaded  { color: var(--color-primary); }
 
 /* Row-action buttons. Previously an inline padding repeated at eight call
    sites, rendering ~21px tall — under the 24px floor and thin for a fingertip
@@ -3436,10 +3538,11 @@ body.is-tablet .budget-app-root button:where(.sav-worth-btn) { padding: 8px 2px;
    Open / Change subject / Delete — a near-miss apart, with Delete as the
    neighbour. Gated on pointer coarseness (Safari 9+, far under the iOS 15
    floor) so desktop table rows keep their density; the wider note-actions
-   gap makes a miss land on empty space rather than the button beside it. */
+   gap (beside the .note-actions base rule, in the Notes section: written here
+   it lost the tie to that later rule and never applied) makes a miss land on
+   empty space rather than the button beside it. */
 @media (pointer: coarse) {
   .budget-app-root .btn-ghost-sm { min-height: 44px; padding: 0.55rem 0.9rem; }
-  .budget-app-root .note-actions { gap: 10px; }
 
   /* Every other control rises to the same 44pt floor, two ways.
 
@@ -3539,7 +3642,6 @@ body.is-tablet .budget-app-root button:where(.sav-worth-btn) { padding: 8px 2px;
   .budget-app-root { --surface-glass-light: rgba(255, 255, 255, .92); }
   .budget-app-root.bud-dark .card,
   .budget-app-root:not(.bud-dark) .card { background: var(--surface); }
-  .budget-app-root .badge-debt        { background: #fdecdb; }
   .budget-app-root .badge-giving      { background: #fbe0ee; }
   .budget-app-root .badge-investment  { background: #ece3fa; color: var(--color-investment); }
   .budget-app-root .badge-luxuries    { background: #daf7ec; }
@@ -3684,6 +3786,10 @@ body.is-tablet .budget-app-root button:where(.sav-worth-btn) { padding: 8px 2px;
   min-height: 28px;
   padding: 0.25rem 0.5rem;
   text-align: left;
+  /* A flex button: justify-content places the name, text-align cannot. The
+     Transactions page set this in its own lane; Import's review table, which
+     reuses the cell, centred its category names (2026-10-20 audit, D1-02). */
+  justify-content: flex-start;
   font: inherit;
   font-size: 0.82rem;
   color: var(--text-primary);
@@ -3994,6 +4100,10 @@ body.is-tablet .budget-app-root button:where(.sav-worth-btn) { padding: 8px 2px;
   font-weight: 600; color: var(--ink-faint); background: none; border: 0;
   padding: 5px 0; margin-block: -5px;
   cursor: pointer; text-align: left;
+  /* A flex button (host and reset both make it inline-flex), so the side is
+     justify-content's to set; text-align alone left the name centred in the
+     space its row gave it (2026-10-20 audit, D1-02). */
+  justify-content: flex-start;
 }
 .budget-app-root .env-name:hover { color: var(--text-primary); text-decoration: underline; }
 .budget-app-root .env-name:focus-visible { outline: 2px solid var(--color-primary); outline-offset: 2px; }
@@ -4106,7 +4216,7 @@ body.is-tablet .budget-app-root button:where(.sav-worth-btn) { padding: 8px 2px;
 .budget-app-root .ei-name {
   font: inherit; font-size: 12.5px; background: none; border: 0;
   padding: 4px 0; margin-block: -4px;
-  cursor: pointer; text-align: left; color: var(--text-primary);
+  cursor: pointer; text-align: left; justify-content: flex-start; color: var(--text-primary);
   flex: 1 1 55%; min-width: 0;
 }
 .budget-app-root .ei-name:hover { text-decoration: underline; }
@@ -4181,6 +4291,10 @@ body.is-tablet .budget-app-root button:where(.sav-worth-btn) { padding: 8px 2px;
   flex: 1 1 auto; min-width: 0;
   padding: 0; border: 0; background: none; cursor: pointer;
   font-size: 15px; font-weight: 650; text-align: start; line-height: 1.35;
+  /* The button is inline-flex (host and reset), so text-align only moved the
+     text inside a centred flex item: the title sat centred over a left-aligned
+     chip and excerpt (2026-10-20 audit, D1-02). */
+  justify-content: flex-start;
   color: var(--text-primary);
 }
 .budget-app-root .note-title:hover { color: var(--color-primary); }
@@ -4202,6 +4316,14 @@ body.is-tablet .budget-app-root button:where(.sav-worth-btn) { padding: 8px 2px;
   display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;
 }
 .budget-app-root .note-actions { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 11px; }
+/* On a touch screen the three adjacent actions (Open / Change subject /
+   Delete) sit further apart, so a miss lands on empty space rather than on
+   Delete. Here, after the base rule, because the copy inside the shared
+   coarse-pointer block above came first and lost the source-order tie: the
+   gap stayed 6px on every phone (2026-10-20 audit, D1-01 cascade-order sweep). */
+@media (pointer: coarse) {
+  .budget-app-root .note-actions { gap: 10px; }
+}
 .budget-app-root .note-empty { padding: 22px 4px; font-size: 13.5px; line-height: 1.55; }
 
 /* ---- Report --------------------------------------------------------------
@@ -4310,17 +4432,8 @@ body.is-tablet .budget-app-root button:where(.sav-worth-btn) { padding: 8px 2px;
   .budget-app-root .plan-free.is-over { background: color-mix(in srgb, var(--color-danger) 7%, transparent); }
 }
 
-@media (max-width: 640px) {
-  .budget-app-root .pot { padding: 24px 20px; }
-  .budget-app-root .pot-fig { font-size: 34px; }
-  .budget-app-root .pot-fig-2 { font-size: 24px; }
-  .budget-app-root .pot-figs { gap: 10px 26px; }
-  /* Tablet and desktop only. On a phone the collapsed row has no width to give
-     a bar, and the remainder is already stated in words under the name. */
-  .budget-app-root .env-sum-bar { display: none; }
-  .budget-app-root .src-amt { width: 110px; }
-  .budget-app-root .env { padding: 20px; }
-}
+/* The Plan page's phone block is at the END of this section (after .env-accent),
+   not here: see the note there. */
 
 /* ============================== Score page ==============================
    The long form of the Dashboard's one-number verdict. Palette variables
@@ -4433,12 +4546,9 @@ body.is-tablet .budget-app-root button:where(.sav-worth-btn) { padding: 8px 2px;
   50%      { box-shadow: 0 2px 10px rgba(180, 83, 9, .34), 0 0 18px 5px rgba(245, 158, 11, .42); }
 }
 
-.budget-app-root .score-win-ribbon {
-  display: inline-block; margin-left: 8px; padding: 1px 7px; border-radius: 999px;
-  font-size: 10px; font-weight: 700;
-  background: var(--color-warning-light); color: var(--color-warning-ink);
-  vertical-align: middle;
-}
+/* (.score-win-ribbon, the amber "Completed" pill, is gone: the Score page now
+   marks a completed win with the parts list's own .score-ring-row-tag, and no
+   view emits the ribbon class any more. 2026-10-20 fix wave.) */
 .budget-app-root .score-win-body { min-width: 0; }
 .budget-app-root .score-win-name { font-size: 13.5px; font-weight: 700; }
 .budget-app-root .score-win-say { font-size: 12.5px; color: var(--text-muted); line-height: 1.45; margin-top: 2px; }
@@ -4485,9 +4595,10 @@ body.is-tablet .budget-app-root button:where(.sav-worth-btn) { padding: 8px 2px;
   100% { opacity: 0; transform: translate3d(var(--bud-drift, 0), var(--bud-fall, 260px), 0) rotate(var(--bud-spin, 360deg)); }
 }
 
-@media (max-width: 600px) {
-  .budget-app-root .score-ring-num { font-size: 44px; }
-}
+/* (No phone size for .score-ring-num here: statement/foundation.css sets it to
+   the figure size at every width, later in the cascade, so the 44px rule that
+   sat here could never apply. Removed by the 2026-10-20 audit's cascade-order
+   sweep.) */
 
 /* ---------------------------- money-flow card ----------------------------
    "Where the money went" — the Sankey-shaped picture the Score page opens
@@ -4649,8 +4760,26 @@ body.is-tablet .budget-app-root button:where(.sav-worth-btn) { padding: 8px 2px;
 .budget-app-root .score-ring-tip-how:empty { display: none; }
 .budget-app-root .score-ring-tip-now:empty { display: none; }
 
+/* Reduced motion for the whole Score page, after the last animation it stops.
+   The first half of this block used to sit near the category bars, a thousand
+   lines above the meter, ring and confetti rules; at equal specificity the
+   later animation won, so a reader who asked for no motion still got all three
+   (2026-10-20 audit, D1-01 cascade-order sweep). The trophy badge keeps its own
+   restatement beside its rule, which predates this move and says the same. */
 @media (prefers-reduced-motion: reduce) {
   .budget-app-root .score-ring-tip { transition: none; }
+  .budget-app-root .score-confetti-bit,
+  .budget-app-root .score-win.is-maxed .score-win-badge,
+  .budget-app-root .score-meter-fill,
+  .budget-app-root .score-ring-fill { animation: none; }
+  /* The fill is scaled by its animation, so switching the animation off has to
+     put the bar back — otherwise reduced motion would show an empty meter. */
+  .budget-app-root .score-meter-fill { transform: scaleX(1); }
+  /* Same idea for the ring: its resting stroke-dashoffset IS the animation's
+     `to` value, so pinning it there directly is what an un-animated arc looks
+     like — not a blank ring. */
+  .budget-app-root .score-ring-fill { stroke-dashoffset: var(--seg-to); }
+  .budget-app-root .score-confetti { display: none; }
 }
 
 /* The centre is a real <button> (tap clears focus mode), sized by its own
@@ -4683,7 +4812,7 @@ body.is-tablet .budget-app-root button:where(.sav-worth-btn) { padding: 8px 2px;
 .budget-app-root .score-ring-legend { flex: 1 1 300px; min-width: 0; }
 .budget-app-root .score-ring-hint { font-size: 11.5px; color: var(--ink-faint); margin: 0 0 8px; }
 .budget-app-root .score-ring-row {
-  display: flex; align-items: flex-start; gap: 12px; width: 100%; text-align: left; font: inherit;
+  display: flex; align-items: flex-start; justify-content: flex-start; gap: 12px; width: 100%; text-align: left; font: inherit;
   cursor: pointer; min-height: 56px; padding: 11px 12px; border-radius: var(--radius); border: 1px solid transparent;
   background: transparent; color: inherit;
 }
@@ -4875,7 +5004,13 @@ body.is-tablet .budget-app-root button:where(.sav-worth-btn) { padding: 8px 2px;
   padding: 11px 0; border-top: 1px solid var(--line-soft);
 }
 .budget-app-root .src2-row:first-child { border-top: 0; }
+/* `display: block`, because the row is two lines (name and kind over date and
+   status) and a <button> is inline-flex in Obsidian and under the reset: the
+   two lines sat SIDE BY SIDE, centred by the host's justify-content, the name
+   at x=405 in a row that starts at x=125 (2026-10-20 audit, D1-02, measured at
+   1280px). As a block the lines stack and text-align does its job. */
 .budget-app-root .src2-main {
+  display: block;
   flex: 1; min-width: 0; text-align: left; background: none; border: 0;
   font: inherit; cursor: pointer; padding: 2px 0;
 }
@@ -4984,6 +5119,30 @@ body.is-tablet .budget-app-root button:where(.sav-worth-btn) { padding: 8px 2px;
    corner radius rather than leaving a border gap around it. */
 .budget-app-root .env-accent {
   height: 3px; margin: -22px -24px 16px; border-radius: 24px 24px 0 0;
+}
+
+/* THE PLAN PAGE ON A PHONE, after every base rule it overrides.
+
+   It used to sit about 600 lines up, above the accordion rules. An @media
+   block adds no specificity, so the later base `.env-sum-bar { display: flex }`
+   won the tie: under 640px every collapsed bucket kept its 150px bar, the
+   name-and-remainder column measured 0px, and a phone showed each bucket as a
+   swatch, a bar, an amount and a percentage with no name (2026-10-20 audit,
+   D1-01, measured at 375px in both themes). The figures' narrower gap lost the
+   same way. Pinned, with the rest of the sheet, by
+   tests/css-media-after-base.test.cjs.
+
+   The two figure sizes this block also carried (.pot-fig 34px, .pot-fig-2
+   24px) are gone: statement/foundation.css sets both at every width, later in
+   the cascade, and its clamp() floor is the phone size now. */
+@media (max-width: 640px) {
+  .budget-app-root .pot { padding: 24px 20px; }
+  .budget-app-root .pot-figs { gap: 10px 26px; }
+  /* Tablet and desktop only. On a phone the collapsed row has no width to give
+     a bar, and the remainder is already stated in words under the name. */
+  .budget-app-root .env-sum-bar { display: none; }
+  .budget-app-root .src-amt { width: 110px; }
+  .budget-app-root .env { padding: 20px; }
 }
 
 /* ---- mobile redesign: savings view ---- */
@@ -5135,14 +5294,24 @@ body.is-tablet .budget-app-root button:where(.sav-worth-btn) { padding: 8px 2px;
    trailing loose after it. Amber, matching the warning tone the mockup's
    own callout uses; the two children keep their own `.kpi-caveat-txt` /
    `.kpi-caveat-btn` look, just inside a bordered box now. */
+/* A flex row like .kpi-caveat, so the sentence and its button keep a gap
+   whether they share a line or the button wraps under. As a plain block the
+   inline-flex sentence and the inline button sat on one line wherever they
+   fitted, touching ("…over a year ago.[Review valuations]", 0px apart), and the
+   button's 8px top margin only helped once it had wrapped (2026-10-20 audit,
+   D1-17). */
 .budget-app-root .sav-banner {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px 12px;
   border: 1px solid var(--color-warning, #f5a524);
   border-radius: 10px;
   padding: 10px 12px;
   margin-bottom: 10px;
   background: var(--color-warning-light, rgba(245,165,36,.08));
 }
-.budget-app-root .sav-banner .kpi-caveat-btn { margin-top: 8px; }
 
 /* The composition bars' ranked list, replacing `.donut-legend`'s grid. One
    row per segment, largest amount first (see renderWorth's own `ranked`),
@@ -5153,6 +5322,7 @@ body.is-tablet .budget-app-root button:where(.sav-worth-btn) { padding: 8px 2px;
 .budget-app-root .sav-worth-btn {
   display: flex;
   align-items: center;
+  justify-content: flex-start;   /* a <button>: the host centres it otherwise (2026-10-20 audit, D1-02) */
   gap: 8px;
   width: 100%;
   padding: 8px 2px;
@@ -5864,7 +6034,6 @@ body.is-tablet .budget-app-root button:where(.sav-worth-btn) { padding: 8px 2px;
 /* Pills and tags that were 9.5-10px capitals */
 .budget-app-root .kind,
 .budget-app-root .debt-plan .dp-tag,
-.budget-app-root .score-win-ribbon,
 .budget-app-root .score-ring-row-tag {
   font-size: var(--st-chip);
   font-weight: 600;
@@ -5995,6 +6164,25 @@ body.is-tablet .budget-app-root button:where(.sav-worth-btn) { padding: 8px 2px;
   font-weight: 400;
   margin-right: .06em;
 }
+/* The Accounts hero: a display figure, drawn with the display symbol pair.
+   Its size used to live in src/styles.css as a three-class rule that out-ranked
+   the line above and set no symbol tokens, so its ::first-letter fell back to
+   the bare .5em ratio and the figure gap: a bigger, closer "R" than every other
+   display figure (2026-10-20 audit, D2-22).
+
+   The SIZE stays the fitted clamp rather than var(--st-display): the hero sits
+   in the narrower column of a two-card band and prints cents, and at 80px the
+   harness's own eight-digit balance ("R 999 999,99" shape) broke onto two lines
+   at a 1024px window (measured: 148px tall in a 423px box). The Budget page's
+   display figure solves the same squeeze with .is-long, which counts printed
+   digits; with cents almost every household balance would count as long and
+   drop to figure size, smaller than this. The symbol pair is what makes it read
+   as one of the display figures, and that it now has. */
+.budget-app-root .acct-hero .hero-num {
+  font-size: clamp(38px, 5.4vw, 62px);
+  --st-cur: var(--st-cur-display);
+  --st-cur-gap: var(--st-cur-gap-display);
+}
 .budget-app-root .hero-sub {
   font-size: var(--st-body);
   line-height: 1.5;
@@ -6025,7 +6213,13 @@ body.is-tablet .budget-app-root button:where(.sav-worth-btn) { padding: 8px 2px;
 .budget-app-root.bv-cur-1 .assets-hero-num::first-letter,
 /* .lo-big is deliberately NOT here: the loan calculators print the country
    PROFILE's currency (tariffMoney), which can be a multi-letter code inside a
-   one-symbol household, and a stray shrunken first letter is worse than none. */
+   one-symbol household, and a stray shrunken first letter is worse than none.
+   Nor are the KPI tiles' .mini .v outside the Dashboard: a tile prints a count
+   ("4"), a percentage or a date as often as money. The figures that ARE money
+   carry .st-money from their view (the money() tiles and the lo-big rows that
+   print the household's currency), and the last selector below styles them
+   (2026-10-20 audit, D1-04 / D2-15: Savings, Debt, Owed, Services and Loans
+   drew the symbol full-size beside the Dashboard's muted one). */
 .budget-app-root.bv-cur-1 .acct-drawer-v.st-cur1:not(.text-warning)::first-letter,
 .budget-app-root.bv-cur-1 .acct-hero .hero-num::first-letter,
 .budget-app-root.bv-cur-1 .st-money::first-letter {
@@ -6038,6 +6232,31 @@ body.is-tablet .budget-app-root button:where(.sav-worth-btn) { padding: 8px 2px;
 }
 
 /* ------------------------------------------------------------
+   6b. THE TONE CLASSES
+   .text-danger / .text-warning / .text-success are how a view says what a
+   figure MEANS: overdrawn, still outstanding, matched. They used to be (0,2,0)
+   rules near the top of src/styles.css, and a component's own colour rule of
+   the same weight further down beat them on source order. The audit measured
+   an overdrawn card balance (.acct-bal.text-danger) in neutral ink while the
+   same figure was red on Savings and the Dashboard, the Assets total
+   (.text-success) in ink, a Savings "unmatched" status (.text-warning) in
+   faint grey, and, out of the harness's sight, "Matches your transactions"
+   muted, the Savings stated-growth line faint and the Report folder problem
+   muted under its own .text-muted (2026-10-20 audit, D1-11).
+
+   So they are doubled to (0,3,0), like .hidden.hidden, and sit HERE, after the
+   whole legacy sheet: they out-rank every class-only colour rule in it, whatever
+   its position. What still beats them is deliberate and heavier: an id-scoped
+   page rule (which adds a compound .x.text-tone beside itself when it must
+   yield, see dashboard.css #healthBody) or a (0,4,0)+ surface rule such as the
+   score slab's white ink. tests/css-tone-wins.test.cjs walks every class string
+   in src/ that carries a tone and holds it.
+   ------------------------------------------------------------ */
+.budget-app-root .text-success.text-success { color: var(--color-success); }
+.budget-app-root .text-danger.text-danger { color: var(--color-danger-ink); }
+.budget-app-root .text-warning.text-warning { color: var(--color-warning-ink); }
+
+/* ------------------------------------------------------------
    7. SUCCESS-COLOURED TEXT ON THE LIGHT THEME
    --color-success (#22c55e) is a fill: right behind a bar or a dot, and 1.9-2.3:1
    as text on the pale tiles and white cards of the light theme, under the 3:1
@@ -6046,11 +6265,12 @@ body.is-tablet .budget-app-root button:where(.sav-worth-btn) { padding: 8px 2px;
    success text takes it here, light theme only: on a dark surface the green is
    already 8:1 and stays as it is. Fills, bars, dots and borders are untouched.
 
-   .text-success is handled by re-pointing the variable its own rule reads, not
-   by a second `color`: a few elements carry .text-success AND a later colour
-   rule of their own (.acct-recon-txt, .sav-row-status, .assets-hero-num); that
-   colour has always won there, and a competing `color` here would repaint them
-   green. The other four have no rival colour, so they are set directly.
+   .text-success is handled by re-pointing the variable its own rule (6b, above)
+   reads, not by a second `color`, so the one rule that colours success text
+   stays the one in 6b. (This note used to say that .acct-recon-txt,
+   .sav-row-status and .assets-hero-num kept their own colour over the tone;
+   since 6b they no longer do, by design.) The other four have no tone class,
+   so they are set directly.
    ------------------------------------------------------------ */
 .budget-app-root:not(.bud-dark) .text-success { --color-success: var(--color-primary); }
 .budget-app-root:not(.bud-dark) .acct-chip.up,
@@ -6899,8 +7119,22 @@ body.is-tablet .budget-app-root button:where(.sav-worth-btn) { padding: 8px 2px;
 .budget-app-root #view-transactions .table .cat-cell .category-select { flex: 1 1 auto; }
 
 /* Amount: tabular, right-aligned, 16px. Spending is weight 500 in the text
-   colour; income (the cell that already carries .text-success) is green, 600,
-   with a "+". */
+   colour; income (the cell that already carries .text-success) is green, 600.
+
+   The sign is the cell's own TEXT: "−R 50,00" / "+R 410,00", the form this app
+   gives every signed flow (views/transactions.js rowFlow; 2026-10-20 audit,
+   D2-04, D1-12, MT-02). It used to be a "+" drawn here by a ::before on income
+   alone, while spending printed money()'s balance form "R -50,00" — two forms
+   in one column — and generated content is in no textContent, so a copied
+   column, a test and most screen readers never got the plus at all. Nothing
+   in this sheet draws a sign now: drawing one as well would print it twice.
+
+   No wrap inside the cell: the sign is text and the figure an inline-block
+   (below), and a line may break between a run of text and an atomic box — a
+   "−" alone on one line and "R 50,00" on the next reads as two things, and a
+   figure split across lines reads as a different number. Not on an unreadable
+   amount (.text-warning), whose cell holds the file's own text and a chip
+   that must stay free to wrap. */
 .budget-app-root #view-transactions .table td.num {
   font-size: 16px;
   font-weight: 500;
@@ -6908,31 +7142,30 @@ body.is-tablet .budget-app-root button:where(.sav-worth-btn) { padding: 8px 2px;
   color: var(--text-primary);
   font-variant-numeric: tabular-nums lining-nums;
 }
+.budget-app-root #view-transactions .table td.num:not(.text-warning) {
+  white-space: nowrap;
+}
 .budget-app-root #view-transactions .table td.num.text-success {
-  position: relative;
   font-weight: 600;
   color: var(--color-primary);
 }
-/* The sign is absolutely positioned: out-of-flow generated content is skipped
-   by ::first-letter, so the currency symbol rule below still lands on the "R"
-   and not on the "+". Its static position is the start of the number; the
-   negative margin pulls it just left of it. The cell is the positioned
-   ancestor (position: relative above): without one, the sign's containing block
-   is the page, so inside .table-responsive (overflow-x: auto) a scrolled table
-   moved the cells and left every "+" behind, unclipped. */
-.budget-app-root #view-transactions .table td.num.text-success::before {
-  content: '+';
-  position: absolute;
-  margin-left: -.7em;
+/* The figure after the sign, in a box of its own, so ::first-letter has a
+   block container whose first letter is the currency symbol whatever the sign:
+   ::first-letter only applies to a block container, and on the cell itself it
+   would now take the sign. Being its own box also keeps the phone card's
+   data-label ::before (src/statement/phone.css), which the CELL draws, from
+   ever being this figure's first letter. */
+.budget-app-root #view-transactions .table td.num .tx-amt {
+  display: inline-block;
 }
 /* The currency symbol, small and muted, as on the statement figures (the
-   foundation's ::first-letter treatment, applied to the cell it cannot name).
-   Two gates, both required: the household's symbol is one character (.bv-cur-1,
-   see controller) AND so is the one THIS row prints (.st-cur1, set by
-   views/transactions.js). A row on a foreign account prints that account's own
-   symbol or code ("USD 12,00", "Rp 5"), and ::first-letter would shrink only
-   its first letter. */
-.budget-app-root.bv-cur-1 #view-transactions .table td.num.st-cur1::first-letter {
+   foundation's ::first-letter treatment, applied to the figure it cannot
+   name). Two gates, both required: the household's symbol is one character
+   (.bv-cur-1, see controller) AND so is the one THIS row prints (.st-cur1 on
+   the cell, set by views/transactions.js). A row on a foreign account prints
+   that account's own symbol or code ("USD 12,00", "Rp 5"), and ::first-letter
+   would shrink only its first letter. */
+.budget-app-root.bv-cur-1 #view-transactions .table td.num.st-cur1 .tx-amt::first-letter {
   font-size: .8em;
   font-weight: 400;
   letter-spacing: 0;
@@ -7219,7 +7452,6 @@ body.is-tablet .budget-app-root button:where(.sav-worth-btn) { padding: 8px 2px;
   .budget-app-root .env-count,
   .budget-app-root .note-date,
   .budget-app-root .score-hero-note,
-  .budget-app-root .score-win-ribbon,
   .budget-app-root .score-flow-m-sub,
   .budget-app-root .score-ring-tip-now,
   .budget-app-root .score-ring-hint,
@@ -7370,6 +7602,18 @@ body.is-tablet .budget-app-root button:where(.sav-worth-btn) { padding: 8px 2px;
   .budget-app-root .bud-shape-note,
   .budget-app-root .acct-deck,
   .budget-app-root .plan-free { margin-left: 14px; margin-right: 14px; }
+  /* The Dashboard's "Budget vs actual" table sits in a .body-pad-tight card,
+     whose 5px rim is the table's edge on a phone; its first and last cells
+     carry the rest of the 14px card gutter (9px), so a category name starts
+     under the card title and the Remaining column ends where the card text
+     does. It started at x=5 under a title at x=14 (2026-10-20 audit, D1-21,
+     measured at 375px). Here rather than in section 6 because a phone on its
+     side has a 20px table rim and its own 0.2rem cells (the 601-700px block at
+     the end of this file), so this is a portrait gutter, not a fit rule. */
+  .budget-app-root #dashBudget thead th:first-child,
+  .budget-app-root #dashBudget tbody td:first-child { padding-left: 9px; }
+  .budget-app-root #dashBudget thead th:last-child,
+  .budget-app-root #dashBudget tbody td:last-child { padding-right: 9px; }
 
   /* ----------------------------------------------------------------
      6. DASHBOARD
@@ -7389,10 +7633,16 @@ body.is-tablet .budget-app-root button:where(.sav-worth-btn) { padding: 8px 2px;
   .budget-app-root #dashBudget tbody td:nth-child(5) { white-space: normal; min-width: 5.75rem; }
   .budget-app-root #dashBudget thead th,
   .budget-app-root #dashBudget tbody td { padding-left: 0.25rem; padding-right: 0.25rem; }
-  .budget-app-root #dashBudget thead th:first-child,
-  .budget-app-root #dashBudget tbody td:first-child { padding-left: 0.2rem; }
-  .budget-app-root #dashBudget thead th:last-child,
-  .budget-app-root #dashBudget tbody td:last-child { padding-right: 0.2rem; }
+  /* The figure columns sat 8px apart ("R 45 000,00 R 45 000,00" read as one
+     run, 2026-10-20 audit D1-21): each figure takes 0.6rem of lead, which
+     the row pays for by setting its cells at 13px (the type floor is 12px).
+     Measured at 375px over the harness household: the table's min-content
+     stays 362px in its 365px scroller, the closest two figures are 13px
+     apart, and no category name wraps onto a line more than it did. The
+     first and last cells' edge padding is the gutter rule in section 5. */
+  .budget-app-root #dashBudget tbody td { font-size: 13px; }
+  .budget-app-root #dashBudget thead th.num,
+  .budget-app-root #dashBudget tbody td.num { padding-left: 0.6rem; }
 
   /* The legend's change column was a fixed 84px (76px under 560px) with nowrap,
      so a seven-digit change ran out of its box over the next column. The width
@@ -7786,9 +8036,12 @@ body.is-tablet .budget-app-root button:where(.sav-worth-btn) { padding: 8px 2px;
 }
 
 /* A phone on its side is still edge-to-edge up to 768px (the plugin's own
-   "full-bleed on mobile" rule), but the page banner's inset for that width sits
-   EARLIER in src/styles.css than the banner's base rule, so it loses to it and
-   the title and every loose block sat on the screen edge. The 14px gutter of
+   "full-bleed on mobile" rule). The page banner's inset for that width used to
+   sit EARLIER in src/styles.css than the banner's base rule, so it lost to it
+   and the title and every loose block sat on the screen edge; this block was
+   the phone's patch. src/styles.css now puts the base rule first (2026-10-20
+   audit, D1-01 sweep), so the banner and section-h lines below agree with it
+   rather than rescue it; the loose blocks still need them. The 14px gutter of
    section 5, keyed on body.is-phone, for 601-768px. */
 @media (min-width: 601px) and (max-width: 768px) {
   body.is-phone .budget-app-root .financial-period-banner { padding-left: 20px; padding-right: 20px; }
@@ -7875,7 +8128,6 @@ body.is-tablet .budget-app-root button:where(.sav-worth-btn) { padding: 8px 2px;
   body.is-phone .budget-app-root .env-count,
   body.is-phone .budget-app-root .note-date,
   body.is-phone .budget-app-root .score-hero-note,
-  body.is-phone .budget-app-root .score-win-ribbon,
   body.is-phone .budget-app-root .score-flow-m-sub,
   body.is-phone .budget-app-root .score-ring-tip-now,
   body.is-phone .budget-app-root .score-ring-hint,
@@ -8019,6 +8271,16 @@ body.is-tablet .budget-app-root button:where(.sav-worth-btn) { padding: 8px 2px;
     padding-left: 0.25rem;
     padding-right: 0.25rem;
   }
+  body.is-phone .budget-app-root #dashBudget tbody td {
+    font-size: 13px;
+  }
+  body.is-phone .budget-app-root #dashBudget thead th.num,
+  body.is-phone .budget-app-root #dashBudget tbody td.num {
+    padding-left: 0.6rem;
+  }
+  /* A phone on its side keeps its 0.2rem edge cells: its table rim is 20px,
+     the same as its card title's, so no extra gutter is owed (the portrait
+     gutter is section 5's). */
   body.is-phone .budget-app-root #dashBudget thead th:first-child,
   body.is-phone .budget-app-root #dashBudget tbody td:first-child {
     padding-left: 0.2rem;
@@ -8200,20 +8462,31 @@ body.is-tablet .budget-app-root button:where(.sav-worth-btn) { padding: 8px 2px;
   }
   .budget-app-root #svcTable[role='table'] > tbody > tr > td:nth-child(6)::before { margin-bottom: 0; }
   .budget-app-root #svcTable[role='table'] > tbody > tr > td:nth-child(7) { align-self: center; justify-self: end; }
+  /* The group bar is ONE band: its two cells touch. The card-row rule above
+     gives every row a 12px grid gap, and the second-cell rule a -6px top
+     margin (written for a service's own second line), and both reached this
+     flex row too: the bar drew as two grey boxes with a white gap, the total
+     6px higher than the name (2026-10-20 audit, D1-22, measured at 375px). The
+     total may wrap at its spaces: since the same wave a group total can carry
+     other currencies beside it ("R 528,50 a month · plus € 10,25 a month"),
+     and a nowrap line that long would squeeze the group name to nothing. */
   .budget-app-root #svcTable[role='table'] > tbody > tr.type-row {
     display: flex;
     align-items: stretch;
     justify-content: space-between;
+    gap: 0;
     padding: 0;
     border-bottom: 0;
   }
   .budget-app-root #svcTable[role='table'] > tbody > tr.type-row > td {
     display: block;
+    margin: 0;
     padding: 0.6rem 0.5rem;
     border-top: 1px solid var(--border-color);
     border-bottom: 1px solid var(--border-color);
   }
   .budget-app-root #svcTable[role='table'] > tbody > tr.type-row > td:first-child { flex: 1 1 auto; font-size: var(--st-micro); }
+  .budget-app-root #svcTable[role='table'] > tbody > tr.type-row > td:last-child:not(:first-child) { white-space: normal; text-align: right; }
 
   /* ---- Tax steps: a compact card, two lines. Line 1 is the tick and the step:
           status pill | step name | remove. Line 2 is the two fields: due | notes,
@@ -8454,16 +8727,19 @@ body.is-tablet .budget-app-root button:where(.sav-worth-btn) { padding: 8px 2px;
   display: flex;
   align-items: stretch;
   justify-content: space-between;
+  gap: 0;
   padding: 0;
   border-bottom: 0;
 }
 .is-phone .budget-app-root #svcTable[role='table'] > tbody > tr.type-row > td {
   display: block;
+  margin: 0;
   padding: 0.6rem 0.5rem;
   border-top: 1px solid var(--border-color);
   border-bottom: 1px solid var(--border-color);
 }
 .is-phone .budget-app-root #svcTable[role='table'] > tbody > tr.type-row > td:first-child { flex: 1 1 auto; font-size: var(--st-micro); }
+.is-phone .budget-app-root #svcTable[role='table'] > tbody > tr.type-row > td:last-child:not(:first-child) { white-space: normal; text-align: right; }
 
 /* ---- Tax steps: a compact card, two lines. Line 1 is the tick and the step:
         status pill | step name | remove. Line 2 is the two fields: due | notes,

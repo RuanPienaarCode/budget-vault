@@ -488,7 +488,7 @@ module.exports = {
     one: 'Ingxenye yawo ehlukanisiwe ihamba nawo.',
     other: 'Izingxenye zawo ezingu-{count} ezihlukanisiwe zihamba nawo.',
   },
-  'tx.delete.part': 'Lena ingxenye eyodwa yokuhlukanisa: izingxenye ngeke zisahlangana zibe umugqa wokuqala, futhi umehluko uphuma kumasamba e-akhawunti yakho. Susa uphawu ku-Ikhishiwe kowokuqala ukuze ubuyisele.',
+  'tx.delete.part': 'Lena ingxenye eyodwa yokuhlukanisa: izingxenye ngeke zisahlangana zibe umugqa wokuqala, futhi umehluko uphuma kumasamba e-akhawunti yakho. Khetha “Khansela ukuhlukanisa” emugqeni wokuqala ukuze ubuyisele.',
   'tx.delete.confirm': 'Susa umugqa',
   'tx.deleted': {
     one: 'Umugqa ususiwe — Londoloza izinguquko ukuze zibhalwe efayeleni',
@@ -1139,6 +1139,8 @@ module.exports = {
   'dash.stale.line': '{line} — {age}.',
   'dash.stale.driftUp': ' Imisebenzi yemali kusukela lapho ihlanganisa {amount} ngaphezulu.',
   'dash.stale.driftDown': ' Imisebenzi yemali kusukela lapho ihlanganisa {amount} ngaphansi.',
+  'dash.stale.driftUpIncluded': ' Imisebenzi yemali kusukela lapho yengeza {amount}, isivele ibaliwe kulezi zibalo.',
+  'dash.stale.driftDownIncluded': ' Imisebenzi yemali kusukela lapho isusa {amount}, isivele ibaliwe kulezi zibalo.',
   'dash.stale.btn': 'Buyekeza amabhalansi',
   'dash.stale.aria': 'Buyekeza amabhalansi ama-akhawunti ekhasini lama-Akhawunti',
 
@@ -1709,4 +1711,45 @@ module.exports = {
   'settings.exchangeRates.source': 'Umthombo wamanani okushintshisana',
   'settings.exchangeRates.sourceDesc': 'Uma kuvuliwe, amanani avela ku-open.er-api.com, insizakalo yamahhala eqhutshwa yi-ExchangeRate-API (exchangerate-api.com). Okuthunyelwa kuphela yikhodi yemali yezinhlamvu ezintathu ekheli lesicelo; njenganoma yisiphi isicelo kwi-inthanethi, nabo babona ikheli lakho le-IP.',
 
+  /* 2026-10-20 audit, Score lane (M1-05, M1-06, M1-07): which income each
+     figure divides by, "all spending" for the inclusive measure, and every
+     part of "Not yet spent" named under it. Machine-assisted, added
+     2026-10-20; not yet read by a first-language reader. */
+  'score.now.wealthBase': 'Manje: {amount} ingcebo esele · kulingana neminyaka engu-{times} yomholo wesabelomali ({income} ngenyanga)',
+  'score.now.allSpendHousehold': 'konke ukusetshenziswa kwemali (kufaka phakathi izikweletu ezimisiwe) {pct} womholo wekhaya',
+  'score.gap.fixMonthly': 'Yonga {amount} ngaphezulu inyanga ngayinye ukuze ufinyelele ku-{pct}% womholo wakho wesabelomali.',
+  'score.gap.fixBuild': 'Khulisa imali yakho elondoloziwe, utshalomali noma impahla nge-{amount} — noma ukhokhe isikweletu ngenani elifanayo — ukuze ufinyelele eminyakeni engu-{times} yomholo wesabelomali.',
+  'score.gap.fixTrim': 'Chitha {amount} ngaphansi ngenyanga sekukonke, kufaka phakathi izikweletu ezimisiwe, ukuze ukusetshenziswa kwemali yakho kuye ngaphansi kwe-{pct}% womholo wekhaya lakho.',
+  'score.flow.sub.incomeToCome': '{amount} yomholo ohleliwe ayikangeni',
+  'score.flow.sub.incomeAbovePlan': '{amount} yomholo ongaphezu kohlelo',
+  'score.flow.sub.setAsideOver': '{amount} ethunyelwe emalini eyongiwe ngaphezu kwalokho uhlelo olwakubeka eceleni',
+  'score.flow.sub.alreadySpent': '{amount} isabelomali esivele siyibala njengechithiwe',
+  'score.flow.chip.alreadySpentNote': '“Ayikachithwa”, ngenhla, ingaphezulu ngo-{amount} kune-“Ndawonye”: imali esesesandleni kodwa isabelomali esivele siyibala njengechithiwe.',
+  /* 2026-10-20 audit, L3 (Report + exports) — M1-04, M1-08, M2-04.
+     Machine-assisted, added 2026-10-20; not native-reviewed. */
+  'report.budget.incomeLeftOut': {
+    one: 'Isikhathi esingu-{count} kwezingu-{total} eziqhathanisiwe asinayo imali engenayo esabelomalini saso: {names}. Imali engenayo ehleliwe, nomugqa ngamunye wemali engenayo kuhlelo-mali kunalokho okwenzeke, kuhlanganisa kuphela izikhathi isabelomali sazo esihlela leyo mali engenayo; imali engenayo engenhla ihlanganisa zonke izikhathi.',
+    other: 'Izikhathi ezingu-{count} kwezingu-{total} eziqhathanisiwe azinayo imali engenayo ezabelomalini zazo: {names}. Imali engenayo ehleliwe, nomugqa ngamunye wemali engenayo kuhlelo-mali kunalokho okwenzeke, kuhlanganisa kuphela izikhathi isabelomali sazo esihlela leyo mali engenayo; imali engenayo engenhla ihlanganisa zonke izikhathi.',
+  },
+  'report.health.noteParts': 'Inombolo eyodwa eyakhiwe ngezingxenye ezikhonjiswa yikhasi lamaPhuzu ({parts}) — isilinganiso esingamaqiniso avela kumanani ale-vault, hhayi ukuhlolwa ngochwepheshe.',
+  'bx.doc.headlineHeading': 'Imali engenayo nokuchithwayo ngesikhathi',
+  'bx.doc.income': 'Imali engenayo',
+  'bx.doc.spent': 'Okuchithiwe',
+  'bx.doc.uncategorised': 'Okungenasigaba',
+  'bx.doc.refunds': 'Izimbuyiselo ezingakhishwanga',
+  /* 2026-10-20 audit fix wave, lane L4 (Accounts) — machine-assisted, not
+     native-reviewed. acct.where.subStop: the ring caption with its closing
+     stop, for when the other-currency sentence follows it (D1-15).
+     acct.overlap: the Accounts page's own card-overlap sentence — its hero
+     leaves Debt-page rows out, so the double count is in net worth on the
+     Savings page and the Dashboard, not "above" (M2-06). */
+  'acct.where.subStop': 'Isabelo salokho okuphethwe yila ma-akhawunti.',
+  'acct.overlap': 'Ama-akhawunti amakhadi esikweletu alandelelwayo: {accounts} · izikweletu zamakhadi ezilandelelwayo: {debts} — uma noma yiliphi ikhadi likukho kokubili, libalwa kabili engcebweni esele ekhasini leMali elondoloziwe notshalomali naseDeshbhodi.',
+  /* 2026-10-20 audit fix wave, lane L6 (Transactions, Plan, Onboarding) —
+     machine-assisted, not native-reviewed. plan.env.sub: the line over the
+     Plan's spending buckets, through t() so its figures are glued (D1-05). */
+  'plan.env.sub': {
+    one: 'Ibhakede lokuchitha eli-{count} · {placed} kubekwe kwa-{pot}',
+    other: 'Amabhakede okuchitha angu-{count} · {placed} kubekwe kwa-{pot}',
+  },
 };

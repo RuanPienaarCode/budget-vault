@@ -67,9 +67,12 @@ const NEG = /R -\d/;
     const label = await splitLabel(plan);
     ok(label, 'the split bar carries an aria-label');
     ok(!NEG.test(label), `the spoken split prints no negative amount (got "${label}")`);
-    ok(!/not yet allocated/.test(label),
-      `and does not call an over-placement "not yet allocated" (got "${label}")`);
-    ok(/R 500\.00 more allocated than (this|the) plan holds/.test(label),
+    ok(!/not spoken for/.test(label),
+      `and does not call an over-placement "not spoken for" (got "${label}")`);
+    /* In the loud card's own words, "more is placed than this plan holds" — it
+       said "more allocated", a word on no part of the page (2026-10-20 audit,
+       D2-14; tests/plan-spoken-for-words.test.cjs). */
+    ok(/R 500\.00 more is placed than (this|the) plan holds/.test(label),
       `it names the R 500 placed past the plan instead (got "${label}")`);
     ok(/R 10000\.00 still left/.test(label), `the parts that were right stay as they were (got "${label}")`);
   }
@@ -99,9 +102,9 @@ const NEG = /R -\d/;
       items: [{ name: 'Tyres', envelope: 'Car', amount: 2000, spent: 2000, status: 'done', category: '', notes: '' }],
     });
     eq(await splitLabel(plan),
-      'Of R 10000.00: R 2000.00 already spent, R 4000.00 allocated but unspent, R 4000.00 not yet allocated. '
-      + 'R 8000.00 still left, R 4000.00 of it still placeable.',
-      'a plan with nothing over reads word for word as it did');
+      'Of R 10000.00: R 2000.00 already spent, R 4000.00 spoken for, R 4000.00 not spoken for. '
+      + 'R 8000.00 still left to spend, R 4000.00 of it left to place.',
+      'a plan with nothing over reads in the words the key and the hero print (2026-10-20 audit, D2-14)');
   }
 
   console.log(`PASS plan-split-aria-label (${checks} checks)`);

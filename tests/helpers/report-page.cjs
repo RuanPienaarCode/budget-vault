@@ -12,7 +12,7 @@
    create, because createReport() reads currentPeriod() and todayIso() at the
    moment Create is pressed, not at mount time. */
 
-const { mountFor } = require('./figures.cjs');
+const { mountFor, readable } = require('./figures.cjs');
 
 const kids = (n, pred, out = []) => {
   for (const c of (n && n.children) || []) {
@@ -45,10 +45,15 @@ async function createReport(M, { pill = 'current', detail = 'summary', json = tr
   const written = [...store.keys()].filter(k => !before.has(k) && !k.endsWith('/.folder'));
   const mdPath = written.find(k => k.endsWith(' Financial Report.md')) || null;
   const jsonPath = written.find(k => k.endsWith(' Financial Report.json')) || null;
+  /* Read back with U+00A0 mapped to a space (figures.cjs `readable`): since
+     the 20 Oct 2026 audit a figure that is a translated sentence's param is
+     glued with U+00A0, and the suites built on this helper match sentences
+     the way a reader reads them, not the way the bytes spell the gap. The
+     document in the vault keeps its U+00A0 — only this reading of it maps. */
   return {
     written, mdPath, jsonPath,
-    md: mdPath ? store.get(mdPath) : null,
-    json: jsonPath ? JSON.parse(store.get(jsonPath)) : null,
+    md: mdPath ? readable(store.get(mdPath)) : null,
+    json: jsonPath ? JSON.parse(readable(store.get(jsonPath))) : null,
     toasts: ctx._toasts.map(t => t.msg),
   };
 }

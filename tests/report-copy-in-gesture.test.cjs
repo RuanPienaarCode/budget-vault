@@ -36,7 +36,7 @@
 const assert = require('assert');
 const { stubObsidian } = require('./helpers/harness.cjs');
 stubObsidian();
-const { pinClock } = require('./helpers/figures.cjs');
+const { pinClock, readable } = require('./helpers/figures.cjs');
 const { mountFor, createReport } = require('./helpers/report-page.cjs');
 const { SEED, B, TODAY, PERIOD } = require('./figures/household.cjs');
 
@@ -139,7 +139,8 @@ async function mount(extra = {}) {
       calls = [];
       await tap(() => M.ctx.copyReport());
       eq([calls[0].inTap, calls[0].kind], [true, 'writeText'], 'text already in memory is written inside the tap, as before');
-      eq(calls[0].text, copyBody(made.md), 'and it is the report just made, frontmatter stripped');
+      // createReport's `md` is in reading form (U+00A0 glue mapped to a space), so the copy is read the same way.
+      eq(readable(calls[0].text), copyBody(made.md), 'and it is the report just made, frontmatter stripped');
     }
 
     /* ---- 4. no ClipboardItem: the old path ------------------------------ */

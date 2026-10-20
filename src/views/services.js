@@ -84,10 +84,12 @@ module.exports = function registerServices(ctx) {
      year" tile: what is stated beside a figure has to be stated over the same
      span as the figure, or the reader is handed a monthly euro next to an
      annual rand. `.trim()` because acct.hero.otherCurrencies carries a leading
-     space for sentence-appending and a KPI sub-line is not one. */
+     space for sentence-appending and a KPI sub-line is not one. In cents, like
+     the tile it sits under (2026-10-20 audit, D2-03): "R 528,50" over "Plus
+     € 10 held …" printed two figures on one tile by two rounding rules. */
   const otherNote = (others, scale = 1) => (others.length
     ? i18n.t('acct.hero.otherCurrencies', {
-      list: others.map(([sym, v]) => moneyIn(sym, v * scale, 0)).join(' · '),
+      list: others.map(([sym, v]) => moneyIn(sym, v * scale)).join(' · '),
     }).trim() : '');
 
   /* Services grouped by their budget category. Both writers of the subtotal
@@ -106,13 +108,18 @@ module.exports = function registerServices(ctx) {
      added unlike currencies. `acct.table.otherCurrencies` is the compact
      companion to the sentence above: a subtotal cell is narrow, so the other
      symbols get a tag rather than a clause. A group billed ENTIRELY abroad
-     still prints its rand subtotal — "R 0/mo · plus € 10/mo" is the truth, and
-     a bare R0 would say the group costs nothing. */
+     still prints its rand subtotal — "R 0,00 a month · plus € 10,00 a month"
+     is the truth, and a bare R0 would say the group costs nothing.
+
+     Cents and " a month" (2026-10-20 audit, D1-13 / D2-03 / D2-26). It was
+     "R 529/mo" under a "Per month" tile reading "R 528,50": a table figure
+     in whole rands, beside its own total in cents, in a unit no other
+     sentence in the app spells that way. */
   function subtotalText(list) {
     const { primary, others } = monthlySplit((list || []).filter(s => s.active));
-    return `${money(primary, 0)}/mo`
+    return `${money(primary)} a month`
       + (others.length ? ' · ' + i18n.t('acct.table.otherCurrencies', {
-        list: others.map(([sym, v]) => `${moneyIn(sym, v, 0)}/mo`).join(' · '),
+        list: others.map(([sym, v]) => `${moneyIn(sym, v)} a month`).join(' · '),
       }) : '');
   }
 
@@ -260,8 +267,8 @@ module.exports = function registerServices(ctx) {
     const active = S.services.filter(s => s.active);
     const { primary: perMonth, others } = monthlySplit(active);
     const tile = kpiTiles($('#servicesKpis'));
-    tile('Per month', money(perMonth), null, otherNote(others));
-    tile('Per year', money(perMonth * 12), null, otherNote(others, 12));
+    tile('Per month', money(perMonth), 'st-money', otherNote(others));
+    tile('Per year', money(perMonth * 12), 'st-money', otherNote(others, 12));
     /* The two counts are unchanged, deliberately. A euro subscription is still
        a subscription — the currency decides which total may hold its AMOUNT,
        not whether the thing exists, and dropping it from the count here would

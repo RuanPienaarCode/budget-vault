@@ -80,7 +80,6 @@
   .budget-app-root .env-count,
   .budget-app-root .note-date,
   .budget-app-root .score-hero-note,
-  .budget-app-root .score-win-ribbon,
   .budget-app-root .score-flow-m-sub,
   .budget-app-root .score-ring-tip-now,
   .budget-app-root .score-ring-hint,
@@ -231,6 +230,18 @@
   .budget-app-root .bud-shape-note,
   .budget-app-root .acct-deck,
   .budget-app-root .plan-free { margin-left: 14px; margin-right: 14px; }
+  /* The Dashboard's "Budget vs actual" table sits in a .body-pad-tight card,
+     whose 5px rim is the table's edge on a phone; its first and last cells
+     carry the rest of the 14px card gutter (9px), so a category name starts
+     under the card title and the Remaining column ends where the card text
+     does. It started at x=5 under a title at x=14 (2026-10-20 audit, D1-21,
+     measured at 375px). Here rather than in section 6 because a phone on its
+     side has a 20px table rim and its own 0.2rem cells (the 601-700px block at
+     the end of this file), so this is a portrait gutter, not a fit rule. */
+  .budget-app-root #dashBudget thead th:first-child,
+  .budget-app-root #dashBudget tbody td:first-child { padding-left: 9px; }
+  .budget-app-root #dashBudget thead th:last-child,
+  .budget-app-root #dashBudget tbody td:last-child { padding-right: 9px; }
 
   /* ----------------------------------------------------------------
      6. DASHBOARD
@@ -250,10 +261,16 @@
   .budget-app-root #dashBudget tbody td:nth-child(5) { white-space: normal; min-width: 5.75rem; }
   .budget-app-root #dashBudget thead th,
   .budget-app-root #dashBudget tbody td { padding-left: 0.25rem; padding-right: 0.25rem; }
-  .budget-app-root #dashBudget thead th:first-child,
-  .budget-app-root #dashBudget tbody td:first-child { padding-left: 0.2rem; }
-  .budget-app-root #dashBudget thead th:last-child,
-  .budget-app-root #dashBudget tbody td:last-child { padding-right: 0.2rem; }
+  /* The figure columns sat 8px apart ("R 45 000,00 R 45 000,00" read as one
+     run, 2026-10-20 audit D1-21): each figure takes 0.6rem of lead, which
+     the row pays for by setting its cells at 13px (the type floor is 12px).
+     Measured at 375px over the harness household: the table's min-content
+     stays 362px in its 365px scroller, the closest two figures are 13px
+     apart, and no category name wraps onto a line more than it did. The
+     first and last cells' edge padding is the gutter rule in section 5. */
+  .budget-app-root #dashBudget tbody td { font-size: 13px; }
+  .budget-app-root #dashBudget thead th.num,
+  .budget-app-root #dashBudget tbody td.num { padding-left: 0.6rem; }
 
   /* The legend's change column was a fixed 84px (76px under 560px) with nowrap,
      so a seven-digit change ran out of its box over the next column. The width
@@ -647,9 +664,12 @@
 }
 
 /* A phone on its side is still edge-to-edge up to 768px (the plugin's own
-   "full-bleed on mobile" rule), but the page banner's inset for that width sits
-   EARLIER in src/styles.css than the banner's base rule, so it loses to it and
-   the title and every loose block sat on the screen edge. The 14px gutter of
+   "full-bleed on mobile" rule). The page banner's inset for that width used to
+   sit EARLIER in src/styles.css than the banner's base rule, so it lost to it
+   and the title and every loose block sat on the screen edge; this block was
+   the phone's patch. src/styles.css now puts the base rule first (2026-10-20
+   audit, D1-01 sweep), so the banner and section-h lines below agree with it
+   rather than rescue it; the loose blocks still need them. The 14px gutter of
    section 5, keyed on body.is-phone, for 601-768px. */
 @media (min-width: 601px) and (max-width: 768px) {
   body.is-phone .budget-app-root .financial-period-banner { padding-left: 20px; padding-right: 20px; }
@@ -736,7 +756,6 @@
   body.is-phone .budget-app-root .env-count,
   body.is-phone .budget-app-root .note-date,
   body.is-phone .budget-app-root .score-hero-note,
-  body.is-phone .budget-app-root .score-win-ribbon,
   body.is-phone .budget-app-root .score-flow-m-sub,
   body.is-phone .budget-app-root .score-ring-tip-now,
   body.is-phone .budget-app-root .score-ring-hint,
@@ -880,6 +899,16 @@
     padding-left: 0.25rem;
     padding-right: 0.25rem;
   }
+  body.is-phone .budget-app-root #dashBudget tbody td {
+    font-size: 13px;
+  }
+  body.is-phone .budget-app-root #dashBudget thead th.num,
+  body.is-phone .budget-app-root #dashBudget tbody td.num {
+    padding-left: 0.6rem;
+  }
+  /* A phone on its side keeps its 0.2rem edge cells: its table rim is 20px,
+     the same as its card title's, so no extra gutter is owed (the portrait
+     gutter is section 5's). */
   body.is-phone .budget-app-root #dashBudget thead th:first-child,
   body.is-phone .budget-app-root #dashBudget tbody td:first-child {
     padding-left: 0.2rem;

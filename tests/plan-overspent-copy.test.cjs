@@ -2,7 +2,8 @@
 /* An overspent plan tells the same figures to every reader (runtime test of
    the 7 Oct 2026 audit fixes, O1 and O2).
 
-   O1. The split bar's aria label read "R -300.00 of it still placeable" on a
+   O1. The split bar's aria label read "R -300.00 of it still placeable" (now
+       "… of it left to place", 2026-10-20 audit D2-14) on a
        plan whose visible card clamps the same figure to R 0.00. A
        screen-reader user was told a negative amount could be placed.
    O2. On a plan whose buckets hold the whole pot, the overspent card said
@@ -64,7 +65,9 @@ async function mountPlan(plan) {
   ok(split, 'the split bar is drawn');
   const label = split.getAttribute('aria-label') || '';
   ok(!/R -\d/.test(label), `the split bar's label states no negative amount (got "${label}")`);
-  ok(/R 0\.00 of it still placeable/.test(label),
+  /* "left to place", the hero's word for this figure — it said "still
+     placeable", a word on no part of the page (2026-10-20 audit, D2-14). */
+  ok(/R 0\.00 of it left to place/.test(label),
     `and says nothing of what is left can be placed (got "${label}")`);
   ok(/R 300\.00 was spent past what its bucket held/.test(label), 'the overspend still closes the label');
 

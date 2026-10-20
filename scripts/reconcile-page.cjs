@@ -31,7 +31,7 @@ const fs = require('fs');
 const path = require('path');
 const { stubObsidian } = require('../tests/helpers/harness.cjs');
 stubObsidian();
-const { dispatchedViews, pinClock, mountFor, harvestView, readVault } = require('../tests/helpers/figures.cjs');
+const { dispatchedViews, pinClock, mountFor, harvestView, readVault, readable } = require('../tests/helpers/figures.cjs');
 
 const argv = process.argv.slice(2);
 const flag = n => { const i = argv.indexOf(`--${n}`); return i < 0 ? null : (argv[i + 1] || true); };
@@ -183,7 +183,7 @@ function globals(ctx, S, period, today) {
     return {
       lens: t.lens, count: t.count, kept: t.kept.length,
       income: t.income, spend: t.spend, net: t.net, setAside: t.setAside,
-      inflow: t.inflow, outflow: t.outflow,
+      inflow: t.inflow, outflow: t.outflow, refunds: t.refunds,
       uncategorised: t.uncategorised, uncatSpend: t.uncatSpend, uncatIncome: t.uncatIncome,
       unknownCount: t.unknown.count, unknownSpend: t.unknown.spend, unknownIncome: t.unknown.income, unknownNames: t.unknown.names,
       foreignCount: t.foreign.count, foreignLabels: t.foreign.labels,
@@ -215,7 +215,7 @@ function globals(ctx, S, period, today) {
     return out;
   };
   const oracleBudget = rows => {
-    const o = { count: 0, income: 0, spend: 0, net: 0, setAside: 0 };
+    const o = { count: 0, income: 0, spend: 0, net: 0, setAside: 0, refunds: 0 };
     for (const r of rows) {
       const amount = Number(r.amount) || 0;
       if (r.excluded) continue;
@@ -226,6 +226,11 @@ function globals(ctx, S, period, today) {
       o.count++;
       if (type === 'transfer') continue;
       o.net += amount;
+      /* Money back on a row under a category that has a file and is neither
+         income nor transfer — restated here, not asked of ledger.js isRefund,
+         so the "refunds not taken off" figure has a reading of its own
+         (2026-10-20 audit, M1-02). */
+      if (amount > 0 && r.cat && ctx.catKnown(r.cat) && type !== 'income') o.refunds += amount;
       if (type === 'income') o.income += amount;
       else if (amount < 0) { o.spend += -amount; if (['savings', 'investment'].includes(String(type || '').toLowerCase())) o.setAside += -amount; }
     }
@@ -658,13 +663,13 @@ function runChecks(G, pages) {
   const splitTotal = F.split.reduce((t, r) => t + r.amount, 0);
 
   /* ---- global: the ledger against the oracle, and the seams against the lens */
-  for (const k of ['income', 'spend', 'net']) {
+  for (const k of ['income', 'spend', 'net', 'refunds']) {
     identity({ name: `Oracle ${k} = BUDGET lens ${k}`, formula: 'independent loop over raw rows (excluded, non-budget, foreign, earmarked outflow, transfer dropped) vs tally(ledger, BUDGET)',
       left: or.budget[k], leftSource: 'oracle (this script)', right: sf.BUDGET[k], rightSource: 'ledger.js tally BUDGET, start..asOf' });
   }
   identity({ name: 'Oracle row count = BUDGET lens count', formula: 'rows the lens kept before the transfer skip', kind: 'count',
     left: or.budget.count, leftSource: 'oracle', right: sf.BUDGET.count, rightSource: 'tally.count', tol: 0 });
-  for (const k of ['income', 'spend', 'net', 'setAside', 'uncatSpend', 'count']) {
+  for (const k of ['income', 'spend', 'net', 'setAside', 'uncatSpend', 'refunds', 'count']) {
     identity({ name: `periodSummary.${k} = BUDGET lens ${k}`, formula: 'summaryInRange IS the BUDGET tally (ADR-0006 Phase 2)', kind: k === 'count' ? 'count' : 'money',
       left: S[k], leftSource: 'periodSummary(p)', right: sf.BUDGET[k], rightSource: 'tally BUDGET so far', tol: k === 'count' ? 0 : CENT });
   }
@@ -774,15 +779,26 @@ function runChecks(G, pages) {
        R 4 000 usual, and "−R 1 500".
 
        Per row, in whole currency units (all three are printed at 0 decimals).
-       Since the 14 Oct 2026 audit the Change column is the rounded TRUE
-       movement, not the difference of the two printed figures: an identical
-       charge every period printed "+R 1" because the Spent column's
-       largest-remainder allocation lifted that row by a unit. The printed
-       parts may now differ from the printed change by that one unit, so tol
-       is 1.01. The sign is a glyph in the delta's own text
-       ("+R 1 600", "−R 1 600"), not part of the harvested figure, so it is read
-       from the leaf's context. A row with no baseline ("new", "—") has no sum
-       to check and is not counted. */
+
+       M1-01 (audit of 20 Oct 2026): the check reads the three PRINTED figures
+       and holds them to the reader's sum EXACTLY. From the 14 Oct 2026 audit
+       until then it compared the Change against the RAW values behind Spent
+       and the baseline at a 1.01 tolerance — on the grounds that the Change
+       column was the rounded true movement and could sit one unit off the
+       printed parts — and so a real row printing (figures made up here)
+       Spent R 2 718, 3M R 2 717 and Change R 0 passed. The reader of that row does 2 718 − 2 717 in their
+       head and gets 1; a checker that excuses the page from its own
+       arithmetic is not checking what the reader reads. Lane L1 fixes the
+       page; until it lands this check may FAIL, which is the point of it.
+
+       Each figure is read off its printed text (U+00A0 mapped to a space
+       first: a figure inside a translated sentence is glued with it since the
+       same audit), never off `raw`, which is the unrounded value the page did
+       not print. The sign is a glyph in the delta's own text ("+R 1 600",
+       "−R 1 600"), not part of the harvested figure, so it is read from the
+       leaf's context. A row with no baseline ("new", "—") has no sum to check
+       and is not counted. */
+    const printedValue = f => parseNum(readable(f.text));
     const legend = C.figs(D, /^dashSplit\/ul\.donut-legend\/li\[\d+\]\/.*span\.dl-(val|base|delta)\[/, 'money');
     const rowsOf = new Map();
     for (const f of legend) {
@@ -792,13 +808,16 @@ function runChecks(G, pages) {
     const compared = [], bad = [];
     for (const [i, r] of rowsOf) {
       if (!r.val || !r.base || !r.delta) continue;
-      const own = String(r.delta.context.own || '');
+      const own = readable(r.delta.context.own || '');
       const sign = /^\s*[\u2212-]/.test(own) ? -1 : 1;
-      const shownChange = sign * figValue(r.delta), want = figValue(r.val) - figValue(r.base);
+      const spent = printedValue(r.val), base = printedValue(r.base);
+      const shownChange = sign * printedValue(r.delta), want = spent - base;
       compared.push(i);
-      if (!near(shownChange, want, 1.01)) bad.push(`row ${i}: ${figValue(r.val)} − ${figValue(r.base)} = ${want}, page prints ${shownChange}`);
+      if (!isNum(shownChange) || !isNum(want) || cents(shownChange) !== cents(want)) {
+        bad.push(`row ${i}: ${r.val.text} − ${r.base.text} = ${want}, page prints ${shownChange}`);
+      }
     }
-    C.add({ page: D, name: 'Donut legend: Change = Spent − baseline (per row)', formula: 'the Change column is the Spent column minus the 3M / prev column, after the rounding the page prints', kind: 'count',
+    C.add({ page: D, name: 'Donut legend: Change = Spent − baseline (per row)', formula: 'the printed Change column is exactly the printed Spent column minus the printed 3M / prev column', kind: 'count',
       pageValue: compared.length ? compared.length - bad.length : null,
       pageSource: compared.length ? `${compared.length - bad.length} of ${compared.length} rows hold${bad.length ? ` · failing: ${bad.join('; ')}` : ''}` : 'no legend row carries a baseline',
       globalValue: compared.length, globalSource: 'legend rows with a Spent, a baseline and a Change', tol: 0 });
@@ -816,8 +835,6 @@ function runChecks(G, pages) {
   /* An income row exactly on its plan prints the words "received as planned"
      on both pages now (budgets.js incomeRemainingText), so no figure to match. */
   const onPlanIncome = r => r.type === 'income' && r.budget && Math.round(r.remaining * 100) === 0;
-  const drawnDashboard = drawn.filter(r => !onPlanIncome(r))
-    .map(r => (r.type === 'income' && r.remaining < 0 ? -r.remaining : r.remaining));
   const drawnBudgetPage = F.rows
     .filter(r => (r.budget && !(r.assumed && r.actual <= r.budget)) || r.unbudgeted)
     /* An income row that landed exactly on its plan (to the cent) prints the
@@ -832,8 +849,13 @@ function runChecks(G, pages) {
     re: /^dashBudget\/tbody\/tr\[\d+\]\/td\.num\[1\]$/, seam: F.rows.map(r => r.budget).filter(v => v), globalSource: 'periodFigures.rows[].budget (non-zero)' , note: 'zero budgets print blank' });
   column({ page: D, name: 'Budget table: Actual column = rows', formula: 'budgetVsActualRows[].actual',
     re: /^dashBudget\/tbody\/tr\[\d+\]\/td\.num\[2\]$/, seam: F.rows.map(r => r.actual), globalSource: 'periodFigures.rows[].actual' });
-  column({ page: D, name: 'Budget table: Remaining column = rows', formula: 'budgetRowStatus.remaining = budget − actual',
-    re: /^dashBudget\/tbody\/tr\[\d+\]\/td\.num\[4\]$/, seam: drawnDashboard, allowExtraZero: true, globalSource: 'periodFigures.rows[].remaining (rows with a budget or an actual; an income row above its plan is the magnitude of "R X more than planned")' });
+  /* Since the 2026-10-20 audit (D2-05) the Dashboard's Remaining cell is the
+     Budget page's own (budgets.js remainingText): "R X over" / "R X left" as
+     a magnitude, "already spent" for an assume-spent row inside its
+     provision, the income sentences — so it is held to the Budget page's
+     seam. It printed the signed "R -X" until then. */
+  column({ page: D, name: 'Budget table: Remaining column = rows', formula: 'budgetRowStatus.remaining = budget − actual, printed as the Budget page prints it',
+    re: /^dashBudget\/tbody\/tr\[\d+\]\/td\.num\[4\]$/, seam: drawnBudgetPage, allowExtraZero: true, globalSource: 'periodFigures.rows[].remaining, sign folded for over rows (budgets.js remainingText, shared with the Budget page)' });
   {
     /* `last` is the last bar that PRINTS ANYTHING, not the last bar that prints
        money. A period the vault holds no rows for is drawn with a title of just
@@ -866,20 +888,35 @@ function runChecks(G, pages) {
   const poolsImplied = (W.byTypeImplied.savings || 0) + (W.byTypeImplied.investment || 0);
   dom({ page: D, name: 'Position: net worth', formula: 'worth(impliedAccounts, debts, assets, owed).net',
     re: /^dashPositionKpis\/@pos-net$/, globalValue: W.implied.net, globalSource: 'worth().net' });
-  /* The tile prints −liabilities (a liability shown as a reduction of net
-     worth, in red, deliberately) and liabilities is fromAccounts + fromDebts.
-     This named fromDebts and dropped the sign: indistinguishable on a household
+  /* The tile prints worth().liabilities = fromAccounts + fromDebts, as a
+     positive figure in plain ink since the 2026-10-20 audit (D2-06: it printed
+     −liabilities in red, against its own comment and the Debts page). This
+     named fromDebts and dropped the sign once: indistinguishable on a household
      with no overdrawn account, wrong on every household with one. */
-  dom({ page: D, name: 'Position: debts', formula: '−worth().liabilities, as the tile prints it',
-    re: /^dashPositionKpis\/@pos-debt$/, globalValue: -W.implied.liabilities, globalSource: '−worth().liabilities' });
+  dom({ page: D, name: 'Position: debts', formula: 'worth().liabilities, as the tile prints it',
+    re: /^dashPositionKpis\/@pos-debt$/, globalValue: W.implied.liabilities, globalSource: 'worth().liabilities' });
   dom({ page: D, name: 'Position: owed to you', formula: 'worth().ownedOwed',
     re: /^dashPositionKpis\/@pos-owed$/, globalValue: W.implied.ownedOwed, globalSource: 'worth().ownedOwed' });
   dom({ page: D, name: 'Position: savings & investments (implied)', formula: 'Σ implied balances of savings- and investment-typed home accounts',
     re: /^dashPositionKpis\/@pos-savings$/, globalValue: poolsImplied, globalSource: 'byTypeImplied.savings + investment' });
-  dom({ page: D, name: 'Position sub: savings (implied)', formula: 'Σ implied, type savings',
-    re: /^dashPositionKpis\/div\.mini\[3\]\/div\.s/, globalValue: W.byTypeImplied.savings || 0, globalSource: 'byTypeImplied.savings', index: 0 });
-  dom({ page: D, name: 'Position sub: invested (implied)', formula: 'Σ implied, type investment',
-    re: /^dashPositionKpis\/div\.mini\[3\]\/div\.s/, globalValue: W.byTypeImplied.investment || 0, globalSource: 'byTypeImplied.investment', index: 1 });
+  /* The two parts are allocated against the tile's own printed whole since
+     the 2026-10-20 audit (D2-01, figures.js printedParts): rounded alone they
+     missed the tile by a rand. So each is held to the allocation, and the
+     allocation to the reader's sum: the parts add to the tile AS PRINTED. */
+  {
+    const { printedParts } = require('../src/figures');
+    const [sAlloc, iAlloc] = printedParts([W.byTypeImplied.savings || 0, W.byTypeImplied.investment || 0], poolsImplied);
+    dom({ page: D, name: 'Position sub: savings (implied)', formula: 'Σ implied, type savings, allocated against the printed tile',
+      re: /^dashPositionKpis\/div\.mini\[3\]\/div\.s/, globalValue: sAlloc, globalSource: 'printedParts(byTypeImplied.savings, .investment)[0]', index: 0 });
+    dom({ page: D, name: 'Position sub: invested (implied)', formula: 'Σ implied, type investment, allocated against the printed tile',
+      re: /^dashPositionKpis\/div\.mini\[3\]\/div\.s/, globalValue: iAlloc, globalSource: 'printedParts(byTypeImplied.savings, .investment)[1]', index: 1 });
+    const printedOf = f => (f ? parseNum(readable(f.text)) : null);
+    const parts = C.figs(D, /^dashPositionKpis\/div\.mini\[3\]\/div\.s/, 'money').slice(0, 2).map(printedOf);
+    const tile = printedOf(C.fig(D, /^dashPositionKpis\/@pos-savings$/));
+    C.add({ page: D, name: 'Position sub: savings + invested = the tile, as printed', formula: 'the two printed parts add to the printed tile', kind: 'money',
+      pageValue: parts.length === 2 && parts.every(isNum) ? parts[0] + parts[1] : null, pageSource: `sub parts [${parts.join(', ')}]`,
+      globalValue: tile, globalSource: 'the tile as printed', tol: 0 });
+  }
   {
     /* The note prints |drift| and says the direction in WORDS ("add up to R 6 100
        more" / "less") — dashboard.js renderStale: `Math.abs(drift)`, key
@@ -898,9 +935,14 @@ function runChecks(G, pages) {
       re: /^dashStale\//, globalValue: Math.abs(W.driftSum), globalSource: '|bookFigures().drift.drift|', renderedFrom: 1, renderedWhen: gate });
     const f = C.fig(D, /^dashStale\//);
     const own = f ? String(f.context.own || '') : '';
-    const word = /\bmore\b/i.test(own) ? 1 : /\bless\b/i.test(own) ? -1 : null;
+    /* The note prints the ALREADY-COUNTED sentences since the 2026-10-20
+       audit (M2-02: the tiles it sits under are implied): "add R X, already
+       counted" (up) / "take off R X, already counted" (down). The stated-basis
+       "add up to R X more / less" is read too, "less" first because it also
+       contains "add". */
+    const word = /\bless\b|\btake off\b/i.test(own) ? -1 : /\bmore\b|\badd\b/i.test(own) ? 1 : null;
     const absent = !f && gate < 1;
-    C.add({ page: D, name: 'Stale note: drift direction', formula: 'dash.stale.driftUp ("more") when Σ delta > 0, driftDown ("less") when < 0', kind: 'count',
+    C.add({ page: D, name: 'Stale note: drift direction', formula: 'dash.stale.driftUpIncluded ("add") when Σ delta > 0, driftDownIncluded ("take off") when < 0', kind: 'count',
       pageValue: absent ? Math.sign(W.driftSum) : word, pageSource: absent ? 'not rendered — nothing stale, or drift under R1' : (f ? `${f.address}: "…${own.slice(-40)}"` : 'no drift note'),
       globalValue: Math.sign(W.driftSum), globalSource: 'sign of bookFigures().drift.drift', tol: 0,
       note: 'reads the English wording; another interface language reports unverified rather than guessing' });
@@ -1085,9 +1127,17 @@ function runChecks(G, pages) {
        off the registered seam. Named, too: this tile is omitted entirely on a
        running period with no income row, which silently shifted every index
        after it. */
-    dom({ page: BP, name: `${strip}: unallocated (left to budget / over-budgeted)`, formula: '|periodFigures.plan.unallocated| = |income − whole plan|',
-      re: new RegExp(`^${strip}/@bud-unallocated$`),
-      globalValue: F.plan && F.plan.unallocated != null ? Math.abs(F.plan.unallocated) : null, globalSource: '|periodFigures.plan.unallocated|' });
+    /* The difference of the Income and Budgeted tiles AS PRINTED since the
+       2026-10-20 audit (D2-01, figures.js printedRemainder): to the cent only
+       when that difference is 0 and the true one is not. */
+    {
+      const { printedRemainder } = require('../src/figures');
+      const p = F.plan;
+      const rem = p && p.unallocated != null ? printedRemainder(p.unallocatedBase, p.total) : null;
+      dom({ page: BP, name: `${strip}: unallocated (left to budget / over-budgeted)`, formula: '|printed income − printed whole plan| (printedRemainder)',
+        re: new RegExp(`^${strip}/@bud-unallocated$`),
+        globalValue: rem ? Math.abs(rem.value) : null, globalSource: '|printedRemainder(plan.unallocatedBase, plan.total)|' });
+    }
     dom({ page: BP, name: `${strip}: total spent`, formula: 'budgetUsed(p).spent', re: new RegExp(`^${strip}/@bud-spent$`), globalValue: U.spent, globalSource: 'budgetUsed.spent' });
     dom({ page: BP, name: `${strip}: % of budget used`, formula: 'budgetUsed(p).used', kind: 'percent', re: new RegExp(`^${strip}/@bud-note-spent$`), globalValue: U.used == null ? null : U.used * 100, globalSource: 'budgetUsed.used' });
     /* RESTORED (ISSUE 96). This used to compare the Budget strip's gap
@@ -1104,8 +1154,11 @@ function runChecks(G, pages) {
       re: new RegExp(`^${strip}/@bud-note-uncat$`), globalValue: F.stripGap.uncat, globalSource: 'budgetSpendGap().uncat',
       /* budgets.js: `if (gapUncat >= 1) addPart(...)`. */
       renderedFrom: 1 });
-    dom({ page: BP, name: `${strip}: refunds netted note`, formula: 'budgetSpendGap().netted',
-      re: new RegExp(`^${strip}/@bud-note-netted$`), globalValue: F.stripGap.netted, globalSource: 'budgetSpendGap().netted',
+    /* "R X in refunds not taken off this figure" names every refund, in full,
+       since the 2026-10-20 audit (M1-02): periodSummary().refunds. It named
+       the strip's own gap until then, which floors each category at zero. */
+    dom({ page: BP, name: `${strip}: refunds not taken off note`, formula: 'periodSummary().refunds',
+      re: new RegExp(`^${strip}/@bud-note-netted$`), globalValue: S.refunds, globalSource: 'periodSummary().refunds',
       renderedFrom: 1 });
     /* Both figures live in ONE named fragment ("R2 000 set aside, R1 000 moved
        so far"), so they are index 0 and 1 WITHIN it — stable however many other
@@ -1205,7 +1258,19 @@ function runChecks(G, pages) {
   /* ---- transactions ---------------------------------------------------- */
   const T = 'transactions';
   {
-    const cells = C.figs(T, /^txTable\/tbody\/tr\[\d+\]\/td\.num\[4\]$/, 'money');
+    /* A row amount prints as a FLOW since the 20 Oct 2026 audit (D2-04):
+       "−R 50,00" / "+R 410,00", the sign the cell's own text ahead of the
+       figure's span (views/transactions.js amountCell), so ::first-letter can
+       still mute the symbol. The figure is therefore td.num[4]/span.tx-amt,
+       harvested as a MAGNITUDE (formatSigned formats the digits of |v|), and
+       its sign is read off the cell — the figure's parent, whose text is the
+       whole "−R 50,00". */
+    const cells = C.figs(T, /^txTable\/tbody\/tr\[\d+\]\/td\.num\[4\]\/span\.tx-amt$/, 'money');
+    const txSigned = f => {
+      const v = figValue(f);
+      if (!isNum(v)) return v;
+      return /^\s*\u2212/.test(readable((f.context && f.context.parent) || '')) ? -Math.abs(v) : Math.abs(v);
+    };
     const shown = cells.length, total = G.oracle.whole.all.rows, mine = G.txPage;
     /* transactions.js `const PAGE = 100`: the table draws that many rows and a
        "Show more" for the rest. tests/reconcile-checker-fixes.test.cjs pins this
@@ -1223,11 +1288,11 @@ function runChecks(G, pages) {
       pageValue: shown, pageSource: `${shown} amount cells in txTable`, globalValue: windowSize, globalSource: `min(${mine.length} selected rows, ${WINDOW})`, tol: 0,
       note: mine.length > WINDOW ? `windowed: ${shown} of ${mine.length} rows shown, the rest behind "Show more"` : '' });
     C.add({ page: T, name: 'Σ rendered amounts = Σ the window of filteredRows()', formula: 'the rows the table drew are the first PAGE rows the page selected, and their amounts add up',
-      pageValue: cells.reduce((t, f) => t + (figValue(f) || 0), 0), pageSource: `Σ ${shown} txTable amounts`,
+      pageValue: cells.reduce((t, f) => t + (txSigned(f) || 0), 0), pageSource: `Σ ${shown} txTable amounts`,
       globalValue: mine.slice(0, windowSize).reduce((t, v) => t + v, 0), globalSource: `Σ first ${windowSize} of filteredRows()` });
     if (mine.length <= WINDOW) {
       C.add({ page: T, name: 'Σ rendered amounts = Σ raw rows', formula: 'every row, excluded and split parents included (unwindowed: the whole period is on screen)',
-        pageValue: cells.reduce((t, f) => t + (figValue(f) || 0), 0), pageSource: 'Σ txTable amounts', globalValue: G.oracle.whole.all.sum, globalSource: 'oracle Σ amount' });
+        pageValue: cells.reduce((t, f) => t + (txSigned(f) || 0), 0), pageSource: 'Σ txTable amounts', globalValue: G.oracle.whole.all.sum, globalSource: 'oracle Σ amount' });
     }
   }
 

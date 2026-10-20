@@ -484,7 +484,7 @@ module.exports = {
     one: 'इसका बँटा हुआ हिस्सा भी साथ चला जाएगा।',
     other: 'इसके {count} बँटे हुए हिस्से भी साथ चले जाएँगे।',
   },
-  'tx.delete.part': 'यह एक बँटे हुए लेन-देन का हिस्सा है: अब हिस्से मिलकर मूल पंक्ति के बराबर नहीं रहेंगे, और अंतर आपके खाते के कुल से निकल जाएगा। वापस लाने के लिए मूल पंक्ति पर "बजट से बाहर" का निशान हटा दें।',
+  'tx.delete.part': 'यह एक बँटे हुए लेन-देन का हिस्सा है: अब हिस्से मिलकर मूल पंक्ति के बराबर नहीं रहेंगे, और अंतर आपके खाते के कुल से निकल जाएगा। वापस लाने के लिए मूल पंक्ति पर "बँटवारा हटाएँ" चुनें।',
   'tx.delete.confirm': 'पंक्ति मिटाएँ',
   'tx.deleted': {
     one: 'पंक्ति हटा दी — फ़ाइल में लिखने के लिए "बदलाव सहेजें" दबाएँ',
@@ -1133,6 +1133,8 @@ module.exports = {
   'dash.stale.line': '{line} — {age}।',
   'dash.stale.driftUp': ' उसके बाद के लेन-देन जुड़कर {amount} ज़्यादा बनाते हैं।',
   'dash.stale.driftDown': ' उसके बाद के लेन-देन जुड़कर {amount} कम बनाते हैं।',
+  'dash.stale.driftUpIncluded': ' उसके बाद के लेन-देन {amount} जोड़ते हैं, जो इन आँकड़ों में पहले से शामिल है।',
+  'dash.stale.driftDownIncluded': ' उसके बाद के लेन-देन {amount} घटाते हैं, जो इन आँकड़ों में पहले से शामिल है।',
   'dash.stale.btn': 'बैलेंस देखें',
   'dash.stale.aria': 'खाते पेज पर खातों के बैलेंस देखें',
 
@@ -1696,4 +1698,45 @@ module.exports = {
   'settings.exchangeRates.source': 'विनिमय-दर का स्रोत',
   'settings.exchangeRates.sourceDesc': 'चालू होने पर दरें open.er-api.com से आती हैं, जो ExchangeRate-API (exchangerate-api.com) की एक मुफ़्त सेवा है। अनुरोध के पते में सिर्फ़ तीन अक्षरों का मुद्रा कोड जाता है; इंटरनेट के हर अनुरोध की तरह यह उन्हें आपका IP पता भी दिखाता है।',
 
+  /* 2026-10-20 audit, Score lane (M1-05, M1-06, M1-07): which income each
+     figure divides by, "all spending" for the inclusive measure, and every
+     part of "Not yet spent" named under it. Machine-assisted, added
+     2026-10-20; not yet read by a first-language reader. */
+  'score.now.wealthBase': 'अभी: {amount} कुल संपत्ति · {times} साल की बजट आय के बराबर (हर महीने {income})',
+  'score.now.allSpendHousehold': 'सारा ख़र्च (तय देनदारियाँ शामिल) घरेलू आय का {pct}',
+  'score.gap.fixMonthly': 'अपनी बजट आय के {pct}% तक पहुँचने के लिए हर महीने {amount} और बचाएँ।',
+  'score.gap.fixBuild': 'अपनी बचत, निवेश या संपत्ति {amount} बढ़ाएँ — या उतना ही कर्ज़ चुकाएँ — ताकि {times} साल की बजट आय तक पहुँच जाएँ।',
+  'score.gap.fixTrim': 'हर महीने कुल {amount} कम ख़र्च करें, तय देनदारियाँ भी शामिल, ताकि आपका ख़र्च आपकी घरेलू आय के {pct}% से नीचे आ जाए।',
+  'score.flow.sub.incomeToCome': 'योजना की {amount} आय अभी आई नहीं',
+  'score.flow.sub.incomeAbovePlan': 'योजना से {amount} ज़्यादा आय',
+  'score.flow.sub.setAsideOver': 'योजना में अलग रखी रक़म से {amount} ज़्यादा बचत में भेजा गया',
+  'score.flow.sub.alreadySpent': '{amount} जिसे बजट पहले ही ख़र्च मानता है',
+  'score.flow.chip.alreadySpentNote': 'ऊपर “अभी ख़र्च नहीं हुआ” “मिलाकर” से {amount} ज़्यादा है: यह पैसा अभी हाथ में है, पर बजट इसे पहले ही ख़र्च मानता है।',
+  /* 2026-10-20 audit, L3 (Report + exports) — M1-04, M1-08, M2-04.
+     Machine-assisted, added 2026-10-20; not native-reviewed. */
+  'report.budget.incomeLeftOut': {
+    one: 'तुलना की गई {total} अवधियों में से {count} अवधि के बजट में कोई आय नहीं है: {names}। बजट में आय, और बजट बनाम असल की हर आय वाली पंक्ति, केवल उन अवधियों को कवर करती हैं जिनके बजट में वह आय रखी गई है; ऊपर आय सभी अवधियों को कवर करती है।',
+    other: 'तुलना की गई {total} अवधियों में से {count} अवधियों के बजट में कोई आय नहीं है: {names}। बजट में आय, और बजट बनाम असल की हर आय वाली पंक्ति, केवल उन अवधियों को कवर करती हैं जिनके बजट में वह आय रखी गई है; ऊपर आय सभी अवधियों को कवर करती है।',
+  },
+  'report.health.noteParts': 'स्कोर पेज पर दिखाए गए हिस्सों ({parts}) से बना एक अकेला आँकड़ा — इस वॉल्ट के आँकड़ों से निकला मोटा अनुमान, कोई पेशेवर आकलन नहीं।',
+  'bx.doc.headlineHeading': 'अवधि अनुसार आय और ख़र्च',
+  'bx.doc.income': 'आय',
+  'bx.doc.spent': 'ख़र्च',
+  'bx.doc.uncategorised': 'बिना श्रेणी वाली',
+  'bx.doc.refunds': 'न घटाई गई वापसी',
+  /* 2026-10-20 audit fix wave, lane L4 (Accounts) — machine-assisted, not
+     native-reviewed. acct.where.subStop: the ring caption with its closing
+     stop, for when the other-currency sentence follows it (D1-15).
+     acct.overlap: the Accounts page's own card-overlap sentence — its hero
+     leaves Debt-page rows out, so the double count is in net worth on the
+     Savings page and the Dashboard, not "above" (M2-06). */
+  'acct.where.subStop': 'इन खातों में रखे पैसे का हिस्सा।',
+  'acct.overlap': 'ट्रैक किए गए क्रेडिट कार्ड खाते: {accounts} · ट्रैक किए गए कार्ड कर्ज़: {debts} — अगर कोई कार्ड दोनों में है, तो वह बचत और निवेश पेज और डैशबोर्ड की कुल संपत्ति में दो बार गिना गया है।',
+  /* 2026-10-20 audit fix wave, lane L6 (Transactions, Plan, Onboarding) —
+     machine-assisted, not native-reviewed. plan.env.sub: the line over the
+     Plan's spending buckets, through t() so its figures are glued (D1-05). */
+  'plan.env.sub': {
+    one: '{count} ख़र्च बकेट · {pot} में से {placed} रखा गया',
+    other: '{count} ख़र्च बकेट · {pot} में से {placed} रखा गया',
+  },
 };

@@ -66,7 +66,8 @@ const ROWS = [
       ok(/R\s?500/.test(kpis[0]), `Per month counts the negative as 0 (R500), not R450 or R279 — got "${kpis[0]}"`);
       ok(/R\s?6[\s ,.]?000/.test(kpis[1]), `and Per year follows (R6 000) — got "${kpis[1]}"`);
       const bar = all(table, n => n._cls && n._cls.has('type-row')).find(r => txt(r).startsWith('Health'));
-      ok(/R\s?0\/mo/.test(txt(bar)), `the Health subtotal bar counts it as R0/mo — got "${txt(bar)}"`);
+      // "R 0,00 a month" since the 2026-10-20 audit (D2-26): cents, and the app's one per-unit form.
+      ok(/R\s?0,00 a month/.test(txt(bar)), `the Health subtotal bar counts it as R 0,00 a month — got "${txt(bar)}"`);
       const row = () => all(table, n => n.tagName === 'TR' && txt(n).startsWith('Gym') && !(n._cls && n._cls.has('type-row')))[0];
       ok(noted(row()), `the row says so without a rebuild: "${txt(row())}"`);
       ok(!noted(all(table, n => n.tagName === 'TR' && txt(n).startsWith('Fibre'))[0]), 'and only on that row');

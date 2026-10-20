@@ -73,7 +73,9 @@ class FakeEl {
   }
   get className() { return [...this._cls].join(' '); }
   set className(v) { this._cls = new Set(String(v).split(/\s+/).filter(Boolean)); }
-  get textContent() { return this._text + this.children.map(c => c.textContent).join(''); }
+  /* U+00A0 (the glue src/i18n.js puts inside a figure that is a sentence's
+     param) reads back as a space, the rule tests/helpers/dom-stub.cjs states. */
+  get textContent() { return (this._text + this.children.map(c => c.textContent).join('')).replace(/\u00a0/g, ' '); }
   set textContent(v) { this._text = v == null ? '' : String(v); this.children = []; }
   empty() { if (this.explode) throw new Error(this.explode); this.children = []; this._text = ''; }
   append(...kids) {
@@ -299,8 +301,10 @@ const IDS = ['heroCard', 'dashStale', 'trendChart', 'trendSub', 'trendRange',
 
    MIXED deliberately carries NO debts and a positive balance, so none of the
    position tiles legitimately renders in `text-danger` — the happy-path sweep
-   below reads that class as "a card reported a failure", and a red Debt tile
-   would look identical to one. The red path gets its own fixture (POSITION). */
+   below reads that class as "a card reported a failure", and a red tile
+   would look identical to one. The ledgers get their own fixture (POSITION).
+   (The Debt tile itself is plain ink since the 2026-10-20 audit, D2-06; a
+   negative net worth is still red.) */
 const CARDS = [
   ['heroCard', 'hero-grid'],
   ['dashStale', 'kpi-caveat-txt'],
@@ -441,8 +445,9 @@ async function mount(files, period = '2026-07') {
     eq(sum.uncategorised, 1, 'and flags it as one uncategorised row');
 
     const sub = nodes.get('dashSplitSub').textContent;
-    ok(/1500\.00 across 2 categories/.test(sub), `donut totals only categorised spend — got: ${sub}`);
-    ok(/R 500\.00 uncategorised, not shown/.test(sub),
+    /* Whole rands since the 2026-10-20 audit (MT-06), like the centre. */
+    ok(/R 1500 across 2 categories/.test(sub), `donut totals only categorised spend — got: ${sub}`);
+    ok(/R 500 uncategorised, not shown/.test(sub),
       `donut names the spend it is leaving out — got: ${sub}`);
 
     /* The invariant behind the whole complaint: hero and donut differ by
@@ -459,7 +464,7 @@ async function mount(files, period = '2026-07') {
     ctx.renderDashboard();
     eq(tagCount(nodes.get('dashSplit'), 'SVG'), 0, 'no slices to draw');
     const note = nodes.get('dashSplit').textContent;
-    ok(/R 1500\.00 went out this period/.test(note),
+    ok(/R 1500 went out this period/.test(note),   // whole, like the subtitle beside it (MT-06)
       `the empty donut states the spend it cannot break down — got: ${note}`);
     ok(/categories in Transactions/.test(note), 'and says what to do about it');
     ok(/uncategorised, not shown/.test(nodes.get('dashSplitSub').textContent),
@@ -540,7 +545,9 @@ async function mount(files, period = '2026-07') {
        you" tile is the same 1 500 inside the net-worth figure beside it. */
     eq(w.ownedOwed, o.outstanding,
       'and the receivable in net worth is the same figure the owed tile prints');
-    ok(txt.includes('R -40000'), 'the debt tile is negated for display, like the Savings page');
+    /* A positive figure in plain ink (2026-10-20 audit, D2-06) — owing reads
+       as a positive figure, like the Savings page and the Debts page. */
+    ok(txt.includes('R 40000') && !txt.includes('R -40000'), 'the debt tile prints what is owed as a positive figure, like the Savings page');
     ok(txt.includes('R 1500'), 'and owed-to-you is net of the part-payment, not the 2 000 lent');
     ok(txt.includes('R 17000'), 'savings + investments are summed into one tile');
     ok(/oldest out \d+ days/.test(txt), 'the owed tile reports age, not a due date');
@@ -752,9 +759,9 @@ async function mount(files, period = '2026-07') {
     const { ctx, nodes } = await mount(GAP);
     ctx.renderDashboard();
     const sub = nodes.get('dashSplitSub').textContent;
-    ok(/R 500\.00 uncategorised, not shown/.test(sub),
+    ok(/R 500 uncategorised, not shown/.test(sub),
       `the uncategorised half is the GROSS outflow, not the net — got: ${sub}`);
-    ok(/R 200\.00 in refunds netted off/.test(sub),
+    ok(/R 200 in refunds netted off/.test(sub),
       `and the refund half is named too — got: ${sub}`);
     /* The point of the whole card: donut + everything it declared == the hero. */
     const sum = ctx.periodSummary('2026-07');
@@ -897,7 +904,8 @@ async function mount(files, period = '2026-07') {
     eq(cells.get('Salary').budget, '—', 'income here carries no budget either');
     eq(cells.get('Salary').rem.textContent, '',
       'but beating an income target is not overspending, so it stays blank');
-    eq(cells.get('Groceries').rem.textContent, 'R 3800.00', 'a budgeted row is unchanged');
+    /* The Budget page's sentence since the 2026-10-20 audit (D2-05). */
+    eq(cells.get('Groceries').rem.textContent, 'R 3800.00 left', 'a budgeted row reads what is left');
   }
   {
     /* And an unbudgeted EXPENSE now states the shortfall, in red. */
@@ -915,7 +923,7 @@ async function mount(files, period = '2026-07') {
     for (const tr of all(nodes.get('dashBudget'), e => e.tagName === 'TR')) {
       const tds = tr.children.filter(c => c.tagName === 'TD');
       if (tds.length === 5 && tds[0].textContent.trim() === 'Transport') {
-        eq(tds[4].textContent, 'R -300.00', 'unbudgeted spend is short by the whole amount');
+        eq(tds[4].textContent, 'R 300.00 over', 'unbudgeted spend is over by the whole amount (the Budget page\'s sentence, D2-05)');
         ok(tds[4]._cls.has('text-danger'), 'and says so in red');
         ok(has(tr, 'bg-danger'), 'with a bar that agrees with the cell beside it');
       }
@@ -1044,7 +1052,9 @@ async function mount(files, period = '2026-07') {
     const { ctx, nodes } = await mount(DRIFTED);
     ctx.renderDashboard();
     const txt = nodes.get('dashStale').textContent;
-    ok(/add up to R 4 ?000 more/.test(txt.replace(/ /g, ' ')),
+    /* The already-counted sentence since the 2026-10-20 audit (M2-02): the
+       tiles this note sits under print IMPLIED balances, which include it. */
+    ok(/add R 4 ?000, already counted in these figures/.test(txt.replace(/ /g, ' ')),
       `the caveat sizes the drift it is warning about — got: ${txt}`);
   });
   {
@@ -1052,7 +1062,7 @@ async function mount(files, period = '2026-07') {
        is about a difference, and there isn't one. */
     const { ctx, nodes } = await mount(POSITION);
     ctx.renderDashboard();
-    ok(!/add up to/.test(nodes.get('dashStale').textContent),
+    ok(!/already counted|add up to/.test(nodes.get('dashStale').textContent),
       'no drift, no drift sentence');
   }
 

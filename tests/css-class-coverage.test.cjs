@@ -117,9 +117,11 @@ ok(!used.has('env-') && !used.has('tone-') && !used.has('status-'),
 const KNOWN_UNSTYLED = [
   'acct-drawer-f', 'acct-fact', 'acct-owners', 'acct-ring',
   'assets-hero-largest', 'budget-reslice-list',
-  'debt-card-overlap', 'num-sm', 'sav-banner-warn',
+  'num-sm', 'sav-banner-warn',
   'score-empty', 'score-gap-go',
 ];
+/* 'debt-card-overlap' left the list on 2026-10-20 (audit D1-17): it is now laid
+   out like a .kpi-caveat and inset to the card title. */
 
 const missing = [...used.keys()].filter(c => !defined.has(c)).sort();
 const unexpected = missing.filter(c => !KNOWN_UNSTYLED.includes(c));

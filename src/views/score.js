@@ -21,6 +21,7 @@ const { periodFlow, railSegments } = require('../money-flow');
 const { sharePercentLabel } = require('../share-percents');
 const { formatSigned, otherHoldings } = require('../currency');
 const { otherCurrencyNet, worth } = require('../worth');
+const { decimalText } = require('../locale');
 
 /* A pillar counts as "going well" a little below the top. Demanding 100% would
    put a household at 97% of its target in the same list as one at 4%, which is
@@ -37,8 +38,19 @@ module.exports = function registerScore(ctx) {
   const signedMoney = v => formatSigned(S.settings.currency, v, 0, locale());
   /* A decimal figure with the household's own mark: toFixed() prints a point,
      and the Dashboard beside this page printed "2,1 months" where this printed
-     "2.1" for the same number (audit L2a-N09). */
-  const decimalNumber = (v, places) => v.toFixed(places).replace('.', locale().decimal);
+     "2.1" for the same number (audit L2a-N09). The shared locale.js helper
+     since 2026-10-20, so "-0,0" cannot outlive its rounding here either. */
+  const decimalNumber = (v, places) => decimalText(v, places, locale());
+  /* Years of income, to one place like the months of cover beside it (two
+     places sat beside one, "2,40 years" by "3,9 months": 2026-10-20 audit D1-15). One place must not
+     round a household UP onto the target it has not reached: 2,96 years printed
+     "3,0 years" beside a gap saying "to reach 3 years". Short of the target, a
+     reading that would land on it is cut to the place below instead. */
+  const yearsNumber = v => {
+    const target = FULL_MARKS.netWorthMultiple;
+    return v < target && Math.round(v * 10) / 10 >= target
+      ? decimalNumber(Math.floor(v * 10) / 10, 1) : decimalNumber(v, 1);
+  };
 
   function renderScore() {
     const hero = $('#scoreHero');
@@ -507,7 +519,11 @@ module.exports = function registerScore(ctx) {
       const maxed = p.at >= 0.999;
       const name = el('div', { class: 'score-win-name' }, i18n.t(`dash.health.why.name.${p.key}`));
       if (maxed) {
-        name.append(el('span', { class: 'score-win-ribbon' }, i18n.t('score.win.fullMarks')));
+        /* The parts list's own class, not a second badge: "Completed" was
+           green text in the ring legend and an amber pill here, on one page
+           (2026-10-20 audit, MT-09). One class is one tone that cannot drift;
+           amber elsewhere means "near the line", which a finished part is not. */
+        name.append(el('span', { class: 'score-ring-row-tag' }, i18n.t('score.win.fullMarks')));
       }
       good.append(el('div', { class: `score-win${maxed ? ' is-maxed' : ''}` },
         /* The badge carries the icon AND the score, so the celebration and the
@@ -560,12 +576,18 @@ module.exports = function registerScore(ctx) {
       if (p.gap) {
         const g = p.gap;
         const amount = money(g.amount, 0);
+        /* Each sentence names the income its figure was measured against
+           (2026-10-20 audit, M1-05/M1-06): the saving and net-worth gaps are
+           shares of BUDGET income, the trim is all spending — fixed bills
+           included, since that is what health-math.js's consumption measure
+           holds — against HOUSEHOLD income. "Day-to-day living" named the flow
+           card's Living costs band, which leaves fixed bills out. */
         row.append(el('p', { class: 'score-gap-do' },
           g.kind === 'fund' ? i18n.t('dash.health.why.fixFund', { amount, target })
-            : g.kind === 'monthly' ? i18n.t('dash.health.why.fixMonthly', { amount, pct: Math.round(FULL_MARKS.savingsRate * 100) })
+            : g.kind === 'monthly' ? i18n.t('score.gap.fixMonthly', { amount, pct: Math.round(FULL_MARKS.savingsRate * 100) })
               : g.kind === 'interest' ? i18n.t('dash.health.why.fixInterest', { amount })
-                : g.kind === 'trim' ? i18n.t('dash.health.why.fixTrimHousehold', { amount, pct: Math.round(FULL_MARKS.consumptionFloor * 100) })
-                  : i18n.t('dash.health.why.fixBuild', { amount, times: FULL_MARKS.netWorthMultiple })));
+                : g.kind === 'trim' ? i18n.t('score.gap.fixTrim', { amount, pct: Math.round(FULL_MARKS.consumptionFloor * 100) })
+                  : i18n.t('score.gap.fixBuild', { amount, times: FULL_MARKS.netWorthMultiple })));
       }
 
       /* And the part a figure cannot give: how anyone actually does this.
@@ -643,8 +665,12 @@ module.exports = function registerScore(ctx) {
          is a real figure (health-math's `months` is only ever set alongside
          it), so no extra null-guard is needed here. i18n wave:
          score.now.reserves.essentials added to lang/en.js and all six
-         sibling tables. */
-      return `${base} ${i18n.t('score.now.reserves.essentials', { amount: money(M.monthlyEssential, 0) })}`;
+         sibling tables. Joined with the row's own separator, not a bare space:
+         the fragment before it carries no full stop, so a space alone read
+         "goal 6 months Essentials average R 9 000 a month." as one run-on
+         clause (2026-10-20 audit, D1-15). " · " is the separator every
+         language's fragments already use, so no table needs a stop of its own. */
+      return `${base} · ${i18n.t('score.now.reserves.essentials', { amount: money(M.monthlyEssential, 0) })}`;
     }
     if (key === 'saving') {
       if (M.savingsRate === null) { return null; }
@@ -684,10 +710,14 @@ module.exports = function registerScore(ctx) {
          audited vault the household base was a fifth larger and nothing said
          which was which (2026-10-07, audit L2a-06). The decision taken: keep
          the household base and name it, with its size, so the reader can see
-         why these do not divide by the Dashboard's income. */
+         why these do not divide by the Dashboard's income.
+         The second share is ALL spending, fixed bills included (ledger.js
+         tally's `consumption`), and says so: it read "living costs", the name
+         the flow card below gives a band that LEAVES fixed bills out — one
+         page, one name, two quantities (2026-10-20 audit, M1-06). */
       const bits = [];
       if (M.fixedShare !== null) { bits.push(i18n.t('score.now.fixedHousehold', { pct: pct(M.fixedShare) })); }
-      if (M.consumptionShare !== null) { bits.push(i18n.t('score.now.livingHousehold', { pct: pct(M.consumptionShare) })); }
+      if (M.consumptionShare !== null) { bits.push(i18n.t('score.now.allSpendHousehold', { pct: pct(M.consumptionShare) })); }
       if (M.budgetUsed !== null) { bits.push(i18n.t('score.now.budget', { pct: pct(M.budgetUsed) })); }
       if ((M.fixedShare !== null || M.consumptionShare !== null) && M.monthlyHouseholdIncome !== null) {
         bits.push(i18n.t('score.now.householdIncome', { amount: money(M.monthlyHouseholdIncome, 0) }));
@@ -711,12 +741,24 @@ module.exports = function registerScore(ctx) {
     const w = worth(book.implied.accounts, S.debts, S.assets, S.settings.currency, S.owed);
     const held = otherHoldings(book.stated.others, book.implied.others, 'implied', accts => otherCurrencyNet(w, accts));
     const listOf = pairs => pairs.map(([sym, v]) => ctx.moneyIn(sym, v, 0)).join(' · ');
+    /* Both sentences carry a leading space for the pages that append them to a
+       finished sentence (the Accounts hero); this line is a run of " · "
+       fragments with no stop, so they are trimmed and joined with the row's
+       own separator. A bare append read "worth 2,40 years of income Plus € 300
+       held in other currencies" (2026-10-20 audit, D1-15). */
     const otherLine = held.shown.length
-      ? ' ' + i18n.t('acct.hero.otherCurrencies', { list: listOf(held.shown) })
-        + (held.differs ? ' ' + i18n.t('acct.hero.otherAsImplied', { list: listOf(held.other) }) : '')
+      ? ' · ' + i18n.t('acct.hero.otherCurrencies', { list: listOf(held.shown) }).trim()
+        + (held.differs ? ' ' + i18n.t('acct.hero.otherAsImplied', { list: listOf(held.other) }).trim() : '')
       : '';
-    return i18n.t('score.now.wealth', {
-      times: decimalNumber(M.netWorthMultiple, 2), amount: money(M.netWorth || 0, 0),
+    /* The multiple divides by BUDGET income (health-math.js healthMetrics:
+       netWorth / (avg.income * 12)), and that income is printed beside it
+       (2026-10-20 audit, M1-05). The only income on the page used to be the
+       Spending row's HOUSEHOLD income, about a fifth larger on the audited
+       vault, so a reader checking the multiple against it got a figure a fifth
+       smaller. M.monthlyIncome is non-null here: netWorthMultiple is only
+       measured where it is. */
+    return i18n.t('score.now.wealthBase', {
+      times: yearsNumber(M.netWorthMultiple), amount: money(M.netWorth || 0, 0), income: money(M.monthlyIncome, 0),
     }) + otherLine;
   }
 
@@ -817,8 +859,21 @@ module.exports = function registerScore(ctx) {
      that claims more than its income (2026-10-07, audit L2a-03): never
      budgeted then reads negative, and is said as "R X budgeted beyond income".
      The set-aside the plan still has to move joins the sentence when there is
-     some, so the parts named here are the parts of the chip's Together. */
+     some, so the parts named here are the parts of the chip's Together.
+
+     And the parts of the BAND, which is more than Together (2026-10-20 audit,
+     M1-07): the income the plan expects that has not landed yet was left out
+     (on the audited vault the caption added up to more than its band by
+     exactly that), and so was the assume-spent provision, money the budget counts as
+     spent that has not left (money-flow.js `alreadySpent`). Every part the
+     band holds is named now, each in words that carry its sign, and the
+     printed figures add up to the printed band: money-flow.js derives the
+     band's rand from these very parts. A part that prints as R 0 is left out
+     of the sentence; it adds nothing a reader can see. Returns the PARTS:
+     the phone joins them into one wrapping line, the Sankey draws one line
+     per part (its caption is a single SVG text run, clipped at the viewBox). */
   function flowASub(lefts) {
+    const D = lefts.display;
     const beyond = lefts.neverBudgeted < -0.005;
     const parts = [];
     if (lefts.leftInBudget < -0.005) {
@@ -839,10 +894,20 @@ module.exports = function registerScore(ctx) {
           inBudget: money(lefts.display.leftInBudget, 0), neverBudgeted: money(lefts.display.neverBudgeted, 0),
         }));
     }
-    if (lefts.setAsideToMove > 0.005) {
-      parts.push(i18n.t('score.flow.sub.setAsideToMove', { amount: money(lefts.display.setAsideToMove, 0) }));
+    if (D.setAsideToMove > 0) {
+      parts.push(i18n.t('score.flow.sub.setAsideToMove', { amount: money(D.setAsideToMove, 0) }));
+    } else if (D.setAsideToMove < 0) {
+      parts.push(i18n.t('score.flow.sub.setAsideOver', { amount: money(Math.abs(D.setAsideToMove), 0) }));
     }
-    return parts.join(' · ');
+    if (D.incomeToCome < 0) {
+      parts.push(i18n.t('score.flow.sub.incomeToCome', { amount: money(Math.abs(D.incomeToCome), 0) }));
+    } else if (D.incomeToCome > 0) {
+      parts.push(i18n.t('score.flow.sub.incomeAbovePlan', { amount: money(D.incomeToCome, 0) }));
+    }
+    if (D.alreadySpent > 0) {
+      parts.push(i18n.t('score.flow.sub.alreadySpent', { amount: money(D.alreadySpent, 0) }));
+    }
+    return parts;
   }
 
   function buildFlowRows(flow) {
@@ -854,6 +919,7 @@ module.exports = function registerScore(ctx) {
        already do — see the note on displayBands in money-flow.js. Same split
        for the sub-line's two lefts, whose printed pair must add up to the
        "Together" row on the chip below. */
+    const notYetParts = flowASub(lefts);
     const rows = [
       {
         key: 'committed', cls: 'is-committed',
@@ -883,7 +949,7 @@ module.exports = function registerScore(ctx) {
       {
         key: 'notYetSpent', cls: 'is-notYetSpent',
         name: i18n.t('score.flow.notYetSpent'), amount: b.notYetSpent, display: b.display.notYetSpent, pct: b.percents.notYetSpent,
-        sub: flowASub(lefts),
+        sub: notYetParts.join(' · '), subParts: notYetParts,
       },
     ];
 
@@ -1026,15 +1092,21 @@ module.exports = function registerScore(ctx) {
        branch. So the geometry stays honest and the TEXT gets a floor: each
        label sits at its band, or one line below the label above it, whichever
        is lower, and the viewBox grows to hold whatever that comes to. */
-    const LABEL_LINE = 22;
+    const LABEL_LINE = 22, CAPTION_LINE = 14;
     let prevLabelY = -Infinity;
     for (const r of laid) {
       const atBand = Math.abs(r.amount) < 0.005 ? (r.top + r.bottom) / 2 + 4 : r.top + 18;
       r.labelY = Math.max(atBand, prevLabelY + LABEL_LINE);
       r.showSub = r.h >= 34;
-      prevLabelY = r.labelY + (r.showSub ? 16 : 0);
+      /* A caption of several parts gets a line per part (2026-10-20 audit,
+         M1-07): one SVG text run cannot wrap, and the right-hand column holds
+         about 80 characters at the caption's 11px, so the parts named last —
+         the ones that make it add up — were the ones cut off at the viewBox. */
+      r.subLines = r.showSub ? (r.subParts && r.subParts.length ? r.subParts : [r.sub]) : [];
+      r.subBottom = r.subLines.length ? r.labelY + 16 + CAPTION_LINE * (r.subLines.length - 1) : r.labelY;
+      prevLabelY = r.subBottom;
     }
-    const contentBottom = laid.reduce((m, r) => Math.max(m, r.labelY + (r.showSub ? 16 : 0)), 0);
+    const contentBottom = laid.reduce((m, r) => Math.max(m, r.subBottom), 0);
     const svgH = Math.max(H, Math.ceil(contentBottom + PAD_B));
 
     /* The reconciled display figures, not the raw bands — the aria-label is
@@ -1090,9 +1162,9 @@ module.exports = function registerScore(ctx) {
       add('text', { x: LABEL_X, y: r.labelY, class: 'score-flow-name' }).textContent = r.name;
       add('text', { x: W - 8, y: r.labelY, 'text-anchor': 'end', class: 'score-flow-amt' }).textContent =
         i18n.t('score.flow.amountPct', { amount: money(r.display, 0), pct: `${r.pct}%` });
-      if (r.showSub) {
-        add('text', { x: LABEL_X, y: r.labelY + 16, class: 'score-flow-caption' }).textContent = r.sub;
-      }
+      r.subLines.forEach((line, i) => {
+        add('text', { x: LABEL_X, y: r.labelY + 16 + CAPTION_LINE * i, class: 'score-flow-caption' }).textContent = line;
+      });
     }
     return svg;
   }
@@ -1265,8 +1337,16 @@ module.exports = function registerScore(ctx) {
       }
       leftRows.push([i18n.t('score.flow.chip.together'), signedMoney(lefts.display.together)]);
       const kinds = 2 + (showSetAside ? 1 : 0) + (Math.abs(lefts.incomeToCome) >= 0.005 ? 1 : 0);
+      /* Together and the "Not yet spent" band above differ by exactly the
+         assume-spent provision (money-flow.js `alreadySpent`, 2026-10-20 audit
+         M1-07): R 15 900 here beside R 16 400 there on the committed household,
+         with nothing naming the R 500. Said here wherever the band is drawn —
+         under an Overspent row there is no band to differ from. The amount is
+         the printed band less the printed Together, by construction. */
+      const heldNote = lefts.display.alreadySpent > 0 && !(flow.overspent > 0.005)
+        ? i18n.t('score.flow.chip.alreadySpentNote', { amount: money(lefts.display.alreadySpent, 0) }) : null;
       wrap.append(buildChip(kinds === 4 ? i18n.t('score.flow.chip.leftsFour')
-        : (kinds === 3 ? i18n.t('score.flow.chip.leftsThree') : i18n.t('score.flow.chip.lefts')), leftRows));
+        : (kinds === 3 ? i18n.t('score.flow.chip.leftsThree') : i18n.t('score.flow.chip.lefts')), leftRows, heldNote));
     }
 
     return wrap;

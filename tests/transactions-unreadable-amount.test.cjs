@@ -77,11 +77,13 @@ const hasClass = (n, c) => n.classList.contains(c);
     const garage = byDesc('Garage rent');
     ok(garage[AMOUNT].textContent.includes('250.00.00') && /could not read/i.test(garage[AMOUNT].textContent), 'a second kind of unreadable cell is shown the same way');
 
+    /* A readable amount prints as the flow it is, the sign before the symbol
+       (2026-10-20 audit, D2-04; tests/transactions-amount-flow-sign.test.cjs). */
     const water = byDesc('Water');
-    eq(water[AMOUNT].textContent, ctx.money(-1234.56), 'a decimal-comma cell that IS readable prints its amount, no chip');
+    eq(water[AMOUNT].textContent, '−' + ctx.money(1234.56), 'a decimal-comma cell that IS readable prints its amount, no chip');
     ok(!/could not read/i.test(water[AMOUNT].textContent) && !hasClass(water[AMOUNT], 'text-warning'), 'and is not drawn as a warning');
     const pay = byDesc('Pay');
-    eq(pay[AMOUNT].textContent, ctx.money(20000), 'a plain amount is untouched');
+    eq(pay[AMOUNT].textContent, '+' + ctx.money(20000), 'a plain amount is untouched');
     ok(hasClass(pay[AMOUNT], 'text-success'), 'an income row keeps its colour');
 
     /* The page still saves what it read: the raw text goes back verbatim. */

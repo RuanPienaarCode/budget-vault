@@ -177,9 +177,21 @@ function donutTotal(ctx, p) {
   const dashSplit = ctx._dashNodes.get('dashSplit');
   ok(!hasClass(dashSplit, 'text-danger'),
     'the donut card rendered without its guard catching a failure — a caught failure would silently read as a R0 total below');
-  const sub = ctx._dashNodes.get('dashSplitSub').textContent;
-  const m = /^R\s*(-?[\d.]+)\s+across/.exec(sub);
-  return m ? Number(m[1]) : 0;
+  /* Summed off the wedges' tooltips, each "Cat: R 1234.56 · 12%" — the one
+     place the card prints every slice to the cent. The subtitle prints the
+     total in whole rands since the 2026-10-20 audit (MT-06: it sat over a
+     whole-rand centre and legend in cents), so reading it here would hold an
+     identity to the cent against a figure printed to the rand. Still the
+     shipped renderSplit's own output, which is this function's whole point. */
+  const titles = [];
+  (function walk(n) {
+    if (n.tagName === 'TITLE') titles.push(n.textContent);
+    for (const k of n.children || []) if (k.nodeType === 1) walk(k);
+  })(dashSplit);
+  return titles.reduce((t, s) => {
+    const m = /: R\s*(-?[\d.]+) ·/.exec(s);
+    return t + (m ? Number(m[1]) : 0);
+  }, 0);
 }
 
 /* Independent netting: for each named non-income/non-transfer category, gross

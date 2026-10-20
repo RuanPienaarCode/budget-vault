@@ -15,6 +15,10 @@ const { supersededBySplit } = require('./tx-role');
    impliedAccounts() is a map over it — so totalReturn measures growth on it
    rather than rolling a stated balance forward by a rule of its own. */
 const { reconcile } = require('./reconcile');
+/* The share-label rule goalPercentLabel builds on, and the household's decimal
+   mark returnPercentText prints with — see those two functions. Both pure. */
+const { sharePercentLabel } = require('./share-percents');
+const { decimalText } = require('./locale');
 
 /* ADR-0007 · poolCatType is built once and shared byte-for-byte. Passing
    ctx.catType instead reverts that one screen to the old rule (two call
@@ -80,14 +84,30 @@ function splitFlows(rows, typeOf, opts) {
 }
 
 /* ADR-0007 · An account's opening balance is inferred so the identity holds.
-   basis: 'derived' | 'stated' (balance − total_invested) | 'none'. */
+   basis: 'derived' | 'stated' (balance − total_invested) | 'none'.
+
+   ONE AS-OF, as totalReturn() measures (2026-10-20 audit, M2-01). Every row
+   used to be set against the STATED balance, which holds none of the rows
+   dated after it: "before your records begin" came out short by exactly those
+   rows (three funds on the vault the audit ran against). Now the balance is
+   rolled forward by reconcile() to today and the flows stop at today. The
+   opening is the same at either as-of; `balanceBasis` lets the card say when
+   the closing is not the balance typed. Hand it the account AS LOADED, never
+   an impliedAccounts() copy, or it is rolled twice. */
 function accountFlows(account, rows, typeOf, opts) {
   const a = account || {};
-  const balance = typeof a.balance === 'number' ? a.balance : 0;
+  const stated = typeof a.balance === 'number' ? a.balance : 0;
   const has = (rows || []).length > 0;
 
   if (has) {
-    const f = splitFlows(rows, typeOf, opts);
+    const asked = (opts && opts.today) || '';
+    const today = ISO_DATE.test(asked) ? asked : todayIso();
+    const rec = reconcile(a, rows, today);
+    const drift = rec.state === 'drift';
+    const balance = drift ? rec.implied : stated;
+    /* A caller's own window still wins; otherwise the flows stop where the
+       balance does. A row dated after today is in no balance yet. */
+    const f = splitFlows(rows, typeOf, { from: (opts && opts.from) || '', to: (opts && opts.to) || today });
     return {
       basis: 'derived',
       opening: balance - f.net,
@@ -97,8 +117,13 @@ function accountFlows(account, rows, typeOf, opts) {
       closing: balance,
       count: f.count,
       growthCategories: f.growthCategories,
+      statedBalance: stated,
+      balanceBasis: drift ? 'implied' : 'stated',
+      sinceStated: drift ? rec.count : 0,
+      asOf: today,
     };
   }
+  const balance = stated;
 
   /* ADR-0007 · Stated baseline: starting_amount first, and a written zero is
      real. `typeof` is the was-it-written test; the old `||` chain got both wrong. */
@@ -558,4 +583,32 @@ function growthRate(g) {
   return cap > 0 ? ((Number(g.rateGrowth) || 0) / cap) * 100 : null;
 }
 
-module.exports = { splitFlows, savedFromOutside, accountFlows, totalReturn, growthTotals, growthSeries, classifyRow, chartable, poolCatType, growthRate };
+/* A growth or return percentage as the pages print it, without the "%": one
+   decimal in the household's own mark, "+" when it is not a loss — "+13,7",
+   "-13,7". ONE formatter for the Savings cards and tile and the Accounts goal
+   cell (2026-10-20 audit, D2-10): the Accounts cell rounded to a whole
+   percent ("-14%") beside a Savings card reading "-13,7%" for the same fund.
+   `loc` is the household's locale profile (ctx.locale()); decimalText does
+   the mark and drops the sign from a figure that rounds to zero. */
+function returnPercentText(v, loc) {
+  const n = Number(v);
+  return `${n >= 0 ? '+' : ''}${decimalText(n, 1, loc)}`;
+}
+
+/* How far toward its savings goal an account is, as a label with no "%" —
+   ONE rule for the two pages that print it (2026-10-20 audit, M2-08, D2-09).
+   Accounts rounded a goal at 99.6% to "100%" while Savings floored the same
+   account to "99%". sharePercentLabel is the app's rule for a share that can
+   land on 0% or 100% (a decimal only where a whole percent would claim the
+   boundary): 99.6% reads "99,6", R30 of R10 000 reads "0,3". Clamped to
+   [0, 100] like the bar it labels. Within half a hundredth of 100 that rule
+   says 100; short of the goal is never "100" here, so that reads "99,99". */
+function goalPercentLabel(balance, goal, decimalSep) {
+  const b = Number(balance), g = Number(goal);
+  if (!(g > 0)) { return '0'; }
+  if (b >= g) { return '100'; }
+  const label = sharePercentLabel(Math.min(1, Math.max(0, b / g)), decimalSep);
+  return label === '100' ? `99${decimalSep || '.'}99` : label;
+}
+
+module.exports = { splitFlows, savedFromOutside, accountFlows, totalReturn, growthTotals, growthSeries, classifyRow, chartable, poolCatType, growthRate, goalPercentLabel, returnPercentText };

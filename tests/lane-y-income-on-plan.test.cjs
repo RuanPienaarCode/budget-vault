@@ -22,9 +22,12 @@ const assert = require('assert');
 const { B, tx, base, account, find, hasClass, textOf, mountFor, pinClock } = require('./helpers/dash-audit.cjs');
 const { incomeRemainingText } = require('../src/views/budgets');
 const i18n = require('../src/i18n');
+const { readable } = require('./helpers/dom-stub.cjs');
 
 let checks = 0;
-const eq = (a, b, m) => { assert.deepStrictEqual(a, b, m); checks++; };
+/* A sentence is compared as the reader reads it: U+00A0, the glue src/i18n.js
+   puts inside a figure that is a sentence's param, reads as a space. */
+const eq = (a, b, m) => { assert.deepStrictEqual(typeof a === 'string' ? readable(a) : a, b, m); checks++; };
 const ok = (c, m) => { assert.ok(c, m); checks++; };
 
 /* ---- the sentence, on its own ---------------------------------------------- */

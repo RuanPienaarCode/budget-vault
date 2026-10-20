@@ -27,7 +27,9 @@ const { descend } = require('./helpers/dom-stub.cjs');
 const { atAuditDate } = require('./_audit-seed.cjs');
 const { sharePercentLabel } = require('../src/share-percents');
 const { FULL_MARKS } = require('../src/health-math');
-const i18n = require('../src/i18n');
+/* Sentences spelled through t() are compared in reading form — see
+   readingI18n in tests/helpers/dom-stub.cjs (U+00A0 glue, 20 Oct 2026). */
+const i18n = require('./helpers/dom-stub.cjs').readingI18n(require('../src/i18n'));
 
 let checks = 0;
 const ok = (c, m) => { assert.ok(c, m); checks++; };
@@ -58,7 +60,11 @@ for (const m of MONTHS) {
 
 const hasCls = (e, c) => !!(e._cls && e._cls.has(c));
 const textOf = e => (e ? e.textContent : '');
-const KEYS = ['score.now.fixedHousehold', 'score.now.livingHousehold', 'score.now.householdIncome', 'dash.health.why.fixTrimHousehold'];
+/* 2026-10-20 audit (M1-06): the inclusive share is "all spending (fixed bills
+   included)" and the trim says so — score.now.allSpendHousehold and
+   score.gap.fixTrim replace score.now.livingHousehold and
+   dash.health.why.fixTrimHousehold on the Score (tests/score-all-spending-named). */
+const KEYS = ['score.now.fixedHousehold', 'score.now.allSpendHousehold', 'score.now.householdIncome', 'score.gap.fixTrim'];
 
 atAuditDate(async () => {
   for (const k of KEYS) ok(i18n.t(k) !== k, `en.js carries ${k}`);
@@ -74,7 +80,7 @@ atAuditDate(async () => {
   const row = descend(nodes.get('#scoreHero')).find(e => hasCls(e, 'score-ring-row') && e.getAttribute('data-k') === 'spending');
   const now = textOf(descend(row).find(e => hasCls(e, 'score-ring-row-now')));
   ok(now.includes(i18n.t('score.now.fixedHousehold', { pct: pct(M.fixedShare) })), `fixed bills are a share of household income — got: ${now}`);
-  ok(now.includes(i18n.t('score.now.livingHousehold', { pct: pct(M.consumptionShare) })), `and so are living costs — got: ${now}`);
+  ok(now.includes(i18n.t('score.now.allSpendHousehold', { pct: pct(M.consumptionShare) })), `and so is all spending — got: ${now}`);
   ok(now.includes(i18n.t('score.now.householdIncome', { amount: ctx.money(M.monthlyHouseholdIncome, 0) })),
     `and the row says what household income holds, and how much it is — got: ${now}`);
   ok(/household income/i.test(now) && /budget/i.test(i18n.t('score.now.householdIncome', { amount: '' })),
@@ -92,8 +98,8 @@ atAuditDate(async () => {
   ok(!!gap, 'the spending pillar is short of full marks here, so it has a gap row');
   const trim = 35000 - FULL_MARKS.consumptionFloor * 45000;
   eq(textOf(descend(gap).find(e => hasCls(e, 'score-gap-do'))),
-    i18n.t('dash.health.why.fixTrimHousehold', { amount: ctx.money(trim, 0), pct: Math.round(FULL_MARKS.consumptionFloor * 100) }),
-    'the trim: R 3 500 less a month to bring living costs under 70% of HOUSEHOLD income');
+    i18n.t('score.gap.fixTrim', { amount: ctx.money(trim, 0), pct: Math.round(FULL_MARKS.consumptionFloor * 100) }),
+    'the trim: R 3 500 less a month to bring all spending under 70% of HOUSEHOLD income');
 
   console.log(`PASS score-household-income-named (${checks} checks)`);
 }, '2026-08-15').catch(e => { console.error(e); process.exit(1); });

@@ -37,7 +37,10 @@ const ok = (c, m) => { assert.ok(c, m); checks++; };
   const M = await renderDash(files, { today: '2026-09-29' });
   const { ctx, nodes, t } = M;
 
-  eq(figNumber(nodes.get('#dashPositionKpis'), 'pos-debt'), -300, 'the amount: the one home, readable, implied-negative account');
+  /* A positive magnitude since the 2026-10-20 audit (D2-06): the tile printed
+     money(-liabilities) in the danger ink, against its own comment and the
+     Debts page's "owing is not a red state". */
+  eq(figNumber(nodes.get('#dashPositionKpis'), 'pos-debt'), 300, 'the amount: the one home, readable, implied-negative account, as what is owed');
   const book = ctx.bookFigures();
   eq(book.overdrawn, 1, 'the count uses the same basis and scope: implied, home currency, readable');
   const tile = t('#dashPositionKpis');

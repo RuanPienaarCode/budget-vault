@@ -23,6 +23,15 @@ const { activeDebts, cardOverlap, typedBelowZero, flooredEntry, shownFigure } = 
 const { debtInterestCoverage } = require('../health-math');
 const { todayIso } = require('../dates');
 const { symbolOf, isForeign } = require('../currency');
+/* A rate or a ratio in the household's own decimal mark (2026-10-20 audit,
+   D2-07 / D1-06 / M2-09). The Rate % field in this page's own table showed
+   "22,25" while the attack order, the debt-to-income line and the schedule
+   note printed "22.25%" and "13.9%" through a bare toFixed: two decimal marks
+   for one reader on one page. */
+const { decimalText } = require('../locale');
+/* A share that can land on 0% or 100% is labelled at that boundary rather
+   than rounded onto it — see the module's own header (2026-10-20 audit, D2-09). */
+const { sharePercentLabel } = require('../share-percents');
 /* Namespace import, per the house rule — `t` is already taken as a local in
    several files, so every file in this app imports i18n the same way. */
 const i18n = require('../i18n');
@@ -224,9 +233,13 @@ module.exports = function registerDebts(ctx) {
     const fxTag = fx.length
       ? ` · ${fx.length} in another currency, not in these figures`
       : '';
-    tile('Total debt', money(total), '',
+    tile('Total debt', money(total), 'st-money',
       `${list.length} active · ${S.debts.length} tracked${fxTag}`);
-    tile('Paying per month', money(perMonth), '', perMonth ? `${money(perMonth * 12, 0)} a year` : 'nothing budgeted');
+    /* The "a year" line in cents, like the tile it sits under (2026-10-20
+       audit, D2-03). "R 3 900,00" over "R 46 800 a year" was one figure
+       printed by two rounding rules on one tile; whole rands belong to the
+       Dashboard and Budget summary figures only. */
+    tile('Paying per month', money(perMonth), 'st-money', perMonth ? `${money(perMonth * 12)} a year` : 'nothing budgeted');
     // The single most actionable number here: what this month costs before a
     // cent of principal moves.
     /* Three states, because a blank Rate column is not a rate of zero. With
@@ -254,12 +267,17 @@ module.exports = function registerDebts(ctx) {
          src/lang/en.js, and the one-missing render is pinned in
          tests/debt-interest-coverage.test.cjs against the other-form render
          so an assertion that passed either way cannot creep back. */
-      tile('Interest this month', money(interest), interest > 0 ? 'text-warning' : '',
+      tile('Interest this month', money(interest), interest > 0 ? 'text-warning st-money' : 'st-money',
         i18n.t('debt.interest.partial',
           { shown: cover.shown, total: cover.total, missing: cover.missing, count: cover.missing }));
     } else {
-      tile('Interest this month', money(interest), interest > 0 ? 'text-warning' : '',
-        perMonth > 0 ? `${Math.round((interest / perMonth) * 100)}% of your payments` : '');
+      /* sharePercentLabel, not Math.round (2026-10-20 audit, D2-09): a debt
+         book at a fraction of a percent of interest printed "0% of your
+         payments" directly under an interest figure that is not nothing —
+         the same trap the Dashboard's debt tile closed in ISSUE 37. Away from
+         0% and 100% the label is the whole percent it always was. */
+      tile('Interest this month', money(interest), interest > 0 ? 'text-warning st-money' : 'st-money',
+        perMonth > 0 ? `${sharePercentLabel(interest / perMonth, ctx.locale().decimal)}% of your payments` : '');
     }
     /* ITEM 1 re-sourcing: this tile used to run the PLANNER's own simulate()
        call below — whatever `extra` sat in #debtExtra and whichever strategy
@@ -354,13 +372,16 @@ module.exports = function registerDebts(ctx) {
        Typing into "Extra per month" or switching Snowball/Avalanche moves
        THIS line, and only this line — never the page's own headline tile. */
     const projLabel = extra > 0 ? 'With this extra' : 'With this plan';
+    /* " extra a month", never "/mo" (2026-10-20 audit, D2-26): the attack
+       order below already says "R 500 extra a month", and one page spelling
+       one unit two ways reads as two quantities. */
     wrap.append(el('div', { class: 'debt-plan-projected' },
       plan.settled && plan.months
         ? el('div', { class: 'dpp-h' }, `${projLabel}: debt-free ${monthLabel(addMonths(plan.months, todayForMonths()))}`)
         : el('div', { class: 'dpp-h text-danger' }, `${projLabel}: not within 50 years`),
       el('div', { class: 'dpp-sub' },
         plan.settled && plan.months ? `${humanMonths(plan.months)} on ${chosen}` : `at this payment, on ${chosen}`,
-        extra > 0 ? ` with ${money(extra, 0)}/mo extra` : '')));
+        extra > 0 ? ` with ${money(extra, 0)} extra a month` : '')));
 
     const grid = el('div', { class: 'debt-plans' });
     for (const r of runs) {
@@ -381,7 +402,7 @@ module.exports = function registerDebts(ctx) {
            while the baseline does not, so crediting the METHOD for the whole
            saving overstates what picking snowball or avalanche actually buys
            — and the green number is the line people read. */
-        if (extra > 0) card.append(el('div', { class: 'dp-src' }, `includes your ${money(extra, 0)}/mo extra`));
+        if (extra > 0) card.append(el('div', { class: 'dp-src' }, `includes your ${money(extra, 0)} extra a month`));
       }
       grid.append(card);
     }
@@ -438,7 +459,7 @@ module.exports = function registerDebts(ctx) {
       const at = plan.payoff[d.key];
       ol.append(el('li', {},
         el('span', { class: 'do-n' }, d.name),
-        el('span', { class: 'do-m num' }, `${(d.rate || 0).toFixed(2)}% · ${money(d.balance, 0)}`),
+        el('span', { class: 'do-m num' }, `${decimalText(d.rate || 0, 2, ctx.locale())}% · ${money(d.balance, 0)}`),
         el('span', { class: 'do-d' }, at ? `clear ${monthLabel(addMonths(at, todayForMonths()))}` : 'not clearing')));
     }
     order.append(ol);
@@ -575,7 +596,7 @@ module.exports = function registerDebts(ctx) {
          reader's finances rather than arithmetic on their numbers — and it is
          the clearest verdict-shaped output in the app. The number is the useful
          part and it stays; the colour and the claim do not. */
-      note.append(el('b', { class: 'num' }, `${ratio.toFixed(1)}%`),
+      note.append(el('b', { class: 'num' }, `${decimalText(ratio, 1, ctx.locale())}%`),
         ` of your${scaleNote} goes to debt payments — ${money(committedAll)} across ` +
         `${list.length} debt${list.length === 1 ? '' : 's'}.`);
     } else {
@@ -760,9 +781,14 @@ module.exports = function registerDebts(ctx) {
                 // live only in a `title`, invisible on a phone, which is half of
                 // where this table is read — caveatChip (dom.js) makes it
                 // reachable by tap there too.
+                /* A sentence, so the rate takes the household's decimal mark
+                   and the start date reads as a date (2026-10-20 audit, D2-07
+                   and D2-11): "at 22.25% … since 2024-03-01" was a table's
+                   spelling of both, beside a Rate field showing "22,25". The
+                   Start date column, where the table has one, keeps ISO. */
                 payoffCell.append(el('div', { class: 'debt-implied' }, caveatChip(
                   `on this plan it would be ${dMoney(d, exp.expected, 0)} by now`,
-                  `From ${dMoney(d, d.original)} at ${d.rate}% paying ${dMoney(d, committed(d))} a month since ${d.start}, `
+                  `From ${dMoney(d, d.original)} at ${decimalText(d.rate, 2, ctx.locale())}% paying ${dMoney(d, committed(d))} a month since ${ctx.dateText(d.start)}, `
                     + `the schedule puts this at ${dMoney(d, exp.expected)} after ${exp.months} months. `
                     + `Your figure is ${dMoney(d, Math.abs(gap))} ${gap > 0 ? 'higher' : 'lower'} — a missed payment, a rate change or a fee would explain it, and so would a stale balance.`)));
               }
@@ -789,11 +815,18 @@ module.exports = function registerDebts(ctx) {
                  it that simply takes decades, so this says what is known rather
                  than asserting the interest is winning. */
               clearCell.append(el('span', { class: 'text-danger' }, committed(d) > 0 ? 'not in 50 yrs' : 'no payment'));
-              interestCell.append(el('span', { class: 'text-danger num' }, `+${dMoney(d, monthlyInterest(d.balance, d.rate), 0)}/mo`));
+              /* Cents and " a month", like every other money cell in this
+                 table and every other per-unit figure on the page (2026-10-20
+                 audit, D2-18 and D2-26) — it was "+R 250/mo". */
+              interestCell.append(el('span', { class: 'text-danger num' }, `+${dMoney(d, monthlyInterest(d.balance, d.rate))} a month`));
             } else {
               clearCell.append(el('span', {}, monthLabel(addMonths(a.months, todayForMonths()))),
                 el('div', { class: 'text-muted fine-note' }, humanMonths(a.months)));
-              interestCell.append(dMoney(d, a.interest, 0));
+              /* Cents (2026-10-20 audit, D2-18 / D1-13): whole rands are for
+                 the Dashboard and Budget summary figures, and this column sat
+                 in a table whose Balance, Payment and Extra cells all keep
+                 theirs. */
+              interestCell.append(dMoney(d, a.interest));
             }
           }
         }

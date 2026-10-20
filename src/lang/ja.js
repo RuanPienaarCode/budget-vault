@@ -456,7 +456,7 @@ module.exports = {
   'tx.delete.parent': {
     other: '分割された {count} 件の明細も一緒に削除されます。',
   },
-  'tx.delete.part': 'これは分割の一部です。残りの明細は元の行の金額に一致しなくなり、その差額は口座残高の集計から外れます。元の行の「除外」のチェックを外すと戻せます。',
+  'tx.delete.part': 'これは分割の一部です。残りの明細は元の行の金額に一致しなくなり、その差額は口座残高の集計から外れます。元の行で「分割を解除」を選ぶと戻せます。',
   'tx.delete.confirm': '行を削除',
   'tx.deleted': {
     other: '{count} 行を削除しました — 「変更を保存」でファイルに書き込まれます',
@@ -1060,6 +1060,8 @@ module.exports = {
   'dash.stale.line': '{line} — {age}。',
   'dash.stale.driftUp': ' その後の取引を合計すると {amount} 多くなります。',
   'dash.stale.driftDown': ' その後の取引を合計すると {amount} 少なくなります。',
+  'dash.stale.driftUpIncluded': ' その後の取引で {amount} 増えており、これらの数字に含まれています。',
+  'dash.stale.driftDownIncluded': ' その後の取引で {amount} 減っており、これらの数字に含まれています。',
   'dash.stale.btn': '残高を確認',
   'dash.stale.aria': '口座ページで口座残高を確認',
 
@@ -1600,4 +1602,43 @@ module.exports = {
   'settings.exchangeRates.source': '為替レートの取得元',
   'settings.exchangeRates.sourceDesc': 'オンにすると、レートは ExchangeRate-API（exchangerate-api.com）が運営する無料サービス open.er-api.com から取得します。送信されるのはリクエストのアドレスに含まれる3文字の通貨コードだけです。インターネット上のあらゆる通信と同様、相手側にはあなたの IP アドレスも見えます。',
 
+  /* 2026-10-20 audit, Score lane (M1-05, M1-06, M1-07): which income each
+     figure divides by, "all spending" for the inclusive measure, and every
+     part of "Not yet spent" named under it. Machine-assisted, added
+     2026-10-20; not yet read by a first-language reader. */
+  'score.now.wealthBase': '現在: 純資産 {amount} · 予算上の収入 {times} 年分に相当（月 {income}）',
+  'score.now.allSpendHousehold': '支出全体（固定費を含む）は世帯収入の {pct}',
+  'score.gap.fixMonthly': '毎月あと {amount} 貯めると、予算上の収入の {pct}% に届きます。',
+  'score.gap.fixBuild': '貯金・投資・不動産をあと {amount} 増やすか、同じ額の借金を返すと、予算上の収入 {times} 年分に届きます。',
+  'score.gap.fixTrim': '固定費も含めた支出全体を月 {amount} 減らすと、世帯収入の {pct}% を下回ります。',
+  'score.flow.sub.incomeToCome': '計画した収入のうち {amount} はまだ入っていません',
+  'score.flow.sub.incomeAbovePlan': '計画より {amount} 多い収入',
+  'score.flow.sub.setAsideOver': '計画で取り分けた額より {amount} 多く貯蓄に移しました',
+  'score.flow.sub.alreadySpent': '{amount} は予算上すでに支出済みとして数えています',
+  'score.flow.chip.alreadySpentNote': '上の「まだ使っていない分」は「合計」より {amount} 多くなっています。手元にはあるものの、予算上はすでに支出済みとして数えているお金です。',
+  /* 2026-10-20 audit, L3 (Report + exports) — M1-04, M1-08, M2-04.
+     Machine-assisted, added 2026-10-20; not native-reviewed. */
+  'report.budget.incomeLeftOut': {
+    other: '比較した {total} 期間のうち {count} 期間は予算に収入がありません: {names}。予算上の収入と、予算と実績の各収入行は、その収入を予算に組んでいる期間だけが対象です。上の収入はすべての期間が対象です。',
+  },
+  'report.health.noteParts': 'スコアページに表示される各要素（{parts}）から算出した一つの数値であり、このボールト内の数値からの大まかな目安であって、専門的な評価ではありません。',
+  'bx.doc.headlineHeading': '期間別の収入と支出',
+  'bx.doc.income': '収入',
+  'bx.doc.spent': '支出',
+  'bx.doc.uncategorised': '未分類',
+  'bx.doc.refunds': '差し引かれていない返金',
+  /* 2026-10-20 audit fix wave, lane L4 (Accounts) — machine-assisted, not
+     native-reviewed. acct.where.subStop: the ring caption with its closing
+     stop, for when the other-currency sentence follows it (D1-15).
+     acct.overlap: the Accounts page's own card-overlap sentence — its hero
+     leaves Debt-page rows out, so the double count is in net worth on the
+     Savings page and the Dashboard, not "above" (M2-06). */
+  'acct.where.subStop': 'これらの口座が保有する割合。',
+  'acct.overlap': '記録中のクレジットカード口座: {accounts} · カード負債: {debts} — 同じカードが両方にある場合、「貯蓄と投資」ページとダッシュボードの純資産で二重に数えられます。',
+  /* 2026-10-20 audit fix wave, lane L6 (Transactions, Plan, Onboarding) —
+     machine-assisted, not native-reviewed. plan.env.sub: the line over the
+     Plan's spending buckets, through t() so its figures are glued (D1-05). */
+  'plan.env.sub': {
+    other: '支出バケット {count} 件 · {pot} のうち {placed} を割り当て済み',
+  },
 };

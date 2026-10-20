@@ -124,12 +124,14 @@ const FILES = {
     console.error = (...a) => { logged.push(a.map(String).join(' ')); };
     try { ctx.renderDashboard(); } finally { console.error = realErr; }
     eq(logged.filter(l => /failed to render/.test(l)), [], 'no Dashboard card fails inside its error boundary (the spending split used to)');
-    ok(/R 700\.00|R 300\.00/.test(dom.$('#dashSplitSub').textContent), 'the spending-split card is drawn (its note names the uncategorised and netted parts)');
+    /* The donut subtitle prints whole rands since the 2026-10-20 audit (MT-06). */
+    ok(/R 700\b|R 300\b/.test(dom.$('#dashSplitSub').textContent), 'the spending-split card is drawn (its note names the uncategorised and netted parts)');
     const table = dom.$('#dashBudget').textContent;
-    ok(table.includes('R 1100.00'), 'Dashboard table: Groceries remaining is the snapshot\'s 1 100');
-    ok(table.includes('R -900.00'), 'Dashboard table: Fuel\'s unbudgeted spend prints its negative remaining');
+    /* In the Budget page's words since the 2026-10-20 audit (D2-05). */
+    ok(table.includes('R 1100.00 left'), 'Dashboard table: Groceries remaining is the snapshot\'s 1 100');
+    ok(table.includes('R 900.00 over'), 'Dashboard table: Fuel\'s unbudgeted spend prints as over by the whole amount');
     const note = dom.$('#dashSplitSub').textContent;
-    ok(note.includes('R 700.00') && note.includes('R 300.00'), 'Dashboard donut note: uncategorised 700 and netted 300, from categoryGap()');
+    ok(/R 700\b/.test(note) && /R 300\b/.test(note), `Dashboard donut note: uncategorised 700 and netted 300, from categoryGap() — got: ${note}`);
   }
   {
     const { financialReportMarkdown } = require('../src/report');

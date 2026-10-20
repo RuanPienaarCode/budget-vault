@@ -53,7 +53,7 @@ async function run(f, pill = 'current') {
   try {
     const M = await mountFor(f, { period: PERIOD, budgetFolder: B });
     const out = await createReport(M, { pill });
-    return { M, ...out, i18n: require('../src/i18n') };
+    return { M, ...out, i18n: require('./helpers/dom-stub.cjs').readingI18n(require('../src/i18n')) };   // reading form, as `md` is read
   } finally { unpin(); }
 }
 /* The independent count: every row the BUDGET lens kept in the window, put

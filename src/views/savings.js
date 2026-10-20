@@ -6,7 +6,8 @@ const { accountsOfType, accountType } = require('../vocabulary');
 const { themeColors, createChart, tip, parseColor, distinctColors, phoneLayout } = require('../chart');
 const { isStale, isStaleValuation, stalenessSummary } = require('../reconcile');
 const { todayIso } = require('../dates');
-const { accountFlows, totalReturn, growthTotals, growthSeries, chartable, poolCatType, growthRate } = require('../savings-math');
+const { accountFlows, totalReturn, growthTotals, growthSeries, chartable, poolCatType, growthRate,
+  goalPercentLabel, returnPercentText } = require('../savings-math');
 const { worth, cardOverlap, accountGroups, debtsByType, assetsByType,
   otherCurrencyNet } = require('../worth');
 const { daysSince } = require('../reconcile');
@@ -105,18 +106,22 @@ module.exports = function registerSavings(ctx) {
        the balance the reader typed — and the chart below prints the IMPLIED
        one, the same as-of the Dashboard's cash card (ISSUE 44). Both are
        summed once, there; what this page adds is the sentence between them,
-       because on the vault this was built against the two read R 674 463,50
-       and R 691 357,55 on one screen with nothing to say why. */
+       because on the vault this was built against the two read about
+       R 17 000 apart on one screen with nothing to say why. */
     const { balances } = bookFigures();
     const totalSavings = balances.stated.byType.savings || 0;
     const totalInvest = balances.stated.byType.investment || 0;
     const homeAccounts = balances.implied.accounts, worthOthers = balances.implied.others;
     /* The same sentence the Dashboard's stale note prints (dash.stale.driftUp),
-       inline because this page is on the English-only backlog. Rounded to the
-       rand, as there; under a rand there is nothing to say. */
+       inline because this page is on the English-only backlog. In CENTS now,
+       not rounded to the rand as the Dashboard rounds it: this line sits under
+       a tile printed in cents, and the cents rule (whole rands on the
+       Dashboard/Budget summary figures only) holds a figure beside a cents
+       twin to cents (2026-10-20 audit, D2-03). Under a rand there is still
+       nothing to say. */
     const driftLine = type => {
       const d = balances.driftByType[type] || 0;
-      return Math.abs(d) >= 1 ? `Transactions since then add up to ${money(Math.abs(d), 0)} ${d > 0 ? 'more' : 'less'}.` : '';
+      return Math.abs(d) >= 1 ? `Transactions since then add up to ${money(Math.abs(d))} ${d > 0 ? 'more' : 'less'}.` : '';
     };
     const kpiNote = (others, type) => [otherTag(others), driftLine(type)].filter(Boolean).join(' · ');
     /* The household symbol, passed at last: worth() has always computed a
@@ -164,12 +169,16 @@ module.exports = function registerSavings(ctx) {
        same USD account printing 0 on Accounts and 460 here (audit L8-05). */
     const held = otherHoldings(balances.stated.others, balances.implied.others, 'implied',
       accts => otherCurrencyNet(w, accts));
-    tile('Net worth', money(netWorth), netWorth >= 0 ? 'grad-txt' : 'text-danger',
-      'what you own minus what you owe' + otherLine(held.shown)
+    /* The caption is a fragment ("what you own minus what you owe") and the
+       other-currency note a sentence of its own (" Plus € 640 held …"), so a
+       full stop joins them when the note is there; glued, it read "what you
+       owe Plus € 640 held" (2026-10-20 audit, D1-15). */
+    tile('Net worth', money(netWorth), `${netWorth >= 0 ? 'grad-txt' : 'text-danger'} st-money`,
+      'what you own minus what you owe' + (held.shown.length ? '.' : '') + otherLine(held.shown)
       + (held.shown.length && held.differs
         ? ` That counts the transactions since the balance was last typed; as typed, ${otherList(held.other)}.` : ''));
-    tile('Savings', money(totalSavings), '', kpiNote(sPlit.others, 'savings'));
-    tile('Investments', money(totalInvest), '', kpiNote(iPlit.others, 'investment'));
+    tile('Savings', money(totalSavings), 'st-money', kpiNote(sPlit.others, 'savings'));
+    tile('Investments', money(totalInvest), 'st-money', kpiNote(iPlit.others, 'investment'));
     growthTile(tile, entries);
     /* NO DEBT TILE HERE, deliberately — it was removed rather than lost.
        This page is about what the household is putting away and what that has
@@ -206,7 +215,9 @@ module.exports = function registerSavings(ctx) {
 
   /* The household's own decimal mark: "+13.7%" beside a Budget page printing
      "100,2%" on the same household (audit L2a-N09). */
-  const pct = v => `${v >= 0 ? '+' : ''}${v.toFixed(1).replace('.', ctx.locale().decimal)}%`;
+  /* savings-math.js's returnPercentText since 20 Oct 2026, the one formatter
+     the Accounts growth cell now prints the same return with (D2-10). */
+  const pct = v => `${returnPercentText(v, ctx.locale())}%`;
 
   /* growthTotals itself now lives in savings-math.js (2026-08-29 audit, M4) —
      see that module's own header on `growthTotals` for the `measured`/
@@ -477,12 +488,17 @@ module.exports = function registerSavings(ctx) {
            April" is still worth knowing, and a bar that silently vanishes when
            a balance ages is a worse answer than one that admits its age. */
         const stale = isStale(a.balance_updated);
-        /* Floored, and capped one short of 100, unless the goal is actually
-           reached — `Math.round` on 99.6% printed "100%" beside a bar that was
-           not full and a `reached` flag that was false, the one combination
-           that should never appear together on a progress bar. */
+        /* Never "100%" short of the goal — `Math.round` on 99.6% printed it
+           beside a bar that was not full and a `reached` flag that was false,
+           the one combination that should never appear together on a progress
+           bar. The rule is savings-math.js's goalPercentLabel now, the SAME one
+           the Accounts goal cell prints, so one account reads one figure on
+           both pages: this page floored to "99%" while Accounts rounded to
+           "100%" (2026-10-20 audit, M2-08). The target date is prose, so it
+           reads "Mar 1, 2027" (D2-11). */
         const pctLine = reached ? 'Goal reached'
-          : `${Math.min(99, Math.floor(pct))}%${a.target_date ? ' · target ' + a.target_date : ''}`;
+          : `${goalPercentLabel(a.balance, a.goal_amount, ctx.locale().decimal)}%`
+            + (a.target_date ? ` · target ${ctx.dateText(a.target_date)}` : '');
         g.append(el('div', {},
           el('div', { class: 'goal-h' },
             el('div', { class: 'gn' }, a.name),
@@ -692,6 +708,17 @@ module.exports = function registerSavings(ctx) {
             line.append(` · its records add up to ${acctMoney(a, -flows.opening, 0)} more than the balance`);
           }
           card.append(line);
+          /* The sum above closes on the balance AS OF TODAY — accountFlows
+             measures at one as-of, as totalReturn does (2026-10-20 audit,
+             M2-01) — and when rows have landed since the balance was typed
+             that is not the figure printed at the top of this card. Said here
+             in the same words renderReturn uses for the same situation, so a
+             reader finishing the sum knows which balance it finishes on. */
+          if (flows.balanceBasis === 'implied') {
+            card.append(measuredOnNote(a, flows.closing, flows.sinceStated,
+              `these add up to ${acctMoney(a, flows.closing, 0)}`,
+              'What was put in, earned and taken out runs to today, and so does the balance it adds up to.'));
+          }
 
           /* And say so outright where the silence is most likely to mislead.
              Only for investments, and only when no growth was recorded at all —
@@ -740,7 +767,7 @@ module.exports = function registerSavings(ctx) {
             'No transactions in the vault for this account, so this is the balance less what the '
               + 'account file records as put in. Import its statements and the split becomes real.')));
         } else if (a.inception_date) {
-          card.append(el('div', { class: 's2' }, `since ${a.inception_date}`));
+          card.append(el('div', { class: 's2' }, `since ${ctx.dateText(a.inception_date)}`));
         }
 
         /* Reconciliation — the same argument the Accounts page makes, on the
@@ -844,7 +871,8 @@ module.exports = function registerSavings(ctx) {
        had been invested since the start — and savings-math.js withholds it
        under a year entirely rather than annualising noise. */
     if (r.annualisedPct !== null) bits.push(`≈ ${pct(r.annualisedPct)} a year`);
-    if (r.since) bits.push(`since ${r.since}`);
+    // A prose date: "since Jan 1, 2025", not the ISO cell (2026-10-20 audit, D2-11).
+    if (r.since) bits.push(`since ${ctx.dateText(r.since)}`);
     if (bits.length) {
       /* Marked "≈" wherever it appears, and — now — explained on tap as well
          as on hover: the whole line carried the caveat before, so the whole
@@ -890,16 +918,9 @@ module.exports = function registerSavings(ctx) {
        forward is a floor, so the growth since that date is named as missing
        rather than implied to be measured. */
     if (r.balanceBasis === 'implied') {
-      const n = r.sinceStated, date = a.balance_updated;
-      card.append(el('div', { class: 's2 s2-caveat' }, caveatChip(
-        `measured on ${acctMoney(a, r.balance, 0)} — your ${date} balance plus ${n} transaction${n === 1 ? '' : 's'} since`,
-        `Growth is what the account holds less what was put in, both as of today. The balance you gave is dated ${date}, `
-          + `so the ${n === 1 ? 'transaction' : `${n} transactions`} recorded since then ${n === 1 ? 'is' : 'are'} added to it first — `
-          + 'the same figure the reconciliation below offers.'
-          + (accountType(a) === 'investment'
-            ? ` On a fund whose value moves with the market, growth since ${date} that no transaction recorded is not in `
-              + 'it yet: confirm the balance and it is.'
-            : ''))));
+      card.append(measuredOnNote(a, r.balance, r.sinceStated,
+        `measured on ${acctMoney(a, r.balance, 0)}`,
+        'Growth is what the account holds less what was put in, both as of today.'));
     }
 
     /* The mirror case. Transactions exist BEFORE the stated opening date, so
@@ -943,6 +964,27 @@ module.exports = function registerSavings(ctx) {
         'Anything here that is not interest or dividends is really a contribution. '
           + 'Recategorise the rows, or change the category\'s type, and this figure corrects itself.')));
     }
+  }
+
+  /* The "what this sum closes on" caveat, shared by both branches of a card —
+     the total-return block (renderReturn) and the derived split with no
+     starting amount — because both now measure at one as-of, today, on the
+     balance reconcile() rolls forward (savings-math.js; 2026-10-20 audit,
+     M2-01), and both sit under a row that prints the balance as TYPED.
+     `lead` names the figure in the branch's own words; `why` opens the
+     longer reading. The date is prose, so it goes through ctx.dateText
+     (D2-11): "your Jun 30 balance", not "your 2026-06-30 balance". */
+  function measuredOnNote(a, closing, n, lead, why) {
+    const date = ctx.dateText(a.balance_updated);
+    return el('div', { class: 's2 s2-caveat' }, caveatChip(
+      `${lead} — your ${date} balance plus ${n} transaction${n === 1 ? '' : 's'} since`,
+      `${why} The balance you gave is dated ${date}, `
+        + `so the ${n === 1 ? 'transaction' : `${n} transactions`} recorded since then ${n === 1 ? 'is' : 'are'} added to it first — `
+        + 'the same figure the reconciliation below offers.'
+        + (accountType(a) === 'investment'
+          ? ` On a fund whose value moves with the market, growth since ${date} that no transaction recorded is not in `
+            + 'it yet: confirm the balance and it is.'
+          : '')));
   }
 
   /* Capital against growth, on the existing .acct-mbar. A LOSS is drawn as what
@@ -1057,10 +1099,11 @@ module.exports = function registerSavings(ctx) {
           : null,
         /* The total is the balances growth was measured ON — as of today, the
            typed ones rolled forward by the rows since — while every card below
-           prints the typed one. Named, rounded to the rand like the KPI drift
-           line above, so the two never disagree on screen without a reason. */
+           prints the typed one. Named in cents like the KPI drift line above
+           (2026-10-20 audit, D2-03: both sit beside a cents total), so the two
+           never disagree on screen without a reason. */
         Math.abs(s.rolled) >= 1
-          ? `as of today — ${money(Math.abs(s.rolled), 0)} ${s.rolled > 0 ? 'more' : 'less'} than the stated balances, `
+          ? `as of today — ${money(Math.abs(s.rolled))} ${s.rolled > 0 ? 'more' : 'less'} than the stated balances, `
             + 'from transactions recorded since'
           : null,
       ].filter(Boolean).join(' · ');
@@ -1114,9 +1157,11 @@ module.exports = function registerSavings(ctx) {
     const Y = v => padT + innerH - ((v - seriesFloor) / span) * innerH;
 
     const uid = `bud-growth-${++growthSeq}`;
-    const listFor = `${money(last.capital, 0)} put in`
-      + (last.posted ? `, ${money(last.posted, 0)} of recorded growth` : '')
-      + (undated ? `, and ${money(undated, 0)} of growth carrying no date` : '');
+    /* In cents, as the legend under the chart and the total it adds up to are
+       (2026-10-20 audit, D2-03) — a screen reader gets the same figures. */
+    const listFor = `${money(last.capital)} put in`
+      + (last.posted ? `, ${money(last.posted)} of recorded growth` : '')
+      + (undated ? `, and ${money(undated)} of growth carrying no date` : '');
     const { svg, add } = createChart({
       w: W, h: H, cls: 'growth-svg',
       label: `What built this balance of ${money(s.closing)}: ${listFor}.`
@@ -1201,11 +1246,16 @@ module.exports = function registerSavings(ctx) {
 
     wrap.append(svg);
 
+    /* In CENTS: the three keys are the parts of the total printed in cents in
+       this card's own header (#savingsGrowthTotal, put in + recorded + undated
+       = closing), and parts under a cents total print at its precision so they
+       add up to it as printed (2026-10-20 audit, D2-01/D2-03). They used to be
+       whole rands, so "R 10 750" and "R 500" sat under "R 11 250,40". */
     const legend = el('ul', { class: 'donut-legend donut-legend--inline' });
     const key = (colour, name, amount) => legend.append(el('li', {},
       el('i', { style: `background:${colour}` }),
       el('span', { class: 'dl-name' }, name),
-      el('span', { class: 'dl-val num' }, money(amount, 0))));
+      el('span', { class: 'dl-val num' }, money(amount))));
     key(cIn, 'Put in', last.capital);
     if (last.posted) key(cGrow, 'Growth recorded', last.posted);
     if (undated) key(cGrow, 'Growth with no date', undated);
@@ -1215,15 +1265,20 @@ module.exports = function registerSavings(ctx) {
        the one thing that could make this disagree with the tiles above, and a
        reader who cannot see that it happened has no way to check. */
     if (s.excluded) {
-      /* Not "nothing records what they started at" — an account can carry a
-         `total_invested` figure (basis 'stated') and still be excluded here,
-         because it has no transactions to hang a date on. The true reason an
-         account is left out of THIS chart is always about placement, not
-         about whether anything was recorded. */
+      /* The reason chartable() (savings-math.js) actually applies: growth is
+         drawn only for an account on the 'measured' basis — one with a
+         Starting amount — that can be placed at a month, from its opening
+         date or its first row. This used to say "their growth carries no date
+         it can be placed at", which is not why a fund with no starting amount
+         is left out, and not what the sub-line above it says ("missing a
+         starting amount or date") about the same accounts (2026-10-20 audit,
+         M2-07). An account carrying only `total_invested` (basis 'stated') has
+         no starting amount either, so the sentence is true of it too, and the
+         card's own "Add starting amount" action is the fix it points to. */
       wrap.append(el('div', { class: 'kpi-caveat-txt', style: 'margin-top:10px' },
         icoEl(['info', 'alert-circle']),
         `${s.excluded} account${s.excluded === 1 ? '' : 's'} left out — `
-        + 'their growth carries no date it can be placed at.'));
+        + 'missing a starting amount or an opening date, so there is nothing to measure growth from.'));
     }
   }
 
@@ -1254,11 +1309,45 @@ module.exports = function registerSavings(ctx) {
     ['other', 'Other', '--ink-faint', '#5f6779'],
   ];
 
-  /* Colours for a type this list has never heard of — walked in order so the
-     same unlisted type keeps the same colour between renders, exactly as the
-     debt and asset walks below do. */
-  const EXTRA_VARS = ['--color-warning', '--color-investment', '--color-info', '--ink-faint'];
-  const EXTRA_FALLBACKS = ['#f5a524', '#6f42c1', '#0ea5e9', '#5f6779'];
+  /* Every segment that is NOT one of the six sealed account types — an
+     Assets-page kind, a Debt-page type, money owed to you, an account type
+     this list has never heard of — takes its colour from this list, in size
+     order, through distinctColors (chart.js), the way the Dashboard donut
+     de-collides its wedges (2026-10-20 audit, D1-20).
+
+     Before, those segments asked for theme variables (--color-accent,
+     --ink-faint, --color-warning…) from four separate fixed walks, so two
+     things went wrong. The colours repeated inside one legend: with more
+     segments than the shared palette could keep apart from the sealed ones,
+     distinctColors ran out and wrapped, and "vehicle (owed)" and "store
+     account (owed)" wore one green. And a row changed colour with the
+     theme, because --color-accent and --ink-faint are redefined between
+     light and dark: the reserved set moved, so the resolver's choices moved
+     with it ("vehicle" lime in one theme, blue in the other).
+
+     So nothing here reads a theme variable, and the reserved set is the
+     sealed types' own fixed hexes (WORTH_TYPES' fallbacks, the default
+     palette's light values), the same in every theme: the same vault draws
+     the same row in the same colour whichever theme it is opened in.
+
+     The list is chart.js's SLICE_PALETTE less the entries that sit within
+     SLICE_MIN_DISTANCE of a sealed colour (#0ea5e9 IS Cheque's; #6366f1 and
+     #a21caf read as Investments' purple, #34d399 as Savings' green, #0369a1
+     as Cash's teal), then four more chosen to stay that far from the sealed
+     six, from the reds, and from each other, and to clear the same contrast
+     the slice palette does on both card surfaces. Nine rows before a colour
+     repeats, where the walks gave four. The last three are the least safe on
+     the other palettes' dark Cash and Other colours, which is why they are
+     last. tests/savings-audit-2026-10-20.test.cjs pins the spacing. */
+  const WORTH_WALK_PALETTE = ['#fb923c', '#a16207', '#84cc16', '#15803d', '#e879f9',
+    '#2563eb', '#a8a29e', '#c026d3', '#818cf8'];
+
+  /* A stored kind word — an Assets-page Kind, a Debt-page Type — as a label:
+     sentence case, like "Savings" and "Cheque" beside it, so one list does not
+     read "vehicle", "precious metals" and "credit card (owed)" under "Savings"
+     (2026-10-20 audit, D1-08 / MT-11). Display only: the word in the file is
+     unchanged. views/assets.js applies the same rule to its own Kind select. */
+  const kindLabel = k => (k ? String(k).charAt(0).toUpperCase() + String(k).slice(1) : k);
 
   function renderWorth() {
     const wrap = $('#savingsWorth'); wrap.empty();
@@ -1275,28 +1364,18 @@ module.exports = function registerSavings(ctx) {
     const meta = new Map(WORTH_TYPES.map(([type, label, varName, fallback]) => [type, {
       label, color: (css.getPropertyValue(varName) || '').trim() || fallback,
     }]));
-    /* Memoised BY TYPE, not by position in the walk. One unlisted type can
-       reach both bars at once — two `tfsa` accounts, one in credit and one
-       overdrawn — and drawing the same type in two colours on one chart says
-       they are two different things. */
-    const extraColors = new Map();
-    const colorFor = type => {
-      if (!extraColors.has(type)) {
-        const i = extraColors.size;
-        extraColors.set(type, (css.getPropertyValue(EXTRA_VARS[i % EXTRA_VARS.length]) || '').trim()
-          || EXTRA_FALLBACKS[i % EXTRA_FALLBACKS.length]);
-      }
-      return extraColors.get(type);
-    };
     /* `known` rides along on the returned segment — see the distinctColors
        pass below, which must never reassign a sealed account-type colour.
        `acctType` rides along too, unlisted types only: the SAME unlisted type
        can reach both bars (a tfsa in credit and a tfsa overdrawn), and the
        colour pass below has to recognise those two segments as one decision,
-       not two — see its own comment. */
+       not two — see its own comment. An unlisted type asks for no colour of
+       its own: the pass hands it one from WORTH_WALK_PALETTE (D1-20). Its
+       label stays as the reader typed it — "tfsa" is the reader's word, not
+       one of this app's kinds. */
     const segFor = g => (g.known
       ? { label: meta.get(g.type).label, amount: g.amount, color: meta.get(g.type).color, known: true }
-      : { label: g.type.replace(/_/g, ' '), amount: g.amount, color: colorFor(g.type), known: false, acctType: g.type });
+      : { label: g.type.replace(/_/g, ' '), amount: g.amount, color: null, known: false, acctType: g.type });
     /* HOME-CURRENCY ACCOUNTS ONLY. This chart's segments are widths on a
        shared scale and shares of one denominator — "16% of what you own" is
        meaningless the moment the numerator and the denominator are in
@@ -1355,24 +1434,21 @@ module.exports = function registerSavings(ctx) {
       : '';
 
     /* Assets-page rows, grouped by their own kind — the house, the car and the
-       ring as three named blocks rather than one anonymous slab. Colours walk a
-       fixed list for the same reason the debt colours below do. Deliberately
+       ring as three named blocks rather than one anonymous slab, each named
+       in sentence case (kindLabel, D1-08). No colour asked for: the pass
+       below hands one out (D1-20). Deliberately
        appended AFTER the accounts so the bar reads bank money first and
        possessions second: the two are not equally liquid, and a chart that
        leads with a house implies you could spend it this week. */
-    const ASSET_VARS = ['--color-accent', '--color-investment', '--color-info', '--ink-faint'];
-    const ASSET_FALLBACKS = ['#0d9488', '#6f42c1', '#0ea5e9', '#5f6779'];
     /* HOME CURRENCY, like the accounts above. These two calls used to take no
        household symbol at all, so every foreign row reached a segment while
        the heading beside it — worth()'s, which holds them out — did not: a
        R2 300 000 bar under a R2 100 000 label on a R2 100 000 track. What is
        held out is named in `worthNote`. */
     const assetSegs = assetsByType(S.assets, S.settings.currency);
-    assetSegs.forEach((a, i) => {
-      const color = (css.getPropertyValue(ASSET_VARS[i % ASSET_VARS.length]) || '').trim()
-        || ASSET_FALLBACKS[i % ASSET_FALLBACKS.length];
-      assets.push({ label: a.type, amount: a.amount, color, fromAssetPage: true });
-    });
+    for (const a of assetSegs) {
+      assets.push({ label: kindLabel(a.type), amount: a.amount, color: null, fromAssetPage: true });
+    }
 
     /* ISSUE 39 — money lent out, drawn LAST in the owned bar and as one block.
        Last because the bar already reads most-liquid-first (bank money, then
@@ -1386,38 +1462,33 @@ module.exports = function registerSavings(ctx) {
        "two figures derived by different rules" shape that would let the bar
        and its own heading disagree. */
     if (w.ownedOwed > 0) {
-      const color = (css.getPropertyValue('--color-info') || '').trim() || '#0ea5e9';
-      assets.push({ label: 'Owed to you', amount: w.ownedOwed, color, fromOwedPage: true });
+      assets.push({ label: 'Owed to you', amount: w.ownedOwed, color: null, fromOwedPage: true });
     }
 
     /* Debt-page rows, grouped by their own type so a bond and a car loan are
-       tellable apart rather than merged into one anonymous block. Colours walk
-       a fixed list so the same debt type keeps the same colour between renders
-       — a segment that changes colour when another debt is added reads as a
-       different debt. */
-    const DEBT_VARS = ['--color-warning', '--color-danger', '--color-investment', '--ink-faint'];
-    const DEBT_FALLBACKS = ['#f5a524', '#f43f5e', '#6f42c1', '#5f6779'];
+       tellable apart rather than merged into one anonymous block, named in
+       sentence case like the asset kinds (D1-08). */
     const debtSegs = debtsByType(S.debts, S.settings.currency);
-    debtSegs.forEach((d, i) => {
-      const color = (css.getPropertyValue(DEBT_VARS[i % DEBT_VARS.length]) || '').trim()
-        || DEBT_FALLBACKS[i % DEBT_FALLBACKS.length];
-      debts.push({ label: d.type, amount: d.amount, color, fromDebtPage: true });
-    });
+    for (const d of debtSegs) {
+      debts.push({ label: kindLabel(d.type), amount: d.amount, color: null, fromDebtPage: true });
+    }
 
-    /* The four colour schemes above (the account-type table, its own
-       unlisted-type walk, the Assets-page walk, the Debt-page walk) each pick
-       from a FIXED list with no idea what the other three chose — the same
-       "--color-accent" landed on both a Cash account and a house asset,
-       drawing identical adjacent rects with no stroke or gap between them, so
-       they merged into one indivisible block and the legend carried two rows
-       with one swatch. One pass, over every segment on the chart together, in
-       size order (distinctColors' own requirement — see chart.js), fixes
-       that. The six sealed account-type colours are `reserved` rather than
-       run through the resolver: they are the one palette this file may not
-       touch (`scripts/presets.cjs` generates it), so they keep whatever this
-       row assigned them regardless of what else is on the chart, and nothing
-       else may be placed close enough to be confused with one. */
-    const sealedColors = [...meta.values()].map(m => m.color);
+    /* The four colour schemes this chart used to have (the account-type
+       table, an unlisted-type walk, an Assets-page walk, a Debt-page walk)
+       each picked from a FIXED list with no idea what the other three chose —
+       the same "--color-accent" landed on both a Cash account and a house
+       asset, drawing identical adjacent rects that merged into one block. One
+       pass, over every segment on the chart together, in size order
+       (distinctColors' own requirement — see chart.js), fixes that. The six
+       sealed account-type colours are not run through the resolver: they are
+       the one palette this file may not touch (`scripts/presets.cjs`
+       generates it), so they keep whatever this row assigned them. Everything
+       else comes from WORTH_WALK_PALETTE, and nothing may be placed close
+       enough to a sealed colour to be confused with one — judged against the
+       sealed types' FIXED hexes, not the live theme values, so the choice is
+       the same in the light and the dark theme (D1-20; see the palette's own
+       header). */
+    const sealedColors = WORTH_TYPES.map(t => t[3]);
     const resizable = [...assets, ...debts].filter(seg => !seg.known);
     /* Grouped so the SAME unlisted account type collapses to ONE colour
        decision even though it can appear once in each bar. distinctColors
@@ -1437,7 +1508,8 @@ module.exports = function registerSavings(ctx) {
       grp.members.push(seg);
     }
     const ordered = [...colorGroups.values()].sort((a, b) => b.amount - a.amount);
-    const resolved = distinctColors(ordered.map(g => g.wanted), { reserved: sealedColors });
+    const resolved = distinctColors(ordered.map(g => g.wanted),
+      { reserved: sealedColors, palette: WORTH_WALK_PALETTE });
     ordered.forEach((grp, i) => { for (const m of grp.members) m.color = resolved[i]; });
 
     const totalAssets = w.assets;
@@ -1503,8 +1575,9 @@ module.exports = function registerSavings(ctx) {
        collapses the whole thing to one node and hides its children. So the
        breakdown has to be in the label itself, or a non-sighted reader gets two
        totals and no composition — and on a desktop, where the titles are
-       dropped in favour of the tooltip, nothing at all. */
-    const listFor = segs => segs.map(s => `${s.label} ${money(s.amount, 0)}`).join(', ');
+       dropped in favour of the tooltip, nothing at all. In cents, as the
+       totals it follows are (2026-10-20 audit, D2-03). */
+    const listFor = segs => segs.map(s => `${s.label} ${money(s.amount)}`).join(', ');
     const { svg, add } = createChart({
       w: W, h: H, cls: 'worth-svg',
       label: `Net worth ${money(net)}: assets ${money(totalAssets)} against debts ${money(totalDebts)}`
@@ -1557,7 +1630,13 @@ module.exports = function registerSavings(ctx) {
         x: W - padR, y: y - 10, 'text-anchor': 'end', 'font-size': '13', 'font-weight': '700',
         fill: 'currentColor', 'fill-opacity': '0.8', 'font-family': 'inherit',
         'data-fig': `${fig}-total`,
-      }).textContent = money(total, 0);
+        /* In CENTS, like the rows listed under the bar and the Net worth tile
+           above it. Each used to round alone — this total and every row to the
+           rand — so the rows did not add up to the total they sit under, and
+           both sat beside a cents KPI (2026-10-20 audit, D2-01/D2-03). The
+           heading runs along the top of a 1000-unit-wide chart, not inside a
+           hole, so the extra three characters have the room. */
+      }).textContent = money(total);
       // The track shows how far short of the longer bar this one falls.
       // rx capped at half of the new thin barH, not the old bar's 10 — a
       // corner radius bigger than the strip is tall drew a barely-rounded
@@ -1674,25 +1753,35 @@ module.exports = function registerSavings(ctx) {
 
     wrap.append(svg, tipBox);
 
-    /* RANKED LIST, replacing the swatch/name/value legend grid — redesign
-       mockup B ("Net worth is the hero"). Same segments, same colours, same
-       amounts as the legend it replaces (and the same figures the bars and
-       their <title>s state — one set of numbers, three views of it), just
-       ordered largest-first and carrying the share the bar's own tooltip
-       already computes, so a reader gets on the page what used to cost a
-       hover/hold. `sharePercents` — not a per-row Math.round — for the same
-       reason `row()` above uses it: a naive per-slice rounder can announce
-       "0%" for a real segment while a neighbour silently absorbs the missing
-       point (see that function's own comment). One call per bar, matching
-       the one `row()` makes for the same segments, so the percentage printed
-       here is never a second, independently-rounded answer to the same
-       question the bar's tooltip already answered. */
+    /* THE LIST UNDER THE BARS, replacing the swatch/name/value legend grid —
+       redesign mockup B ("Net worth is the hero"). Same segments, same
+       colours, same amounts as the legend it replaces (and the same figures
+       the bars and their <title>s state — one set of numbers, three views of
+       it), carrying the share the bar's own tooltip already computes, so a
+       reader gets on the page what used to cost a hover/hold. `sharePercents`
+       — not a per-row Math.round — for the same reason `row()` above uses it:
+       a naive per-slice rounder can announce "0%" for a real segment while a
+       neighbour silently absorbs the missing point (see that function's own
+       comment). One call per bar, matching the one `row()` makes for the same
+       segments, so the percentage printed here is never a second,
+       independently-rounded answer to the same question the bar's tooltip
+       already answered.
+
+       IN BAR ORDER, not ranked by size (2026-10-20 audit, MT-11). The list
+       used to be one size ranking across both bars, so it interleaved what
+       you own with what you owe and ran in a different order from the
+       segments drawn directly above it — a swatch had to be hunted for. It
+       now reads the owned bar left to right (bank money, possessions, money
+       lent: the liquidity order the bar is built in), then the owed bar the
+       same way, so row N is segment N. And in CENTS: the rows are the parts
+       of the bar totals printed in cents above them, and add up to them as
+       printed (D2-01/D2-03). */
     const assetShares = sharePercents(assets.map(s => s.amount));
     const debtShares = sharePercents(debts.map(s => s.amount));
     const ranked = [
       ...assets.map((seg, i) => ({ seg, share: assetShares[i], of: 'own' })),
       ...debts.map((seg, i) => ({ seg: { ...seg, label: `${seg.label} (owed)` }, share: debtShares[i], of: 'owe' })),
-    ].sort((a, b) => b.seg.amount - a.seg.amount);
+    ];
 
     /* TAPPABLE, ROW-BY-ROW — the composition list becomes another way into
        the page that actually owns each segment's figure, the same way the
@@ -1708,7 +1797,7 @@ module.exports = function registerSavings(ctx) {
     for (const { seg, share, of } of ranked) {
       const dest = navFor(seg);
       const btn = el('button', { type: 'button', class: 'sav-worth-btn',
-        'aria-label': `${seg.label}, ${money(seg.amount, 0)}, ${share}% of what you ${of}. Open ${dest === 'owed' ? 'Owed Money' : dest[0].toUpperCase() + dest.slice(1)}.` },
+        'aria-label': `${seg.label}, ${money(seg.amount)}, ${share}% of what you ${of}. Open ${dest === 'owed' ? 'Owed Money' : dest[0].toUpperCase() + dest.slice(1)}.` },
         /* `i`, not `span` — tests/savings-cards.test.cjs walks the swatch by
            TAG (`e.tagName === 'I'`), the same shape the legend it replaces
            used, so the colour-per-unlisted-type guard keeps pinning the same
@@ -1717,7 +1806,7 @@ module.exports = function registerSavings(ctx) {
         el('span', { class: 'sav-worth-name' }, seg.label),
         el('span', { class: 'sav-worth-end' },
           el('span', { class: 'sav-worth-share' }, `${share}%`),
-          el('span', { class: 'num sav-worth-val' }, money(seg.amount, 0))));
+          el('span', { class: 'num sav-worth-val' }, money(seg.amount))));
       btn.addEventListener('click', () => ctx.switchView(dest));
       const row = el('li', { class: `sav-worth-row${of === 'owe' ? ' sav-worth-row--owe' : ''}` }, btn);
       list.append(row);

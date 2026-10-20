@@ -6,8 +6,8 @@
    the Accounts page read STATED balances off S.accounts; the Dashboard's
    position tile, the Savings worth chart, the Score and the Report read
    IMPLIED ones off impliedAccounts(). On the vault this was built against
-   the Savings page printed "Investments R 674 463,50" above a chart whose
-   own Investments segment read R 691 357,55 — the R 16 894,05 between them
+   the Savings page printed one "Investments" figure above a chart whose
+   own Investments segment read about R 17 000 more — the gap between them
    was the reconcile drift, and the only surface that said so was a note on
    a different page.
 
@@ -208,7 +208,8 @@ async function mount(files = FILES) {
          above is built from every account, not just the pool. This hero
          prints STATED, so the sign keeps the ORIGINAL sense — a positive
          drift means transactions since the stated figures netted MORE in. */
-      ok(/Transactions since your stated balances add up to R 750 more\./.test(hero),
+      /* In cents under the cents hero since the 2026-10-20 audit (D2-03 / MT-07). */
+      ok(/Transactions since your stated balances add up to R 750\.00 more\./.test(hero),
         'the Accounts hero discloses the same drift figures.js computes for the whole book, worded for the base IT prints (stated)');
     }
     {
@@ -227,9 +228,9 @@ async function mount(files = FILES) {
       /* NEGATIVE drift here keeps the ORIGINAL sense (this hero prints
          STATED, unlike the tile above): transactions since the stated
          figures netted an OUTFLOW, so they add up to less — driftDown. */
-      ok(/Transactions since your stated balances add up to R 1750 less\./.test(hero),
+      ok(/Transactions since your stated balances add up to R 1750\.00 less\./.test(hero),
         'the sign flips correctly on the hero too, and in the opposite direction from the tile\'s wording because this surface prints the OTHER base');
-      ok(!/add up to R 1750 more/.test(hero), 'and the "more" wording from the positive case does not leak into this one');
+      ok(!/add up to R 1750(\.00)? more/.test(hero), 'and the "more" wording from the positive case does not leak into this one');
     }
 
     /* ---- 4. the Savings KPIs print the STATED book and say what moved ------ */
@@ -239,9 +240,10 @@ async function mount(files = FILES) {
       const kpis = text('savingsKpis');
       ok(kpis.includes('R 20000.00'), `Savings KPI: stated savings (got: ${kpis.slice(0, 300)})`);
       ok(kpis.includes('R 50000.00'), 'Investments KPI: stated investments');
-      ok(/Transactions since then add up to R 1000 more/.test(kpis),
+      /* In cents under the cents KPI tile since the 2026-10-20 audit (D2-03). */
+      ok(/Transactions since then add up to R 1000\.00 more/.test(kpis),
         'the Savings KPI names the rows that moved after its balance was stated — the same sentence the Dashboard\'s stale note uses');
-      ok(!/R 250 less/.test(kpis), 'the checking drift belongs to no KPI on this page');
+      ok(!/R 250(\.00)? less/.test(kpis), 'the checking drift belongs to no KPI on this page');
     }
     {
       const quiet = { ...FILES };

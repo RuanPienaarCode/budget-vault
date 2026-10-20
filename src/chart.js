@@ -226,7 +226,7 @@ function createChart({ w, h, label, cls }) {
   const svg = document.createElementNS(NS, 'svg');
   svg.setAttribute('viewBox', `0 0 ${w} ${h}`);
   svg.setAttribute('role', 'img');
-  svg.setAttribute('aria-label', label);
+  if (label !== undefined && label !== null) svg.setAttribute('aria-label', label); // no label, no attribute: a decorative sparkline read "undefined" (2026-10-20 audit)
   if (cls) svg.setAttribute('class', cls);
   // currentColor drives axis text and gridlines, so both follow the theme
   // without a second getComputedStyle read per element.

@@ -24,6 +24,7 @@ const { accountType } = require('./vocabulary');
 const { netByOwner } = require('./owners');
 const { normalizeAmount, parseNum } = require('./amount');
 const { todayIso } = require('./dates');
+const { largestRemainder } = require('./share-percents');
 
 /* ADR-0007 · One readable-balance rule. The loader parses "about 300" to 0 and
    keeps the text in `balanceRaw`; only when normalizeAmount ALSO fails on that
@@ -75,13 +76,54 @@ function remainderDecimals(v) {
    Rounds the way formatAmount does (toFixed on the magnitude), not Math.round,
    so a half-unit rounds the same way it prints. { value, decimals } for
    money(Math.abs(value), decimals); value carries the sign. */
+/* A figure as money(v, 0) prints it, as a signed whole number: the magnitude
+   rounded by toFixed (formatAmount's own rounding), the sign put back. */
+const printedWhole = v => (v < 0 ? -1 : 1) * Number(Math.abs(v).toFixed(0));
+
 function printedRemainder(budget, spent) {
-  const whole = v => (v < 0 ? -1 : 1) * Number(Math.abs(v).toFixed(0));
-  const diff = whole(budget) - whole(spent);
+  const diff = printedWhole(budget) - printedWhole(spent);
   if (diff !== 0) return { value: diff, decimals: 0 };
   const exact = budget - spent;
   const decimals = remainderDecimals(exact);
   return { value: decimals ? Math.round(exact * 100) / 100 : 0, decimals };
+}
+
+/* The whole-unit parts of a whole-unit figure, allocated so they add up to it
+   AS PRINTED (2026-10-20 audit, D2-01). The Dashboard's Where-you-stand tiles
+   print a total in whole rands with its parts on the line beneath ("R 1 000
+   owned · R 301 owed" under a net worth of R 700), and each part used to be
+   rounded on its own — two roundings of half a rand each can miss the total
+   by a rand, and the reader adding the line up finds a figure the tile never
+   claimed. The total is printedWhole of the parts' true sum (the one rounding
+   the tile itself makes); the parts are that total distributed by largest
+   remainder, the donut legend's rule (share-percents.js), so each part stays
+   within a unit of its own true value.
+
+   `values` are SIGNED parts of the sum: a difference passes its subtracted
+   term negated (net worth is [owned, −owed]) and the caller prints its
+   magnitude. `total` is the figure the tile itself prints, when the caller
+   holds it already (worth() hands net worth back rounded to the cent, which
+   can sit on the other side of a half-rand from the raw sum of its parts);
+   it defaults to that sum. Returns whole numbers in the same order. */
+function printedParts(values, total) {
+  const nums = values.map(v => Number(v) || 0);
+  const sum = total === undefined ? nums.reduce((s, v) => s + v, 0) : Number(total) || 0;
+  return largestRemainder(nums, printedWhole(sum));
+}
+
+/* The tone of "{pct}% of spending budget used", ONE rule for the Dashboard
+   hero and the Budget strip (2026-10-20 audit, MT-14). The Dashboard painted
+   it amber always — 49% used with a day of the period left read as a warning,
+   so the colour carried nothing — while the Budget page printed the same line
+   plain always. The thresholds are the budget table's own, read from
+   budgetRowStatus rather than restated: a category row turns amber at 85% of
+   its envelope (`near`) and red past it (`over`), and the whole spending
+   budget is one more envelope. Returns the class to add, '' for none; the
+   classes are the app's two existing tone inks. `used` is budgetUsed(p). */
+function usedToneClass(used) {
+  if (!used || !(Number(used.budgeted) > 0)) return '';
+  const { over, near } = budgetRowStatus({ budget: used.budgeted, actual: used.spent, type: 'expense' });
+  return over ? 'text-danger' : near ? 'text-warning' : '';
 }
 
 module.exports = function registerFigures(ctx) {
@@ -219,10 +261,15 @@ module.exports = function registerFigures(ctx) {
     const incomeBase = incomeBaseFor(args);
     const allocated = allocatedShare({ budgeted: total, ...args });
     const baseDiffers = allocated !== null && Math.round((incomeBase - actualIncome) * 100) !== 0;
-    const unallocated = (hasIncomeRow || totals.income > 0) ? totals.income - total
-      : (periodFinished ? actualIncome - total : null);
+    /* `unallocatedBase` is the income the remainder is taken from, named so
+       the Budget strip can print the remainder from the figure its own
+       income tile (or that tile's "received so far" note) prints beside it
+       (2026-10-20 audit, D2-01) rather than from a third rounding. */
+    const unallocatedBase = (hasIncomeRow || totals.income > 0) ? totals.income
+      : (periodFinished ? actualIncome : null);
+    const unallocated = unallocatedBase === null ? null : unallocatedBase - total;
     return { total, spend: totals.spend, setAside: totals.setAside, income: totals.income, hasIncomeRow,
-      actualIncome, periodFinished, incomeBase, allocated, baseDiffers, unallocated };
+      actualIncome, periodFinished, incomeBase, allocated, baseDiffers, unallocated, unallocatedBase };
   }
 
   /* The snapshot. Everything a period page prints about the period, built
@@ -320,9 +367,9 @@ module.exports = function registerFigures(ctx) {
      Savings KPIs and the Accounts page summed the first and the Dashboard
      tile, the Savings chart, the Score and the Report summed the second, each
      in its own loop; on the vault this was built against the Savings page
-     printed R 674 463,50 invested above a chart segment reading
-     R 691 357,55, and nothing on that page said the R 16 894,05 between
-     them was rows nobody had confirmed yet. Both bases live here so a page
+     printed one invested figure above a chart segment reading another some
+     R 17 000 higher, and nothing on that page said the gap between them was
+     rows nobody had confirmed yet. Both bases live here so a page
      that prints one is handed the other, and the drift, with it.
 
      Home currency only, the way every total in this app is (currency.js);
@@ -379,3 +426,5 @@ module.exports.balanceReadable = balanceReadable;
 module.exports.amountUnreadable = amountUnreadable;
 module.exports.remainderDecimals = remainderDecimals;
 module.exports.printedRemainder = printedRemainder;
+module.exports.printedParts = printedParts;
+module.exports.usedToneClass = usedToneClass;

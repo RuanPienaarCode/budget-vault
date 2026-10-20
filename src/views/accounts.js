@@ -32,7 +32,10 @@ const { symbolOf, isForeign, splitByCurrency: splitAccounts, primaryTotal, other
    the goal cell and drawer answer a different growth figure for the same
    account than the Savings page does (exactly the two-call-sites-drift bug
    the comment above already names one instance of). */
-const { totalReturn, poolCatType } = require('../savings-math');
+/* goalPercentLabel and returnPercentText beside them: the goal cell and the
+   growth cell print by the SAME rules the Savings page prints the same
+   account by (2026-10-20 audit, M2-08 / D2-10). */
+const { totalReturn, poolCatType, goalPercentLabel, returnPercentText } = require('../savings-math');
 const { yamlStr, parseFrontmatter } = require('../markdown');
 const { safeSeg } = require('../vault-path');
 /* Namespace import: this file binds `t` in askFields callbacks. */
@@ -81,7 +84,9 @@ const { worth, cardOverlap } = require('../worth');
    percentage column is allocated by largest remainder, never rounded per
    group. Re-exported at the bottom of this file so the donut test keeps
    reading each view's own door. */
-const { sharePercents } = require('../share-percents');
+/* sharePercentLabel for the credit-limit share: whole percents except where a
+   whole one would claim 0% or 100% (2026-10-20 audit, D2-09). */
+const { sharePercents, sharePercentLabel } = require('../share-percents');
 
 module.exports = function registerAccounts(ctx) {
   const { S, $, app, root, plugin, money, toast, writeFile, ensureFolder, relPath, fileAt, ledger, tally, LENSES,
@@ -970,7 +975,8 @@ module.exports = function registerAccounts(ctx) {
       if (conv.converted.length) {
         bits.push(i18n.t(conv.stale ? 'acct.hero.convertedStale' : 'acct.hero.converted', {
           list: conv.converted.map((c, i) => `${c.code} ${parts[i].replace(/^\S+\s/, '')}`).join(' · '),
-          date: conv.date,
+          // "rates for Aug 27": a date in a sentence is prose (2026-10-20 audit, D2-11).
+          date: ctx.dateText(conv.date),
           days: conv.age === null ? '?' : String(conv.age),
         }));
       }
@@ -1014,7 +1020,7 @@ module.exports = function registerAccounts(ctx) {
        off STATED balances (balances.stated.accounts above) with no caveat,
        while the Dashboard's position tile and the Savings chart print IMPLIED
        for the same accounts and say nothing either — on the vault this was
-       measured against, the gap was R 16 894,05, big enough to want an answer.
+       measured against, the gap was some R 17 000, big enough to want an answer.
        `balances.drift` (figures.js) is exactly `w.net`'s own implied-minus-
        stated gap, because `net` here is built from the same account list and
        the same positive-minus-negative rule balanceBook() sums by.
@@ -1025,9 +1031,13 @@ module.exports = function registerAccounts(ctx) {
        POSITIVE drift means the transactions since those stated balances
        netted an INFLOW the reader hasn't seen confirmed yet — "add up to
        more", the same direction the reused sentence always meant. */
+    /* In CENTS (2026-10-20 audit, D2-03 / MT-07): this sentence sits under
+       a hero printed in cents, and the cents rule keeps whole rands to the
+       Dashboard/Budget summary figures. "R 150" under "R 20 290,40" was two
+       precisions in one card. */
     const heroDrift = balances.drift || 0;
     const heroDriftLine = Math.abs(heroDrift) >= 1
-      ? i18n.t(heroDrift > 0 ? 'acct.hero.driftUp' : 'acct.hero.driftDown', { amount: money(Math.abs(heroDrift), 0) })
+      ? i18n.t(heroDrift > 0 ? 'acct.hero.driftUp' : 'acct.hero.driftDown', { amount: money(Math.abs(heroDrift)) })
       : '';
 
     const hero = el('div', { class: 'card hero acct-hero' },
@@ -1101,16 +1111,22 @@ module.exports = function registerAccounts(ctx) {
      see worth.js's cardOverlap() header. Accounts and Debt are the two pages
      that actually invite a reader to add the same Visa twice (one as an
      account, one as a debt row), and until now they were the only two pages
-     that said nothing about it: the net figure at the top of this very page
-     is exactly the one that double-counts. Reuses dash.overlap's wording
-     rather than a page-local copy, so the sentence cannot drift between the
-     three places it now appears. */
+     that said nothing about it.
+
+     Its OWN sentence, not dash.overlap's (2026-10-20 audit, M2-06). The
+     Dashboard's ends "…it is counted twice above", true under the Dashboard's
+     net-worth tile and false here: the hero above this note sums the ACCOUNTS
+     alone and says so ("Assets and debts recorded on their own pages are not
+     counted here"), so a card in both is counted once on this page. Where it
+     IS counted twice is net worth, on the Savings page and the Dashboard, and
+     acct.overlap names those. The button and its label are the Dashboard's,
+     because those are true here as well. */
   function overlapNote() {
     const o = cardOverlap(S.accounts, S.debts);
     if (!o) return null;
     const note = el('div', { class: 'kpi-caveat' },
       el('div', { class: 'kpi-caveat-txt' }, icoEl(['info', 'alert-circle']),
-        i18n.t('dash.overlap', { accounts: o.cardAccounts, debts: o.cardDebts })));
+        i18n.t('acct.overlap', { accounts: o.cardAccounts, debts: o.cardDebts })));
     const btn = el('button', { type: 'button', class: 'kpi-caveat-btn',
       'aria-label': i18n.t('dash.overlap.aria') }, i18n.t('dash.overlap.btn'));
     btn.addEventListener('click', () => ctx.switchView('debts'));
@@ -1222,12 +1238,18 @@ module.exports = function registerAccounts(ctx) {
     const { others: cardOthers } = splitByCurrency(S.accounts);
     const cardOtherLine = otherCurrenciesLine(cardOthers);
 
+    /* acct.where.sub is a caption with no closing stop, and the currency line
+       is a sentence of its own (" Plus € 640 held …"), so glued together they
+       read "Share of what these accounts hold Plus € 640 held" (2026-10-20
+       audit, D1-15). When the second sentence follows, the caption's own
+       stopped form leads — a KEY rather than a "." added here, so each
+       language ends the caption with its own mark (。 in ja and zh). */
     const card = el('div', { class: 'card acct-ring' });
     card.append(el('div', { class: 'card-h' },
       el('div', {},
         el('h2', {}, i18n.t('acct.where.title')),
         el('div', { class: 'sub' },
-          i18n.t('acct.where.sub') + cardOtherLine))));
+          i18n.t(cardOtherLine ? 'acct.where.subStop' : 'acct.where.sub') + cardOtherLine))));
 
     const body = el('div', { class: 'body-pad acct-ring-body' });
     if (!sum) {
@@ -1286,6 +1308,12 @@ module.exports = function registerAccounts(ctx) {
         + (g.others.length ? ` ${otherCurrenciesTag(g.others)}` : ''));
       a0 += sweep;
     });
+    /* The CENTRE stays whole rands — deliberately, and the one figure on this
+       card that does. It sits in the donut's hole, 184 units across at 26-unit
+       bold type, and a household's total in cents ("R 345 678,90", twelve
+       characters) is wider than the hole. The legend under the ring carries
+       the cents instead (below), and its rows add up to `sum` exactly, of
+       which this is the rounding (2026-10-20 audit, D2-01 / D2-03). */
     add('text', {
       x: cx, y: cy + 10, 'text-anchor': 'middle', 'font-size': '26', 'font-weight': '700',
       fill: 'currentColor', 'font-family': 'inherit',
@@ -1294,14 +1322,20 @@ module.exports = function registerAccounts(ctx) {
     const legend = el('ul', { class: 'donut-legend acct-ring-legend' });
     /* Drawn wedges first, then any group that holds only foreign money — it
        has no wedge and no share of the ring, but it is listed rather than
-       dropped, so the legend still accounts for every account on the page. */
+       dropped, so the legend still accounts for every account on the page.
+
+       In CENTS (2026-10-20 audit, D2-03 / MT-07): the hero two cards up, the
+       group totals in the table below and this ring's own tooltips all print
+       cents, and the legend was the one reading of the same group totals in
+       whole rands — each rounded alone, so the rows did not add up to the
+       figure they explain (D2-01). In cents they add up to `sum` to the cent. */
     [...drawn.map((g, i) => [g, shares[i]]), ...foreignOnly.map(g => [g, '0'])]
       .forEach(([g, pct]) => {
         const tag = otherCurrenciesTag(g.others);
         legend.append(el('li', {},
           el('i', { style: `background:${g.colour}` }),
           el('span', { class: 'dl-name' }, i18n.t(g.key)),
-          el('span', { class: 'dl-val num' }, money(g.total, 0),
+          el('span', { class: 'dl-val num' }, money(g.total),
             ...(tag ? [el('span', { class: 'acct-group-other' }, ` ${tag}`)] : [])),
           el('span', { class: 'dl-pct' }, `${pct}%`)));
       });
@@ -1337,7 +1371,9 @@ module.exports = function registerAccounts(ctx) {
         { count: r.rec.count, implied: acctMoney(r.a, r.rec.implied), stated: acctMoney(r.a, r.a.balance) });
     }
     if (r.state === 'stale') {
-      return i18n.t('acct.deck.why.stale', { count: r.days, date: r.a.balance_updated });
+      // A prose date, "last checked Aug 1" (2026-10-20 audit, D2-11); the
+      // table's Confirmed column keeps the ISO cell.
+      return i18n.t('acct.deck.why.stale', { count: r.days, date: ctx.dateText(r.a.balance_updated) });
     }
     /* Its own branch rather than the generic fallthrough below, because this is
        the only `why` line besides drift and stale that states a NUMBER — the
@@ -1656,11 +1692,18 @@ module.exports = function registerAccounts(ctx) {
         el('i', { class: tone || '', style: `width:${Math.min(100, Math.max(0, pct)).toFixed(1)}%` })),
       el('span', { class: 'acct-mbar-l' }, label));
 
+    /* Both shares below are labelled by the app's boundary rule rather than a
+       bare Math.round (2026-10-20 audit, M2-08 / D2-09): Math.round printed
+       "100%" for a card at 99,7% of its limit — under the bar that turns red
+       at "over" — and "0%" for one at 0,3% that does owe something, and a
+       goal at 99,6% read "100%" here while the Savings page, for the same
+       account, read "99%". */
+    const dec = ctx.locale().decimal;
     const u = utilisationOf(a);
     if (u) {
       return bar(u.pct, u.over ? 'bg-danger' : u.near ? 'bg-warning' : '',
         u.over ? i18n.t('acct.overLimit', { amount: acctMoney(a, -u.available, 0) })
-          : i18n.t('acct.limitOf', { pct: Math.round(u.pct), amount: acctMoney(a, a.credit_limit, 0) }));
+          : i18n.t('acct.limitOf', { pct: sharePercentLabel(u.pct / 100, dec), amount: acctMoney(a, a.credit_limit, 0) }));
     }
     if (a.goal_amount > 0) {
       const pct = (a.balance / a.goal_amount) * 100;
@@ -1668,9 +1711,11 @@ module.exports = function registerAccounts(ctx) {
          two lines up in `bar()` — an overdrawn account with a savings goal
          used to print "−340% of R10 000" beside a bar that could only ever
          show zero width, two figures making two different claims about the
-         same account. */
-      const shown = Math.min(100, Math.max(0, pct));
-      return bar(pct, '', i18n.t('acct.goalOf', { pct: Math.round(shown), amount: acctMoney(a, a.goal_amount, 0) }));
+         same account. goalPercentLabel clamps the same way, and is the ONE
+         rule the Savings goal bar prints by too. */
+      return bar(pct, '', i18n.t('acct.goalOf', {
+        pct: goalPercentLabel(a.balance, a.goal_amount, dec), amount: acctMoney(a, a.goal_amount, 0),
+      }));
     }
     /* r.tr.basis !== 'none', not `a.total_invested > 0` — the old gate hid this
        whole branch from an account on basis 'measured' (starting_amount +
@@ -1697,8 +1742,14 @@ module.exports = function registerAccounts(ctx) {
          bar in the drawer beside a dash-free 0% in the table. */
       if (tr.returnPct === null) return el('span', { class: 'acct-dash' }, '—');
       const pct = tr.returnPct;
-      return bar(100, pct < 0 ? 'bg-warning' : '',
-        i18n.t('acct.growthOn', { pct: (pct >= 0 ? '+' : '') + Math.round(pct), amount: acctMoney(a, tr.capitalIn, 0) }));
+      /* One decimal in the household's mark, through the formatter the Savings
+         card and the Report print the same return with — this cell rounded to
+         a whole percent, "-14%" beside Savings' "-13,7%" for one fund
+         (2026-10-20 audit, D2-10). And a loss in Savings' rose (bg-danger), not
+         amber: the same fund's ▼ figure is text-danger there, and amber here
+         read as a different, milder verdict on the same number (D2-17). */
+      return bar(100, pct < 0 ? 'bg-danger' : '',
+        i18n.t('acct.growthOn', { pct: returnPercentText(pct, ctx.locale()), amount: acctMoney(a, tr.capitalIn, 0) }));
     }
     return el('span', { class: 'acct-dash' }, '—');
   }
@@ -1960,7 +2011,9 @@ module.exports = function registerAccounts(ctx) {
     if (!a.in_budget) badges.append(badge(i18n.t('acct.badge.notInBudget'), 'muted'));
     if (!r.rows.length) badges.append(badge(i18n.t('acct.badge.noTx'), 'warn'));
     if (a.balance_updated && r.days === null) {
-      badges.append(badge(i18n.t('acct.badge.asOf', { date: a.balance_updated }), 'muted'));
+      // dateText: prose for a real date (D2-11); a cell it cannot read comes
+      // back exactly as typed, which is what this badge exists to show.
+      badges.append(badge(i18n.t('acct.badge.asOf', { date: ctx.dateText(a.balance_updated) }), 'muted'));
     }
     /* The account's own two currency fields contradicting each other, said on
        the row rather than left to be inferred from a total. `currency: R` with
@@ -2034,12 +2087,16 @@ module.exports = function registerAccounts(ctx) {
     const undatable = n ? i18n.t('acct.recon.undatable', { count: n }) : '';
     if (rec.state === 'drift') {
       const diff = rec.implied - a.balance;
+      /* The difference in CENTS, like the implied figure in the same sentence
+         and the stated one in the drawer's heading it is the difference
+         between ("R 1 150,40 — R 150 higher" was two precisions in one
+         clause); the date as prose (2026-10-20 audit, D2-03 / D2-11). */
       line.append(el('div', { class: 'acct-recon-txt' },
         i18n.t('acct.drawer.drift', {
           count: rec.count,
-          date: a.balance_updated,
+          date: ctx.dateText(a.balance_updated),
           implied: acctMoney(a, rec.implied),
-          diff: acctMoney(a, Math.abs(diff), 0),
+          diff: acctMoney(a, Math.abs(diff)),
           dir: i18n.t(diff < 0 ? 'acct.drawer.lower' : 'acct.drawer.higher'),
         }) + (rec.ahead ? i18n.t('acct.recon.pending', { count: rec.ahead }) : '') + undatable));
       const btn = el('button', { type: 'button', class: 'acct-recon-btn',
@@ -2053,7 +2110,7 @@ module.exports = function registerAccounts(ctx) {
       : r.state === 'nofolder' ? i18n.t('acct.drawer.recon.nofolder')
         : r.state === 'nodate' ? i18n.t('acct.drawer.recon.nodate')
           : r.state === 'unreadable' ? i18n.t('acct.drawer.recon.unreadable')
-            : r.state === 'stale' ? i18n.t('acct.drawer.recon.stale', { date: a.balance_updated })
+            : r.state === 'stale' ? i18n.t('acct.drawer.recon.stale', { date: ctx.dateText(a.balance_updated) })
               : rec.state === 'pending' ? i18n.t('acct.recon.upToDate', { count: rec.ahead })
                 : i18n.t('acct.drawer.recon.ok');
     line.append(el('div', { class: `acct-recon-txt${r.state === 'ok' ? ' text-success' : ' text-muted'}` },
@@ -2362,13 +2419,22 @@ module.exports = function registerAccounts(ctx) {
 
      Thresholds match the dashboard's budget bars — over at 100%, near at 85% —
      so a bar means the same thing wherever it appears in this app. Kept apart
-     from the markup below so the arithmetic can be tested without a DOM. */
+     from the markup below so the arithmetic can be tested without a DOM.
+
+     `available` is the limit PLUS the balance, whichever its sign (2026-10-20
+     audit, M2-12). It used to be the limit less `used`, and `used` floors at
+     zero — right for the bar, wrong for this: a card R500 in credit has the
+     whole limit AND the R500 to spend, and the drawer printed the limit alone,
+     as though the credit were not there. For a card in debt the two
+     spellings agree; over the limit it goes negative, which is what
+     acct.overLimit states the size of. Cent-rounded, -0 collapsed. */
   function utilisationOf(a) {
     if (!isCreditCard(a) || !a.credit_limit || a.credit_limit <= 0) return null;
     const used = Math.max(0, -a.balance);
     const pct = (used / a.credit_limit) * 100;
     const over = used > a.credit_limit;
-    return { used, pct, over, near: !over && pct >= 85, available: a.credit_limit - used };
+    const available = (Math.round((a.credit_limit + a.balance) * 100) / 100) || 0;
+    return { used, pct, over, near: !over && pct >= 85, available };
   }
   /* `keys` names the extra frontmatter fields to write from the model — the
      edit form passes the ones whose line it changed, Ignore and the import pass

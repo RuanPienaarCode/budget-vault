@@ -482,8 +482,8 @@ function nextDue(stats, cycle, today) {
    not less.
 
    IT MUST NEVER RETURN AN AVERAGE. A four-month mean of everything landing in
-   one real account came to R61 000 against a true salary of R40 240 — it had
-   quietly folded in a second earner who stopped in February, a R40 000 payment
+   one real account came to about half again its true salary — it had
+   quietly folded in a second earner who stopped in February, a large payment
    that arrived on the 6th and left again on the 7th, and two insurance claims.
    Every one of those inflates a mean and not one of them is coming again. A
    figure the reader can check against their own payslip earns trust; a mean

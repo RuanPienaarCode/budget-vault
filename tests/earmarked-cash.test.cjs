@@ -136,7 +136,7 @@ atAuditDate(async () => {
   const left = nodes.get('leftBody').textContent;
   ok(left.includes('R 41800'), `cash on hand is unchanged — got: ${left}`);
   ok(left.includes(`R 23000${i18n.t('dash.left.earmarked')}`),
-    `the emergency fund and the baby fund are shown as set aside — got: ${left}`);
+    `the emergency fund and the baby fund are shown as in your funds (the term's label since the 2026-10-20 audit, D2-12) — got: ${left}`);
   ok(left.includes('Baby fund') && left.includes('Emergency fund'),
     'named, so the reader can disagree with the claim');
   /* R41 800 − R23 000 set aside − R1 500 committed. The committed figure is
@@ -153,7 +153,7 @@ atAuditDate(async () => {
 
   /* And the per-day rate is drawn from the same figure as the headline —
      committed.js's own rule that every "free" on this card is ONE number. */
-  ok(left.includes('R 597/day'),
+  ok(left.includes('R 597 a day'),   // one per-unit form since the 2026-10-20 audit (MT-12)
     `the per-day rate divides the free figure, not the cash pile — got: ${left}`);
 
   console.log(`PASS earmarked-cash (${checks} checks)`);

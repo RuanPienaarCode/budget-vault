@@ -36,7 +36,7 @@
 const fs = require('fs');
 const path = require('path');
 const { makeCtx, loadInto } = require('./harness.cjs');
-const { makeDom } = require('./dom-stub.cjs');
+const { makeDom, readable } = require('./dom-stub.cjs');
 
 /* ---- the money recorder -------------------------------------------------
    Wrapped at src/currency.js's formatAmount, NOT at ctx.money, because
@@ -229,11 +229,31 @@ const NUMBER = /(^|[^\w-])(-?\d[\d  ,.]*\d|-?\d)/gu;
 const ISO_DATE = /\d{4}-\d{2}-\d{2}/g;
 const TRIM = /^[\s,.;:)\]]+|[\s,.;:(\[]+$/gu;
 
+/* Printed prose, read back the way the formatter wrote it.
+
+   Since the audit of 20 Oct 2026 src/i18n.js interpolate() glues a figure
+   that is a sentence's param with U+00A0, so "R 12 345" can no longer wrap
+   as "R 12" / "345" on a phone. The formatter itself still writes U+0020
+   (currency.js formatAmount is untouched), so the recorded money strings
+   below say "R 12 345" while the sentence says "R\u00a012\u00a0345" — and an
+   indexOf between the two finds nothing. Unmatched, the figure fell through
+   to NUMBER, which does not cross a U+00A0, and the ledger reported "R 12 100"
+   as the bare numbers 12 and 100.
+
+   Mapped back to U+0020 HERE, once, for everything that reads printed text:
+   numbersIn (the DOM harvest and the Report markdown harvest), ownText (the
+   leaf readers scripts/reconcile-page.cjs and the dash-audit suites build on).
+   The mapping is the inverse of the one interpolate applies, so a harvested
+   line reads exactly as it did before the glue — which is what lets the
+   golden ledgers prove the change moved whitespace and nothing else.
+   `readable` itself lives in dom-stub.cjs, beside the stub's own textContent
+   that applies it, so there is one spelling of the mapping. */
+
 function numbersIn(text, moneyStrings = []) {
   /* Dates are blanked, not deleted: every other offset must stay put, because
      the claimed-span bookkeeping below is what stops one figure being reported
      twice under two kinds. */
-  const s = String(text).replace(ISO_DATE, m => ' '.repeat(m.length));
+  const s = readable(text).replace(ISO_DATE, m => ' '.repeat(m.length));
   if (!s.trim()) return [];
   const out = [];
   const claimed = [];
@@ -302,8 +322,8 @@ function addressOf(node, rootId) {
    which numbers to look at by which of two equivalent DOM calls a view happened
    to use. */
 function ownText(el) {
-  return (el._text || '')
-    + el.children.filter(c => c.nodeType === 1 && c.tagName === '#TEXT').map(c => c._text).join('');
+  return readable((el._text || '')
+    + el.children.filter(c => c.nodeType === 1 && c.tagName === '#TEXT').map(c => c._text).join(''));
 }
 
 function leaves(el, out = []) {
@@ -476,4 +496,4 @@ function readVault(root) {
   return out;
 }
 
-module.exports = { readVault, harvestReportMarkdown, harvestReports, dispatchedViews, pinClock, mountFor, harvestView, harvestAll, numbersIn, addressOf, leaves, ownText };
+module.exports = { readable, readVault, harvestReportMarkdown, harvestReports, dispatchedViews, pinClock, mountFor, harvestView, harvestAll, numbersIn, addressOf, leaves, ownText };

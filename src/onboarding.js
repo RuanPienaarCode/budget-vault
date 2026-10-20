@@ -28,6 +28,7 @@
 
 const { Modal, Setting, Notice, normalizePath, TFile, TFolder } = require('obsidian');
 const { PROFILES, COUNTRY_ORDER, localeFor } = require('./locale');
+const { formatAmount } = require('./currency');
 const { SET_ASIDE_TYPES } = require('./vocabulary');
 /* Namespace import for the same reason settings-tab.js uses one: this file
    binds `t` as a parameter in several `.addText(t => …)` callbacks, so a bare
@@ -1039,11 +1040,22 @@ class OnboardingWizard extends Modal {
   }
 
   /* One money formatter for the wizard, so the hint, the summary and the
-     opening-balance line cannot disagree about how a figure reads. Deliberately
-     plainer than the app's money(): the locale profile the app formats with
-     belongs to a vault that does not exist yet. */
+     opening-balance line cannot disagree about how a figure reads — and it is
+     the APP's formatter (currency.js formatAmount), under the separators of the
+     country chosen on the country screen (2026-10-20 audit, D2-08).
+
+     It used to be `${symbol} ${n.toFixed(2)}`, on the reasoning that the
+     locale profile the app formats with "belongs to a vault that does not
+     exist yet". It belongs to the COUNTRY, which this wizard has already
+     asked for, and the plain version printed "R 30000.00" on the screen where
+     a South African reader had just picked South Africa — the one place in
+     the app a figure was ungrouped and pointed, seconds before the app itself
+     printed the same figure "R 30 000,00". localeFor is resolved per call, so
+     going back and changing the country changes the figures too. A negative
+     keeps formatAmount's balance form ("R -1 500,50"): the opening balance
+     this prints is a balance. */
   moneyText(n) {
-    return `${this.currencySymbol()} ${(Number(n) || 0).toFixed(2)}`;
+    return formatAmount(this.currencySymbol(), Number(n) || 0, 2, localeFor(this.data.country));
   }
 
   /* The budget folder, on the LAST screen rather than the first.

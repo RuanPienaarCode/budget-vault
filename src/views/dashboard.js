@@ -10,7 +10,7 @@ const { stalenessSummary, isStale } = require('../reconcile');
 const { whatsLeft, isSettleCard } = require('../committed');
 const { scoreBand } = require('../health-math');
 const { todayIso, isRealIsoDate } = require('../dates');
-const { balanceReadable, printedRemainder } = require('../figures');
+const { balanceReadable, printedRemainder, printedParts, usedToneClass } = require('../figures');
 const { worth, cardOverlap, otherCurrencyNet } = require('../worth');
 const { owedSummary } = require('../owed-math');
 const { currenciesIn, symbolOf, isForeign, splitByCurrency, formatSigned } = require('../currency');
@@ -38,15 +38,18 @@ const { sharePercents, largestRemainder, sharePercentLabel } = require('../share
    off ctx, so neither view depends on the other's registration order. */
 const { assumedActual } = require('../money-flow');
 /* The income row's words ("more than planned" / "still to come" / "received as
-   planned") are the Budget page's own, so one row reads the same on both. */
-const { incomeRemainingText } = require('./budgets');
+   planned") are the Budget page's own, so one row reads the same on both.
+   Since the 2026-10-20 audit (D2-05, D1-07) so are every other row's — the
+   whole Remaining cell, through remainingText — and the group headings,
+   through typeGroupLabel. */
+const { remainingText, typeGroupLabel } = require('./budgets');
 /* `keeps`/`dropsAnyOf` are the lens row tests — ledger()/LENSES come off ctx (period.js
    provides them), but the predicate itself is a pure module export. */
 const { keeps, dropsAnyOf, isRefund } = require('../ledger');
 const { poolAccounts } = require('../vocabulary');
 
 module.exports = function registerDashboard(ctx) {
-  const { S, $, app, root, plugin, money, toast, fileAt, periodSummary, budgetTotals, budgetUsed, budgetVsActualRows, categorySpendRows, categoryGap, planFigures, bookFigures, periodTitle, periodMonthName, periodShortLabel, dayLabel, periodRange, shiftPeriod, currentPeriod, txInPeriod, catType, catAssumeSpent, movedToFunds, accountForLabel, periodsForMonths, trendPeriods, historySpan, elapsedDays, periodSpend, compareTotals, healthSnapshot, locale, ledger, LENSES, periodFigures } = ctx;
+  const { S, $, app, root, plugin, money, toast, fileAt, periodSummary, budgetTotals, budgetUsed, budgetVsActualRows, categorySpendRows, categoryGap, planFigures, bookFigures, periodTitle, periodMonthName, periodShortLabel, dayLabel, dateText, periodRange, shiftPeriod, currentPeriod, txInPeriod, catType, catAssumeSpent, movedToFunds, accountForLabel, periodsForMonths, trendPeriods, historySpan, elapsedDays, periodSpend, compareTotals, healthSnapshot, locale, ledger, LENSES, periodFigures } = ctx;
 
   /* ONE FACT PER LINE (Statement type, Oct 2026). The footnotes under a figure
      used to be a single string joined with ' · '. They are now one block per
@@ -841,10 +844,12 @@ module.exports = function registerDashboard(ctx) {
        accounts are known up to, so nothing after it is in this cash — on the
        vault this was found on, a month's same window held five figures of
        spending not imported yet. Silent when that day is today. Printed as
-       an ISO date, like the due dates in the list below, so the two can be
-       compared at a glance, and in the Accounts page's own words for a
-       balance's date (`as of {date}`), borrowed rather than reworded. */
-    if (L.cashAsOf && L.cashAsOf < asOfToday) cashParts.push(i18n.t('acct.badge.asOf', { date: L.cashAsOf }));
+       a prose date (ctx.dateText), like the due dates in the list below, so
+       the two can be compared at a glance, and in the Accounts page's own
+       words for a balance's date (`as of {date}`), borrowed rather than
+       reworded. It was the ISO key until the 2026-10-20 audit (D2-11 /
+       MT-08): "as of 2026-09-26" one line under "ends on Oct 21". */
+    if (L.cashAsOf && L.cashAsOf < asOfToday) cashParts.push(i18n.t('acct.badge.asOf', { date: dateText(L.cashAsOf) }));
     if (L.staleCounted) cashParts.push(i18n.t('dash.left.unconfirmed', { count: L.staleCounted }));
     if (L.unknownAccounts.length) cashParts.push(i18n.t('dash.left.undated', { count: L.unknownAccounts.length }));
     /* A balance nobody could read is held out of the figure the way the
@@ -1006,7 +1011,7 @@ module.exports = function registerDashboard(ctx) {
         g.L.cashKnown ? i18n.t('dash.left.cash') + ' ' + gm(g.L.cash) : null,
         /* This band's cash has its own as-of, read off ITS accounts. */
         g.L.cashKnown && g.L.cashAsOf && g.L.cashAsOf < asOfToday
-          ? i18n.t('acct.badge.asOf', { date: g.L.cashAsOf }) : null,
+          ? i18n.t('acct.badge.asOf', { date: dateText(g.L.cashAsOf) }) : null,
         /* Named for the same reason the home chain names it: this band's cash
            less its committed does not reach its free figure without it, and a
            term that moves a total silently is the exclusion currency.js forbids. */
@@ -1026,7 +1031,7 @@ module.exports = function registerDashboard(ctx) {
           ? i18n.t('dash.left.cycle', { spend: gm(g.L.cycle.spend), settling: gm(g.L.cycle.settling) }) : null,
         g.L.cycle
           ? i18n.t(g.L.cycle.over ? 'dash.left.cycleOver' : 'dash.left.cycleUnder',
-            { amount: gm(Math.abs(g.L.cycle.headroom)), date: g.L.cycle.date }) : null,
+            { amount: gm(Math.abs(g.L.cycle.headroom)), date: dateText(g.L.cycle.date) }) : null,
         /* This band's own cash is an implied balance too, so the same caveat
            belongs to it — and its OWN count, over ITS accounts. A euro row
            nobody can date qualifies the euro figure and nothing else. */
@@ -1052,7 +1057,14 @@ module.exports = function registerDashboard(ctx) {
        which is the one case worth colouring red. */
     if (L.cycle) {
       const c = L.cycle;
-      const pct = Math.round(c.ratio * 100);
+      /* sharePercentLabel, not a bare Math.round (2026-10-20 audit, M1-13 /
+         D2-09). This share's whole job is the 100% line — under it the cycle
+         paid for itself, over it it did not — and a card at 99,75% of the
+         income that settles it printed "100%" beside "R 10 of headroom",
+         the boundary rounding eating the one fact the figure exists for. The
+         same helper the hero's used and allocated shares go through. The
+         bar keeps the unrounded share; only its width is clamped. */
+      const pct = sharePercentLabel(c.ratio, locale().decimal);
       body.append(el('div', { class: `left-cycle${c.over ? ' is-over' : ''}` },
         el('div', { class: 'lc-head' },
           el('span', { class: 'lc-t' }, i18n.t('dash.left.cycle', {
@@ -1063,10 +1075,10 @@ module.exports = function registerDashboard(ctx) {
           'aria-label': i18n.t('dash.left.cycleAria', {
             spend: money(c.spend), settling: money(c.settling), pct,
           }) },
-        el('i', { style: `width:${Math.min(100, pct).toFixed(1)}%` })),
+        el('i', { style: `width:${Math.max(0, Math.min(100, (Number(c.ratio) || 0) * 100)).toFixed(1)}%` })),
         el('div', { class: 'lc-s' }, i18n.t(
           c.over ? 'dash.left.cycleOver' : 'dash.left.cycleUnder',
-          { amount: money(Math.abs(c.headroom), 0), date: c.date }))));
+          { amount: money(Math.abs(c.headroom), 0), date: dateText(c.date) }))));
     }
 
     /* What is coming IN, when the rows can prove it — and nothing at all when
@@ -1083,7 +1095,7 @@ module.exports = function registerDashboard(ctx) {
         icoEl(['arrow-down-circle', 'circle-arrow-down', 'arrow-down']),
         el('div', {},
           el('div', { class: 'li-t' }, i18n.t('dash.left.incoming', {
-            amount: money(L.incoming.amount, 0), date: L.incoming.next,
+            amount: money(L.incoming.amount, 0), date: dateText(L.incoming.next),
           })),
           el('div', { class: 'li-s' }, i18n.t(
             after >= 0 ? 'dash.left.incomingCovers' : 'dash.left.incomingShort',
@@ -1218,10 +1230,13 @@ module.exports = function registerDashboard(ctx) {
            account's rows stop short of it is neither "expected" nor "was
            due": committed.js cannot know whether it went off, only that no
            statement holding that day has been imported, and it says so. */
+        /* Prose dates (ctx.dateText), not the ISO key, since the 2026-10-20
+           audit (D2-11): "expected 2026-10-15" under a card whose subtitle
+           reads "ends on Oct 21". */
         const when = it.basis === 'not-imported'
-          ? i18n.t('dash.left.notImported', { date: it.due })
+          ? i18n.t('dash.left.notImported', { date: dateText(it.due) })
           : it.due
-            ? i18n.t(it.missed ? 'dash.left.overdue' : 'dash.left.expected', { date: it.due })
+            ? i18n.t(it.missed ? 'dash.left.overdue' : 'dash.left.expected', { date: dateText(it.due) })
             : i18n.t('dash.left.thisPeriod');
         /* ISSUE 47. A weekly service commits several charges in one period, so
            the row states the CADENCE — "4 × R250" — rather than a single
@@ -1298,6 +1313,16 @@ module.exports = function registerDashboard(ctx) {
      reconciler compared the Debt tile against a household that had no greeting
      line and read the wrong node for it. A name costs nothing at runtime and
      survives a reordered card. */
+  /* `sub` is a LIST of facts, one per line (factLines, the hero's pattern),
+     never one concatenated string (2026-10-20 audit, MT-05 / D1-15). The
+     sub-line is a fragment ("R 10 501 savings · R 5 000 invested") followed
+     by whole sentences appended to it — the other-currency disclosure, the
+     stated-versus-implied drift — and concatenated they read "R 5 000
+     invested Your stated balances read R 500 less.": no stop, because the
+     fragment has none to give and a stop cannot be added in one language's
+     punctuation for all twelve. As separate facts each starts its own line,
+     and the hidden '·' between them keeps a reader of the text (the ledger,
+     a screen reader walking the leaves) from gluing them back together. */
   function posTile(grid, { label, value, cls, sub, view, say, fig }) {
     const btn = el('button', {
       type: 'button', class: `v num ${cls || ''}`,
@@ -1305,7 +1330,8 @@ module.exports = function registerDashboard(ctx) {
       'aria-label': say, onclick: () => ctx.switchView(view),
     }, value);
     const t = el('div', { class: 'mini' }, el('div', { class: 'l' }, label), btn);
-    if (sub) t.append(el('div', { class: 's' }, sub));
+    const facts = factLines((Array.isArray(sub) ? sub : [sub]).map(s => (s || '').trim()));
+    if (facts.length) t.append(el('div', { class: 's' }, facts));
     grid.append(t);
     return t;
   }
@@ -1386,11 +1412,18 @@ module.exports = function registerDashboard(ctx) {
       : '';
     if (!hasLedger) return;
 
+    /* The parts printed under each whole-rand tile are ALLOCATED against the
+       tile's own printed figure (figures.js printedParts, 2026-10-20 audit
+       D2-01), not each rounded alone: two half-rand roundings printed
+       "R 1 000 owned · R 301 owed" under a net worth of R 700, and a reader
+       adding the line up finds a figure the tile never claimed. A
+       difference passes its subtracted term negated. */
+    const [ownedPart, owedNeg] = printedParts([w.assets, -w.liabilities], w.net);
     posTile(grid, {
       label: i18n.t('dash.pos.netWorth'), value: money(w.net, 0), fig: 'pos-net',
       cls: w.net >= 0 ? 'grad-txt' : 'text-danger',
-      sub: i18n.t('dash.pos.netWorthSub', { owned: money(w.assets, 0), owed: money(w.liabilities, 0) })
-        + otherLine(worthOtherNet),
+      sub: [i18n.t('dash.pos.netWorthSub', { owned: money(ownedPart, 0), owed: money(-owedNeg, 0) }),
+        otherLine(worthOtherNet)],
       view: 'savings',
       /* The disclosure goes into the aria-label too. The sub-line beside it is
          a sibling and still reachable, but a screen reader following the tile
@@ -1400,9 +1433,14 @@ module.exports = function registerDashboard(ctx) {
         + otherLine(worthOtherNet),
     });
 
-    /* Negated for display — owed money reads as a positive figure, the same
-       convention the Savings composition chart uses for its liability slices
-       (the Savings Debt tile that shared it is gone; savings.js says why).
+    /* A positive figure in the tile's ordinary ink — owed money reads as a
+       positive figure, the same convention the Savings composition chart uses
+       for its liability slices (the Savings Debt tile that shared it is gone;
+       savings.js says why) and the Debts page uses for its own totals, where
+       owing is a fact to plan around and not a red state. This comment said
+       so for a release while the code beside it printed money(-liabilities)
+       in the danger ink: "R -4 500" (say) in rose under a label that already says
+       Debt (2026-10-20 audit, D2-06).
        Split by ledger for the same reason: an overdrawn cheque account and a
        home loan are both "owed" and live in different files, so a single total
        with no breakdown sends the reader to the wrong page to find it.
@@ -1430,11 +1468,11 @@ module.exports = function registerDashboard(ctx) {
        euro one — the same "count what the figure was built from" rule the
        owedAccounts line above already follows, missed one line further down. */
     const homeActive = w.active.filter(d => !isForeign(d, S.settings.currency)).length;
+    const [onAccounts, onDebtPage] = printedParts([w.fromAccounts || 0, w.fromDebts || 0], w.liabilities);
     posTile(grid, {
-      label: i18n.t('dash.pos.debt'), value: money(-w.liabilities, 0), fig: 'pos-debt',
-      cls: w.liabilities > 0 ? 'text-danger' : '',
+      label: i18n.t('dash.pos.debt'), value: money(w.liabilities, 0), fig: 'pos-debt',
       sub: w.fromDebts && w.fromAccounts
-        ? i18n.t('dash.pos.debtSplit', { accounts: money(w.fromAccounts, 0), debts: money(w.fromDebts, 0) })
+        ? i18n.t('dash.pos.debtSplit', { accounts: money(onAccounts, 0), debts: money(onDebtPage, 0) })
         : w.fromDebts > 0 ? i18n.t('dash.pos.debtActive', { count: homeActive })
           : w.fromAccounts > 0 ? i18n.t('dash.pos.debtAccounts', { count: owedAccounts })
             : i18n.t('dash.pos.debtNone'),
@@ -1469,17 +1507,18 @@ module.exports = function registerDashboard(ctx) {
        what IS out; the age stays, because how long money has been gone is
        counted in every currency (owed-math.js, "pressure before money"). */
     const owedOnlyOther = !(owed.outstanding > 0) && owedOthers.length > 0;
+    /* The age clause (" · oldest out N days") continues the fragment before
+       it; the other-currency sentence is a fact of its own (MT-05). */
+    const owedAge = owed.oldestDays !== null ? i18n.t('dash.pos.owedOldest', { days: owed.oldestDays, count: owed.oldestDays }) : '';
     posTile(grid, {
       label: i18n.t('dash.pos.owed'), value: money(owed.outstanding, 0), fig: 'pos-owed',
       cls: owed.outstanding > 0 ? 'text-warning' : '',
       sub: owedOnlyOther
-        ? i18n.t('dash.pos.owedOnlyOther', { symbol: S.settings.currency, list: owedOtherList })
-          + (owed.oldestDays !== null ? i18n.t('dash.pos.owedOldest', { days: owed.oldestDays, count: owed.oldestDays }) : '')
-        : (owed.outstanding > 0
-          ? i18n.t('dash.pos.owedOpen', { count: owed.open })
-            + (owed.oldestDays !== null ? i18n.t('dash.pos.owedOldest', { days: owed.oldestDays, count: owed.oldestDays }) : '')
-          : (owed.entries ? i18n.t('dash.pos.owedRecovered', { amount: money(owed.recovered, 0) }) : i18n.t('dash.pos.owedNone')))
-          + owedOtherLine,
+        ? [i18n.t('dash.pos.owedOnlyOther', { symbol: S.settings.currency, list: owedOtherList }) + owedAge]
+        : [owed.outstanding > 0
+          ? i18n.t('dash.pos.owedOpen', { count: owed.open }) + owedAge
+          : (owed.entries ? i18n.t('dash.pos.owedRecovered', { amount: money(owed.recovered, 0) }) : i18n.t('dash.pos.owedNone')),
+        owedOtherLine],
       view: 'owed',
       say: owedOnlyOther
         ? i18n.t('dash.pos.owedSayOnlyOther', { symbol: S.settings.currency, list: owedOtherList })
@@ -1514,10 +1553,11 @@ module.exports = function registerDashboard(ctx) {
     const savingsDriftLine = Math.abs(savingsDrift) >= 1
       ? i18n.t(savingsDrift > 0 ? 'dash.pos.savingsDriftUp' : 'dash.pos.savingsDriftDown', { amount: money(Math.abs(savingsDrift), 0) })
       : '';
+    const [savingsPart, investPart] = printedParts([savings, invest], savings + invest);
     posTile(grid, {
       label: i18n.t('dash.pos.savings'), value: money(savings + invest, 0), fig: 'pos-savings',
-      sub: i18n.t('dash.pos.savingsSub', { savings: money(savings, 0), invested: money(invest, 0) })
-        + otherLine(savingsOthers) + savingsDriftLine,
+      sub: [i18n.t('dash.pos.savingsSub', { savings: money(savingsPart, 0), invested: money(investPart, 0) }),
+        otherLine(savingsOthers), savingsDriftLine],
       view: 'savings',
       say: i18n.t('dash.pos.savingsSay', { amount: money(savings + invest) })
         + otherLine(savingsOthers) + savingsDriftLine,
@@ -1591,9 +1631,19 @@ module.exports = function registerDashboard(ctx) {
     /* Phase 3 of ADR-0006: the same reconcile pass the what's-left card
        reads — see bookFigures() in figures.js for the counting rules. */
     const { drift, driftForeign, driftUnplaced } = bookFigures().drift;
-    /* Below a whole currency unit there is nothing to report but rounding. */
+    /* Below a whole currency unit there is nothing to report but rounding.
+
+       The ALREADY-COUNTED sentences (2026-10-20 audit, M2-02). This note sits
+       under the Where-you-stand tiles, which since ISSUE 44 print IMPLIED
+       balances — the stated figure with every transaction since already added
+       in. "Transactions since then add up to R X more" is the stated-basis
+       sentence: true beside a figure that leaves them out, and an instruction
+       to add R X a second time beside one that does not. The comment above
+       still describes the decision it was written for (the tiles quoting what
+       the files SAY); ISSUE 44 reversed that decision and this line was not
+       moved with it. */
     const driftNote = Math.abs(drift) >= 1
-      ? i18n.t(drift > 0 ? 'dash.stale.driftUp' : 'dash.stale.driftDown', { amount: money(Math.abs(drift), 0) })
+      ? i18n.t(drift > 0 ? 'dash.stale.driftUpIncluded' : 'dash.stale.driftDownIncluded', { amount: money(Math.abs(drift), 0) })
       : '';
     /* Reuses the hero's own key rather than a second sentence for the same
        fact — the drift figure above covers the household's currency only, and
@@ -1815,7 +1865,12 @@ module.exports = function registerDashboard(ctx) {
       el('div', { class: 'stat' },
         el('div', {}, el('div', { class: 'sl' }, i18n.t('dash.stat.spent'))),
         el('div', {}, el('div', { class: 'sv' }, money(used.spent, 0)),
-          usedPct !== null ? el('div', { class: 'st' }, el('span', { class: 'tag warn' }, i18n.t('dash.stat.used', { pct: usedPct }))) : '')));
+          /* Toned by ONE rule shared with the Budget strip (figures.js
+             usedToneClass, 2026-10-20 audit MT-14): plain under the 85% mark,
+             warning from it, danger past 100%. It was `tag warn` always, so
+             49% used with a day of the period left read as a warning and the
+             colour said nothing at all. */
+          usedPct !== null ? el('div', { class: 'st' }, el('span', { class: `tag${usedToneClass(used) ? ' ' + usedToneClass(used) : ''}` }, i18n.t('dash.stat.used', { pct: usedPct }))) : '')));
     if (foreignNote.length) statCol.append(el('div', { class: 'stat stat-note' }, el('div', { class: 'st' }, foreignNote)));
     /* A real <button>, not a plain <div> — this is the app's clearest
        statement of outstanding work and, until now, the one figure on the
@@ -1949,10 +2004,15 @@ module.exports = function registerDashboard(ctx) {
       const cat = r.cat;
       if (r.type !== lastType) {
         lastType = r.type;
-        body.append(el('tr', { class: 'type-row' }, el('td', { colspan: '5' }, r.type)));
+        /* The Budget page's own group label (typeGroupLabel), not the raw
+           stored key: this row printed "income", "expense" in lowercase and
+           in English under every language, beside a Budget page printing
+           "Income", "Everyday expenses" for the same groups (2026-10-20
+           audit, D1-07 / MT-04). */
+        body.append(el('tr', { class: 'type-row' }, el('td', { colspan: '5' }, typeGroupLabel(r.type))));
       }
       /* Phase 3 of ADR-0006: the row's status comes with the row. */
-      const { pct, over, unbudgeted, near, remaining } = r;
+      const { pct, over, unbudgeted, near } = r;
       /* Spending in a category nobody budgeted for is over budget by the whole
          amount, and it used to be the one kind of overspend this table said
          nothing about: the Remaining cell was left blank whenever there was no
@@ -1962,7 +2022,15 @@ module.exports = function registerDashboard(ctx) {
       // An assume-spent row is on budget by construction, and a zero-budget one
       // has nothing to be over — neither is the unbudgeted-spending case.
       const barCls = r.type === 'income' ? '' : (over || unbudgeted) ? ' bg-danger' : near ? ' bg-warning' : '';
-      const bar = el('div', { class: 'cat-bar' }, el('i', { class: `cat-bar-fill${barCls}`, style: `width:${pct}%` }));
+      /* Clamped to 0–100 at the one place it becomes a width (2026-10-20
+         audit, M1-11). A refund bigger than the category's spend leaves the
+         row's Actual negative — a true figure, printed as it is — and
+         budgetRowStatus's share follows it below zero; "width:-40%" is not a
+         width, the browser drops the declaration, and the bar rendered as
+         nothing at all rather than as the empty bar it is. */
+      const barPct = Math.max(0, Math.min(100, Number(pct) || 0));
+      const bar = el('div', { class: 'cat-bar' }, el('i', { class: `cat-bar-fill${barCls}`, style: `width:${barPct}%` }));
+      const rem = remainingText(r, money);
       body.append(el('tr', {},
         el('td', {}, cat, r.notes ? el('div', { class: 'text-muted fine-note', style: 'margin-top:2px' }, r.notes.split('\n')[0]) : ''),
         el('td', { class: 'num' }, r.budget ? money(r.budget) : '—'),
@@ -1971,13 +2039,14 @@ module.exports = function registerDashboard(ctx) {
         /* An INCOME row that beat its plan is not overspent: budgetRowStatus
            reports `over` and a negative `remaining` for any row whose actual
            exceeds its budget, and this cell printed that as a red "R -1 000"
-           (2026-09-29 audit). It reads the Budget page's own two sentences
-           instead - the same keys, so one row is worded one way on both pages
-           - and is never red. */
-        el('td', { class: `num${(over || unbudgeted) && r.type !== 'income' ? ' text-danger' : ''}` },
-          r.type === 'income' && r.budget
-            ? incomeRemainingText(remaining, money)
-            : (r.budget || unbudgeted) ? money(remaining) : '')));
+           (2026-09-29 audit). It read the Budget page's own two sentences for
+           income from then; every other row followed on 2026-10-20 (D2-05),
+           when an expense row still read a red "R -500,00" here beside "R
+           500,00 over" on the Budget page — one row, two wordings, and the
+           balance form currency.js keeps for a BALANCE on a shortfall. The
+           whole cell is the Budget page's remainingText now, so the two
+           pages word every row one way; red exactly when it says "over". */
+        el('td', { class: `num${rem.over ? ' text-danger' : ''}` }, rem.text)));
     }
     if (!sorted.length) body.append(el('tr', {}, el('td', { colspan: '5', class: 'text-muted' }, i18n.t('dash.table.empty'))));
     t.append(body);
@@ -2488,33 +2557,42 @@ module.exports = function registerDashboard(ctx) {
       return { baseText: '—', text: i18n.t('dash.split.new'), cls: 'is-new' };
     }
     const avg = (base.totals[cat] || 0) / base.counted;
-    /* `now` is the category's own UNROUNDED amount (2026-10-14 audit, L2a-N08),
-       and each side is rounded the way it prints, THEN subtracted: R 915 against
-       R 636 reads +R 279, not the +R 278 that subtracting first would give
-       beside two figures plainly 279 apart.
+    /* `now` is the figure the Spent column PRINTS for this row — rowMoney[i],
+       the largest-remainder allocation that makes the column sum to the
+       centre total — and the baseline is rounded the way it prints. The
+       Change is their difference, so it is exactly the sum a reader does with
+       the two figures printed beside it (2026-10-20 audit, M1-01).
 
-       What is NOT an input is the Spent column's printed value. That column is
-       allocated by largest remainder so it sums to the centre total, which can
-       lift a row by a whole unit it never earned. A category that cost the same amount to
-       the cent in each of the four periods printed a Spent one unit above its
-       baseline and a Change of +R 1 — a movement that did not happen, in the one
-       column whose job is to say whether spending moved. Allocation is for
-       making a column add up; it is not evidence about a category.
-
-       This replaces the 2026-09-29 rule (the change is the difference of the
-       two PRINTED figures), written against the opposite symptom: R3 775 beside
-       R2 513 with a Change of +R1 261. Both cannot hold once allocation has
-       lifted a row. The change is now always the rounded true movement; on a
-       row the allocation lifted, the printed Spent is one unit above it, and
-       that is the lesser lie — a rounding difference between whole-unit
-       figures, not a change reported where there was none. */
+       This restores the 2026-09-29 rule and reverses the 2026-10-14 one
+       (L2a-N08), which took `now` unrounded so the allocation's one-unit lift
+       could not show as a change, and called the Spent column sitting a unit
+       off the Change "the lesser lie". Three reasons it was the wrong trade:
+         - every other printed difference in this app is built from the
+           figures AS PRINTED (figures.js printedRemainder and printedParts,
+           the what's-left strip), so a reader who checks one column by eye
+           has learnt they can check them all — this was the one column that
+           failed them;
+         - the repo's own reconciliation (scripts/reconcile-page.cjs, "Donut
+           legend: Change = Spent − baseline") holds the legend to that sum,
+           and failed two rows on the vault the audit ran against;
+         - the lift it was protecting against is harmless now: the one unit
+           allocation adds shows identically in the Spent and Change columns,
+           and the deadband below reads it as flat, so it gets no colour and
+           cannot be taken for a movement. */
     const r = v => Number(v.toFixed(0));
     const diff = r(now) - r(avg);
-    /* DEADBAND, both ways. A move earns a colour only when it is worth noticing
-       as a proportion of what this category usually costs AND worth noticing as
-       money. Either test alone mislabels: 3% of a large category is a real sum,
-       and 40% of a tiny one is not. */
-    const cls = Math.abs(diff) < base.floor || Math.abs(diff) < r(avg) * 0.03
+    /* DEADBAND, both ways, on that same printed difference. A move earns a
+       colour only when it is worth noticing as a proportion of what this
+       category usually costs AND worth noticing as money. Either test alone
+       mislabels: 3% of a large category is a real sum, and 40% of a tiny one
+       is not.
+
+       And never for one unit. Two figures each rounded to the unit can sit a
+       unit apart with nothing moved at all — more so once the allocation can
+       lift a row by one — so a difference of one is what rounding alone
+       produces. The proportional floors already cover it on any period that
+       spends more than a few hundred; this says it for the small ones too. */
+    const cls = Math.abs(diff) <= 1 || Math.abs(diff) < base.floor || Math.abs(diff) < r(avg) * 0.03
       ? 'is-flat'
       : (diff > 0 ? 'is-up' : 'is-down');
     /* The explicit-direction form: a plus or a typographic minus BEFORE the
@@ -2588,12 +2666,14 @@ module.exports = function registerDashboard(ctx) {
        figures.js's categoryGap(), and the Report page reads the same one. */
     const { uncat, netted } = categoryGap(S.period);
     const parts = [];
-    if (uncat >= 1) parts.push(i18n.t('dash.split.uncatNote', { amount: money(uncat) }));
-    if (netted >= 1) parts.push(i18n.t('dash.split.nettedNote', { amount: money(netted) }));
+    /* Whole rands, the whole subtitle (2026-10-20 audit, MT-06 / D1-14 /
+       D2-03): see the summary line below. */
+    if (uncat >= 1) parts.push(i18n.t('dash.split.uncatNote', { amount: money(uncat, 0) }));
+    if (netted >= 1) parts.push(i18n.t('dash.split.nettedNote', { amount: money(netted, 0) }));
     /* The slices are gross, so a set-aside contribution draws one — correct for
        a spending SPLIT, and the reason this total differs from the hero's. */
     const splitSetAside = budgetUsed(S.period).setAside;
-    if (splitSetAside >= 1) parts.push(i18n.t('dash.split.setAsideNote', { amount: money(splitSetAside) }));
+    if (splitSetAside >= 1) parts.push(i18n.t('dash.split.setAsideNote', { amount: money(splitSetAside, 0) }));
     const gapNote = parts.join('');
 
     // Was hand-built English plural surgery on the word "category" (an 'y'
@@ -2601,14 +2681,20 @@ module.exports = function registerDashboard(ctx) {
     // that IS translated — every other language rendered the English noun
     // regardless of language setting. dash.split.summary carries the whole
     // sentence per plural form instead.
+    /* In whole rands, like the centre and the legend it sits over (2026-10-20
+       audit, MT-06 / D1-14 / D2-03): "R 12 480,65 across 7 categories" above
+       a centre reading "R 12 481" (made up) put one figure on one card at two
+       precisions. Its gap notes above go with it, and so does the sentence
+       that stands in for the chart when nothing is categorised; the wedges'
+       hover tooltips keep their cents. */
     $('#dashSplitSub').textContent = (total > 0
-      ? i18n.t('dash.split.summary', { amount: money(total), count: spend.length, month: periodMonthName(S.period) })
+      ? i18n.t('dash.split.summary', { amount: money(total, 0), count: spend.length, month: periodMonthName(S.period) })
       : periodMonthName(S.period)) + gapNote;
 
     if (!total) {
       wrap.append(el('p', { class: 'text-muted', style: 'margin:0' },
         uncat > 0
-          ? i18n.t('dash.split.onlyUncat', { amount: money(uncat) })
+          ? i18n.t('dash.split.onlyUncat', { amount: money(uncat, 0) })
           : i18n.t('dash.split.empty')));
       return;
     }
@@ -2646,6 +2732,12 @@ module.exports = function registerDashboard(ctx) {
        the three can never disagree with each other the way three independent
        Math.round() calls on the same slice occasionally did. */
     const shares = sharePercents(shown.map(x => x.amount));
+    /* The printed share. "<1%" for a slice that is not nothing but whose
+       allocated share is 0 (2026-10-20 audit, M1-10): "0%" beside its own
+       "R 40" is two claims on one row, the same trap sharePercentLabel closes
+       at the 0% boundary for a single share. The allocation itself is
+       untouched, so the numeric column still sums to 100. */
+    const pctLabel = shares.map((p, i) => (p === 0 && shown[i].amount > 0 ? '<1' : String(p)));
     /* The legend's money column, allocated the same way as its percentage
        column just above rather than left to `money(x.amount, 0)` rounding
        each row alone. Independent rounding is exactly the trap sharePercents
@@ -2663,7 +2755,7 @@ module.exports = function registerDashboard(ctx) {
     const { svg, add } = createChart({
       w: W, h: H, cls: 'donut',
       label: i18n.t('dash.split.aria', { month: periodMonthName(S.period) }) +
-        shown.map((x, i) => `${x.cat} ${shares[i]}%`).join(', '),
+        shown.map((x, i) => `${x.cat} ${pctLabel[i]}%`).join(', '),
     });
 
     let a = -Math.PI / 2;                      // 12 o'clock, so the largest slice starts at the top
@@ -2674,7 +2766,7 @@ module.exports = function registerDashboard(ctx) {
         fill: x.color, stroke: themeColors(root).hole, 'stroke-width': '2',
         class: x.other ? null : 'donut-slice',
       });
-      tip(add, seg, `${x.cat}: ${money(x.amount)} · ${shares[i]}%`);
+      tip(add, seg, `${x.cat}: ${money(x.amount)} · ${pctLabel[i]}%`);
       /* Pointer only, deliberately: the <svg> is role="img", which takes its
          whole subtree out of the accessibility tree, so a focusable wedge would
          be a tab stop no screen reader can announce. The legend below carries
@@ -2704,11 +2796,10 @@ module.exports = function registerDashboard(ctx) {
        reassuring, wrong, and wrong in the direction that stops people looking. */
     const base = compareBaseline();
 
-    /* The figure the Change column reads for THIS period is the category's own
-       unrounded amount, NOT the Spent column's allocated value (`rowMoney[i]`
-       below): the allocation exists so the column sums to the centre total, and
-       a unit it moves a row by is not a change in that category's spending. See
-       compareCell for the 2026-10-14 reversal of the earlier rule.
+    /* The figure the Change column reads for THIS period is the Spent
+       column's own printed value (`rowMoney[i]` below), so Change is exactly
+       printed Spent − printed baseline. See compareCell for why (2026-10-20
+       audit, M1-01, reversing the 2026-10-14 rule).
 
        The window needs nothing extra: `spend` comes from periodSummary, which
        closes at today for the running period (ISSUE 35), and the baseline caps
@@ -2724,7 +2815,7 @@ module.exports = function registerDashboard(ctx) {
       el('span', { class: 'dl-base' }, base.label),
       el('span', { class: 'dl-delta' }, i18n.t('dash.split.colChange'))));
     shown.forEach((x, i) => {
-      const pct = shares[i];
+      const pct = pctLabel[i];
       /* Rebuilt per row rather than shared: these are appended into either a
          plain <li> or a <button>, and a node can only live in one of them. */
       /* "Other" gets no comparison: it is a bucket whose membership changes
@@ -2732,7 +2823,7 @@ module.exports = function registerDashboard(ctx) {
          each time. A change figure there would be arithmetic without meaning —
          the same reason the row has no drill-through. */
       const cmp = base && !x.other
-        ? compareCell(x.cat, x.amount, base)
+        ? compareCell(x.cat, rowMoney[i], base)
         : null;
       const face = () => [
         el('i', { style: `background:${x.color}` }),
@@ -2900,8 +2991,17 @@ function heroQualifiers(F, money) {
   if (used.assumed >= 1) {
     add('assumed', 'spent', i18n.t('dash.hero.assumedIncluded', { amount: money(used.assumed, 0) }), { amount: used.assumed });
   }
-  const netted = (F && F.gap && F.gap.netted) || 0;
-  if (netted >= 1) add('netted', 'spent', i18n.t('dash.hero.nettedOff', { amount: money(netted, 0) }), { amount: netted });
+  /* EVERY refund the period kept, in full: periodSummary().refunds (ledger.js
+     tally), not the donut's gap (2026-10-20 audit, M1-02). The sentence says
+     how much the gross spent figure beside it did not take off, and the gap
+     floors each category at zero — a R 3 000 refund against R 1 000 of that
+     category's spend was named as R 1 000. On the vault the audit ran against
+     one month named about a third of the refunds that came in, and the Report
+     printed both numbers in one document. The key stays 'netted' for the API's
+     readers; the donut's own "netted off" note keeps the gap, where it is the
+     true figure. */
+  const refunds = Number(sum.refunds) || 0;
+  if (refunds >= 1) add('netted', 'spent', i18n.t('dash.hero.nettedOff', { amount: money(refunds, 0) }), { amount: refunds });
   /* An amount typed into a budget row or a transaction that the loader could
      not read counts as 0 in every figure above (2026-10-14 audit, L8-02). The
      hero is the most-read card in the app and the plan's remaining figure falls

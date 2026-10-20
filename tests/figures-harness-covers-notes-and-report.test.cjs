@@ -64,8 +64,11 @@ const eq = (a, b, m) => { assert.deepStrictEqual(a, b, m); checks++; };
       const r = results.find(x => x.view === key);
       eq(r.error, null, `${key}: generated without error`);
       ok(r.figures.length > 20, `${key}: its markdown figures are harvested (${r.figures.length})`);
-      const inc = r.figures.find(f => /^report-(3m|12m)\/Income & Spend\/Income\//.test(f.address) && f.kind === 'money');
-      ok(inc, `${key}: the Income row of Income & Spend has an addressed money figure`);
+      /* The heading is the section's own words — sentence case since the
+         2026-10-20 audit (D2-20) — matched without regard to case so the
+         address test is about addressing, not about styling. */
+      const inc = r.figures.find(f => /^report-(3m|12m)\/Income & Spend\/Income\//i.test(f.address) && f.kind === 'money');
+      ok(inc, `${key}: the Income row of Income & spend has an addressed money figure`);
       ok(r.figures.some(f => f.kind === 'percent'), `${key}: percentages (e.g. "% of spending budget used") are harvested`);
       ok(!r.figures.some(f => /\b2026-\d\d-\d\d\b/.test(f.text) || /^\d\d:\d\d$/.test(f.text)), `${key}: the generated-at stamp and ISO dates are not figures`);
     }

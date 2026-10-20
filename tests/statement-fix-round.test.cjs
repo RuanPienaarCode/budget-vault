@@ -5,10 +5,14 @@
    October 2026 restyle, and each fix is one declaration that a tidy-up could
    delete without any other suite noticing:
 
-     1. THE INCOME "+" MOVES WITH ITS CELL. td.num.text-success::before is
-        position: absolute, so the cell must be position: relative, otherwise the
-        sign's containing block is the page and a table scrolled inside
-        .table-responsive leaves every "+" behind.
+     1. AN AMOUNT'S SIGN NEVER PARTS FROM ITS FIGURE. Since the 20 Oct 2026
+        audit (D2-04) the sign is the cell's own text, a span ahead of the
+        figure's inline-block ("−" | "R 50,00"), not a "+" drawn by a ::before.
+        A line may break between two boxes, so the cell must not wrap, or a
+        narrow column prints the sign on one line and the figure on the next.
+        (It used to pin the absolutely positioned "+" to its cell; that rule
+        is gone, and a sign drawn by the sheet as well as written in the text
+        would print twice — so that is checked for too.)
      2. A FIELD OR BUTTON KEEPS ITS FOCUS / HOVER BORDER. The firmer color-mix()
         edge on the Transactions controls out-ranks .form-control:focus and
         .btn-ghost:hover (src/styles.css), so it must be switched off in exactly
@@ -41,12 +45,14 @@ const inCtx = (r, frag) => r.context.some(c => c.includes(frag));
 
 /* each check returns a list of problems */
 const CHECKS = {
-  incomePlusMovesWithCell: rules => {
-    const before = rules.filter(r => r.selectors.some(s => /td\.num\.text-success::before$/.test(s)));
-    const cell = rules.filter(r => r.selectors.some(s => /#view-transactions \.table td\.num\.text-success$/.test(s)));
+  amountSignStaysWithFigure: rules => {
+    const cell = rules.filter(r => r.selectors.some(s => /#view-transactions \.table td\.num(:not\(\.text-warning\))?$/.test(s)));
+    const drawn = rules.filter(r => r.selectors.some(s => /#view-transactions[^,]*td\.num[^,]*::?before$/.test(s))
+      && r.decls.some(d => d.prop === 'content' && /['"][+−-]['"]/.test(d.value)));
     const out = [];
-    if (!before.some(r => (decl(r, 'position') || {}).value === 'absolute')) out.push('the "+" rule is not position: absolute any more (test is stale)');
-    if (!cell.some(r => (decl(r, 'position') || {}).value === 'relative')) out.push('td.num.text-success is not position: relative, so the absolute "+" has no cell to stay in');
+    if (!cell.length) out.push('no rule for the Transactions amount cell (test is stale)');
+    if (!cell.some(r => (decl(r, 'white-space') || {}).value === 'nowrap')) out.push('the amount cell may wrap, so its sign can land on a line of its own');
+    for (const r of drawn) out.push(`the sheet draws a sign of its own as well as the text's: ${r.prelude}`);
     return out;
   },
 
@@ -133,7 +139,9 @@ const broke = (name, find, repl) => {
   const found = CHECKS[name](rulesOf(text.replace(find, repl)));
   ok(found.length > 0, `negative control: ${name} did not notice the invariant being broken`);
 };
-broke('incomePlusMovesWithCell', /(#view-transactions \.table td\.num\.text-success \{\s*)position: relative;/, '$1');
+broke('amountSignStaysWithFigure', /(#view-transactions \.table td\.num:not\(\.text-warning\) \{\s*)white-space: nowrap;/, '$1');
+broke('amountSignStaysWithFigure', /(#view-transactions \.table td\.num\.text-success \{)/,
+  "#view-transactions .table td.num.text-success::before { content: '+'; }\n.budget-app-root $1");
 broke('firmEdgeYieldsToFocusAndHover', '.btn-ghost:not(:hover)', '.btn-ghost');
 broke('firmEdgeYieldsToFocusAndHover', '#txSearch:not(:focus)', '#txSearch');
 broke('figuresNeverWrap', /(\.budget-app-root \.score-flow-in,[^{]*\.lo-big \{\s*)white-space: nowrap;/, '$1');
@@ -145,4 +153,4 @@ broke('successInkIsLightOnly', '.budget-app-root:not(.bud-dark) .acct-chip.up,',
 broke('legendKeepsRoomForNames', 'flex-basis: 470px', 'flex-basis: 260px');
 broke('legendKeepsRoomForNames', /(\.donut-legend \.dl-val \{\s*font-weight: )500;/, '$1600;');
 
-console.log(`PASS statement-fix-round — the income sign, focus/hover edges, figure wrapping, long budget figures, light-theme success ink and legend room are each pinned, and each pin fails when broken (${checks} checks)`);
+console.log(`PASS statement-fix-round — the amount's sign kept with its figure, focus/hover edges, figure wrapping, long budget figures, light-theme success ink and legend room are each pinned, and each pin fails when broken (${checks} checks)`);

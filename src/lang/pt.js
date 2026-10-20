@@ -485,7 +485,7 @@ module.exports = {
     one: 'A parte da divisão vai junto.',
     other: 'As {count} partes da divisão vão junto.',
   },
-  'tx.delete.part': 'Esta é uma parte de uma divisão: as partes vão deixar de somar a linha original, e a diferença sai dos totais da sua conta. Desmarque "Fora do orçamento" na linha original para repor.',
+  'tx.delete.part': 'Esta é uma parte de uma divisão: as partes vão deixar de somar a linha original, e a diferença sai dos totais da sua conta. Escolha "Desfazer divisão" na linha original para repor.',
   'tx.delete.confirm': 'Excluir linha',
   'tx.deleted': {
     one: 'Linha removida — use Salvar alterações para gravar no arquivo',
@@ -1134,6 +1134,8 @@ module.exports = {
   'dash.stale.line': '{line} — {age}.',
   'dash.stale.driftUp': ' As transações desde então somam {amount} a mais.',
   'dash.stale.driftDown': ' As transações desde então somam {amount} a menos.',
+  'dash.stale.driftUpIncluded': ' As transações desde então somam {amount}, já incluídas nestes valores.',
+  'dash.stale.driftDownIncluded': ' As transações desde então retiram {amount}, já incluídas nestes valores.',
   'dash.stale.btn': 'Revisar saldos',
   'dash.stale.aria': 'Revisar os saldos das contas na página Contas',
 
@@ -1697,4 +1699,45 @@ module.exports = {
   'settings.exchangeRates.source': 'Fonte das cotações',
   'settings.exchangeRates.sourceDesc': 'Quando ligado, as cotações vêm de open.er-api.com, um serviço gratuito da ExchangeRate-API (exchangerate-api.com). O único dado enviado é o código de moeda de três letras no endereço da requisição; como em qualquer requisição pela internet, eles também veem o seu endereço IP.',
 
+  /* 2026-10-20 audit, Score lane (M1-05, M1-06, M1-07): which income each
+     figure divides by, "all spending" for the inclusive measure, and every
+     part of "Not yet spent" named under it. Machine-assisted, added
+     2026-10-20; not yet read by a first-language reader. */
+  'score.now.wealthBase': 'Hoje: {amount} de patrimônio líquido · equivale a {times} anos de renda do orçamento ({income} por mês)',
+  'score.now.allSpendHousehold': 'todos os gastos (contas fixas incluídas) {pct} da renda familiar',
+  'score.gap.fixMonthly': 'Poupe mais {amount} por mês para chegar a {pct}% da sua renda do orçamento.',
+  'score.gap.fixBuild': 'Aumente a sua poupança, os seus investimentos ou os seus imóveis em {amount} — ou abata o mesmo em dívidas — para chegar a {times} anos de renda do orçamento.',
+  'score.gap.fixTrim': 'Gaste {amount} a menos por mês no total, contas fixas incluídas, para que os seus gastos fiquem abaixo de {pct}% da sua renda familiar.',
+  'score.flow.sub.incomeToCome': '{amount} da renda prevista ainda não chegou',
+  'score.flow.sub.incomeAbovePlan': '{amount} de renda acima do previsto',
+  'score.flow.sub.setAsideOver': '{amount} a mais enviado à poupança do que o plano separou',
+  'score.flow.sub.alreadySpent': '{amount} que o orçamento já conta como gasto',
+  'score.flow.chip.alreadySpentNote': '“Ainda não gasto”, acima, é {amount} maior que “Juntos”: dinheiro ainda em mãos que o orçamento já conta como gasto.',
+  /* 2026-10-20 audit, L3 (Report + exports) — M1-04, M1-08, M2-04.
+     Machine-assisted, added 2026-10-20; not native-reviewed. */
+  'report.budget.incomeLeftOut': {
+    one: '{count} dos {total} períodos comparados não tem renda no orçamento: {names}. A renda orçada, e cada linha de renda em orçado vs. real, cobrem só os períodos cujo orçamento prevê essa renda; a renda acima cobre todos os períodos.',
+    other: '{count} dos {total} períodos comparados não têm renda no orçamento: {names}. A renda orçada, e cada linha de renda em orçado vs. real, cobrem só os períodos cujo orçamento prevê essa renda; a renda acima cobre todos os períodos.',
+  },
+  'report.health.noteParts': 'Um único número formado pelas partes que a página Nota mostra ({parts}) — uma medida aproximada a partir dos números deste cofre, não uma avaliação profissional.',
+  'bx.doc.headlineHeading': 'Renda e gastos por período',
+  'bx.doc.income': 'Renda',
+  'bx.doc.spent': 'Gasto',
+  'bx.doc.uncategorised': 'Sem categoria',
+  'bx.doc.refunds': 'Estornos não abatidos',
+  /* 2026-10-20 audit fix wave, lane L4 (Accounts) — machine-assisted, not
+     native-reviewed. acct.where.subStop: the ring caption with its closing
+     stop, for when the other-currency sentence follows it (D1-15).
+     acct.overlap: the Accounts page's own card-overlap sentence — its hero
+     leaves Debt-page rows out, so the double count is in net worth on the
+     Savings page and the Dashboard, not "above" (M2-06). */
+  'acct.where.subStop': 'Participação no que estas contas guardam.',
+  'acct.overlap': 'Contas de cartão de crédito acompanhadas: {accounts} · dívidas de cartão acompanhadas: {debts} — se algum cartão estiver nos dois, ele é contado duas vezes no patrimônio líquido da página Poupança e investimentos e do Painel.',
+  /* 2026-10-20 audit fix wave, lane L6 (Transactions, Plan, Onboarding) —
+     machine-assisted, not native-reviewed. plan.env.sub: the line over the
+     Plan's spending buckets, through t() so its figures are glued (D1-05). */
+  'plan.env.sub': {
+    one: '{count} envelope de gasto · {placed} alocado de {pot}',
+    other: '{count} envelopes de gasto · {placed} alocados de {pot}',
+  },
 };

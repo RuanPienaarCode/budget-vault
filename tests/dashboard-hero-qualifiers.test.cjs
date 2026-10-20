@@ -25,7 +25,7 @@
 const assert = require('assert');
 const { stubObsidian } = require('./helpers/harness.cjs');
 stubObsidian();
-const { mountFor, pinClock } = require('./helpers/figures.cjs');
+const { mountFor, pinClock, readable } = require('./helpers/figures.cjs');
 const { find, textOf } = require('./helpers/dash-audit.cjs');
 
 let checks = 0;
@@ -122,7 +122,9 @@ function oracle(F, money, i18n) {
     ok(Q.every(q => typeof q.text === 'string' && q.text && !/^dash\./.test(q.text)), 'every text is a real sentence, not a key');
 
     const r = rendered(nodes);
-    const lineText = line => Q.filter(q => q.line === line).map(q => q.text);
+    /* `rendered` reads through textOf, which maps the U+00A0 gluing a figure
+       in a sentence back to a space; the builder's text is read the same way. */
+    const lineText = line => Q.filter(q => q.line === line).map(q => readable(q.text));
     eq(r.ahead, [lineText('spent').join(' · '), ...lineText('scheduled'), ...lineText('funds')],
       'the hero prints the builder\'s lines and nothing else under its figure');
     eq(r.foreign, lineText('foreign'), 'and the foreign note is the builder\'s');
@@ -145,7 +147,8 @@ function oracle(F, money, i18n) {
     for (const [name, files, today, period, bf] of cases) {
       const { ctx, nodes, F } = await mount(files, { today, period, budgetFolder: bf });
       const i18n = require('../src/i18n');
-      const want = oracle(F, ctx.money, i18n);
+      const spelled = oracle(F, ctx.money, i18n);
+      const want = { ahead: spelled.ahead.map(readable), foreign: spelled.foreign.map(readable) };
       eq(rendered(nodes), want, `${name}: the hero's qualifier lines are exactly the pre-builder ones`);
       lit += want.ahead.length + want.foreign.length;
     }

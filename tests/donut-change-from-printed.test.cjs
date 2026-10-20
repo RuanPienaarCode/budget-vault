@@ -1,20 +1,21 @@
 'use strict';
-/* The donut legend's Change column reports a change that did not happen, and
-   prints it in a minus no other figure on the page uses (2026-10-14 audit,
-   L2a-N08 and the Dashboard half of L2a-N09).
+/* The donut legend's one-unit case, and the minus every signed part prints
+   with (2026-10-14 audit, L2a-N08 and the Dashboard half of L2a-N09;
+   2026-10-20 audit, M1-01).
 
    The Spent column is allocated by largest remainder so it sums to the centre
-   total. That can lift one row by a whole unit it never earned — and the Change
-   column used to be computed from the allocated figure. A category that cost
-   exactly the same amount to the cent in every period printed a Spent one
-   unit above its baseline and a Change of "+R 1": a movement in the one column
-   whose job is to say whether spending moved. The change is now taken from the
-   category's own unrounded amount (rounded the way it prints, then
-   subtracted from the rounded baseline).
-
-   That reverses the 2026-09-29 rule that the Change is the difference of the
-   two PRINTED figures (tests/dashboard-audit-hero-donut.test.cjs, section 8,
-   now pins the new rule). Both cannot hold once allocation has moved a row.
+   total, and that can lift one row by a whole unit. The 2026-10-14 audit saw a
+   category that cost exactly the same to the cent in every period print a
+   Spent one unit above its baseline and a Change of "+R 1", and took the
+   Change from the category's unrounded amount instead — the rule this file is
+   named after. The 2026-10-20 audit reversed that (M1-01): the Change is
+   printed Spent − printed baseline again, because a reader checks it against
+   the two figures beside it and the repo's reconciliation does too, and on
+   that rule the unrounded Change failed real rows. What answers the original
+   complaint now is the deadband: a one-unit difference is what two roundings
+   produce on their own, so the lifted row prints "+R 1" and reads FLAT — no
+   colour, not a movement. This file pins that case;
+   tests/dash-donut-printed-figures.test.cjs pins the rule across every row.
 
    Minus style (L2a-N09, Dashboard half): the Change column's "−R 2 300" is the
    household's one form for a signed part (currency.js formatSigned), and the
@@ -25,7 +26,7 @@
    Synthetic household: three categories whose cents force the allocation to lift
    the first row by one unit.
 
-     node tests/donut-change-from-unrounded.test.cjs */
+     node tests/donut-change-from-printed.test.cjs */
 const assert = require('assert');
 const { B, tx, base, account, textOf, find, hasClass, renderDash } = require('./helpers/dash-audit.cjs');
 const { formatSigned } = require('../src/currency');
@@ -70,16 +71,19 @@ const ok = (c, m) => { assert.ok(c, m); checks++; };
   const cell = (li, cls) => textOf(find(li, n => hasClass(n, cls))[0]);
   const groceries = rows.find(li => /Groceries/.test(cell(li, 'dl-name')));
   ok(groceries, 'the Groceries legend row is rendered');
-  /* The allocation did lift this row (that is the premise), and the change still reads nothing. */
+  /* The allocation did lift this row (that is the premise): the Change is the
+     printed sum, and it reads flat — no colour, so not a movement. */
   eq(cell(groceries, 'dl-val'), 'R 1 251', 'premise: the Spent column was allocated one unit above plain rounding');
   eq(cell(groceries, 'dl-base'), 'R 1 250', 'premise: the baseline is the plain rounded average');
-  eq(cell(groceries, 'dl-delta'), 'R 0', 'the Change is R 0: the category cost what it always costs');
+  eq(cell(groceries, 'dl-delta'), '+R 1', 'the Change is 1 251 − 1 250, the sum the reader does');
+  ok(hasClass(find(groceries, n => hasClass(n, 'dl-delta'))[0], 'is-flat'), 'and reads flat: the category cost what it always costs');
 
-  /* Every row: the Change is the rounded unrounded difference, and no row uses the old glyph. */
-  const truth = { Groceries: 1250.48 - 1250.48, Phone: 100.40 - 100.40, 'Car loan': 100.30 - 100.30 };
+  /* Every row nothing moved in reads flat, whatever the allocation did to it. */
   for (const li of rows) {
     const name = cell(li, 'dl-name');
-    if (name in truth) eq(cell(li, 'dl-delta'), 'R 0', `${name}: nothing moved, nothing is reported`);
+    if (['Groceries', 'Phone', 'Car loan'].includes(name)) {
+      ok(hasClass(find(li, n => hasClass(n, 'dl-delta'))[0], 'is-flat'), `${name}: nothing moved, nothing is coloured`);
+    }
   }
   ok(!/−/.test(textOf(nodes.get('#dashSplit'))), 'no typographic minus in the donut legend');
 
@@ -94,7 +98,7 @@ const ok = (c, m) => { assert.ok(c, m); checks++; };
   const rows2 = find(r2.nodes.get('#dashSplit'), n => n.tagName === 'LI' && n._parent && hasClass(n._parent, 'donut-legend')
     && !hasClass(n, 'donut-legend-head'));
   const byName = n => rows2.find(li => new RegExp(n).test(cell(li, 'dl-name')));
-  eq(cell(byName('Groceries'), 'dl-delta'), '+R 1 000', 'a rise: an explicit plus before the symbol');
+  eq(cell(byName('Groceries'), 'dl-delta'), '+R 1 001', 'a rise: an explicit plus before the symbol (2 251 − 1 250 as printed)');
   eq(cell(byName('Phone'), 'dl-delta'), '−R 50', 'a fall: the typographic minus before the symbol');
 
   /* The what's-left card's confirmation-day net: a signed part, in the same form
@@ -108,5 +112,5 @@ const ok = (c, m) => { assert.ok(c, m); checks++; };
   ok(/2 rows on a confirmation day \(\u2212R 2 800\)/.test(leftText), `the net reads as a signed part — got: ${leftText}`);
   ok(!/R -2 800/.test(leftText), 'and not in the balance form');
 
-  console.log(`PASS donut-change-from-unrounded — the Change column is computed from unrounded amounts so allocation cannot invent a movement, and reads as a signed part (${checks} checks)`);
+  console.log(`PASS donut-change-from-printed — the allocation's one-unit lift prints in the Change as the printed sum and reads flat, and a change reads as a signed part (${checks} checks)`);
 })().catch(e => { console.error(e.message || e); process.exit(1); });

@@ -50,12 +50,14 @@ const textOf = node => {
    rather than "the second money figure in the note"), so it is several element
    nodes where it used to be one. textOf's ' | ' delimiter lands between them
    and would report a separator bug that is purely its own. The separator
-   assertions below are about what the reader reads, so they read it flat. */
+   assertions below are about what the reader reads, so they read it flat —
+   and with U+00A0 (the glue src/i18n.js puts inside a figure that is a
+   sentence's param) read as the space the reader sees. */
 const flatOf = node => {
   let out = '';
   const walk = n => { if (n._text) out += n._text; for (const c of (n.children || [])) walk(c); };
   walk(node);
-  return out;
+  return out.replace(/\u00a0/g, ' ');
 };
 
 atAuditDate(async () => {

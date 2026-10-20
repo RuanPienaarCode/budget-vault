@@ -467,7 +467,7 @@ module.exports = {
   'tx.delete.parent': {
     other: '{count} bagian pecahannya ikut terhapus.',
   },
-  'tx.delete.part': 'Ini salah satu bagian dari transaksi yang dipecah: bagian-bagiannya tidak lagi berjumlah sama dengan baris aslinya, dan selisihnya keluar dari total rekening Anda. Hapus centang "Luar anggaran" pada baris asli untuk mengembalikannya.',
+  'tx.delete.part': 'Ini salah satu bagian dari transaksi yang dipecah: bagian-bagiannya tidak lagi berjumlah sama dengan baris aslinya, dan selisihnya keluar dari total rekening Anda. Pilih "Batalkan pecahan" pada baris asli untuk mengembalikannya.',
   'tx.delete.confirm': 'Hapus baris',
   'tx.deleted': {
     other: '{count} baris dihapus — tekan Simpan perubahan untuk menuliskannya ke berkas',
@@ -1086,6 +1086,8 @@ module.exports = {
   'dash.stale.line': '{line} — {age}.',
   'dash.stale.driftUp': ' Transaksi sejak saat itu berjumlah {amount} lebih banyak.',
   'dash.stale.driftDown': ' Transaksi sejak saat itu berjumlah {amount} lebih sedikit.',
+  'dash.stale.driftUpIncluded': ' Transaksi sejak saat itu menambah {amount}, sudah termasuk dalam angka ini.',
+  'dash.stale.driftDownIncluded': ' Transaksi sejak saat itu mengurangi {amount}, sudah termasuk dalam angka ini.',
   'dash.stale.btn': 'Tinjau saldo',
   'dash.stale.aria': 'Tinjau saldo rekening di halaman Rekening',
 
@@ -1621,4 +1623,43 @@ module.exports = {
   'settings.exchangeRates.source': 'Sumber kurs',
   'settings.exchangeRates.sourceDesc': 'Saat dinyalakan, kurs berasal dari open.er-api.com, layanan gratis dari ExchangeRate-API (exchangerate-api.com). Yang dikirim hanya kode mata uang tiga huruf di alamat permintaan; seperti permintaan internet apa pun, mereka juga melihat alamat IP Anda.',
 
+  /* 2026-10-20 audit, Score lane (M1-05, M1-06, M1-07): which income each
+     figure divides by, "all spending" for the inclusive measure, and every
+     part of "Not yet spent" named under it. Machine-assisted, added
+     2026-10-20; not yet read by a first-language reader. */
+  'score.now.wealthBase': 'Sekarang: kekayaan bersih {amount} · setara {times} tahun pemasukan anggaran ({income} sebulan)',
+  'score.now.allSpendHousehold': 'semua pengeluaran (termasuk tagihan tetap) {pct} dari pemasukan rumah tangga',
+  'score.gap.fixMonthly': 'Tabung {amount} lagi tiap bulan untuk mencapai {pct}% dari pemasukan anggaran Anda.',
+  'score.gap.fixBuild': 'Tumbuhkan tabungan, investasi, atau properti Anda sebesar {amount} — atau lunasi utang sebesar itu — untuk mencapai {times} tahun pemasukan anggaran.',
+  'score.gap.fixTrim': 'Kurangi total pengeluaran {amount} sebulan, termasuk tagihan tetap, supaya pengeluaran Anda turun di bawah {pct}% pemasukan rumah tangga Anda.',
+  'score.flow.sub.incomeToCome': '{amount} pemasukan yang direncanakan belum masuk',
+  'score.flow.sub.incomeAbovePlan': '{amount} pemasukan lebih dari rencana',
+  'score.flow.sub.setAsideOver': '{amount} lebih banyak dikirim ke tabungan daripada yang disisihkan rencana',
+  'score.flow.sub.alreadySpent': '{amount} yang sudah dihitung anggaran sebagai terbelanjakan',
+  'score.flow.chip.alreadySpentNote': '“Belum dibelanjakan” di atas {amount} lebih besar daripada “Bersama-sama”: uang yang masih di tangan, tetapi sudah dihitung anggaran sebagai terbelanjakan.',
+  /* 2026-10-20 audit, L3 (Report + exports) — M1-04, M1-08, M2-04.
+     Machine-assisted, added 2026-10-20; not native-reviewed. */
+  'report.budget.incomeLeftOut': {
+    other: '{count} dari {total} periode yang dibandingkan tidak punya pemasukan dalam anggarannya: {names}. Pemasukan dianggarkan, dan setiap baris pemasukan di anggaran vs aktual, hanya mencakup periode yang anggarannya merencanakan pemasukan itu; pemasukan di atas mencakup setiap periode.',
+  },
+  'report.health.noteParts': 'Satu angka yang dibangun dari bagian-bagian yang ditampilkan halaman Skor ({parts}) — ukuran kasar dari angka-angka di vault ini, bukan penilaian profesional.',
+  'bx.doc.headlineHeading': 'Pemasukan dan pengeluaran per periode',
+  'bx.doc.income': 'Pemasukan',
+  'bx.doc.spent': 'Pengeluaran',
+  'bx.doc.uncategorised': 'Tanpa kategori',
+  'bx.doc.refunds': 'Pengembalian dana yang tidak dikurangkan',
+  /* 2026-10-20 audit fix wave, lane L4 (Accounts) — machine-assisted, not
+     native-reviewed. acct.where.subStop: the ring caption with its closing
+     stop, for when the other-currency sentence follows it (D1-15).
+     acct.overlap: the Accounts page's own card-overlap sentence — its hero
+     leaves Debt-page rows out, so the double count is in net worth on the
+     Savings page and the Dashboard, not "above" (M2-06). */
+  'acct.where.subStop': 'Porsi dari apa yang dipegang rekening-rekening ini.',
+  'acct.overlap': 'Rekening kartu kredit yang dilacak: {accounts} · utang kartu yang dilacak: {debts} — kalau ada kartu yang tercatat di keduanya, ia terhitung dua kali dalam kekayaan bersih di halaman Tabungan dan investasi dan di Dasbor.',
+  /* 2026-10-20 audit fix wave, lane L6 (Transactions, Plan, Onboarding) —
+     machine-assisted, not native-reviewed. plan.env.sub: the line over the
+     Plan's spending buckets, through t() so its figures are glued (D1-05). */
+  'plan.env.sub': {
+    other: '{count} kantong belanja · {placed} dialokasikan dari {pot}',
+  },
 };

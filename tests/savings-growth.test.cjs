@@ -196,7 +196,8 @@ async function mount(files) {
      period ends where the growth was measured, not on the pinned clock (audit
      2026-10-14, L2a-N10). It read +14,9% when it ran on to the pinned day. */
   ok(/≈ \+15,2% a year/.test(fund), `annualised, and marked approximate — got "${fund}"`);
-  ok(fund.includes('since 2025-01-01'), `over a stated period — got "${fund}"`);
+  // A prose date since the 2026-10-20 audit (D2-11): "Jan 1, 2025", not the ISO cell.
+  ok(fund.includes('since Jan 1, 2025'), `over a stated period — got "${fund}"`);
 
   /* The identity a reader can check by eye: the two figures on the card add up
      to the balance printed above them. */
@@ -250,9 +251,11 @@ async function mount(files) {
   const label = svg.getAttribute('aria-label');
   ok(label.includes(`balance of ${money(75000)}`),
     `it states the balance it accounts for — got "${label}"`);
-  ok(label.includes(`${money(60000, 0)} put in`), 'the capital');
-  ok(label.includes(`${money(1000, 0)} of recorded growth`), 'the growth that carries dates');
-  ok(label.includes(`${money(14000, 0)} of growth carrying no date`),
+  /* In cents, like the total it adds up to and the legend under the chart
+     (2026-10-20 audit, D2-03). */
+  ok(label.includes(`${money(60000)} put in`), 'the capital');
+  ok(label.includes(`${money(1000)} of recorded growth`), 'the growth that carries dates');
+  ok(label.includes(`${money(14000)} of growth carrying no date`),
     `and the growth that does not — got "${label}"`);
 
   /* 2. the chart's own total agrees with the tile and the card. */

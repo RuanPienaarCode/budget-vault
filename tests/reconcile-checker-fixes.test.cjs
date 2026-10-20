@@ -248,9 +248,17 @@ const clone = x => JSON.parse(JSON.stringify(x));
 
     /* NEGATIVE CONTROL: one amount cell drawn wrong. */
     const pages = clone(r.pages);
-    const cell = pages.find(p => p.view === 'transactions').figures.find(x => /^txTable\/tbody\/tr\[\d+\]\/td\.num\[4\]$/.test(x.address) && x.kind === 'money');
+    const cell = pages.find(p => p.view === 'transactions').figures.find(x => /^txTable\/tbody\/tr\[\d+\]\/td\.num\[4\]\/span\.tx-amt$/.test(x.address) && x.kind === 'money');
     cell.raw = cell.raw + 1;
     eq(one(runChecks(r.G, pages), 'transactions', /Σ rendered amounts = Σ the window/).status, 'fail', 'a wrong amount in the window fails the sum');
+    /* And a wrong SIGN: the figure is harvested as a magnitude since the
+       amount prints as a flow ("−R 50,00", 2026-10-20 audit D2-04), and the
+       sign is read off its cell — a cell that printed "+" for money that left
+       must fail the same sum. */
+    const flipped = clone(r.pages);
+    const out = flipped.find(p => p.view === 'transactions').figures.find(x => /span\.tx-amt$/.test(x.address) && /^\s*\u2212/.test(x.context.parent));
+    out.context.parent = out.context.parent.replace('\u2212', '+');
+    eq(one(runChecks(r.G, flipped), 'transactions', /Σ rendered amounts = Σ the window/).status, 'fail', 'a flipped sign in the window fails the sum');
   }
 
   /* ---- 8. The two untraced fails ------------------------------------------ */
@@ -260,13 +268,16 @@ const clone = x => JSON.parse(JSON.stringify(x));
     const drift = one(r.checks, 'dashboard', /^Stale note: drift$/);
     eq([drift.status, drift.pageValue, drift.globalValue], ['pass', 6100, 6100], 'the stale note prints the drift as a MAGNITUDE and is compared as one');
     const dir = one(r.checks, 'dashboard', /Stale note: drift direction/);
-    eq([dir.status, dir.pageValue, dir.globalValue], ['pass', -1, -1], 'the direction the words carry ("less") matches the sign of the drift');
+    eq([dir.status, dir.pageValue, dir.globalValue], ['pass', -1, -1], 'the direction the words carry ("take off") matches the sign of the drift');
 
-    /* NEGATIVE CONTROL: the sentence says "more" while the drift is downward. */
+    /* NEGATIVE CONTROL: the sentence says "add" while the drift is downward.
+       The note prints the already-counted sentences since the 2026-10-20 audit
+       (M2-02), "take off R X" / "add R X"; the stated-basis "less" / "more" is
+       swapped too, so the control bites on either wording. */
     const pages = clone(r.pages);
     const stale = pages.find(p => p.view === 'dashboard').figures.find(x => /^dashStale\//.test(x.address) && x.kind === 'money');
-    stale.context.own = stale.context.own.replace(/less/, 'more');
-    eq(one(runChecks(r.G, pages), 'dashboard', /Stale note: drift direction/).status, 'fail', 'a note that says "more" for a downward drift fails');
+    stale.context.own = stale.context.own.replace(/take off/, 'add').replace(/\bless\b/, 'more');
+    eq(one(runChecks(r.G, pages), 'dashboard', /Stale note: drift direction/).status, 'fail', 'a note that says "add" for a downward drift fails');
     const gone = clone(r.pages);
     const dp = gone.find(p => p.view === 'dashboard');
     dp.figures = dp.figures.filter(x => !/^dashStale\//.test(x.address));

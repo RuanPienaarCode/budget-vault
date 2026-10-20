@@ -19,7 +19,7 @@ const { askBudgetReslice, confirmModal } = require('../modal');
 const { inferIntervalFromKeys, resliceBudget } = require('../reslice');
 const { ISO_DATE, isoDayNumber } = require('../dates');
 const { sharePercentLabel } = require('../share-percents');
-const { amountUnreadable, remainderDecimals } = require('../figures');
+const { amountUnreadable, printedRemainder, usedToneClass } = require('../figures');
 /* Namespace import — this file binds `t` as a local (`const t = $('#budTable')`),
    so a bare `t` from i18n would be shadowed inside renderBudgets(). */
 const i18n = require('../i18n');
@@ -87,6 +87,58 @@ function incomeRemainingText(remaining, money) {
   return cents < 0
     ? i18n.t('bud.remaining.incomeMore', { amount: money(-r) })
     : i18n.t('bud.remaining.incomeToCome', { amount: money(r) });
+}
+
+/* The WHOLE Remaining cell of one budget-vs-actual row, on the Budget page
+   and the Dashboard's budget table alike (2026-10-20 audit, D2-05). Only the
+   income branch above was shared; an expense row read "R 500,00 over" here
+   and a red "R -500,00" on the Dashboard — one row, two wordings and two
+   signs, the second in the balance form currency.js keeps for a balance, not
+   for a shortfall. `row` is a budgetVsActualRows row (figures.js), which
+   carries its status; nothing is recomputed here.
+
+   Returns { text, over, assumed }: `over` is the one state either page
+   paints red (never an income row, which beating its plan is not), and
+   `assumed` the carried-in "already spent" state the Budget page styles.
+   Module-level and exported for the reason incomeRemainingText is. */
+function remainingText(row, money) {
+  if (!row) return { text: '', over: false, assumed: false };
+  /* Spend in a category nobody budgeted for is over by the whole amount —
+     the one kind of overspend a blank cell used to hide. */
+  if (!row.budget) {
+    return row.unbudgeted
+      ? { text: i18n.t('bud.remaining.over', { amount: money(row.actual) }), over: true, assumed: false }
+      : { text: '', over: false, assumed: false };
+  }
+  /* An assume-spent row is its own actual until real spend overruns it; past
+     that it IS an ordinary row and falls through to the arithmetic below. */
+  if (row.assumed && !row.over) return { text: i18n.t('bud.remaining.assumed'), over: false, assumed: true };
+  if (row.type === 'income') return { text: incomeRemainingText(row.remaining, money), over: false, assumed: false };
+  return row.remaining < 0
+    ? { text: i18n.t('bud.remaining.over', { amount: money(-row.remaining) }), over: true, assumed: false }
+    : { text: i18n.t('bud.remaining.left', { amount: money(row.remaining) }), over: false, assumed: false };
+}
+
+/* The group heading used to print the raw stored `type` string verbatim —
+   'income', 'luxuries', 'transfer' — straight onto the page, never routed
+   through i18n (audit finding 4). controller.js's typeBadge was already
+   fixed for the SAME text on the row's own Type column; this is the same
+   wiz.type.* lookup with the same raw fallback, reused rather than
+   re-derived, because two things translating one enum by different rules is
+   exactly this repo's recurring bug shape. i18n.t() returns the key itself
+   when nothing matches (its documented worst case), and rendering THAT
+   ('wiz.type.mygroup') for a household's own custom group would read worse
+   than the raw word it replaced — so the fallback compares against the key
+   it asked for, not against `undefined`, same as typeBadge does.
+
+   Module-level and exported since the 2026-10-20 audit (D1-07 / MT-04): the
+   Dashboard's budget table printed the same groups as raw lowercase keys
+   ("income", "expense") under the same heading this page prints "Income",
+   "Everyday expenses". */
+function typeGroupLabel(type) {
+  const key = 'wiz.type.' + type;
+  const label = i18n.t(key);
+  return label === key ? type : label;
 }
 
 module.exports = function registerBudgets(ctx) {
@@ -445,7 +497,6 @@ module.exports = function registerBudgets(ctx) {
        fit a category-netting gap regardless of which page it's disclosed on. */
     const stripGap = budgetSpendGap();
     const gapUncat = stripGap.uncat;
-    const gapNetted = stripGap.netted;
     /* The tile's OWN sentence, computed here rather than at the return below,
        because every separator decision under it needs to know whether anything
        precedes it. It did not, and the two fragments that carry no leading
@@ -478,8 +529,19 @@ module.exports = function registerBudgets(ctx) {
        wording printed here told a reader the opposite of what the figure had
        done (2026-10-14 audit, L2b-02). The hero's key, so the two pages cannot
        word one fact differently; it carries no leading separator, so sep()
-       supplies it exactly when something stands to the left. */
-    if (gapNetted >= 1) addPart('bud-note-netted', sep() + i18n.t('dash.hero.nettedOff', { amount: money(gapNetted, 0) }));
+       supplies it exactly when something stands to the left.
+
+       And the hero's FIGURE: every refund the period kept, in full
+       (periodSummary().refunds, ledger.js tally). It named the strip's own gap
+       until the 2026-10-20 audit (M1-02), and a gap is not a refund total —
+       it floors each category at zero, so a R 3 000 refund against R 1 000 of
+       that category's spend was named as R 1 000, on a sentence whose whole
+       claim is how much the gross figure did not take off. On the vault the
+       audit ran against, one month's sentence named about a third of the
+       refunds that came in. The gap's own netted half is still the donut's to
+       print, on the one card where "netted off" is true. */
+    const refunds = sum.refunds || 0;
+    if (refunds >= 1) addPart('bud-note-netted', sep() + i18n.t('dash.hero.nettedOff', { amount: money(refunds, 0) }));
     /* ISSUE 30. A SECOND omission, and a different one: the gap note above
        accounts for what this tile's gross figure holds that the table below it
        nets away, and this accounts for what periodSummary never counted at
@@ -559,12 +621,22 @@ module.exports = function registerBudgets(ctx) {
     let unallocatedTile = null;
     if (plan.unallocated !== null) {
       const unallocated = plan.unallocated;
+      /* The difference of the two figures this strip prints beside it, as
+         printed (2026-10-20 audit, D2-01): the income tile (or, with no income
+         row on a finished period, its "received so far" note) less the
+         Budgeted tile — planFigures' `unallocatedBase` is whichever of the two
+         the remainder was taken from. Rounding the true remainder on its own
+         printed "R 8 001" between "R 24 000" and "R 16 000" for a plan of
+         24 000,40 against 15 999,60 (made up): the Dashboard hero's own defect
+         (L2a-N07), on this page's statement figure. printedRemainder keeps
+         that fix's cents rule with it — a real over/left that rounds to R0
+         prints to the cent, because "Over-budgeted R 0" says the plan is over
+         and states no amount — and never flips the sign of the true
+         remainder, so the label still reads `unallocated`. */
+      const rem = printedRemainder(plan.unallocatedBase, plan.total);
       unallocatedTile = {
-        /* To the cent when a real over/left figure would round to R0
-           (2026-10-14 audit, L2a-N07): "Over-budgeted R 0" says the plan is
-           over and states no amount. */
         label: i18n.t(unallocated < 0 ? 'bud.total.over' : 'bud.total.left'),
-        value: money(Math.abs(unallocated), remainderDecimals(unallocated)),
+        value: money(Math.abs(rem.value), rem.decimals),
         /* One name for both branches. The tile prints a MAGNITUDE and the
            label carries the direction, so a reconciliation must compare it to
            |unallocated| — reading it as a signed figure is how the check on
@@ -620,7 +692,10 @@ module.exports = function registerBudgets(ctx) {
       ...(unallocatedTile ? [unallocatedTile] : []),
       { label: i18n.t('bud.total.spent'), value: money(spent, 0), over: used.budgeted > 0 && spent > used.budgeted,
         fig: 'bud-spent', note: spentNote + gapText(),
-        noteParts: [...(spentNote ? [{ fig: 'bud-note-spent', text: spentNote }] : []), ...gapParts] },
+        /* The percentage's tone is the Dashboard hero's, from one rule
+           (figures.js usedToneClass, 2026-10-20 audit MT-14): this line was
+           always plain here while the hero painted it amber always. */
+        noteParts: [...(spentNote ? [{ fig: 'bud-note-spent', text: spentNote, cls: usedToneClass(used) }] : []), ...gapParts] },
     ];
   }
 
@@ -644,7 +719,8 @@ module.exports = function registerBudgets(ctx) {
       if (i) out.push(el('br'));
       out.push(piece);
     });
-    return [...(lead ? [el('span', { class: 'bud-sep' }, NOTE_SEP)] : []), el('span', { 'data-fig': pt.fig }, ...out)];
+    return [...(lead ? [el('span', { class: 'bud-sep' }, NOTE_SEP)] : []),
+      el('span', { 'data-fig': pt.fig, ...(pt.cls ? { class: pt.cls } : {}) }, ...out)];
   }
 
   /* longFig (.is-long in statement/budget.css) is dom.js's, shared with the
@@ -674,22 +750,8 @@ module.exports = function registerBudgets(ctx) {
     }
   }
 
-  /* The group heading used to print the raw stored `type` string verbatim —
-     'income', 'luxuries', 'transfer' — straight onto the page, never routed
-     through i18n (audit finding 4). controller.js's typeBadge was already
-     fixed for the SAME text on the row's own Type column; this is the same
-     wiz.type.* lookup with the same raw fallback, reused rather than
-     re-derived, because two things translating one enum by different rules is
-     exactly this repo's recurring bug shape. i18n.t() returns the key itself
-     when nothing matches (its documented worst case), and rendering THAT
-     ('wiz.type.mygroup') for a household's own custom group would read worse
-     than the raw word it replaced — so the fallback compares against the key
-     it asked for, not against `undefined`, same as typeBadge does. */
-  function typeGroupLabel(type) {
-    const key = 'wiz.type.' + type;
-    const label = i18n.t(key);
-    return label === key ? type : label;
-  }
+  /* typeGroupLabel — the group heading's words — is module-level now (see
+     above), shared with the Dashboard's budget table. */
 
   function renderBudgets() {
     $('#budPeriodLabel').textContent = `${periodMonthName(S.period)} · ${periodTitle(S.period)}`;
@@ -782,33 +844,13 @@ module.exports = function registerBudgets(ctx) {
            over/left arithmetic as an ordinary row, because at that point it
            IS one. */
         const remainingEl = el('div', { class: 'bud-remaining' });
+        /* The words are remainingText's (module level above), the one
+           wording the Dashboard's budget table prints for the same row
+           (2026-10-20 audit, D2-05); only the classes are this page's. */
         const updateRemaining = () => {
-          if (!row.budget) {
-            /* Spend in a category nobody budgeted for used to leave this line
-               blank — the one kind of overspend this page said nothing
-               about. Mirrors dashboard.js's renderBudgetTable. */
-            if (row.unbudgeted) {
-              remainingEl.textContent = i18n.t('bud.remaining.over', { amount: money(actual) });
-              remainingEl.className = 'bud-remaining over st-over';
-            } else {
-              remainingEl.textContent = ''; remainingEl.className = 'bud-remaining';
-            }
-            return;
-          }
-          if (assumed && !row.over) {
-            remainingEl.textContent = i18n.t('bud.remaining.assumed');
-            remainingEl.className = 'bud-remaining bud-remaining-assumed';
-            return;
-          }
-          if (isIncome) {
-            remainingEl.textContent = incomeRemainingText(row.remaining, money);
-            remainingEl.className = 'bud-remaining';
-            return;
-          }
-          remainingEl.textContent = row.remaining < 0
-            ? i18n.t('bud.remaining.over', { amount: money(-row.remaining) })
-            : i18n.t('bud.remaining.left', { amount: money(row.remaining) });
-          remainingEl.className = 'bud-remaining' + (row.remaining < 0 ? ' over st-over' : '');
+          const r = remainingText(row, money);
+          remainingEl.textContent = r.text;
+          remainingEl.className = 'bud-remaining' + (r.over ? ' over st-over' : r.assumed ? ' bud-remaining-assumed' : '');
         };
         updateRemaining();
         /* Actual cell — kept as element references so an amount edit can
@@ -1197,3 +1239,5 @@ module.exports = function registerBudgets(ctx) {
    than on its subject. */
 module.exports.assumedActual = assumedActual;
 module.exports.incomeRemainingText = incomeRemainingText;
+module.exports.remainingText = remainingText;
+module.exports.typeGroupLabel = typeGroupLabel;

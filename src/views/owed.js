@@ -46,15 +46,21 @@ module.exports = function registerOwed(ctx) {
     const s = owedSummary(S.owed, undefined, S.settings.currency);
     const tile = kpiTiles($('#owedKpis'));
     /* Entries in another currency are stated beside the figure, never added
-       into it — see owedSummary()'s own header. */
-    const inOwn = list => list
-      .map(([sym, v]) => (typeof ctx.moneyIn === 'function' ? ctx.moneyIn(sym, v, 0) : `${sym} ${Math.round(v)}`))
-      .join(' · ');
+       into it — see owedSummary()'s own header.
+
+       Through ctx.moneyIn alone (2026-10-20 audit, D2-26). There was a
+       fallback here for a ctx without it — `${sym} ${Math.round(v)}`, a
+       second spelling of money that groups no thousands — and it could never
+       run: controller.js builds the ctx with moneyIn in the same literal as
+       money, before any view registers (tests/owed-no-hand-money-fallback).
+       In cents, like the tile figure each note sits under (D2-03): "R 1 500,00"
+       over "plus € 1 300" was one tile printed by two rounding rules. */
+    const inOwn = list => list.map(([sym, v]) => ctx.moneyIn(sym, v)).join(' · ');
     const owedOthers = (s.otherCurrencies || []);
     const otherTag = owedOthers.length
       ? `plus ${inOwn(owedOthers)} owed in other currencies`
       : null;
-    tile('Outstanding', money(s.outstanding), s.outstanding > 0 ? 'text-warning' : '', otherTag);
+    tile('Outstanding', money(s.outstanding), s.outstanding > 0 ? 'text-warning st-money' : 'st-money', otherTag);
     /* Money that came back in another currency needs saying for the same
        reason money still out does. It cannot join the rand figure beside it —
        €200 is not R200 and this app never invents a rate — and until
@@ -63,7 +69,7 @@ module.exports = function registerOwed(ctx) {
        its unrecovered half was disclosed on the tile directly above. One
        ledger, half of it visible. */
     const backOthers = (s.recoveredOthers || []);
-    tile('Recovered', money(s.recovered), 'text-success',
+    tile('Recovered', money(s.recovered), 'text-success st-money',
       backOthers.length ? `plus ${inOwn(backOthers)} recovered in other currencies` : null);
     tile('Entries', String(s.entries));
   }

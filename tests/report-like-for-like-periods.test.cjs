@@ -44,7 +44,9 @@ const { pinClock } = require('./helpers/figures.cjs');
 const { mountFor, createReport, section } = require('./helpers/report-page.cjs');
 const { SEED, B, TODAY, PERIOD } = require('./figures/household.cjs');
 const report = require('../src/report');
-const i18n = require('../src/i18n');
+/* Sentences spelled through t() are compared in reading form — see
+   readingI18n in tests/helpers/dom-stub.cjs (U+00A0 glue, 20 Oct 2026). */
+const i18n = require('./helpers/dom-stub.cjs').readingI18n(require('../src/i18n'));
 
 let checks = 0;
 const ok = (c, m) => { assert.ok(c, m); checks++; };
@@ -109,7 +111,7 @@ const row = (json, cat) => json.budgets_vs_actuals.find(r => r.category === cat)
     const note = i18n.t('report.budget.leftOut', { count: 1, total: 2, names: 'August 2026' });
     ok(r.md.includes(note), `the document names the period left out — expected "${note}"`);
     ok(/not compared/.test(note) && /income and spend above cover all 2/.test(note), 'in words that also say what the plain totals cover');
-    ok(section(r.md, 'Income & Spend').includes(note), 'under the section the figures are in');
+    ok(section(r.md, i18n.t('report.section.incomeSpend')).includes(note), 'under the section the figures are in');
   }
 
   /* ---- a single period, and a selection with no budget at all ------------------- */

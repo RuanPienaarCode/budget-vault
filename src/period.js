@@ -143,17 +143,41 @@ module.exports = function registerPeriod(ctx) {
     return `${MONTH_FULL[m - 1]} ${y}`;
   }
   /* Axis-sized label for the dashboard trend, which used to slice the key
-     apart itself and would read a 'YYYY-MM-DD' key as a nonsense month. */
+     apart itself and would read a 'YYYY-MM-DD' key as a nonsense month.
+
+     MT-13 (audit of 20 Oct 2026): a month period reads "Aug ’26" — U+2019,
+     the typographic year elision — not "Aug 26". With periods that start on
+     the 22nd, "Aug 26" on the trend axis reads as the 26th of August, the
+     exact trap the ADR-0007 note below names for the day label; the
+     apostrophe makes the year unmistakable without widening the axis. An
+     interval period keeps "7 Aug": that label IS a day, the period's start. */
   function periodShortLabel(p) {
     if (intervalDays() && DATE_KEY.test(p)) {
       const [, m, d] = p.split('-').map(Number);
       return `${d} ${MONTHS[m - 1]}`;
     }
-    return `${MONTHS[parseInt(p.slice(5), 10) - 1]} ${p.slice(2, 4)}`;
+    return `${MONTHS[parseInt(p.slice(5), 10) - 1]} \u2019${p.slice(2, 4)}`;
   }
   /* ADR-0007 · dayLabel names a day; periodShortLabel names a period. The axis
      label renders the YEAR second, so it printed 'Aug 26' for a period ending the 22nd. */
   const dayLabel = d => `${MONTHS[parseInt(d.slice(5, 7), 10) - 1]} ${parseInt(d.slice(8), 10)}`;
+  /* A date for PROSE (audit of 20 Oct 2026): dayLabel ("Oct 23"), with
+     ", YYYY" appended only when the year is not today's. dayLabel alone is
+     right in a sentence about this year and wrong about any other — "last
+     confirmed Oct 23", read in October 2026 about a 2025 date, says days when
+     it means a year. Today is the same one currentPeriod and periodSummary
+     read: injected when the caller has one, the local clock otherwise, so a
+     pinned test and the reconciliation's --today agree with the page.
+
+     Anything that is not a real ISO date — empty, a word the reader typed, a
+     date-shaped impossibility, a timestamp — comes back exactly as given, so
+     a caller can hand it a raw cell without guarding first. */
+  function dateText(iso, todayArg) {
+    if (!isRealIsoDate(iso)) return iso;
+    const today = DATE_KEY.test(todayArg || '') ? todayArg : todayIso();
+    const label = dayLabel(iso);
+    return iso.slice(0, 4) === today.slice(0, 4) ? label : `${label}, ${iso.slice(0, 4)}`;
+  }
 
   function periodTitle(p) {
     const { start, end } = periodRange(p);
@@ -439,6 +463,9 @@ module.exports = function registerPeriod(ctx) {
       uncategorised: t.uncategorised, uncatSpend: t.uncatSpend, uncatIncome: t.uncatIncome,
       unknown: t.unknown, byCat: t.byCat,
       setAside: t.setAside, fundedFromSavings: t.fundedFromSavings,
+      /* What gross `spend` does not take off, in full — the figure the
+         "refunds not taken off" sentences name (2026-10-20 audit, M1-02). */
+      refunds: t.refunds,
       count: t.count,
       foreign: t.foreign,
     };
@@ -552,6 +579,9 @@ module.exports = function registerPeriod(ctx) {
 
   ctx.provide({
     periodRange, currentPeriod, shiftPeriod, periodTitle, periodMonthName, periodShortLabel, dayLabel,
+    /* Audit of 20 Oct 2026: the one way to name a date inside a sentence —
+       dayLabel plus the year when it is not this year's. */
+    dateText,
     txInPeriod, catType, periodSummary, monthlyIncome, budgetTotals, budgetTotalsOf, accountForLabel, accountIndex, impliedAccounts, accountsWithFolder, nonBudgetLabels,
     /* Published so the score's household walk (health-data.js) narrows rows by
        the SAME predicate summaryInRange does — a second spelling of "which
