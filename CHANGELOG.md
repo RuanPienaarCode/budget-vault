@@ -3,6 +3,71 @@
 All notable changes to Budget Vault. Versions match the plugin version in
 `manifest.json` and the release tag exactly (no `v` prefix).
 
+## 1.54.0 — 2026-10-20
+
+An audit of 1.53.0 for math, totals and design. Adding up the raw files still
+matched to the cent across thirteen periods; what changed is where two printed
+figures meet — a rounding taken twice, a refund counted by the wrong rule, one
+word for two amounts, one amount in two formats — and a handful of places where
+the design system lost a CSS tie. Every fix has a guard test.
+
+### Changed
+
+- **"Refunds not taken off this figure" names every refund.** It used to read
+  the donut's per-category gap, which stops at zero, so a refund bigger than its
+  category's spend that period was mostly lost. The Dashboard, the Budget page
+  and the PDF export now print the full figure.
+- **Figures in a sentence never break across lines.** An amount inside a
+  sentence is joined with no-break spaces, so "R 14 765" can't wrap mid-number.
+- **One sign for money that moved.** Transactions print "−R 50,00" and
+  "+R 410,00", as the Dashboard always did; balances keep "R -500". The
+  Dashboard's budget table says "R 500,00 over" like the Budget page, and the
+  Debt tile prints what you owe as a positive figure.
+- **The Score names its base.** "Worth 1,8 years of budget income (R X a
+  month)"; saving and debt say "budget income"; the Spending row's measure is
+  "all spending (fixed bills included)", and "Living costs" names only the flow
+  band. The "Not yet spent" caption adds up to its band.
+- **The Report and exports.** Income rows read "more than planned / still to
+  come / received as planned"; a 12-month report compares income only over
+  periods that plan it and names the rest; net worth carries the card-overlap
+  caveat. The workbook's About sheet has a per-period Income, Spent,
+  Uncategorised and Refunds table.
+- **Where two figures sit together they agree.** Remainders and parts are taken
+  from the figures as printed; a figure beside its twin prints at the twin's
+  precision (whole rands stay on the Dashboard and Budget summary figures);
+  decimals use your locale's mark everywhere; dates in sentences read "Sep 26";
+  the trend axis reads "May ’26".
+- **One word per amount.** "In your funds" and "in your emergency funds" for
+  fund balances ("set aside" keeps its meaning), "you owe" beside "Owed to
+  you", and on the Plan page spoken for / not spoken for / placed / left to
+  place. Navigation and headings are sentence case.
+- **"% of spending budget used"** is neutral until 85%, amber near the limit and
+  red over it, on the Dashboard and the Budget page alike.
+
+### Fixed
+
+- Plan on a phone: collapsed buckets show their names again (a phone rule lost
+  to a later one; ten more such rules are fixed and now guarded).
+- Savings: "before your records begin" is measured at one date, so funds whose
+  balance was typed before their latest transactions read correctly.
+- Dashboard "Where it went": Change is the printed Spent minus the printed
+  baseline; a slice under 1% reads "<1%".
+- Accounts: the card-overlap note says where the double count is; a card's
+  Available is its limit plus its balance; growth reads to one decimal.
+- Loans: costs are neutral ink, and total cost of ownership includes insurance
+  when it is switched on.
+- Transactions: a row on a foreign account shows that account's symbol; the
+  Transactions and Owed tables fit a desktop window.
+- Copy report formats money the way Save report does.
+- The setup wizard prints amounts in your country's format.
+- Tax: the assessed callout uses the tax pack's currency; "3 days overdue".
+- PDF: a type heading row is never left alone at the foot of a page; the Plan
+  bar's screen-reader label no longer reads a negative as an amount.
+- Import: an account the review can't match asks again instead of showing one
+  account and writing to another.
+- Tone colours always win (an overdrawn balance prints red); Obsidian's centred
+  buttons are aligned; money tiles get the muted currency symbol everywhere.
+
 ## 1.53.0 — 2026-10-15
 
 A full audit of 1.52.0 — figures, saves, exports, security, iOS and the
