@@ -177,9 +177,12 @@ class PinnedDate extends RealDate {
     const pct = sharePercentLabel(bu.used, '.');
     ok(md.includes(i18n.t('bud.total.spentNoteAssumed', { pct, amount: money(bu.assumed) })),
       `"% used" is the label the hero and the Budget tile print (${pct}%), and the assume-spent provision added into it is named`);
-    ok(md.includes(i18n.t('dash.stat.setAside', { amount: money(bu.setAside, 0) })),
+    /* In the hero's own fragments, to the cent: the document prints every
+       figure in cents, and the hero's whole rands are the hero's (2026-10-20
+       audit, M1-09). */
+    ok(md.includes(i18n.t('dash.stat.setAside', { amount: money(bu.setAside) })),
       'the set-aside held OUT of that numerator is named, in the hero\'s own fragment');
-    ok(md.includes(i18n.t('dash.stat.ofWhichSetAside', { amount: money(planned, 0), moved: money(moved, 0) })),
+    ok(md.includes(i18n.t('dash.stat.ofWhichSetAside', { amount: money(planned), moved: money(moved) })),
       'and the "saved so far" sentence beside it states the PLANNED set-aside, as the hero does');
   }
 

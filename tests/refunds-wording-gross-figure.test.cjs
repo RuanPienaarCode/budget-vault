@@ -64,12 +64,14 @@ const files = {
 
   /* Control: the donut's slices ARE net per category, and its subtitle keeps saying so. */
   const sub = dash.t('#dashSplitSub');
-  ok(/R 3 000,00 in refunds netted off/.test(sub), `the donut keeps its true sentence — got: ${sub}`);
+  ok(/R 3 000 in refunds netted off/.test(sub), `the donut keeps its true sentence (in whole rands, like its centre, since the 2026-10-20 audit) — got: ${sub}`);
 
   /* The API reads the hero's own builder, so the reworded sentence reaches Vista from the same key. */
   i18n.setLanguage('en');
   const money = (v, d) => `R ${Number(v).toFixed(d)}`;
-  const q = heroQualifiers({ used: {}, summary: {}, gap: { netted: 250 } }, money);
+  /* summary.refunds — every refund, in full — since the 2026-10-20 audit
+     (M1-02); the donut's gap is not what this sentence names. */
+  const q = heroQualifiers({ used: {}, summary: { refunds: 250 }, gap: { netted: 0 } }, money);
   ok(q.length === 1 && q[0].key === 'netted' && /not taken off this figure/.test(q[0].text),
     `heroQualifiers hands the API the same reworded sentence — got: ${JSON.stringify(q)}`);
 

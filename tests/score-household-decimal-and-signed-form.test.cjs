@@ -44,8 +44,10 @@ const eq = (a, b, m) => { assert.strictEqual(a, b, m); checks++; };
     ctx.renderScore();
     const text = [...nodes.values()].map(r => [...leaves(r)].map(l => ownText(l)).join(' ')).join(' ').replace(/\s+/g, ' ');
     ok(/Now: \d+,\d months covered/.test(text), 'months covered use the household decimal comma');
-    ok(/worth \d+,\d\d years of income/.test(text), 'years of income use it too');
-    ok(!/\d\.\d+ (months covered|years of income)/.test(text), 'and neither prints a point');
+    /* One place since 2026-10-20 (audit D1-15: "5,70 years" beside "3,9
+       months"), and the base named (M1-05): tests/score-budget-income-base. */
+    ok(/worth \d+,\d years of budget income/.test(text), 'years of income use it too');
+    ok(!/\d\.\d+ (months covered|years of budget income)/.test(text), 'and neither prints a point');
   } finally { unpin(); }
   console.log(`PASS score-household-decimal-and-signed-form (${checks} checks)`);
 })().catch(e => { console.error(e); process.exit(1); });

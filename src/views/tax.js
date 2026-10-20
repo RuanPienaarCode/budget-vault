@@ -109,7 +109,12 @@ module.exports = function registerTax(ctx) {
     const tile = kpiTiles($('#taxKpis'));
 
     const d = daysTo(activeDeadline(t));
-    tile('Deadline', d === null ? '—' : d < 0 ? `${-d} d overdue` : `${d} days`,
+    /* Days in words, singular and plural (2026-10-20 audit, D2-26): late read
+       "3 d overdue" — the one abbreviated unit in the app, on the tile a
+       household reads when it is already late — and a count of one read
+       "1 days" either side of the deadline. */
+    const days = n => `${n} ${n === 1 ? 'day' : 'days'}`;
+    tile('Deadline', d === null ? '—' : d < 0 ? `${days(-d)} overdue` : days(d),
       d !== null && d < 0 ? 'text-danger' : d !== null && d <= 30 ? 'text-warning' : '');
     const steps = t.steps.filter(s => s.status !== 'n/a');
     tile('Steps done', `${steps.filter(s => s.status === 'done').length} / ${steps.length}`);

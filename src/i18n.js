@@ -212,10 +212,75 @@ function defaultLanguage() {
    producing a sentence that reads as if a real value were zero. */
 const PLACEHOLDER = /\{(\w+)\}/g;
 
+/* A figure inside a sentence must not break across lines (audit of
+   20 Oct 2026). The za locale groups thousands with U+0020 and money puts a
+   U+0020 after the symbol, so every gap inside "R 12 345" is an ordinary
+   breaking space. On a real vault a signed figure in brackets wrapped as
+   "(−R 12" on one line and "345)" on the next (figures here made up), and on
+   a phone "R 48" / "000,00" — and read across the break, "R 12" is a
+   different number, not an untidy one. So a param VALUE that is, as a whole,
+   a figure has those spaces swapped for U+00A0 before it goes into the
+   sentence. Done here, once, because every translated sentence passes through
+   this function and no view has to remember it.
+
+   "As a whole" is the load-bearing part. The shape is anchored at both ends,
+   so a value that merely CONTAINS a figure — "R 1 200 of R 3 000", "R 1 200/mo"
+   — is left alone, as is anything that is not a figure at all: a category
+   name, "3 accounts", a date. Three shapes count:
+
+     money    an optional sign, a symbol, a space, an optional sign, a number:
+              "R 12 345", "−R 12 345" (formatSigned), "R -50,00" (formatAmount),
+              "+R 3 922", "€ 640,00", "USD 1 200,00" (a conflicted account is
+              labelled by its code — currency.js symbolOf)
+     percent  an optional sign, a number, an optional space, "%": "12 %"
+     number   an optional sign and a grouped number: "12 345"
+
+   The symbol is the hard part, and the same problem tests/helpers/figures.cjs
+   names in its own header: a symbol cannot be pinned down by shape alone. What
+   it may be here is a currency sign with up to three letters before it ("€",
+   "$", "US$", "R$"), three CAPITALS (an ISO code), or one or two letters with
+   an optional full stop ("R", "Rp", "kr", "Rs."). That rules out "Oct 21" and
+   "Mai 21" — a month is three letters in title case, which is neither — at the
+   cost of a household that types a three-letter, lower-case symbol keeping its
+   breaking space. That cost is a figure that can still wrap, which is the
+   state every figure was in before this; the opposite mistake would glue words
+   the reader expects to wrap. (A param that is a two-letter word and a number,
+   "in 2026", reads as a figure too and keeps its two words on one line —
+   harmless, and no view passes one today.)
+
+   The gaps it accepts are U+0020, U+00A0 and U+202F, so a value that is
+   already partly glued (or came out of Intl.NumberFormat, whose fr-FR output
+   uses U+202F) still reads as a figure — and only U+0020 is replaced, so the
+   swap is idempotent. Unicode property escapes need the `u` flag, which the
+   iOS 15 WebKit floor has had since Safari 11.1 (src/amount.js already relies
+   on \p{Sc}). No lookbehind: anchored alternation does the whole job.
+
+   Anything that reads printed prose back — the figures ledger, the
+   reconciliation, a guard test matching a sentence — must map U+00A0 to a
+   space first. tests/helpers/dom-stub.cjs `readable` is the one spelling of
+   that mapping: the stub's textContent, the figures harvest and the Report
+   read-back all go through it. src/pdf.js normalizeText already does the same
+   before its WinAnsi check, so an export stays vector text. */
+const FIG_GAP = '[ \\u00a0\\u202f]';
+const FIG_SIGN = '[+\\-\\u2212]?';
+const FIG_NUM = '\\d+(?:[ \\u00a0\\u202f.,]\\d{3})*(?:[.,]\\d+)?';
+const FIG_SYMBOL = '(?:\\p{L}{0,3}\\p{Sc}|\\p{Lu}{3}|\\p{L}{1,2}\\.?)';
+const WHOLE_FIGURE = new RegExp(
+  `^(?:${FIG_SIGN}${FIG_SYMBOL}${FIG_GAP}${FIG_SIGN}${FIG_NUM}`   // money
+  + `|${FIG_SIGN}${FIG_NUM}${FIG_GAP}?%`                           // percent
+  + `|${FIG_SIGN}${FIG_NUM})$`, 'u');                               // grouped number
+
+/* The param as interpolate prints it: String(v), with its spaces made
+   unbreakable when the whole of it is a figure. Exported for the guard test. */
+function nbspFigure(v) {
+  const s = String(v);
+  return s.indexOf(' ') >= 0 && WHOLE_FIGURE.test(s) ? s.replace(/ /g, '\u00a0') : s;
+}
+
 function interpolate(s, params) {
   if (!params || typeof s !== 'string') return s;
   return s.replace(PLACEHOLDER, (whole, name) =>
-    Object.prototype.hasOwnProperty.call(params, name) ? String(params[name]) : whole);
+    Object.prototype.hasOwnProperty.call(params, name) ? nbspFigure(params[name]) : whole);
 }
 
 /* One key, resolved against one table. Plural entries are objects keyed by
@@ -285,6 +350,8 @@ module.exports = {
   pluralCategory,
   day,
   applyDom,
+  interpolate,
+  nbspFigure,
   TABLES,
   LANGUAGE_NAMES,
   LANGUAGE_ORDER,

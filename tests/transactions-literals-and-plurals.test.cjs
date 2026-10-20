@@ -172,7 +172,9 @@ const clear = () => { seen.fields.length = 0; seen.confirms.length = 0; };
       const i = I();
       answer.fields = { date: '2026-09-20', desc: 'Corner Cafe', label: 'Cheque', dir: 'out', amount: '35', cat: 'Dining', note: '' };
       await ctx.addTransaction();
-      eq(lastToast(ctx), i.t('tx.add.done', { amount: ctx.money(-35), account: 'Cheque', month: '2026-09' }), 'the add toast is translated');
+      /* The amount is named as the flow it is, "−R 35,00" — the sign before the
+         symbol (2026-10-20 audit, D2-04) — not money()'s balance form "R -35,00". */
+      eq(lastToast(ctx), i.t('tx.add.done', { amount: '−' + ctx.money(35), account: 'Cheque', month: '2026-09' }), 'the add toast is translated');
       ok(!/^Added/.test(lastToast(ctx)), 'and does not start with English');
 
       filter(ctx, { cat: 'Fuel' });

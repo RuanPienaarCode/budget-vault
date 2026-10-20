@@ -144,9 +144,10 @@ atAuditDate(async () => {
   ctx.renderDashboard();
 
   const left = nodes.get('leftBody').textContent;
-  ok(left.includes(i18n.t('dash.left.overdue', { date: '2026-09-01' })),
+  /* The date reads as prose (ctx.dateText, 2026-10-20 audit D2-11). */
+  ok(left.includes(i18n.t('dash.left.overdue', { date: ctx.dateText('2026-09-01') })),
     `the card says the instalment WAS due, not that it is expected — got: ${left}`);
-  ok(!left.includes(i18n.t('dash.left.expected', { date: '2026-09-01' })),
+  ok(!left.includes(i18n.t('dash.left.expected', { date: ctx.dateText('2026-09-01') })),
     'and never tells the reader to wait for something that has already not happened');
   ok(!left.includes(i18n.t('dash.left.none')),
     'and no longer reports "nothing scheduled" over a real unpaid instalment');

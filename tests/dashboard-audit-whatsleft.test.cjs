@@ -190,7 +190,8 @@ const ok = (c, m) => { assert.ok(c, m); checks++; };
       [`${B}/Settings.md`]: '---\nmonth_start_day: 22\ncurrency: "R"\ncountry: za\n---\n',
     }, { today: '2026-10-15' });
     const left = monthly.t('#leftBody');
-    ok(/was due 2026-10-10/.test(left),
+    /* A prose date (ctx.dateText) since the 2026-10-20 audit, D2-11. */
+    ok(/was due Oct 10/.test(left),
       `the instalment keeps the day its history taught it, and is flagged overdue: ${left}`);
     eq(figNumber(monthly.nodes.get('#leftBody'), 'left-committed'), 1500, 'and is still committed');
 
@@ -231,7 +232,7 @@ const ok = (c, m) => { assert.ok(c, m); checks++; };
     }
     const { t } = await renderDash(files, { today: '2026-09-20' });
     const left = t('#leftBody');
-    ok(/30[  ]?000 lands on 2026-09-25/.test(left), `the salary is the income that is landing: ${left}`);
+    ok(/30[  ]?000 lands on Sep 25/.test(left), `the salary is the income that is landing: ${left}`);
     ok(!/35[  ]?000 lands/.test(left), 'not the transfer between the household\'s own accounts');
   }
 

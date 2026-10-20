@@ -138,8 +138,13 @@ module.exports = function registerHealthData(ctx) {
       const consumption = h.consumption, fixed = h.fixed, income = F.summary.income;
       periods.push({
         income,
-        /* The spending, debt and net-worth shares keep household scope: their
-           numerators are HOUSEHOLD-lens (health-math.js healthMetrics). */
+        /* Only the two SPENDING shares (fixed bills, all spending) divide by
+           household income: their numerators are HOUSEHOLD-lens spend, which
+           keeps Excluded rows and accounts outside the budget (health-math.js
+           healthMetrics). Saving, debt and the net-worth multiple divide by
+           `income` above, the budget income, and the Score says which base each
+           figure has (2026-10-20 audit, M1-05: this comment used to put debt and
+           net worth on household scope, which the code never did). */
         householdIncome: h.netIncome,
         essential: essentialTotal(householdSpend, catType, S.settings.nonessential_groups),
         savings, consumption, fixed, consumptionBudget,

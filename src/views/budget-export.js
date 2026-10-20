@@ -56,6 +56,7 @@ const DOC_LABEL_KEYS = [
   'generated', 'range', 'categories', 'allCategories', 'periodLine', 'periodUncat',
   'noteFilter', 'noteForeign', 'noteInProgress', 'noteWide', 'noteTx',
   'amountsIn', 'noteNoBudget', 'exactHeading', 'noteExact', 'noteExactOnly', 'noteExactThrough',
+  'headlineHeading', 'income', 'spent', 'uncategorised', 'refunds',
 ];
 
 module.exports = function registerBudgetExport(ctx) {
@@ -92,6 +93,12 @@ module.exports = function registerBudgetExport(ctx) {
     /* An assume-spent row's tag, the Budget page's own word for it. */
     out.assumedRow = i18n.t('bud.assumed.tag');
     out.assumedNone = i18n.t('bud.assumed.note');
+    /* An income row's Remaining in the PDF, the Budget page's own three
+       sentences (2026-10-20 audit, D2-05). {amount} survives as a placeholder
+       for budget-export.js to fill per row. */
+    out.incomeMore = i18n.t('bud.remaining.incomeMore', { amount: '{amount}' });
+    out.incomeToCome = i18n.t('bud.remaining.incomeToCome', { amount: '{amount}' });
+    out.incomeAsPlanned = i18n.t('bud.remaining.incomeAsPlanned');
     /* Sheet names stay English on purpose: Excel forbids a handful of
        characters and caps them at 31, and a formula someone writes against
        'Summary'!C2 should survive the household changing its language. */
@@ -177,11 +184,25 @@ module.exports = function registerBudgetExport(ctx) {
                           spent with no transaction behind it — said on the same
                           line as the figure (`inline`)
        fundedFromSavings  spending a fund paid for, held out of every figure
+     and a third that changes it as much (2026-10-20 audit, M2-03):
+       refunds            money back under a spending category, which the
+                          gross Spent figure does NOT take off — `refunds` is
+                          summaryInRange(start, end).refunds, every refund the
+                          budget lens kept, the figure the Budget page's Total
+                          spent names in the same words (the hero's
+                          dash.hero.nettedOff). On the vault this was found on,
+                          one month's line sat off its own table by an amount
+                          nothing in the file explained, and a tax-year window
+                          by far more.
+                          Inline: it qualifies the figure on that line
      Amounts to the cent, like every other figure in the file. */
-  function caveatsFor(assumedAmount, funds) {
+  function caveatsFor(assumedAmount, funds, refunds) {
     const out = [];
     if (assumedAmount >= 1) {
       out.push({ key: 'assumed', inline: true, text: i18n.t('dash.hero.assumedIncluded', { amount: money(assumedAmount) }) });
+    }
+    if ((Number(refunds) || 0) >= 1) {
+      out.push({ key: 'refunds', inline: true, text: i18n.t('dash.hero.nettedOff', { amount: money(refunds) }) });
     }
     if (funds && funds.count > 0) {
       out.push({ key: 'fundedFromSavings', text: i18n.t('dash.fundedFromSavings', { amount: money(funds.spend), count: funds.count }) });
@@ -220,7 +241,7 @@ module.exports = function registerBudgetExport(ctx) {
            summary's `spend` is the gross outflow, set-aside money included
            (L4A-01); the model never re-derives either. */
         spent: used.spent,
-        caveats: caveatsFor(used.assumed, summary.fundedFromSavings),
+        caveats: caveatsFor(used.assumed, summary.fundedFromSavings, summary.refunds),
         /* In date mode the transactions are the exact-date ones, gathered once
            below — not each period's list, which would run past both ends. */
         txs: withRows && answer.includeTx && !isDates(answer) ? txInPeriod(p) : [],
@@ -231,7 +252,7 @@ module.exports = function registerBudgetExport(ctx) {
       const { rows, through, summary } = categoryActualsInRange(answer.from, answer.to);
       /* A window has no budget handed to it, so nothing is assume-spent in it:
          only the funds sentence applies. */
-      exact = { from: answer.from, to: answer.to, through, rows, summary, caveats: caveatsFor(0, summary && summary.fundedFromSavings),
+      exact = { from: answer.from, to: answer.to, through, rows, summary, caveats: caveatsFor(0, summary && summary.fundedFromSavings, summary && summary.refunds),
         txs: withRows && answer.includeTx ? txInRange(answer.from, through) : [] };
     }
     return buildModel({
@@ -336,7 +357,9 @@ module.exports = function registerBudgetExport(ctx) {
        moneyIn('') rather than a second formatter: the household's separators
        are the point, only the unit is dropped. */
     const plainMoney = typeof ctx.moneyIn === 'function' ? v => String(ctx.moneyIn('', v)).trim() : null;
-    const doc = modelToDoc(model, { money, rowMoney, plainMoney, labels: docLabels() });
+    /* `decimal` — the household's mark, for the Used column's share label
+       (2026-10-20 audit, D2-09). */
+    const doc = modelToDoc(model, { money, rowMoney, plainMoney, labels: docLabels(), decimal: (locale() || {}).decimal });
     const page = doc.landscape ? PAGE.A4_LANDSCAPE : PAGE.A4;
     const meta = { title: `${doc.title} ${model.rangeLabel}`.trim(), ...stampOf(model), producer: 'Budget Vault' };
     const pageLabel = (n, m) => i18n.t('bx.doc.pageOf', { n, m });

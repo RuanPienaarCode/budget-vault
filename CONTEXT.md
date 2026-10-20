@@ -103,14 +103,15 @@ _Avoid_: drawdown, redemption, disinvestment
 **Moved to funds**:
 Money the household transferred, in a period so far, from one of its own
 non-fund accounts into a savings or investment account — the receiving side of
-a set-aside, and the one figure behind "R X moved so far" on the Dashboard, the
-Budget strip and the Report. An inflow counts only when an equal outflow from
+a set-aside, and the one figure behind "R X of R Y saved so far" on the
+Dashboard, the Budget strip and the Report (1.49.1 reworded the interface from
+"moved so far" at the household's request; this term keeps its name). An inflow counts only when an equal outflow from
 another of the household's own accounts is its other leg, and never when the
 household marked either leg Excluded. So a payout or gift that lands in a fund
 from outside, interest the fund credited itself, a shuffle between two funds
 and a windfall the household vetoed from its income are all not moved. Decided
 29 Sep 2026 (ADR-0006, amendment).
-_Avoid_: saved, deposited, contributions, set aside (that is the sending side)
+_Avoid_: saved (except the decided "saved so far" sentence above), deposited, contributions, set aside (that is the sending side)
 
 **Saving rate**:
 Regular saving from normal income, over normal income: moved to funds (above),

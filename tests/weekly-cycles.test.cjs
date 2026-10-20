@@ -47,7 +47,9 @@ const assert = require('assert');
 const { stubObsidian, makeCtx, loadInto } = require('./helpers/harness.cjs');
 stubObsidian();
 const { makeDom } = require('./helpers/dom-stub.cjs');
-const i18n = require('../src/i18n');
+/* Sentences spelled through t() are compared in reading form — see
+   readingI18n in tests/helpers/dom-stub.cjs (U+00A0 glue, 20 Oct 2026). */
+const i18n = require('./helpers/dom-stub.cjs').readingI18n(require('../src/i18n'));
 const { SEED, PERIOD, TODAY, atAuditDate } = require('./_audit-seed.cjs');
 const { CYCLES, SCHEMAS } = require('../src/table-schema');
 const { nextExpected } = require('../src/recurring');

@@ -41,6 +41,17 @@ const i18n = require('../i18n');
 module.exports = function registerPlan(ctx) {
   const { S, $, app, money, toast, writeFile, fileAt, pathTaken } = ctx;
 
+  /* A figure inside one of this page's English sentences, glued so it cannot
+     break across a line (2026-10-20 audit, D1-05). The za locale groups
+     thousands with an ordinary space and money() puts one after the symbol,
+     so a phone wrapped "R 56 / 000,00" — and "R 56" read on its own is a
+     different number. i18n.t glues a param that is wholly a figure; these
+     sentences are concatenated here, outside it, so they take the same glue
+     from the same function (i18n.nbspFigure) rather than a second spelling of
+     it. A figure standing alone in its own element (.pot-fig, .sk2-fig,
+     .env-amt) is kept whole by the stylesheet instead. */
+  const fig = v => i18n.nbspFigure(money(v));
+
   const { mark, clear: clearDirty } = ctx.dirtyFlag('planDirty', '#planSave');
 
   /* Which spending bucket is open in the accordion — collapsed-list-with-one-
@@ -247,16 +258,26 @@ module.exports = function registerPlan(ctx) {
          bar prints the same figure in danger red, and the colour says which
          way it points; a screen reader has no colour, only a minus read in the
          voice of a number that is fine. Each is worded as what it is instead,
-         the first as the loud card below words it. */
+         the first as the loud card below words it.
+
+         And in the WORDS the page shows (2026-10-20 audit, D2-14). This is
+         the sentence a screen reader hears in place of the key, and it said
+         "allocated but unspent", "not yet allocated" and "still placeable" —
+         words on no part of the screen — while the key beside it printed
+         "Spoken for", "Not spoken for" and the hero "Left to place". Each
+         figure is now spoken with the label printed beside it: spoken for
+         (committed), not spoken for (free), still left to spend (left), left
+         to place (placeable), and the over-placed case in the loud card's own
+         words. */
       el('div', { class: 'plan-split', role: 'img',
         'aria-label': `Of ${money(sum.pot)}: ${money(sum.spent)} already spent, ` +
-          `${money(sum.committed)} allocated but unspent, ` +
+          `${money(sum.committed)} spoken for, ` +
           (sum.free < -0.005
-            ? `${money(-sum.free)} more allocated than this plan holds. `
-            : `${money(Math.max(0, sum.free))} not yet allocated. `) +
+            ? `${money(-sum.free)} more is placed than this plan holds. `
+            : `${money(Math.max(0, sum.free))} not spoken for. `) +
           (sum.left < -0.005
             ? `${money(-sum.left)} more spent than this plan holds.`
-            : `${money(Math.max(0, sum.left))} still left, ${money(Math.max(0, sum.placeable))} of it still placeable.`) +
+            : `${money(Math.max(0, sum.left))} still left to spend, ${money(Math.max(0, sum.placeable))} of it left to place.`) +
           (sum.overspend > 0.005 ? ` ${money(sum.overspend)} was spent past what its bucket held.` : '') },
         el('i', { class: 's-spent', style: `width:${pct(seg.spent)}%` }),
         el('i', { class: 's-alloc', style: `width:${pct(seg.committed)}%` }),
@@ -387,8 +408,14 @@ module.exports = function registerPlan(ctx) {
      `shares` is the render's one partition of the pot (envelopeShares), read
      by position: badge i is envelope i's slice of it. */
   function renderEnvelopes(p, sum, shares) {
+    /* Through i18n.t, so both figures are glued whole (2026-10-20 audit,
+       D1-05): concatenated here, "… placed of R 56 000,00" wrapped on a phone
+       between "R 56" and "000,00". A plural on the bucket count, so `count` is
+       passed (i18n picks the form on `count` alone). "placed" is what the
+       buckets hold — the hero's word, never "spoken for", which is what they
+       hold less what has gone (D2-14). */
     $('#planEnvSub').textContent = p.envelopes.length
-      ? `${p.envelopes.length} spending bucket${p.envelopes.length === 1 ? '' : 's'} · ${money(sum.allocated)} placed of ${money(sum.pot)}`
+      ? i18n.t('plan.env.sub', { count: p.envelopes.length, placed: money(sum.allocated), pot: money(sum.pot) })
       : 'Nothing placed yet — a spending bucket is one intent, and the items are what it buys.';
     const host = $('#planEnvelopes');
     host.classList.add('plan-env-accordion');
@@ -425,7 +452,7 @@ module.exports = function registerPlan(ctx) {
      read on a fresh plan. */
   function envelopeRemainder(state, spent) {
     const remaining = round2(-state.overAmt);
-    if (state.isOverspent) return { text: `${money(-remaining)} over`, cls: 'text-danger' };
+    if (state.isOverspent) return { text: `${fig(-remaining)} over`, cls: 'text-danger' };
     if (spent <= 0.005) return { text: i18n.t('plan.env.nothingSpent'), cls: 'text-muted' };
     if (remaining <= 0.005) return { text: i18n.t('plan.env.allSpent'), cls: 'text-muted' };
     return { text: i18n.t('plan.env.leftInBucket', { amount: money(remaining) }), cls: '' };
@@ -483,14 +510,14 @@ module.exports = function registerPlan(ctx) {
     const flags = [];
     if (isOverspent) {
       flags.push(el('span', { class: 'num text-danger env-rail-flag' },
-        icoEl(['alert-triangle', 'triangle-alert'], 'env-rail-flag-ico'), `${money(overAmt)} over`));
+        icoEl(['alert-triangle', 'triangle-alert'], 'env-rail-flag-ico'), `${fig(overAmt)} over`));
     }
     if (isOvercommitted) {
-      flags.push(el('span', { class: 'num text-warning env-rail-flag' }, `${money(-gap)} over-committed`));
+      flags.push(el('span', { class: 'num text-warning env-rail-flag' }, `${fig(-gap)} over-committed`));
     }
     if (!isOverspent && !isOvercommitted) {
       flags.push(el('span', { class: `num ${gap > 0 ? 'text-warning' : ''}` },
-        gap > 0 ? `${money(gap)} unassigned` : spent > 0 ? `${money(spent)} spent` : ''));
+        gap > 0 ? `${fig(gap)} unassigned` : spent > 0 ? `${fig(spent)} spent` : ''));
     }
     return flags;
   }
@@ -544,7 +571,9 @@ module.exports = function registerPlan(ctx) {
     const slider = el('input', {
       class: 'env-slider', type: 'range', min: '0', max: String(sliderMax),
       step: '10', value: String(env.amount),
-      'aria-label': `Amount allocated to ${env.name}`,
+      /* "placed", the word the page prints for what a bucket holds — this was
+         "allocated", a word on no part of the screen (2026-10-20 audit, D2-14). */
+      'aria-label': `Amount placed in ${env.name}`,
       ...(initialFill ? { style: initialFill } : {}),
     });
 
@@ -665,7 +694,7 @@ module.exports = function registerPlan(ctx) {
        the width in a card that is 280px at its narrowest. */
     const right = done || part
       ? el('span', { class: 'ei-actual num' },
-          `${money(i.spent)}${part ? ` / ${money(i.amount)}` : ''}`)
+          `${fig(i.spent)}${part ? ` / ${fig(i.amount)}` : ''}`)
       : el('span', { class: 'ei-amt num' }, money(i.amount));
 
     return el('li', { class: 'env-item' }, tick,
@@ -704,11 +733,13 @@ module.exports = function registerPlan(ctx) {
     card.classList.toggle('is-over', over);
     card.empty();
 
+    /* Every figure in this card's sentences goes through fig(): glued, so a
+       phone cannot break one across a line (2026-10-20 audit, D1-05). */
     const heading = overspent
-      ? `${money(sum.overspend)} was spent past what its bucket held`
+      ? `${fig(sum.overspend)} was spent past what its bucket held`
       : overplaced
-        ? `${money(-sum.free)} more is placed than this plan holds`
-        : `${money(sum.free)} is not spoken for`;
+        ? `${fig(-sum.free)} more is placed than this plan holds`
+        : `${fig(sum.free)} is not spoken for`;
     /* The percentage is of the figure the heading just quoted, not always of
        `free` — quoting one number and then taking a share of a different one
        is how the rest of this repo's two-figures-one-rule bugs started. The
@@ -727,17 +758,23 @@ module.exports = function registerPlan(ctx) {
        is a different figure: on a fully placed plan both read R 0,00. */
     const shownPlaceable = allUnplaced ? sum.left : Math.max(0, sum.placeable);
     const contrast = Math.abs(shownPlaceable - sum.free) >= 0.005
-      ? ` — not the ${money(sum.free)} the buckets alone suggest` : '';
+      ? ` — not the ${fig(sum.free)} the buckets alone suggest` : '';
+    /* In the key's words (2026-10-20 audit, D2-14): money in no bucket is "not
+       spoken for", the label the key prints beside that very figure, never
+       "unplaced". The extra an overrun spent came out of money that was not
+       spoken for, or out of what another bucket still had spoken for; when no
+       bucket still holds any unspent money (allUnplaced), what is left is
+       none of it spoken for. */
     const body = overspent
-      ? 'The extra came out of money this plan had not placed, or had placed in another bucket. '
-        + `That leaves ${money(sum.left)} in this plan, `
-        + (allUnplaced ? 'all of it unplaced'
-          : `of which ${money(Math.max(0, sum.placeable))} can still be placed`)
+      ? 'The extra came out of money that was not spoken for, or spoken for by another bucket. '
+        + `That leaves ${fig(sum.left)} in this plan, `
+        + (allUnplaced ? 'none of it spoken for'
+          : `of which ${fig(Math.max(0, sum.placeable))} can still be placed`)
         + `${contrast}. `
         + 'Raise the bucket that ran over, or record where the extra came from.'
       : overplaced
         ? 'The spending buckets add up to more than the money coming in. Take some back out, or add the source that covers it.'
-        : 'Leaving money unplaced is a decision too — but it should be one you made, not one you forgot.';
+        : 'Leaving money not spoken for is a decision too — but it should be one you made, not one you forgot.';
 
     card.append(
       el('h2', {}, heading),
@@ -835,11 +872,14 @@ module.exports = function registerPlan(ctx) {
 
   async function removeEnvelope(p, env) {
     const items = p.items.filter(i => i.envelope === env.name);
+    /* "no longer spoken for": the key's own words for where a bucket's money
+       goes when the bucket does — it said "back to unplaced", a word on no
+       part of the page (2026-10-20 audit, D2-14). */
     const ok = await confirmModal(app, {
       title: `Remove ${env.name}?`,
       message: items.length
-        ? `${items.length} item${items.length === 1 ? '' : 's'} inside it will be removed too. The money goes back to unplaced.`
-        : 'The money goes back to unplaced.',
+        ? `${items.length} item${items.length === 1 ? '' : 's'} inside it will be removed too. Its money is no longer spoken for.`
+        : 'Its money is no longer spoken for.',
       confirmText: 'Remove',
     });
     if (!ok) return;

@@ -227,6 +227,12 @@ function tally(stamped, lens) {
   }
 
   let income = 0, spend = 0, net = 0, setAside = 0, inflow = 0, outflow = 0;
+  /* Every refund the lens kept, in full (2026-10-20 audit, M1-02). Gross
+     `spend` takes none of these off, and the sentence beside it says so; the
+     donut's gap cannot stand in for this figure, because it floors each
+     category at zero and so loses whatever a refund returned beyond that
+     category's own spend in the period. */
+  let refunds = 0;
   let uncategorised = 0, uncatSpend = 0, uncatIncome = 0;
   const unknown = { count: 0, spend: 0, income: 0, names: [] };
   const unknownSeen = new Set();
@@ -239,6 +245,7 @@ function tally(stamped, lens) {
   for (const s of kept) {
     net += s.amount;
     if (s.amount > 0) inflow += s.amount; else outflow += s.amount;
+    if (isRefund(s)) refunds += s.amount;
     if (s.setAside) setAside += -s.amount;
     byCat[s.cat] = (byCat[s.cat] || 0) + s.amount;
     if (s.amount < 0) grossOutByCat[s.cat] = (grossOutByCat[s.cat] || 0) - s.amount;
@@ -277,6 +284,7 @@ function tally(stamped, lens) {
   return {
     lens: lens.name, count, kept,
     income, spend, net, setAside, byCat, grossOutByCat, inflow, outflow,
+    refunds: Math.round(refunds * 100) / 100,
     uncategorised, uncatSpend, uncatIncome, unknown,
     foreign: { count: foreignHere.size, labels: [...foreignHere.keys()], symbols: [...new Set(foreignHere.values())] },
     fundedFromSavings,

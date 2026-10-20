@@ -8,7 +8,7 @@
    the household's own currency, though, the tile fell to its "nothing out"
    branch and then appended the list, so a screen reader was told
 
-     "Nothing outstanding. Open Owed Money. Plus € 300 owed in other
+     "Nothing outstanding. Open Owed money. Plus € 300 owed in other
       currencies, not converted."
 
    — a sentence that denies the money and then names it — and the sub-line
@@ -56,7 +56,7 @@ const flat = s => String(s).replace(/\s+/g, ' ').trim();
     ok(!/recovered/.test(t.sub), `the sub-line leads with what is out, not with what came back: ${t.sub}`);
     eq(flat(t.sub), `Nothing outstanding in R · ${eur300} owed in other currencies, not converted · oldest out 401 days`,
       'the sub-line says which currency "nothing" is in, names the euro, and keeps the age of the loan');
-    eq(flat(t.say), `Nothing outstanding in R. ${eur300} owed to you in other currencies, not converted. Open Owed Money.`,
+    eq(flat(t.say), `Nothing outstanding in R. ${eur300} owed to you in other currencies, not converted. Open Owed money.`,
       'and the label a screen reader is handed says the same');
   }
 
@@ -71,7 +71,7 @@ const flat = s => String(s).replace(/\s+/g, ' ').trim();
     const { nodes } = await renderDash(files, { today: '2026-10-07', period: '2026-10' });
     const t = tile(nodes);
     ok(/recovered/.test(t.sub) && !/other currencies/.test(t.sub), `everything back: the recovered line, no list: ${t.sub}`);
-    eq(t.say, 'Nothing outstanding. Open Owed Money.', 'and the plain label');
+    eq(t.say, 'Nothing outstanding. Open Owed money.', 'and the plain label');
   }
 
   /* ---- 3. control: rand outstanding beside the euro loan is untouched ---- */
@@ -84,7 +84,9 @@ const flat = s => String(s).replace(/\s+/g, ' ').trim();
     };
     const { nodes } = await renderDash(files, { today: '2026-10-07', period: '2026-10' });
     const t = tile(nodes);
-    ok(/^2 outstanding · oldest out 401 days Plus € 300 owed in other currencies, not converted\.$/.test(flat(t.sub)),
+    /* The same two sentences, each its own fact since the 2026-10-20 audit
+       (MT-05): glued, they read "… 401 days Plus € 300 …" with no stop. */
+    ok(/^2 outstanding · oldest out 401 days · Plus € 300 owed in other currencies, not converted\.$/.test(flat(t.sub)),
       `the mixed case keeps the Phase-1 sentence: ${t.sub}`);
   }
 

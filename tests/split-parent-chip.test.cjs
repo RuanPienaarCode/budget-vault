@@ -82,6 +82,7 @@ require.cache[modalPath] = {
    and this wrapper is seen by the real view. It delegates, so every string on
    the page is still the real one. */
 const i18n = require('../src/i18n');
+const { readable } = require('./helpers/dom-stub.cjs');
 const realT = i18n.t;
 let tCalls = [];
 i18n.t = (key, params) => { tCalls.push({ key, params }); return realT(key, params); };
@@ -153,6 +154,10 @@ const bodyRows = ctx => {
 const cellOf = (tr, i) => kids(tr, 'TD')[i];
 // Every element under a node, matched on tag — the stub's own descend().
 const within = (node, tag) => descend(node).filter(e => e.tagName === tag);
+/* A row found by the amount it PRINTS. A row amount prints as the flow it is,
+   through currency.js formatSigned under the country's separators — "−R 1 200,00"
+   / "+R 40 000,00", whatever the money() stub above says (2026-10-20 audit,
+   D2-04; tests/transactions-amount-flow-sign.test.cjs). */
 const rowByAmount = (rows, text) => rows.find(tr => cellOf(tr, 4) && cellOf(tr, 4).textContent === text);
 const render = ctx => { tCalls = []; ctx.renderTransactions(); return bodyRows(ctx); };
 const rowIn = (S, match) => S.txFiles['Cheque/2026-07'].rows.find(match);
@@ -174,7 +179,7 @@ const rowIn = (S, match) => S.txFiles['Cheque/2026-07'].rows.find(match);
 {
   const { ctx } = await mount();
   const rows = render(ctx);
-  const parent = rowByAmount(rows, 'R -1200.00');
+  const parent = rowByAmount(rows, '\u2212R 1 200,00');
   ok(!!parent, 'the split parent is on the page — a split never hides the bank line');
   const cell = cellOf(parent, EXCL);
 
@@ -204,7 +209,7 @@ const rowIn = (S, match) => S.txFiles['Cheque/2026-07'].rows.find(match);
 {
   const { ctx } = await mount();
   const rows = render(ctx);
-  const chip = within(cellOf(rowByAmount(rows, 'R -1200.00'), EXCL), 'BUTTON')[0];
+  const chip = within(cellOf(rowByAmount(rows, '\u2212R 1 200,00'), EXCL), 'BUTTON')[0];
 
   const label = asked('tx.split.chip');
   eq(label.length, 1, 'the chip label comes from tx.split.chip');
@@ -236,7 +241,7 @@ const rowIn = (S, match) => S.txFiles['Cheque/2026-07'].rows.find(match);
     _row: rowIn(S, r => r.split === 'part' && r.amount === -400),
   });
 
-  const chip = within(cellOf(rowByAmount(render(ctx), 'R -1200.00'), EXCL), 'BUTTON')[0];
+  const chip = within(cellOf(rowByAmount(render(ctx), '\u2212R 1 200,00'), EXCL), 'BUTTON')[0];
   ok(!!chip, 'the parent still shows a chip — one part fewer is not one split fewer');
 
   const label = asked('tx.split.chip');
@@ -245,8 +250,9 @@ const rowIn = (S, match) => S.txFiles['Cheque/2026-07'].rows.find(match);
   eq(gap.length, 1, 'and the money nobody is accounting for is stated');
   eq(gap[0].params.amount, 'R 400.00',
     'as the magnitude of the shortfall, formatted in the row\'s own currency');
+  // In reading form, as the stub's textContent reads it: U+00A0 glue maps to a space.
   eq(chip.textContent,
-    realT('tx.split.chip', { count: 1 }) + ' · ' + realT('tx.split.chipGap', { amount: 'R 400.00' }),
+    readable(realT('tx.split.chip', { count: 1 }) + ' · ' + realT('tx.split.chipGap', { amount: 'R 400.00' })),
     'the two clauses are joined into one chip label');
 
   /* The arithmetic behind it is pure and lives in tx-role.js, so the view holds
@@ -265,10 +271,10 @@ const rowIn = (S, match) => S.txFiles['Cheque/2026-07'].rows.find(match);
   const rows = render(ctx);
 
   for (const [amount, what] of [
-    ['R -800.00', 'a split part'],
-    ['R -400.00', 'the other split part'],
-    ['R 40000.00', 'an ordinary row'],
-    ['R -2500.00', 'an ordinary row that is already excluded'],
+    ['\u2212R 800,00', 'a split part'],
+    ['\u2212R 400,00', 'the other split part'],
+    ['+R 40 000,00', 'an ordinary row'],
+    ['\u2212R 2 500,00', 'an ordinary row that is already excluded'],
   ]) {
     const tr = rowByAmount(rows, amount);
     ok(!!tr, `${what} is on the page`);
@@ -277,12 +283,12 @@ const rowIn = (S, match) => S.txFiles['Cheque/2026-07'].rows.find(match);
     eq(boxes[0].getAttribute('type'), 'checkbox', `${what}'s control is a checkbox`);
   }
 
-  eq(within(cellOf(rowByAmount(rows, 'R -2500.00'), EXCL), 'INPUT')[0].getAttribute('checked'), '',
+  eq(within(cellOf(rowByAmount(rows, '\u2212R 2 500,00'), EXCL), 'INPUT')[0].getAttribute('checked'), '',
     'an excluded row renders its box ticked');
 
   // And the checkbox still WORKS — a cell full of inert controls would pass
   // every assertion above and be a worse page than the one this replaces.
-  const box = within(cellOf(rowByAmount(rows, 'R -800.00'), EXCL), 'INPUT')[0];
+  const box = within(cellOf(rowByAmount(rows, '\u2212R 800,00'), EXCL), 'INPUT')[0];
   box.checked = true;
   box._fire('change');
   eq(rowIn(S, r => r.split === 'part' && r.amount === -800).excluded, true,
@@ -297,7 +303,7 @@ const rowIn = (S, match) => S.txFiles['Cheque/2026-07'].rows.find(match);
   seen.confirms = [];
   const f = S.txFiles['Cheque/2026-07'];
   const onDisk = ctx.vault._store.get(TX_PATH);
-  const chip = within(cellOf(rowByAmount(render(ctx), 'R -1200.00'), EXCL), 'BUTTON')[0];
+  const chip = within(cellOf(rowByAmount(render(ctx), '\u2212R 1 200,00'), EXCL), 'BUTTON')[0];
 
   chip.click();
   await new Promise(r => setTimeout(r, 0));      // the handler is async
@@ -309,7 +315,7 @@ const rowIn = (S, match) => S.txFiles['Cheque/2026-07'].rows.find(match);
   eq(msg.length, 1, 'and a message built from tx.unsplit.msg');
   eq(msg[0].params.count, 2, 'saying how many parts go');
   eq(msg[0].params.desc, 'Big shop', 'which row it is');
-  eq(msg[0].params.amount, 'R -1200.00', 'and what it is worth');
+  eq(msg[0].params.amount, '\u2212R 1 200,00', 'and what it is worth');
 
   eq(f.rows.filter(r => splitRole(r.split) === 'part').length, 0, 'the parts are gone');
   const parent = rowIn(S, r => r.desc === 'Big shop');
@@ -326,7 +332,7 @@ const rowIn = (S, match) => S.txFiles['Cheque/2026-07'].rows.find(match);
     + 'is pressed "Reload from disk" is a working undo — the same rule deleteTransaction follows.');
 
   // The row now renders like any other, which is the visible half of the fix.
-  const back = within(cellOf(rowByAmount(render(ctx), 'R -1200.00'), EXCL), 'INPUT');
+  const back = within(cellOf(rowByAmount(render(ctx), '\u2212R 1 200,00'), EXCL), 'INPUT');
   eq(back.length, 1, 'an un-split row gets its checkbox back');
   eq(back[0].getAttribute('checked'), null, 'unticked, because the un-split unticked it');
 }
@@ -337,7 +343,7 @@ const rowIn = (S, match) => S.txFiles['Cheque/2026-07'].rows.find(match);
   answers.confirm = false;
   const f = S.txFiles['Cheque/2026-07'];
   const before = f.rows.length;
-  within(cellOf(rowByAmount(render(ctx), 'R -1200.00'), EXCL), 'BUTTON')[0].click();
+  within(cellOf(rowByAmount(render(ctx), '\u2212R 1 200,00'), EXCL), 'BUTTON')[0].click();
   await new Promise(r => setTimeout(r, 0));
 
   eq(f.rows.length, before, 'no rows leave on a cancel');

@@ -140,8 +140,22 @@
 .budget-app-root #view-transactions .table .cat-cell .category-select { flex: 1 1 auto; }
 
 /* Amount: tabular, right-aligned, 16px. Spending is weight 500 in the text
-   colour; income (the cell that already carries .text-success) is green, 600,
-   with a "+". */
+   colour; income (the cell that already carries .text-success) is green, 600.
+
+   The sign is the cell's own TEXT: "−R 50,00" / "+R 410,00", the form this app
+   gives every signed flow (views/transactions.js rowFlow; 2026-10-20 audit,
+   D2-04, D1-12, MT-02). It used to be a "+" drawn here by a ::before on income
+   alone, while spending printed money()'s balance form "R -50,00" — two forms
+   in one column — and generated content is in no textContent, so a copied
+   column, a test and most screen readers never got the plus at all. Nothing
+   in this sheet draws a sign now: drawing one as well would print it twice.
+
+   No wrap inside the cell: the sign is text and the figure an inline-block
+   (below), and a line may break between a run of text and an atomic box — a
+   "−" alone on one line and "R 50,00" on the next reads as two things, and a
+   figure split across lines reads as a different number. Not on an unreadable
+   amount (.text-warning), whose cell holds the file's own text and a chip
+   that must stay free to wrap. */
 .budget-app-root #view-transactions .table td.num {
   font-size: 16px;
   font-weight: 500;
@@ -149,31 +163,30 @@
   color: var(--text-primary);
   font-variant-numeric: tabular-nums lining-nums;
 }
+.budget-app-root #view-transactions .table td.num:not(.text-warning) {
+  white-space: nowrap;
+}
 .budget-app-root #view-transactions .table td.num.text-success {
-  position: relative;
   font-weight: 600;
   color: var(--color-primary);
 }
-/* The sign is absolutely positioned: out-of-flow generated content is skipped
-   by ::first-letter, so the currency symbol rule below still lands on the "R"
-   and not on the "+". Its static position is the start of the number; the
-   negative margin pulls it just left of it. The cell is the positioned
-   ancestor (position: relative above): without one, the sign's containing block
-   is the page, so inside .table-responsive (overflow-x: auto) a scrolled table
-   moved the cells and left every "+" behind, unclipped. */
-.budget-app-root #view-transactions .table td.num.text-success::before {
-  content: '+';
-  position: absolute;
-  margin-left: -.7em;
+/* The figure after the sign, in a box of its own, so ::first-letter has a
+   block container whose first letter is the currency symbol whatever the sign:
+   ::first-letter only applies to a block container, and on the cell itself it
+   would now take the sign. Being its own box also keeps the phone card's
+   data-label ::before (src/statement/phone.css), which the CELL draws, from
+   ever being this figure's first letter. */
+.budget-app-root #view-transactions .table td.num .tx-amt {
+  display: inline-block;
 }
 /* The currency symbol, small and muted, as on the statement figures (the
-   foundation's ::first-letter treatment, applied to the cell it cannot name).
-   Two gates, both required: the household's symbol is one character (.bv-cur-1,
-   see controller) AND so is the one THIS row prints (.st-cur1, set by
-   views/transactions.js). A row on a foreign account prints that account's own
-   symbol or code ("USD 12,00", "Rp 5"), and ::first-letter would shrink only
-   its first letter. */
-.budget-app-root.bv-cur-1 #view-transactions .table td.num.st-cur1::first-letter {
+   foundation's ::first-letter treatment, applied to the figure it cannot
+   name). Two gates, both required: the household's symbol is one character
+   (.bv-cur-1, see controller) AND so is the one THIS row prints (.st-cur1 on
+   the cell, set by views/transactions.js). A row on a foreign account prints
+   that account's own symbol or code ("USD 12,00", "Rp 5"), and ::first-letter
+   would shrink only its first letter. */
+.budget-app-root.bv-cur-1 #view-transactions .table td.num.st-cur1 .tx-amt::first-letter {
   font-size: .8em;
   font-weight: 400;
   letter-spacing: 0;

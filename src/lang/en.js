@@ -34,14 +34,14 @@ module.exports = {
   'nav.plan': 'Plan',
   'nav.notes': 'Notes',
   'nav.report': 'Report',
-  'nav.savings': 'Savings & Investments',
+  'nav.savings': 'Savings & investments',
   'nav.accounts': 'Accounts',
   'nav.assets': 'Assets',
   'nav.debts': 'Debt',
-  'nav.owed': 'Owed Money',
+  'nav.owed': 'Owed money',
   'nav.services': 'Services',
   'nav.tax': 'Tax',
-  'nav.loans': 'Loan Calculators',
+  'nav.loans': 'Loan calculators',
   'nav.import': 'Import CSV',
   'nav.reload': 'Reload from disk',
   'nav.pluginSettings': 'Plugin settings',
@@ -510,7 +510,12 @@ module.exports = {
     one: 'Its split part goes with it.',
     other: 'Its {count} split parts go with it.',
   },
-  'tx.delete.part': 'This is one part of a split: the parts will no longer add up to the original line, and the difference leaves your account totals. Untick Excluded on the original to put it back.',
+  /* The way back names the control the original line really has, as it is
+     labelled (2026-10-20 audit, D2-21): it said "Untick Excluded", but the
+     column is "Excl. budget" and a split parent has no tick at all — its cell
+     is the split chip, whose one action is Un-split (tx.unsplit.action). Every
+     language names its own tx.unsplit.action word for word. */
+  'tx.delete.part': 'This is one part of a split: the parts will no longer add up to the original line, and the difference leaves your account totals. To put it back, choose Un-split on the original line.',
   'tx.delete.confirm': 'Delete row',
   'tx.deleted': {
     one: 'Row removed — Save changes to write it to the file',
@@ -773,6 +778,14 @@ module.exports = {
   'bx.doc.noteExactOnly': 'These figures cover exactly {from} to {to}. No budget period ends inside this range, so there are no budget tables.',
   'bx.doc.noteExactThrough': 'The range ends on {to}; the figures run through {through}, the day this was made.',
   'bx.doc.pageOf': 'Page {n} of {m}',
+  /* 2026-10-20 audit, M2-04 — the workbook About sheet's headline table:
+     each period's line, the PDF's "Income · Spent · Uncategorised", as
+     numbers, with the refunds that Spent does not take off. */
+  'bx.doc.headlineHeading': 'Income and spending by period',
+  'bx.doc.income': 'Income',
+  'bx.doc.spent': 'Spent',
+  'bx.doc.uncategorised': 'Uncategorised',
+  'bx.doc.refunds': 'Refunds not taken off',
 
   /* ============================= Accounts page ============================ */
   'acct.group.bank': 'Bank accounts',
@@ -837,7 +850,7 @@ module.exports = {
   'acct.field.balance': 'Current balance',
   'acct.field.goal': 'Savings goal',
   'acct.field.goalOpt': 'Savings goal (optional)',
-  'acct.field.goalOptDesc': 'Shows a progress bar on Savings & Investments.',
+  'acct.field.goalOptDesc': 'Shows a progress bar on Savings & investments.',
   'acct.field.goalDate': 'Goal target date',
   'acct.field.monthly': 'Monthly contribution',
   'acct.field.invested': 'Total invested',
@@ -971,6 +984,12 @@ module.exports = {
   'acct.hero.driftDown': ' Transactions since your stated balances add up to {amount} less.',
   'acct.where.title': 'Where it sits',
   'acct.where.sub': 'Share of what these accounts hold',
+  // 2026-10-20 audit, D1-15: the same caption with its closing stop, used when
+  // the other-currency sentence (acct.hero.otherCurrencies) follows it.
+  'acct.where.subStop': 'Share of what these accounts hold.',
+  // 2026-10-20 audit, M2-06: the Accounts hero leaves Debt-page rows out, so a
+  // card in both is counted twice in net worth, not "above" (dash.overlap).
+  'acct.overlap': 'Credit-card accounts tracked: {accounts} · card debts tracked: {debts} — if any card is in both, it is counted twice in net worth on the Savings page and the Dashboard.',
   'acct.where.aria': 'Share of what these accounts hold: {parts}',
   'acct.where.part': '{group} {pct}%',
   'acct.where.empty': 'Nothing to show yet.',
@@ -1157,7 +1176,10 @@ module.exports = {
 
   'dash.pos.sub': 'As things stand today — these do not move with the period above',
   'dash.pos.netWorth': 'Net worth',
-  'dash.pos.netWorthSub': '{owned} owned · {owed} owed',
+  /* "{owed} you owe", not "{owed} owed" (2026-10-20 audit, D2-13): the tile
+     two places along is "Owed to you", and a bare "owed" named the opposite
+     direction beside it. */
+  'dash.pos.netWorthSub': '{owned} owned · {owed} you owe',
   'dash.pos.netWorthSay': 'Net worth {net} — {owned} owned against {owed} owed. Open Savings and Investments.',
   'dash.pos.debt': 'Debt',
   'dash.pos.debtSplit': '{accounts} on accounts · {debts} on the debt page',
@@ -1182,10 +1204,10 @@ module.exports = {
   'dash.pos.owedRecovered': '{amount} recovered',
   'dash.pos.owedNone': 'nothing lent out',
   'dash.pos.owedSay': {
-    one: '{amount} owed to you across {count} entry. Open Owed Money.',
-    other: '{amount} owed to you across {count} entries. Open Owed Money.',
+    one: '{amount} owed to you across {count} entry. Open Owed money.',
+    other: '{amount} owed to you across {count} entries. Open Owed money.',
   },
-  'dash.pos.owedSayNone': 'Nothing outstanding. Open Owed Money.',
+  'dash.pos.owedSayNone': 'Nothing outstanding. Open Owed money.',
   'dash.pos.savings': 'Savings & investments',
   'dash.pos.savingsSub': '{savings} savings · {invested} invested',
   'dash.pos.savingsSay': '{amount} in savings and investments. Open Savings and Investments.',
@@ -1207,6 +1229,8 @@ module.exports = {
      moved those balances, so "old" carries a size rather than only an age. */
   'dash.stale.driftUp': ' Transactions since then add up to {amount} more.',
   'dash.stale.driftDown': ' Transactions since then add up to {amount} less.',
+  'dash.stale.driftUpIncluded': ' Transactions since then add {amount}, already counted in these figures.',
+  'dash.stale.driftDownIncluded': ' Transactions since then take off {amount}, already counted in these figures.',
   'dash.stale.btn': 'Review balances',
   'dash.stale.aria': 'Review account balances on the Accounts page',
 
@@ -1257,13 +1281,17 @@ module.exports = {
   'dash.health.subNone': 'No completed periods to average yet',
   'dash.health.monthsUnit': 'months',
   'dash.health.months': 'of essential spending covered',
+  /* The emergency-fund earmarks, worded as the Score's reserves line words the
+     same total (score.now.reserves, 2026-10-20 audit D2-12): "set aside" is
+     CONTEXT.md's word for money moved under a savings or investment category
+     in a period, a different figure on the same Dashboard. */
   'dash.health.meterTip': {
-    one: '{earmarked} set aside of the {goal} that covers {count} month',
-    other: '{earmarked} set aside of the {goal} that covers {count} months',
+    one: '{earmarked} in your emergency funds, of the {goal} that covers {count} month',
+    other: '{earmarked} in your emergency funds, of the {goal} that covers {count} months',
   },
   'dash.health.monthsMeta': {
-    one: 'Goal {count} month · {amount} set aside',
-    other: 'Goal {count} months · {amount} set aside',
+    one: 'Goal {count} month · {amount} in your emergency funds',
+    other: 'Goal {count} months · {amount} in your emergency funds',
   },
   /* The setup hint doubles as the only documentation most readers will meet, so
      it names the CONTROL rather than the frontmatter key it writes: the key is
@@ -1273,10 +1301,16 @@ module.exports = {
   'dash.health.needHistory': 'needs income history',
   'dash.health.noEssential': 'no essential spending recorded to measure this against',
   'dash.health.over': '{name} is marked to set aside more than it actually holds',
-  'dash.health.savings': 'of income saved on average',
+  /* "of budget income": both shares divide by BUDGET income (health-data.js),
+     the base the Score's saving and debt parts now name — so the tile and the
+     part read alike (2026-10-20 audit, L2 alignment). */
+  'dash.health.savings': 'of budget income saved on average',
   'dash.health.savingDown': 'averaging {amount} a month coming out',
-  'dash.health.perMonth': '{amount} / month',
-  'dash.health.debt': 'of income to debt interest on average',
+  /* One per-unit form for Dashboard prose, " a month" / " a day" (2026-10-20
+     audit, MT-12): this read "R 4 210 / month" on the same page as
+     "R 870/day" (figures made up). */
+  'dash.health.perMonth': '{amount} a month',
+  'dash.health.debt': 'of budget income to debt interest on average',
   'dash.health.debtNone': 'no debts recorded',
   'dash.health.debtFree': 'debt-free',
   'dash.health.debtNoRate': 'no rate recorded on your debts',
@@ -1329,21 +1363,21 @@ module.exports = {
   'score.win.debtNoRate': 'Your repayments sit comfortably against your income — though none of your debts records an interest rate, so what they cost you to carry is not counted here.',
   'score.win.spending': 'Your outgoings leave room to breathe — you are not living at the edge of what comes in.',
   'score.win.wealth': 'What you own has grown well past what you owe. That is the part that quietly grows on its own.',
-  'score.now.reserves': 'Now: {months} months covered · {amount} set aside · goal {target} months',
+  'score.now.reserves': 'Now: {months} months covered · {amount} in your emergency funds · goal {target} months',
   'score.now.reserves.essentials': 'Essentials average {amount} a month.',
-  'score.now.saving': 'Averaging {pct} of income saved · {amount} a month over recent periods — regular transfers into your funds; windfalls marked Excluded are left out',
+  'score.now.saving': 'Averaging {pct} of budget income saved · {amount} a month over recent periods — regular transfers into your funds; windfalls ticked Excl. budget are left out',
   'score.now.savingDown': 'Averaging {amount} a month drawn out of savings over recent periods, not added to it',
-  'score.now.debt': 'Averaging {pct} of income going to interest over recent periods',
+  'score.now.debt': 'Averaging {pct} of budget income going to interest over recent periods',
   'score.now.fixed': 'fixed bills {pct} of income',
   'score.now.living': 'living costs {pct}',
   'score.now.budget': 'budget used {pct}',
   'score.now.wealth': 'Now: {amount} net worth · worth {times} years of income',
   'score.how.reserves': 'Money set aside that could carry the household with no income, counted in months of essential spending.',
   'score.how.reserves.essentialDef': '"Essential" excludes luxuries, giving, savings, investment, income and transfers, plus anything added under Settings → Non-essential groups.',
-  'score.how.saving': 'What reaches your savings and investments each month, as a share of what you earn.',
+  'score.how.saving': 'What reaches your savings and investments each month, as a share of your budget income.',
   'score.how.debt': 'What debt costs you — interest, and the repayments you are committed to.',
-  'score.how.spending': 'How much of your income is promised before you decide anything, what living costs, and whether you stay inside your own budget.',
-  'score.how.wealth': 'Everything you own, less everything you owe, against a year of income.',
+  'score.how.spending': 'How much of your household income is promised before you decide anything, how much of it you spend in all, and whether you stay inside your own budget.',
+  'score.how.wealth': 'Everything you own, less everything you owe, against a year of budget income.',
   'score.how.foot': 'A part your files cannot answer yet is left out and the rest share its weight — so the score is always out of 100, and never marks you down for a question you have not been asked.',
   'score.guide.reserves': 'Mark the account holding this money as your emergency fund on the Accounts page, then feed it whatever is comfortable each month. Consistency beats size — a standing transfer on payday beats whatever is left at month end.',
   'score.guide.saving': 'Move the transfer to the day you are paid rather than the day before the next one. Saving what is left over means saving what nothing else wanted; saving first means the rest of the month adjusts around it.',
@@ -1358,7 +1392,7 @@ module.exports = {
 
   /* ------------------------- money-flow card -------------------------- */
   'score.flow.title': 'Where the money went',
-  'score.flow.sub': 'Every rand that came in this period, and what happened to it',
+  'score.flow.sub': 'Every rand of budget income this period, and what happened to it',
   'score.flow.moneyIn': 'Money in',
   'score.flow.thisPeriod': 'this period',
   'score.flow.committed': 'Committed & fixed bills',
@@ -1417,6 +1451,23 @@ module.exports = {
   'score.ring.showAll': 'Show all five parts',
   'score.ring.hint': 'Tap a part to see it on its own.',
   'score.gap.railAria': '{name}: {points} of {max} points earned.',
+  /* 2026-10-20 audit (M1-05, M1-06, M1-07). Which income each figure divides
+     by, named beside it: the saving, debt and net-worth figures divide by
+     BUDGET income (the Dashboard's, Excluded windfalls out), the two spending
+     shares by HOUSEHOLD income. The Spending row's inclusive measure is "all
+     spending" — the flow card's "Living costs" band is what is left after
+     fixed bills and saving, a different quantity. And every part of "Not yet
+     spent" is named under it, so its caption adds up to the band. */
+  'score.now.wealthBase': 'Now: {amount} net worth · worth {times} years of budget income ({income} a month)',
+  'score.now.allSpendHousehold': 'all spending (fixed bills included) {pct} of household income',
+  'score.gap.fixMonthly': 'Save {amount} more each month to reach {pct}% of your budget income.',
+  'score.gap.fixBuild': 'Grow your savings, investments or property by {amount} — or pay down debt by the same — to reach {times} years of budget income.',
+  'score.gap.fixTrim': 'Spend {amount} less a month in all, fixed bills included, to bring your spending under {pct}% of your household income.',
+  'score.flow.sub.incomeToCome': '{amount} of planned income not in yet',
+  'score.flow.sub.incomeAbovePlan': '{amount} more income than planned',
+  'score.flow.sub.setAsideOver': '{amount} more sent to savings than the plan set aside',
+  'score.flow.sub.alreadySpent': '{amount} the budget already counts as spent',
+  'score.flow.chip.alreadySpentNote': 'Not yet spent, above, is {amount} more than Together: money still in hand that the budget already counts as spent.',
 
   /* --------------------- what's left + comparison ------------------- */
   'shell.dash.left': 'Money left this period',
@@ -1425,7 +1476,12 @@ module.exports = {
   'dash.left.notNow': 'This card measures the money you have right now, so it only reads true for the period you are in. Switch to {period} to see it.',
   'dash.left.cash': 'in your accounts',
   'dash.left.committed': 'still committed',
-  'dash.left.earmarked': 'set aside',
+  /* Earmarked fund balances — "in your funds", not "set aside" (2026-10-20
+     audit, D2-12): CONTEXT.md reserves "set aside" for money moved under a
+     savings or investment category in a period, which is a different
+     quantity printed on the same Dashboard. barAriaSetAside below names this
+     same term for a screen reader and says it the same way. */
+  'dash.left.earmarked': 'in your funds',
   'dash.left.earmarkedFrom': { one: '{count} fund', other: '{count} funds', },
   'dash.left.free': 'actually free',
   'dash.left.short': 'short',
@@ -1468,9 +1524,9 @@ module.exports = {
     one: '{count} day',
     other: '{count} days',
   },
-  'dash.left.perDay': '{amount}/day',
+  'dash.left.perDay': '{amount} a day',
   'dash.left.barAria': 'Of {cash}, {committed} is committed and {free} is free',
-  'dash.left.barAriaSetAside': 'Of {cash}, {earmarked} is set aside, {committed} is committed and {free} is free',
+  'dash.left.barAriaSetAside': 'Of {cash}, {earmarked} is in your funds, {committed} is committed and {free} is free',
   /* The same bar when the commitments exceed the cash. The sighted reader sees
      a fully-amber bar and the figure above it labelled "short"; the neutral
      wording announced "{free} is free" for money that is not there, which is
@@ -1484,7 +1540,8 @@ module.exports = {
   'dash.left.thisPeriod': 'due this period',
   /* 2026-10-07 audit. A debit order whose due date has passed while its
      account has not been imported up to that day: held in "still
-     committed" rather than dropped. {date} is the ISO due date, as in
+     committed" rather than dropped. {date} is the due date in prose form
+     ("Oct 1", ctx.dateText — the ISO key until the 2026-10-20 audit), as in
      dash.left.expected / dash.left.overdue; the count is how many such
      orders, beside "N debit orders" under "still committed". */
   'dash.left.notImported': 'due {date} — not imported yet',
@@ -1502,7 +1559,7 @@ module.exports = {
      {list} as above. The sub-line is followed by dash.pos.owedOldest when a
      lending date is known; the second key is the tile's aria-label. */
   'dash.pos.owedOnlyOther': 'Nothing outstanding in {symbol} · {list} owed in other currencies, not converted',
-  'dash.pos.owedSayOnlyOther': 'Nothing outstanding in {symbol}. {list} owed to you in other currencies, not converted. Open Owed Money.',
+  'dash.pos.owedSayOnlyOther': 'Nothing outstanding in {symbol}. {list} owed to you in other currencies, not converted. Open Owed money.',
   'dash.left.lastCharged': 'usually about {amount}',
   'dash.left.times': '{count} × {amount}',
   'dash.left.asListed': 'as listed, no charge history',
@@ -1620,18 +1677,20 @@ module.exports = {
   /* The generated NOTE's own words — src/report.js's financialReportMarkdown().
      Rendered in the reader's own language because the note is meant to leave
      the app: an advisor or an AI chat reads only the words on the page, never
-     the interface around it. */
-  'report.title': 'Financial Report — {period}',
+     the interface around it. Headings in sentence case, as every page title
+     and the budget export's PDF from the same Budget page are (2026-10-20
+     audit, D2-20: they were Title Case here alone). */
+  'report.title': 'Financial report — {period}',
   'report.generatedLine': 'Generated {date}',
   'report.rule': 'Figures follow the app\'s own rules — an excluded transaction is left out of income and spend totals but still listed below if this report includes transaction detail.',
   'report.disclaimer': 'This report summarises your own numbers. It is not financial advice — confirm anything important with a financial advisor or other qualified professional before acting on it.',
-  'report.section.incomeSpend': 'Income & Spend',
+  'report.section.incomeSpend': 'Income & spend',
   'report.col.income': 'Income',
   'report.col.spend': 'Spend',
   'report.col.net': 'Net',
   'report.col.budgetIncome': 'Budgeted income',
   'report.col.budgetSpend': 'Total budgeted',
-  'report.section.category': 'Spend by Category',
+  'report.section.category': 'Spend by category',
   'report.category.empty': 'No spending recorded in this report.',
   'report.category.uncat': '{amount} of spend in this report is uncategorised and does not appear as a row above.',
   'report.category.netted': '{amount} in refunds is netted off inside its own category and does not appear as a separate row.',
@@ -1650,13 +1709,13 @@ module.exports = {
   'report.col.category': 'Category',
   'report.col.amount': 'Amount',
   'report.col.percent': '%',
-  'report.section.budgetActual': 'Budget vs Actual',
+  'report.section.budgetActual': 'Budget vs actual',
   'report.budget.empty': 'No budget or spending recorded in this report.',
   'report.col.type': 'Type',
   'report.col.budget': 'Budget',
   'report.col.actual': 'Actual',
   'report.col.remaining': 'Remaining',
-  'report.section.savings': 'Savings & Investment Growth',
+  'report.section.savings': 'Savings & investment growth',
   'report.asOf': '_As of today — not scoped to the period above; see the note under this heading in the app._',
   'report.savings.none': 'No savings or investment accounts recorded.',
   'report.savings.unmeasured': 'No savings or investment account has a starting amount or inception date set, so growth cannot be measured yet.',
@@ -1682,17 +1741,17 @@ module.exports = {
   'report.col.balance': 'Balance',
   'report.col.rate': 'Rate',
   'report.col.interest': 'Monthly interest',
-  'report.section.netWorth': 'Net Worth',
+  'report.section.netWorth': 'Net worth',
   'report.col.netWorth': 'Net worth',
   'report.col.owned': 'Owned',
   'report.col.owed': 'Owed',
-  'report.section.health': 'Financial Health',
+  'report.section.health': 'Financial health',
   'report.health.score': 'Score',
   'report.health.months': 'Emergency fund',
   'report.health.savingsRate': 'Saving rate',
   'report.health.interestShare': 'Debt interest share of income',
   'report.health.note': 'A single number combining emergency-fund months, saving rate and debt interest share — a rough gauge from the numbers in this vault, not a professional assessment.',
-  'report.section.transactions': 'Transaction Detail',
+  'report.section.transactions': 'Transaction detail',
   'report.transactions.count': {
     one: '{count} transaction in this report.',
     other: '{count} transactions in this report.',
@@ -1740,6 +1799,14 @@ module.exports = {
   'plan.source.fieldRemove': "Remove this source",
   'plan.source.fieldRemoveYes': "Remove it",
   'plan.env.expandAria': "Expand {name}",
+  /* The line over the spending buckets (2026-10-20 audit, D1-05: built by
+     hand, it wrapped mid-figure on a phone — through t() the figures are
+     glued). {placed} is what the buckets hold, the hero's "place" word;
+     never "spoken for", which is what they hold less what has gone. */
+  'plan.env.sub': {
+    one: '{count} spending bucket · {placed} placed of {pot}',
+    other: '{count} spending buckets · {placed} placed of {pot}',
+  },
   'plan.env.leftInBucket': "{amount} left",
   'plan.env.allSpent': "all of it spent",
   'plan.env.nothingSpent': "nothing spent yet",
@@ -1786,6 +1853,16 @@ module.exports = {
     one: '{count} of {total} periods has no budget and is not compared: {names}. The budget figures (budget used, budget against actual, saved so far) cover only the other periods; income and spend above cover all {total}.',
     other: '{count} of {total} periods have no budget and are not compared: {names}. The budget figures (budget used, budget against actual, saved so far) cover only the other periods; income and spend above cover all {total}.',
   },
+  /* 2026-10-20 audit, M1-04 — the income side of the like-for-like rule:
+     which of the compared periods plan no income at all. */
+  'report.budget.incomeLeftOut': {
+    one: '{count} of the {total} periods compared has no income in its budget: {names}. Budgeted income, and each income row in budget against actual, cover only the periods whose budget plans that income; income above covers every period.',
+    other: '{count} of the {total} periods compared have no income in their budget: {names}. Budgeted income, and each income row in budget against actual, cover only the periods whose budget plans that income; income above covers every period.',
+  },
+  /* 2026-10-20 audit, M1-08 — the score has five parts, and the old note
+     (report.health.note) named three. {parts} is the Score page's own names
+     for them (dash.health.why.name.*), joined with " · ". */
+  'report.health.noteParts': 'A single number built from the parts the Score page shows ({parts}) — a rough gauge from the numbers in this vault, not a professional assessment.',
 
   'tx.ruleFix.title': 'Update the matching rule too?',
   'tx.ruleFix.msg': 'Rows matching "{pattern}" are filed as {old} by a rule. {reach} Update it to {cat} only if they all belong there. If this one is an exception, choose Just this row.',

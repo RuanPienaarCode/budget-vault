@@ -302,7 +302,6 @@
 /* Pills and tags that were 9.5-10px capitals */
 .budget-app-root .kind,
 .budget-app-root .debt-plan .dp-tag,
-.budget-app-root .score-win-ribbon,
 .budget-app-root .score-ring-row-tag {
   font-size: var(--st-chip);
   font-weight: 600;
@@ -433,6 +432,25 @@
   font-weight: 400;
   margin-right: .06em;
 }
+/* The Accounts hero: a display figure, drawn with the display symbol pair.
+   Its size used to live in src/styles.css as a three-class rule that out-ranked
+   the line above and set no symbol tokens, so its ::first-letter fell back to
+   the bare .5em ratio and the figure gap: a bigger, closer "R" than every other
+   display figure (2026-10-20 audit, D2-22).
+
+   The SIZE stays the fitted clamp rather than var(--st-display): the hero sits
+   in the narrower column of a two-card band and prints cents, and at 80px the
+   harness's own eight-digit balance ("R 999 999,99" shape) broke onto two lines
+   at a 1024px window (measured: 148px tall in a 423px box). The Budget page's
+   display figure solves the same squeeze with .is-long, which counts printed
+   digits; with cents almost every household balance would count as long and
+   drop to figure size, smaller than this. The symbol pair is what makes it read
+   as one of the display figures, and that it now has. */
+.budget-app-root .acct-hero .hero-num {
+  font-size: clamp(38px, 5.4vw, 62px);
+  --st-cur: var(--st-cur-display);
+  --st-cur-gap: var(--st-cur-gap-display);
+}
 .budget-app-root .hero-sub {
   font-size: var(--st-body);
   line-height: 1.5;
@@ -463,7 +481,13 @@
 .budget-app-root.bv-cur-1 .assets-hero-num::first-letter,
 /* .lo-big is deliberately NOT here: the loan calculators print the country
    PROFILE's currency (tariffMoney), which can be a multi-letter code inside a
-   one-symbol household, and a stray shrunken first letter is worse than none. */
+   one-symbol household, and a stray shrunken first letter is worse than none.
+   Nor are the KPI tiles' .mini .v outside the Dashboard: a tile prints a count
+   ("4"), a percentage or a date as often as money. The figures that ARE money
+   carry .st-money from their view (the money() tiles and the lo-big rows that
+   print the household's currency), and the last selector below styles them
+   (2026-10-20 audit, D1-04 / D2-15: Savings, Debt, Owed, Services and Loans
+   drew the symbol full-size beside the Dashboard's muted one). */
 .budget-app-root.bv-cur-1 .acct-drawer-v.st-cur1:not(.text-warning)::first-letter,
 .budget-app-root.bv-cur-1 .acct-hero .hero-num::first-letter,
 .budget-app-root.bv-cur-1 .st-money::first-letter {
@@ -476,6 +500,31 @@
 }
 
 /* ------------------------------------------------------------
+   6b. THE TONE CLASSES
+   .text-danger / .text-warning / .text-success are how a view says what a
+   figure MEANS: overdrawn, still outstanding, matched. They used to be (0,2,0)
+   rules near the top of src/styles.css, and a component's own colour rule of
+   the same weight further down beat them on source order. The audit measured
+   an overdrawn card balance (.acct-bal.text-danger) in neutral ink while the
+   same figure was red on Savings and the Dashboard, the Assets total
+   (.text-success) in ink, a Savings "unmatched" status (.text-warning) in
+   faint grey, and, out of the harness's sight, "Matches your transactions"
+   muted, the Savings stated-growth line faint and the Report folder problem
+   muted under its own .text-muted (2026-10-20 audit, D1-11).
+
+   So they are doubled to (0,3,0), like .hidden.hidden, and sit HERE, after the
+   whole legacy sheet: they out-rank every class-only colour rule in it, whatever
+   its position. What still beats them is deliberate and heavier: an id-scoped
+   page rule (which adds a compound .x.text-tone beside itself when it must
+   yield, see dashboard.css #healthBody) or a (0,4,0)+ surface rule such as the
+   score slab's white ink. tests/css-tone-wins.test.cjs walks every class string
+   in src/ that carries a tone and holds it.
+   ------------------------------------------------------------ */
+.budget-app-root .text-success.text-success { color: var(--color-success); }
+.budget-app-root .text-danger.text-danger { color: var(--color-danger-ink); }
+.budget-app-root .text-warning.text-warning { color: var(--color-warning-ink); }
+
+/* ------------------------------------------------------------
    7. SUCCESS-COLOURED TEXT ON THE LIGHT THEME
    --color-success (#22c55e) is a fill: right behind a bar or a dot, and 1.9-2.3:1
    as text on the pale tiles and white cards of the light theme, under the 3:1
@@ -484,11 +533,12 @@
    success text takes it here, light theme only: on a dark surface the green is
    already 8:1 and stays as it is. Fills, bars, dots and borders are untouched.
 
-   .text-success is handled by re-pointing the variable its own rule reads, not
-   by a second `color`: a few elements carry .text-success AND a later colour
-   rule of their own (.acct-recon-txt, .sav-row-status, .assets-hero-num); that
-   colour has always won there, and a competing `color` here would repaint them
-   green. The other four have no rival colour, so they are set directly.
+   .text-success is handled by re-pointing the variable its own rule (6b, above)
+   reads, not by a second `color`, so the one rule that colours success text
+   stays the one in 6b. (This note used to say that .acct-recon-txt,
+   .sav-row-status and .assets-hero-num kept their own colour over the tone;
+   since 6b they no longer do, by design.) The other four have no tone class,
+   so they are set directly.
    ------------------------------------------------------------ */
 .budget-app-root:not(.bud-dark) .text-success { --color-success: var(--color-primary); }
 .budget-app-root:not(.bud-dark) .acct-chip.up,

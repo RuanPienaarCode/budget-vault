@@ -92,12 +92,22 @@ async function budgetTiles(files) {
     const o = await hero(vault({ income: 2000, food: 1000, spent: 1500 }));
     eq([o.label, o.big], ['Over the spending budget', '500'], 'control: a real overspend is whole units');
   }
-  /* C. The Budget page: plan exceeds planned income by 30c. */
+  /* C. The Budget page: plan exceeds planned income by 30c. Since the
+     2026-10-20 audit (D2-01) the tile is the difference of the Income and
+     Budgeted tiles AS PRINTED (printedRemainder, the hero's rule), so the
+     cents case is the one where both tiles print the same whole figure —
+     R 1 000 and R 1 000 — and the true remainder is still 30c. */
   {
-    const t = await budgetTiles(vault({ income: 1000.20, food: 1000.50, spent: 10 }));
+    const t = await budgetTiles(vault({ income: 1000.10, food: 1000.40, spent: 10 }));
     ok(/Over-budgeted R 0,30 /.test(t), `C: the over-budgeted tile states R 0,30, not R 0 — got: ${t}`);
-    const left = await budgetTiles(vault({ income: 1000.50, food: 1000.20, spent: 10 }));
+    const left = await budgetTiles(vault({ income: 1000.40, food: 1000.10, spent: 10 }));
     ok(/Left to budget R 0,30 /.test(left), `C: and the mirror, left to budget — got: ${left}`);
+    /* And where the two tiles print different whole figures, the tile is
+       their difference: R 1 000 planned against R 1 001 budgeted is R 1 over,
+       not the R 0,30 a reader cannot find on the strip. */
+    const apart = await budgetTiles(vault({ income: 1000.20, food: 1000.50, spent: 10 }));
+    ok(/Planned income R 1 000 .*Total budgeted R 1 001 .*Over-budgeted R 1 /.test(apart),
+      `D2-01: the tile is the printed income less the printed plan — got: ${apart}`);
     const clean = await budgetTiles(vault({ income: 2000, food: 1500, spent: 10 }));
     ok(/Left to budget R 500 /.test(clean), `control: a whole-unit remainder has no cents — got: ${clean}`);
   }

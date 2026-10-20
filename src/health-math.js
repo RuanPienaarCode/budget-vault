@@ -247,7 +247,11 @@ function healthMetrics({
      lump sums"): the budget income, Excluded windfalls out. The two SPENDING
      shares are the exception - their numerators are HOUSEHOLD-lens spend,
      which keeps Excluded rows, so they divide by household income; over
-     budget income they read living costs above 100% of income on the real vault. */
+     budget income they read spending above 100% of income on the real vault.
+     `consumption` is ALL spending bar set-aside (ledger.js tally), fixed bills
+     included, so the Score calls it "all spending", not "living costs" — the
+     flow card's Living costs band is what is left after fixed bills and saving
+     (money-flow.js), a different quantity (2026-10-20 audit, M1-06). */
   const share = v => (hasIncome && v !== null && v !== undefined ? v / avg.income : null);
   const hhIncome = avg.householdIncome;
   const hasHhIncome = hhIncome !== null && hhIncome > 0;
@@ -334,9 +338,10 @@ function scoreBreakdown(m, targetMonths) {
     if (key === 'spending') {
       if (!hh) { return null; }
       /* The cheapest of the three to move is whichever is furthest from its
-         floor, but the honest single figure is what living costs would have to
-         come down by to clear the consumption ceiling — the one a reader can
-         act on this month without renegotiating a contract. */
+         floor, but the honest single figure is what all spending (fixed bills
+         included, as `consumption` is) would have to come down by to clear the
+         consumption floor's 70% — the one a reader can act on this month.
+         views/score.js says it in those words (2026-10-20 audit, M1-06). */
       const target = FULL_MARKS.consumptionFloor * hh;
       const need = (m.monthlyConsumption || 0) - target;
       return need > 0 ? { kind: 'trim', amount: need } : null;

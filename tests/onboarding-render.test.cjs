@@ -525,8 +525,12 @@ function walkPath(w, expected, label) {
     eq(totals.spend, 4000, 'and the planned spend is everything that is not income');
     eq(totals.left, 6000, 'so what is left over is one subtraction, not a second derivation');
     w.renderStep();
-    const hint = textOf(w.contentEl, 'budget-onb-hint');
-    ok(hint.includes('10000.00') && hint.includes('6000.00'),
+    /* In the chosen country's separators (2026-10-20 audit, D2-08: it read
+       "R 10000.00" on a South African wizard). The figures inside the
+       translated sentence are glued with U+00A0 (i18n interpolate), mapped
+       back to a space here to read them. */
+    const hint = textOf(w.contentEl, 'budget-onb-hint').replace(/ /g, ' ');
+    ok(hint.includes('R 10 000,00') && hint.includes('R 6 000,00'),
       `the live hint shows the same figures the writer will use, got "${hint}"`);
     await w.next();
     eq(w.stepIdx, w.steps().indexOf('finish'), 'readable amounts advance to the summary');

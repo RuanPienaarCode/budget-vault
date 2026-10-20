@@ -17,6 +17,9 @@ const { fact } = require('../facts');
 
 const { el } = require('../dom');
 const { totalsFor, amortise, byYear, loanProfileFor } = require('../loan-math');
+/* A bare decimal in the household's own mark — the deposit share and the
+   rate hint (2026-10-20 audit, D2-07). */
+const { decimalText } = require('../locale');
 
 module.exports = function registerLoans(ctx) {
   const { S, $, money } = ctx;
@@ -44,6 +47,26 @@ module.exports = function registerLoans(ctx) {
     return cur && cur !== S.settings.currency && typeof ctx.moneyIn === 'function'
       ? ctx.moneyIn(cur, v, dp)
       : money(v, dp);
+  };
+  /* A tariff figure in the household's own currency is marked .st-money like
+     every other money headline, so its symbol is muted the same way (2026-10-20
+     audit, D1-04). A profile in another currency prints its own symbol through
+     moneyIn and is left unmarked: the first letter there is not the symbol this
+     household reads everywhere else. */
+  const tariffBig = () => {
+    const cur = P().currency;
+    return cur && cur !== S.settings.currency ? 'lo-big' : 'lo-big st-money';
+  };
+
+  /* The formatters the profile's notes are built with (2026-10-20 audit,
+     D2-26 / D2-07). loan-math.js is pure, so its rateNote/costsNote/feesNote
+     are functions of these rather than sentences with "R5 250" and "11.00%"
+     typed into them: a statutory figure reads the way tariffMoney prints the
+     same figure in the card beneath it, and a rate the way the rest of the
+     page writes a decimal. Whole units, like every tariff on the cards. */
+  const noteFmt = {
+    money: v => tariffMoney(v, 0),
+    decimal: (v, dp) => decimalText(v, dp, ctx.locale()),
   };
 
   /* Said once per card, and only when the two actually differ — a household
@@ -104,7 +127,7 @@ module.exports = function registerLoans(ctx) {
      the "untouched fields follow the country default" behaviour, and because
      the hint under it is profile text that changes with the country. */
   function rateField(state, recalc) {
-    const f = numField('Interest rate (% a year)', P().rateNote, state.rate ?? P().defaultRate,
+    const f = numField('Interest rate (% a year)', P().rateNote(noteFmt), state.rate ?? P().defaultRate,
       { min: '0', max: '40', step: '0.25' },
       // An emptied field means "I have not decided", not "0%". Reading a
       // cleared box as a zero-interest loan produced a cheerful, completely
@@ -119,7 +142,7 @@ module.exports = function registerLoans(ctx) {
     // the hint and — while the reader has not overridden it — the rate itself.
     syncs.push(() => {
       const p = P();
-      f.hintEl.textContent = p.rateNote;
+      f.hintEl.textContent = p.rateNote(noteFmt);
       if (state.rate === null) f.input.value = String(p.defaultRate);
     });
     return f.wrap;
@@ -147,11 +170,12 @@ module.exports = function registerLoans(ctx) {
     });
 
     const pct = () => (state.price > 0 ? (state.deposit / state.price) * 100 : state.depositPct);
-    // One decimal only when there is one to show: "13.3%" earns its place,
-    // "10.0%" does not.
+    // One decimal only when there is one to show: "13,3%" earns its place,
+    // "10,0%" does not. In the household's decimal mark, like every other
+    // decimal on the page (2026-10-20 audit, D2-07) — it read "13.3%".
     const show = () => {
       const v = pct();
-      lab.textContent = `Deposit — ${Math.round(v * 10) % 10 ? v.toFixed(1) : Math.round(v)}%`;
+      lab.textContent = `Deposit — ${Math.round(v * 10) % 10 ? decimalText(v, 1, ctx.locale()) : Math.round(v)}%`;
       if (document.activeElement !== slider) slider.value = String(Math.min(100, Math.round(v)));
       if (document.activeElement !== amt) amt.value = String(Math.round(state.deposit));
     };
@@ -203,6 +227,18 @@ module.exports = function registerLoans(ctx) {
   }
 
   /* ------------------------------ output --------------------------------- */
+  /* The result rows print WHOLE units, deliberately: each is a calculator's
+     estimate off a rate, a tariff and a default the disclaimer below tells the
+     reader to check, and cents would claim a precision none of them has. The
+     amortisation tables further down are a schedule, read row by row like any
+     other table in the app, and keep cents (2026-10-20 audit, D1-13 / D2-18).
+
+     No tone on a cost (D2-16 / D1-19). The repayment was the green gradient
+     — the colour this app gives good news — and the totals around it rose,
+     the colour it keeps for over and short. A repayment, a monthly total, the
+     cash needed upfront and a balloon are what the loan costs, neither good
+     news nor an overspend; they print in neutral ink, as the Debt page's own
+     "Paying per month" does. Interest keeps its amber, as it does there. */
   const row = (label, value, cls) => el('div', { class: 'lo-row' },
     el('span', { class: 'lo-l' }, label),
     el('b', { class: `lo-v num ${cls || ''}` }, value));
@@ -246,10 +282,10 @@ module.exports = function registerLoans(ctx) {
     for (const y of rows) {
       body.append(el('tr', {},
         el('td', {}, String(y.year)),
-        el('td', { class: 'num' }, money(y.opening, 0)),
-        el('td', { class: 'num text-warning' }, money(y.interest, 0)),
-        el('td', { class: 'num' }, money(y.capital, 0)),
-        el('td', { class: 'num' }, money(y.closing, 0))));
+        el('td', { class: 'num' }, money(y.opening)),
+        el('td', { class: 'num text-warning' }, money(y.interest)),
+        el('td', { class: 'num' }, money(y.capital)),
+        el('td', { class: 'num' }, money(y.closing))));
     }
     tbl.append(body);
   }
@@ -308,9 +344,9 @@ module.exports = function registerLoans(ctx) {
 
     const out = $('#loanHomeOut'); out.empty();
     const block = el('div', { class: 'loan-out' },
-      row('Monthly repayment', money(t.payment, 0), 'lo-big grad-txt'));
+      row('Monthly repayment', money(t.payment, 0), 'lo-big st-money'));
     if (service > 0) block.append(row('Monthly service fee', money(service, 0)));
-    if (fee.monthlyTotal !== null) block.append(row('Total per month', money(fee.monthlyTotal, 0), 'text-danger'));
+    if (fee.monthlyTotal !== null) block.append(row('Total per month', money(fee.monthlyTotal, 0)));
     block.append(
       row('Loan amount', money(loan, 0)),
       row('Total interest', money(t.totalInterest, 0), 'text-warning'),
@@ -319,13 +355,13 @@ module.exports = function registerLoans(ctx) {
     block.append(row('Deposit', money(deposit, 0)));
     if (p.hasBuyingCosts) block.append(row('Once-off costs', money(onceOff, 0)));
     if (fee.termTotal > 0) block.append(row('Service fees over the term', money(fee.termTotal, 0)));
-    block.append(row('Cash needed upfront', money(deposit + (p.hasBuyingCosts ? onceOff : 0), 0), 'text-danger'));
+    block.append(row('Cash needed upfront', money(deposit + (p.hasBuyingCosts ? onceOff : 0), 0)));
     block.append(el('div', { class: 'lo-note' }, DISCLAIMER));
     out.append(block);
 
     $('#loanHomeCostsCard').classList.toggle('hidden', !p.hasBuyingCosts);
     if (p.hasBuyingCosts) {
-      $('#loanHomeCostsSub').textContent = p.costsNote + tariffNote();
+      $('#loanHomeCostsSub').textContent = p.costsNote(noteFmt) + tariffNote();
       const costs = $('#loanHomeCosts'); costs.empty();
       costs.append(el('div', { class: 'loan-out' },
         row('Transfer duty', tariffMoney(duty)),
@@ -333,7 +369,7 @@ module.exports = function registerLoans(ctx) {
         row('Transfer costs (est.)', tariffMoney(transfer)),
         row('Initiation fee', tariffMoney(init)),
         el('div', { class: 'lo-sep' }),
-        row('Total once-off costs', tariffMoney(onceOff), 'lo-big')));
+        row('Total once-off costs', tariffMoney(onceOff), tariffBig())));
     }
 
     amortTable($('#loanHomeAmort'),
@@ -424,18 +460,18 @@ module.exports = function registerLoans(ctx) {
 
     const out = $('#loanCarOut'); out.empty();
     const block = el('div', { class: 'loan-out' },
-      row('Monthly instalment', money(t.payment, 0), 'lo-big grad-txt'));
+      row('Monthly instalment', money(t.payment, 0), 'lo-big st-money'));
     if (service > 0) block.append(row('Monthly service fee', money(service, 0)));
     if (insurance) block.append(row('Insurance (rough estimate)', money(insurance, 0)));
     if (service > 0 || insurance) {
-      block.append(row('Total per month', money(t.payment + service + insurance, 0), 'text-danger'));
+      block.append(row('Total per month', money(t.payment + service + insurance, 0)));
     }
     block.append(el('div', { class: 'lo-sep' }),
       row('Finance amount', money(finance, 0)),
       row('Total interest', money(t.totalInterest, 0), 'text-warning'),
       row('Total repaid', money(t.totalRepaid, 0)));
     if (balloon > 0) {
-      block.append(row('Balloon due at the end', money(balloon, 0), 'text-danger'));
+      block.append(row('Balloon due at the end', money(balloon, 0)));
       block.append(el('div', { class: 'lo-note' },
         'The balloon is not paid off by the instalments — at the end of the term you settle it, ' +
         'refinance it, or trade the car in and hope it is worth more than the balloon. That is why ' +
@@ -447,21 +483,28 @@ module.exports = function registerLoans(ctx) {
     // of nothing rather than as "not modelled here".
     if (init > 0) block.append(row('Initiation fee', money(init, 0)));
     if (serviceTotal > 0) block.append(row('Service fees over the term', money(serviceTotal, 0)));
+    /* The insurance over the term, when it is ticked (2026-10-20 audit,
+       M2-13). "Total per month" above already carries the premium, so the
+       term total built from the same rows has to carry it for every month
+       too — it was left out, and the two totals described different cars.
+       Gated like the service-fee row beside it: nothing ticked, no row. */
+    const insuranceTotal = insurance * car.months;
+    if (insuranceTotal > 0) block.append(row('Insurance over the term (rough estimate)', money(insuranceTotal, 0)));
     // The deposit belongs in this total: it is money spent on the car, and it
     // is listed three rows up. Leaving it out understates the true cost.
-    block.append(row('Total cost of ownership', money(deposit + t.totalRepaid + init + serviceTotal, 0), 'lo-big'));
+    block.append(row('Total cost of ownership', money(deposit + t.totalRepaid + init + serviceTotal + insuranceTotal, 0), 'lo-big st-money'));
     block.append(el('div', { class: 'lo-note' }, DISCLAIMER));
     out.append(block);
 
     $('#loanCarFeesCard').classList.toggle('hidden', !p.hasBuyingCosts);
     if (p.hasBuyingCosts) {
-      $('#loanCarFeesSub').textContent = p.feesNote + tariffNote();
+      $('#loanCarFeesSub').textContent = p.feesNote(noteFmt) + tariffNote();
       const fees = $('#loanCarFees'); fees.empty();
       fees.append(el('div', { class: 'loan-out' },
         row('Initiation fee (once-off)', tariffMoney(init)),
         row('Monthly service fee', tariffMoney(service)),
         el('div', { class: 'lo-sep' }),
-        row('Total service fees over the term', tariffMoney(serviceTotal), 'lo-big')));
+        row('Total service fees over the term', tariffMoney(serviceTotal), tariffBig())));
     }
 
     amortTable($('#loanCarAmort'),

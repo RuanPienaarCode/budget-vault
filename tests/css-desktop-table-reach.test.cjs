@@ -153,11 +153,31 @@ for (const [n, w] of Object.entries(DEBT_INPUTS)) {
    .is-phone) stacks these rows into cards whose controls fill their cell, and a
    max-width or a padding written for the table would follow them in. */
 const D = `body:not(.is-phone) ${R} #debtTable`;
-want(`${D} td:nth-child(6) > select`, 'max-width', WIDE, v => px(v) === 128, 'cap the Category select at 8rem (it was 212px, the width of its longest option)');
-want(`${D} th`, 'padding-inline', WIDE, v => px(v) === 10, 'tighten the Debts cell padding to 10px (11 columns x 12px)');
-want(`${D} td`, 'padding-inline', WIDE, v => px(v) === 10, 'tighten the Debts body cell padding to 10px');
-want(`${D} .debt-prog`, 'min-width', WIDE, v => px(v) === 92, 'lower the progress cell floor (it was 120px)');
-want(`${D} .debt-prog .cat-bar`, 'min-width', WIDE, v => px(v) === 52, 'lower the progress bar floor (it was 70px) so the cell can reach it');
+/* Second pass (2026-10-20 audit, D1-18): the first pass fitted the card but
+   left a 74px name column (names broke per word), a clipped Category select
+   (8rem showed "Debt Repayme") and a three-line Interest heading. The select
+   now flexes between a floor that shows a two-word category whole and the
+   width of a long one; the name and Interest columns get floors; Rate and
+   Extra flex; the cell padding and progress floors give the room back.
+   Measured at 1280px: min-content 1068px in the 1078px card. */
+{
+  const d = want(`${D} td:nth-child(6) > select`, 'min-width', WIDE, v => px(v) >= 136,
+    'give the Category select a floor that shows "Debt Repayments" whole (8rem clipped it to "Debt Repayme")');
+  ok(d, 'the Category select floor is set');
+}
+want(`${D} td:nth-child(6) > select`, 'max-width', WIDE, v => px(v) > 136 && px(v) <= 176, 'and let it grow only to 11rem (it was 212px, the width of its longest option)');
+want(`${D} td:nth-child(6) > select`, 'width', WIDE, v => v === '100%', 'and take the column it is given between the two');
+want(`${D} th`, 'padding-inline', WIDE, v => px(v) === 8, 'tighten the Debts cell padding to 8px (11 columns x 16px)');
+want(`${D} td`, 'padding-inline', WIDE, v => px(v) === 8, 'tighten the Debts body cell padding to 8px');
+want(`${D} thead th`, 'white-space', WIDE, v => v === 'normal', 'let the Debts headings wrap ("Extra / month", "Interest still to pay")');
+want(`${D} thead th:first-child`, 'min-width', WIDE, v => px(v) >= 112, 'give the Debt name column a floor (it was 74px: "Visa / Gold")');
+want(`${D} thead th:nth-child(9)`, 'min-width', WIDE, v => px(v) >= 104, 'give "Interest still to pay" the room for two lines, not three');
+for (const [n, lo, hi] of [[3, 56, 68], [5, 68, 84]]) {
+  want(`${D} td:nth-child(${n}) > input`, 'min-width', WIDE, v => px(v) === lo, `let Debts column ${n}'s input narrow to ${lo}px`);
+  want(`${D} td:nth-child(${n}) > input`, 'max-width', WIDE, v => px(v) === hi, `and no wider than the ${hi}px it was`);
+}
+want(`${D} .debt-prog`, 'min-width', WIDE, v => px(v) === 80, 'lower the progress cell floor (it was 120px, then 92)');
+want(`${D} .debt-prog .cat-bar`, 'min-width', WIDE, v => px(v) === 40, 'lower the progress bar floor (it was 70px, then 52) so the cell can reach it');
 
 /* ---- 4. TRANSACTIONS: wrap the names, tighten the padding, cap the note ----
    Scoped like Debts: a landscape iPhone (.is-phone, 601-932px) stacks these

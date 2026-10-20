@@ -16,6 +16,33 @@
 
    Used by tests/views-render.test.cjs and tests/debts-render.test.cjs. */
 
+/* Text is READ back with U+00A0 mapped to a space.
+
+   Since the audit of 20 Oct 2026 src/i18n.js interpolate() glues a figure
+   that is a sentence's param with U+00A0 ("R\u00a012\u00a0345"), so a phone
+   can no longer wrap it as "R 12" / "345". The views still WRITE that, and
+   this stub stores what they wrote; only the two read paths a suite matches
+   sentences through — textContent and getAttribute (aria-label, title) — map
+   it back, so a suite asserting /R 12 345/ against a sentence reads the
+   sentence the way the reader does rather than the way the bytes spell it.
+   One normalise here instead of one in each of the suites that read prose.
+
+   The raw bytes stay reachable: `rawText` is textContent without the mapping,
+   and `_text` / `attrs` are untouched — tests/i18n-figure-nbsp.test.cjs is
+   where the glue itself is pinned. */
+const readable = s => String(s).replace(/\u00a0/g, ' ');
+
+/* The other half of the same rule. A suite that reads a sentence through the
+   stub and compares it with the sentence spelled through the app's own t()
+   must hold both in reading form, or the comparison is between "R 4 700" and
+   "R\u00a04\u00a0700". readingI18n(require('../src/i18n')) is the module
+   unchanged except that t() hands back its sentence the way the stub reads
+   one. Nothing in src/ sees it: a suite opts in, and the glue itself is still
+   pinned against the real t() in tests/i18n-figure-nbsp.test.cjs. */
+const readingI18n = i18n => new Proxy(i18n, {
+  get: (mod, key) => (key === 't' ? (k, params) => readable(mod.t(k, params)) : mod[key]),
+});
+
 class FakeEl {
   constructor(tag = 'div') {
     this.nodeType = 1;
@@ -42,7 +69,8 @@ class FakeEl {
   }
   get className() { return [...this._cls].join(' '); }
   set className(v) { this._cls = new Set(String(v).split(/\s+/).filter(Boolean)); }
-  get textContent() { return this._text + this.children.map(c => c.textContent).join(''); }
+  get textContent() { return readable(this.rawText); }
+  get rawText() { return this._text + this.children.map(c => (c.rawText !== undefined ? c.rawText : c.textContent)).join(''); }
   set textContent(v) { this._text = v == null ? '' : String(v); this.children = []; }
   // A real <select> exposes its <option>s, and more than one view counts them
   // to decide whether the list still needs building.
@@ -82,7 +110,7 @@ class FakeEl {
     this.attrs[k] = String(v);
     if (k === 'class') { this.className = String(v); }
   }
-  getAttribute(k) { return k in this.attrs ? this.attrs[k] : null; }
+  getAttribute(k) { return k in this.attrs ? readable(this.attrs[k]) : null; }
   removeAttribute(k) { delete this.attrs[k]; }
   hasAttribute(k) { return k in this.attrs; }
   /* Handlers are KEPT, not swallowed. A stub that drops them lets a suite prove
@@ -222,4 +250,4 @@ function makeDom() {
   return { $, nodes, FakeEl };
 }
 
-module.exports = { FakeEl, makeDom, installDom, descend };
+module.exports = { FakeEl, makeDom, installDom, descend, readable, readingI18n };

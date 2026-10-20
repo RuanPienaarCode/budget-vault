@@ -252,10 +252,17 @@ const ZA_INIT_CAP = vatIncl(ZA_INIT_CAP_EX_VAT);   // R6 037.50
 const ZA_OTHER_INIT_BASE = fact('za.nca.init.other.base');
 const ZA_OTHER_INIT_CAP_EX_VAT = fact('za.nca.init.other.cap');
 
+/* The amounts above which each table's 10% applies — named, because the
+   statutory notes below quote them too, and a threshold spelled once in the
+   fee and again in the sentence describing the fee is two figures free to
+   drift apart (2026-10-20 audit, D2-26). */
+const ZA_MORTGAGE_INIT_ABOVE = 10000;
+const ZA_OTHER_INIT_ABOVE = 1000;
+
 function zaMortgageInitiationFee(loanAmount) {
   const a = Number(loanAmount) || 0;
   if (a <= 0) return 0;
-  const exVat = Math.min(fact('za.nca.init.mortgage.base') + Math.max(0, a - 10000) * 0.10, ZA_INIT_CAP_EX_VAT);
+  const exVat = Math.min(fact('za.nca.init.mortgage.base') + Math.max(0, a - ZA_MORTGAGE_INIT_ABOVE) * 0.10, ZA_INIT_CAP_EX_VAT);
   return Math.round(vatIncl(exVat));
 }
 
@@ -275,7 +282,7 @@ function zaVehicleInitiationFee(financeAmount) {
      one expression once before; the two fees must agree about what they
      include. */
   const exVat = Math.min(
-    ZA_OTHER_INIT_BASE + Math.max(0, a - 1000) * 0.10,
+    ZA_OTHER_INIT_BASE + Math.max(0, a - ZA_OTHER_INIT_ABOVE) * 0.10,
     ZA_OTHER_INIT_CAP_EX_VAT,
   );
   return Math.round(vatIncl(exVat));
@@ -286,7 +293,8 @@ function zaVehicleInitiationFee(financeAmount) {
    the Act, is R60" — exclusive of VAT, so R69.00 at 15%. The figure here was
    R74.50, which matches no version of the regulation: it was R50 before 6 May
    2016 and R60 after. Stored VAT-inclusive because that is what is rendered. */
-const ZA_SERVICE_FEE = vatIncl(fact('za.nca.servicefee'));   // R69.00 exactly
+const ZA_SERVICE_FEE_EX_VAT = fact('za.nca.servicefee');
+const ZA_SERVICE_FEE = vatIncl(ZA_SERVICE_FEE_EX_VAT);   // R69.00 exactly
 
 /* Conveyancing and bond-registration cost anchors, INCLUDING VAT, the deeds
    office fee and typical disbursements. Interpolated between anchors and
@@ -347,9 +355,22 @@ const LOAN_PROFILES = {
        is six weeks or three years old, which is the state the old wording left
        them in while quoting a prime rate that had moved and two fee caps that
        had never been read from the regulation at all. */
-    rateNote: 'This calculator defaults to 11.00%. South Africa\'s prime rate has moved since — confirm today\'s rate and what your bank actually offered you before relying on any figure here.',
-    costsNote: 'Estimates only. Transfer duty is arithmetic on the SARS table effective 1 April 2025, checked against sars.gov.za in August 2026; bond registration and transfer costs are interpolated from the guideline conveyancing tariff, which this app has never verified, and will differ from your attorney\'s quote. Lender fees are modelled on the National Credit Act caps as read from Government Gazette 39379 (initiation R5 250 + VAT, monthly service fee R60 + VAT).',
-    feesNote: 'Lender fees are modelled on the National Credit Act caps in Government Gazette 39379 of 6 November 2015 — a mortgage initiation fee of R1 100 plus 10% above R10 000, capped at R5 250 + VAT (R6 038); other credit agreements, including vehicle finance, R165 plus 10% above R1 000, capped at R1 050 + VAT (R1 208); monthly service fee R60 + VAT (R69). Lenders set their own within those caps, so ask for the actual fees on your quote.',
+    /* Functions of the view's formatters since the 2026-10-20 audit (D2-26,
+       D2-07): the figures in them were typed by hand — "R5 250", "R60",
+       "11.00%" — beside money()'s "R 5 250" and a rate field showing "11" on
+       a page whose every other decimal is a comma. This module stays pure, so
+       it is handed `f.money(v)` (whole units, in this profile's currency) and
+       `f.decimal(v, dp)` (a bare decimal in the household's mark), and each
+       figure is now the constant the arithmetic above uses, not a second
+       spelling of it — the VAT-inclusive caps rounded to the rand exactly as
+       the two fee functions round them. */
+    rateNote: f => `This calculator defaults to ${f.decimal(fact('za.prime.rate'), 2)}%. South Africa's prime rate has moved since — confirm today's rate and what your bank actually offered you before relying on any figure here.`,
+    costsNote: f => 'Estimates only. Transfer duty is arithmetic on the SARS table effective 1 April 2025, checked against sars.gov.za in August 2026; bond registration and transfer costs are interpolated from the guideline conveyancing tariff, which this app has never verified, and will differ from your attorney\'s quote. '
+      + `Lender fees are modelled on the National Credit Act caps as read from Government Gazette 39379 (initiation ${f.money(ZA_INIT_CAP_EX_VAT)} + VAT, monthly service fee ${f.money(ZA_SERVICE_FEE_EX_VAT)} + VAT).`,
+    feesNote: f => 'Lender fees are modelled on the National Credit Act caps in Government Gazette 39379 of 6 November 2015 — '
+      + `a mortgage initiation fee of ${f.money(fact('za.nca.init.mortgage.base'))} plus 10% above ${f.money(ZA_MORTGAGE_INIT_ABOVE)}, capped at ${f.money(ZA_INIT_CAP_EX_VAT)} + VAT (${f.money(Math.round(ZA_INIT_CAP))}); `
+      + `other credit agreements, including vehicle finance, ${f.money(ZA_OTHER_INIT_BASE)} plus 10% above ${f.money(ZA_OTHER_INIT_ABOVE)}, capped at ${f.money(ZA_OTHER_INIT_CAP_EX_VAT)} + VAT (${f.money(Math.round(vatIncl(ZA_OTHER_INIT_CAP_EX_VAT)))}); `
+      + `monthly service fee ${f.money(ZA_SERVICE_FEE_EX_VAT)} + VAT (${f.money(ZA_SERVICE_FEE)}). Lenders set their own within those caps, so ask for the actual fees on your quote.`,
     serviceFee: ZA_SERVICE_FEE,
     transferDuty: zaTransferDuty,
     transferCost: price => round50(interpolate(ZA_TRANSFER_COST, price)),
@@ -367,9 +388,10 @@ const GENERIC_LOAN_PROFILE = {
      one works on figures the READER typed. */
   currency: '',
   defaultRate: 8,
-  rateNote: 'Enter the annual interest rate your lender quoted.',
-  costsNote: '',
-  feesNote: '',
+  // Functions, like the za profile's: the view calls each with its formatters.
+  rateNote: () => 'Enter the annual interest rate your lender quoted.',
+  costsNote: () => '',
+  feesNote: () => '',
   serviceFee: 0,
   transferDuty: () => 0,
   transferCost: () => 0,

@@ -36,7 +36,11 @@
 const assert = require('assert');
 const { stubObsidian } = require('./helpers/harness.cjs');
 stubObsidian();
-const { pinClock } = require('./helpers/figures.cjs');
+const { pinClock, readable } = require('./helpers/figures.cjs');
+/* The sentences this suite expects are spelled through the app's own t(), and
+   read the way createReport()'s `md` and the strip's text() are read: with the
+   U+00A0 that glues a figure in a sentence mapped back to a space. */
+const reading = i18n => ({ t: (key, params) => readable(i18n.t(key, params)) });
 const { mountFor, createReport, kids, text } = require('./helpers/report-page.cjs');
 const { SEED, B, TODAY, PERIOD } = require('./figures/household.cjs');
 
@@ -61,7 +65,7 @@ async function report(files, opts) {
   try {
     const M = await mountFor(files, { period: PERIOD, budgetFolder: B });
     const out = await createReport(M, opts);
-    return { M, ...out, i18n: require('../src/i18n') };
+    return { M, ...out, i18n: reading(require('../src/i18n')) };
   } finally { unpin(); }
 }
 async function budgetStrip(files) {
@@ -70,11 +74,14 @@ async function budgetStrip(files) {
     const M = await mountFor(files, { period: PERIOD, budgetFolder: B });
     M.ctx.renderBudgets();
     const frag = kids(M.nodes.get('#budTotalsTop'), n => n.attrs && n.attrs['data-fig'] === 'bud-note-setaside')[0];
-    return { M, frag: frag ? text(frag) : null, i18n: require('../src/i18n') };
+    return { M, frag: frag ? text(frag) : null, i18n: reading(require('../src/i18n')) };
   } finally { unpin(); }
 }
-const sentence = (i18n, money, planned, moved) =>
-  i18n.t('dash.stat.ofWhichSetAside', { amount: money(planned, 0), moved: money(moved, 0) });
+/* `dp`: the Report prints the pair to the cent like every figure in it; the
+   Budget page's strip, a whole-rand summary surface, to the rand (2026-10-20
+   audit, M1-09). One sentence, each surface's own precision. */
+const sentence = (i18n, money, planned, moved, dp = 2) =>
+  i18n.t('dash.stat.ofWhichSetAside', { amount: money(planned, dp), moved: money(moved, dp) });
 
 (async () => {
   /* ---- 1-2, 5-6. one period, three different numbers -------------------- */
@@ -97,12 +104,12 @@ const sentence = (i18n, money, planned, moved) =>
     eq(bu.set_aside_moved, moved, 'JSON budget_used.set_aside_moved is movedToFunds()');
     eq(bu.set_aside, paid, 'JSON budget_used.set_aside is still the ADR-0005 operand (paid), unchanged');
 
-    ok(r.md.includes(r.i18n.t('dash.stat.setAside', { amount: ctx.money(paid, 0) })),
+    ok(r.md.includes(r.i18n.t('dash.stat.setAside', { amount: ctx.money(paid) })),
       'the set-aside PAID is still named, in the hero\'s own fragment, so the document reconciles gross spend to the numerator');
 
     const at = r.md.indexOf(want);
     const line = r.md.slice(at, at + want.length);
-    ok(line.indexOf(ctx.money(moved, 0)) < line.indexOf(ctx.money(planned, 0)),
+    ok(line.indexOf(readable(ctx.money(moved))) < line.indexOf(readable(ctx.money(planned))),
       'moved is the first figure and planned the second — the order the reconcile checker reads');
   }
 
@@ -122,7 +129,8 @@ const sentence = (i18n, money, planned, moved) =>
     eq(r.json.income_vs_spend.budget_used.set_aside_planned, 2000, 'and JSON carries the planned figure');
 
     const s = await budgetStrip(files);
-    ok(s.frag && s.frag.includes(want), `the Budget page's strip says the same — got ${JSON.stringify(s.frag)}`);
+    const wantStrip = sentence(r.i18n, ctx.money, 2000, ctx.movedToFunds(PERIOD), 0);
+    ok(s.frag && s.frag.includes(wantStrip), `the Budget page's strip says the same, in its whole rands — got ${JSON.stringify(s.frag)}`);
   }
   {
     /* No set-aside envelope in the plan, though R2 000 still left for
@@ -134,7 +142,7 @@ const sentence = (i18n, money, planned, moved) =>
     const { ctx } = r.M;
     eq([ctx.planFigures(PERIOD).setAside, ctx.budgetUsed(PERIOD).setAside], [0, 2000], 'fixture: nothing planned, R2 000 paid');
     ok(!/saved so far/.test(r.md), 'no "saved so far" sentence when the plan sets nothing aside');
-    ok(r.md.includes(r.i18n.t('dash.stat.setAside', { amount: ctx.money(2000, 0) })),
+    ok(r.md.includes(r.i18n.t('dash.stat.setAside', { amount: ctx.money(2000) })),
       'the paid set-aside is still named as held out of spent');
     eq(r.json.income_vs_spend.budget_used.set_aside_planned, 0, 'JSON says nothing was planned, as a zero');
 
@@ -159,7 +167,7 @@ const sentence = (i18n, money, planned, moved) =>
   {
     const s = await budgetStrip(withRainyDay());
     const { ctx } = s.M;
-    const want = sentence(s.i18n, ctx.money, ctx.planFigures(PERIOD).setAside, ctx.movedToFunds(PERIOD));
+    const want = sentence(s.i18n, ctx.money, ctx.planFigures(PERIOD).setAside, ctx.movedToFunds(PERIOD), 0);
     ok(s.frag && s.frag.includes(want), `the strip names the planned set-aside — expected "${want}", got ${JSON.stringify(s.frag)}`);
   }
 

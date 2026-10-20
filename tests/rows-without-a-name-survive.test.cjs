@@ -36,7 +36,7 @@
 const assert = require('assert');
 const { stubObsidian, makeCtx, loadInto } = require('./helpers/harness.cjs');
 stubObsidian();
-const { mountFor, pinClock } = require('./helpers/figures.cjs');
+const { mountFor, pinClock, readable } = require('./helpers/figures.cjs');
 const { find, textOf } = require('./helpers/dash-audit.cjs');
 const { worth } = require('../src/worth');
 const { owedSummary } = require('../src/owed-math');
@@ -152,7 +152,8 @@ async function flat(kind, path, text, view, ser) {
     ctx.renderBudgets();
     const note = find(M.nodes.get('#budTable'), n => n.attrs && n.attrs['data-fig'] === 'bud-unnamed')[0];
     ok(note, 'the Budget page names the row it is not counting');
-    const expected = i18n.t('bud.unnamed.note', { count: 1, amount: ctx.money(750) });
+    // Read as textOf reads the page: the U+00A0 gluing the figure is a space.
+    const expected = readable(i18n.t('bud.unnamed.note', { count: 1, amount: ctx.money(750) }));
     ok(expected !== 'bud.unnamed.note' && /no category/.test(expected), `the disclosure has words of its own: ${expected}`);
     eq(textOf(note), expected, 'and they carry the count and the amount');
 

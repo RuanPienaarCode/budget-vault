@@ -468,7 +468,7 @@ module.exports = {
     one: 'Die verdeelde deel gaan saam.',
     other: 'Die {count} verdeelde dele gaan saam.',
   },
-  'tx.delete.part': 'Dit is een deel van \'n verdeling: die dele tel nie meer op tot die oorspronklike lyn nie, en die verskil verlaat jou rekeningtotale. Ontmerk Uitgesluit op die oorspronklike om dit terug te sit.',
+  'tx.delete.part': 'Dit is een deel van \'n verdeling: die dele tel nie meer op tot die oorspronklike lyn nie, en die verskil verlaat jou rekeningtotale. Kies Verdeling ongedaan maak op die oorspronklike lyn om dit terug te sit.',
   'tx.delete.confirm': 'Skrap ry',
   'tx.deleted': {
     one: 'Ry verwyder — stoor veranderinge om dit in die lêer te skryf',
@@ -1113,6 +1113,8 @@ module.exports = {
   'dash.stale.line': '{line} — {age}.',
   'dash.stale.driftUp': ' Transaksies sedertdien tel op tot {amount} meer.',
   'dash.stale.driftDown': ' Transaksies sedertdien tel op tot {amount} minder.',
+  'dash.stale.driftUpIncluded': ' Transaksies sedertdien voeg {amount} by, reeds in hierdie syfers ingesluit.',
+  'dash.stale.driftDownIncluded': ' Transaksies sedertdien trek {amount} af, reeds in hierdie syfers ingesluit.',
   'dash.stale.btn': 'Gaan saldo\'s na',
   'dash.stale.aria': 'Gaan rekeningsaldo\'s op die Rekeninge-bladsy na',
 
@@ -1681,4 +1683,45 @@ module.exports = {
   'settings.exchangeRates.source': 'Wisselkoersbron',
   'settings.exchangeRates.sourceDesc': 'Wanneer aangeskakel, kom koerse van open.er-api.com, \'n gratis diens deur ExchangeRate-API (exchangerate-api.com). Slegs die drieletter-geldeenheidkode in die versoek se adres word gestuur; soos enige internetversoek wys dit ook jou IP-adres aan hulle.',
 
+  /* 2026-10-20 audit, Score lane (M1-05, M1-06, M1-07): which income each
+     figure divides by, "all spending" for the inclusive measure, and every
+     part of "Not yet spent" named under it. Machine-assisted, added
+     2026-10-20; not yet read by a first-language reader. */
+  'score.now.wealthBase': 'Nou: {amount} netowaarde · gelykstaande aan {times} jaar se begrotingsinkomste ({income} per maand)',
+  'score.now.allSpendHousehold': 'alle besteding (vaste rekeninge ingesluit) {pct} van huishoudelike inkomste',
+  'score.gap.fixMonthly': 'Spaar elke maand {amount} meer om {pct}% van jou begrotingsinkomste te bereik.',
+  'score.gap.fixBuild': 'Laat jou spaargeld, beleggings of eiendom met {amount} groei — of betaal soveel skuld af — om {times} jaar se begrotingsinkomste te bereik.',
+  'score.gap.fixTrim': 'Bestee altesaam {amount} minder per maand, vaste rekeninge ingesluit, om jou besteding onder {pct}% van jou huishoudelike inkomste te bring.',
+  'score.flow.sub.incomeToCome': '{amount} van die beplande inkomste nog nie ontvang nie',
+  'score.flow.sub.incomeAbovePlan': '{amount} meer inkomste as beplan',
+  'score.flow.sub.setAsideOver': '{amount} meer na spaargeld as wat die plan opsy gesit het',
+  'score.flow.sub.alreadySpent': '{amount} wat die begroting reeds as bestee tel',
+  'score.flow.chip.alreadySpentNote': '„Nog nie bestee nie”, hierbo, is {amount} meer as „Saam”: geld wat nog in die hand is, maar wat die begroting reeds as bestee tel.',
+  /* 2026-10-20 audit, L3 (Report + exports) — M1-04, M1-08, M2-04.
+     Machine-assisted, added 2026-10-20; not native-reviewed. */
+  'report.budget.incomeLeftOut': {
+    one: '{count} van die {total} vergelykte tydperke het geen inkomste in sy begroting nie: {names}. Begrote inkomste, en elke inkomstery in begroting teenoor werklik, dek net die tydperke wie se begroting daardie inkomste beplan; inkomste hierbo dek elke tydperk.',
+    other: '{count} van die {total} vergelykte tydperke het geen inkomste in hul begroting nie: {names}. Begrote inkomste, en elke inkomstery in begroting teenoor werklik, dek net die tydperke wie se begroting daardie inkomste beplan; inkomste hierbo dek elke tydperk.',
+  },
+  'report.health.noteParts': 'Een enkele syfer, saamgestel uit die dele wat die Telling-bladsy wys ({parts}) — \'n ruwe aanduiding uit hierdie kluis se eie syfers, nie \'n professionele assessering nie.',
+  'bx.doc.headlineHeading': 'Inkomste en besteding per tydperk',
+  'bx.doc.income': 'Inkomste',
+  'bx.doc.spent': 'Bestee',
+  'bx.doc.uncategorised': 'Ongekategoriseer',
+  'bx.doc.refunds': 'Terugbetalings nie afgetrek nie',
+  /* 2026-10-20 audit fix wave, lane L4 (Accounts) — machine-assisted, not
+     native-reviewed. acct.where.subStop: the ring caption with its closing
+     stop, for when the other-currency sentence follows it (D1-15).
+     acct.overlap: the Accounts page's own card-overlap sentence — its hero
+     leaves Debt-page rows out, so the double count is in net worth on the
+     Savings page and the Dashboard, not "above" (M2-06). */
+  'acct.where.subStop': 'Aandeel van wat hierdie rekeninge hou.',
+  'acct.overlap': 'Kredietkaartrekeninge gevolg: {accounts} · kaartskulde gevolg: {debts} — as enige kaart in albei is, word dit dubbel getel in die netto waarde op die Spaargeld en Beleggings-bladsy en die Paneelbord.',
+  /* 2026-10-20 audit fix wave, lane L6 (Transactions, Plan, Onboarding) —
+     machine-assisted, not native-reviewed. plan.env.sub: the line over the
+     Plan's spending buckets, through t() so its figures are glued (D1-05). */
+  'plan.env.sub': {
+    one: '{count} bestedingsbak · {placed} geplaas van {pot}',
+    other: '{count} bestedingsbakke · {placed} geplaas van {pot}',
+  },
 };

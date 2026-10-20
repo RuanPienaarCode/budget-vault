@@ -34,6 +34,14 @@ const { assetTotal, foreignTotals, typedBelowZero, flooredEntry, shownFigure } =
 const ASSET_TYPES = ['property', 'vehicle', 'household contents', 'jewellery',
   'precious metals', 'electronics', 'collectibles', 'equipment', 'other'];
 
+/* A stored kind as a LABEL: sentence case, like every other label in the app
+   (2026-10-20 audit, D1-08 — the Kind select read "vehicle", "precious metals"
+   beside "Savings" and "Cheque"). Display only: the option's value, and so
+   the word written back to Assets.md, is the stored word unchanged, and a kind
+   typed by hand is labelled by the same rule. views/savings.js's composition
+   list names these kinds by the same rule. */
+const kindLabel = k => (k ? String(k).charAt(0).toUpperCase() + String(k).slice(1) : k);
+
 /* A valuation goes stale on a different clock to a bank balance. The 30 days
    reconcile.js uses is right for a figure a statement re-confirms every month
    and badly wrong here — nobody has a house valued monthly, so a 30-day rule
@@ -55,11 +63,16 @@ module.exports = function registerAssets(ctx) {
      in its OWN symbol — a Lisbon flat shown as "R 250 000" is not a missing
      label but a claim the household holds rand it does not — and the page
      total sums the household's currency alone, naming the rest beside it. */
-  const aMoney = (a, v, dp = 2) => (isForeign(a, S.settings.currency) && typeof ctx.moneyIn === 'function'
+  /* ctx.moneyIn unguarded (2026-10-20 audit, D2-26). Both lines used to ask
+     `typeof ctx.moneyIn === 'function'` first, and the second fell back to a
+     hand-written `${sym} ${Math.round(v)}` — a money formatter with no
+     grouping and no locale. The branch could not run: controller.js builds
+     ctx WITH moneyIn before any view registers, and the test harness does the
+     same, so it was a second spelling of money that nothing exercised. */
+  const aMoney = (a, v, dp = 2) => (isForeign(a, S.settings.currency)
     ? ctx.moneyIn(symbolOf(a, S.settings.currency), v, dp)
     : money(v, dp));
-  const otherList = pairs => pairs.map(([sym, v]) => (typeof ctx.moneyIn === 'function'
-    ? ctx.moneyIn(sym, v, 0) : `${sym} ${Math.round(v)}`)).join(' · ');
+  const otherList = pairs => pairs.map(([sym, v]) => ctx.moneyIn(sym, v, 0)).join(' · ');
 
   const { mark, clear: clearDirty } = ctx.dirtyFlag('assetsDirty', '#assetSave');
 
@@ -314,9 +327,10 @@ module.exports = function registerAssets(ctx) {
             // focusRow: rebuilding the table drops focus to <body> otherwise —
             // see the restore block below. Same fix as Owed Money and Debt.
             onchange: e => { a.type = e.target.value; mark(); renderAssets(S.assets.indexOf(a)); } },
+            // Labelled in sentence case, valued by the stored word (D1-08).
             ...(a.type && !ASSET_TYPES.includes(a.type)
-              ? [el('option', { value: a.type, selected: '' }, a.type)] : []),
-            ...ASSET_TYPES.map(k => el('option', { value: k, ...(k === a.type ? { selected: '' } : {}) }, k)))),
+              ? [el('option', { value: a.type, selected: '' }, kindLabel(a.type))] : []),
+            ...ASSET_TYPES.map(k => el('option', { value: k, ...(k === a.type ? { selected: '' } : {}) }, kindLabel(k))))),
           el('td', { class: 'num' }, el('input', { type: 'number', step: '0.01', min: '0',
             class: 'form-control form-control-sm', value: shownFigure(a, 'value'),
             'aria-label': `Value of ${a.name}`,
@@ -417,7 +431,8 @@ module.exports = function registerAssets(ctx) {
   async function addAsset() {
     const r = await askFields(app, 'New asset', [
       { key: 'name', label: 'What is it?', type: 'text', placeholder: 'e.g. The house' },
-      { key: 'type', label: 'Kind', type: 'select', value: 'property', options: ASSET_TYPES },
+      { key: 'type', label: 'Kind', type: 'select', value: 'property',
+        options: ASSET_TYPES.map(k => ({ value: k, label: kindLabel(k) })) },
       { key: 'value', label: 'What would it sell for?', type: 'number', value: '0' },
       { key: 'valued', label: 'When was that worked out?', type: 'date', value: todayIso(),
         desc: 'If this figure comes from an older valuation, set the date it was true.' },

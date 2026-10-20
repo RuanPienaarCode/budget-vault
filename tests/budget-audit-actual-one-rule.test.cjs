@@ -28,7 +28,9 @@ const assert = require('assert');
 const { stubObsidian, makeCtx, loadInto } = require('./helpers/harness.cjs');
 stubObsidian();
 const { makeDom } = require('./helpers/dom-stub.cjs');
-const i18n = require('../src/i18n');
+/* Sentences spelled through t() are compared in reading form — see
+   readingI18n in tests/helpers/dom-stub.cjs (U+00A0 glue, 20 Oct 2026). */
+const i18n = require('./helpers/dom-stub.cjs').readingI18n(require('../src/i18n'));
 
 let checks = 0;
 const ok = (c, m) => { assert.ok(c, m); checks++; };
@@ -161,17 +163,19 @@ const num = s => Number(/-?\d+\.\d\d/.exec(s)[0]);
   eq(remOf(budRows.get('Groceries')).textContent, i18n.t('bud.remaining.left', { amount: 'R 400.00' }), 'expense left is unchanged');
   eq(num(remOf(budRows.get('Groceries')).textContent), byCat.get('Groceries').remaining, 'and equals the row remaining');
 
-  /* Remaining, both pages, every budgeted non-income row: same number. */
+  /* Remaining, both pages, every budgeted non-income row: the same WORDS
+     since the 2026-10-20 audit (D2-05). The Dashboard printed the signed
+     "R -600.00" beside the Budget page's "R 600.00 over" until then. */
   for (const cat of ['Groceries', 'Gym', 'Fun']) {
     const r = byCat.get(cat);
     const bud = remOf(budRows.get(cat)).textContent;
-    const dash = amountIn(dashRows.get(cat).children[4].textContent);
-    eq(Math.abs(num(bud)), Math.abs(num(dash)), `${cat}: remaining magnitude agrees across pages`);
-    eq(num(dash), r.remaining, `${cat}: Dashboard prints the row's remaining`);
+    const dash = dashRows.get(cat).children[4].textContent;
+    eq(dash, bud, `${cat}: the two pages print one Remaining`);
+    eq(num(dash), Math.abs(r.remaining), `${cat}: and it is the row's remaining, as a magnitude`);
   }
-  /* An assume-spent row inside its provision prints words on the Budget page
-     and the row's own remaining (budget - actual = 0) on the Dashboard. */
-  eq(num(dashRows.get('Carry').children[4].textContent), byCat.get('Carry').remaining, 'Carry: Dashboard prints the row remaining');
+  /* An assume-spent row inside its provision prints the same words on both
+     pages ("already spent"); its remaining is nothing. */
+  eq(dashRows.get('Carry').children[4].textContent, i18n.t('bud.remaining.assumed'), 'Carry: the Dashboard says "already spent" too');
   eq(byCat.get('Carry').remaining, 0, 'an assume-spent row inside its provision has nothing left to spend');
 
   /* ---- live edit: typing an amount moves the row and the strip at once ---- */

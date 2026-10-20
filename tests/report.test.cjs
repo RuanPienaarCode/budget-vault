@@ -249,8 +249,9 @@ const DATA = {
   /* `unconfirmed_balances` (2026-10-07, REPORT-1) is null here: this
      hand-built DATA never went through buildReportData, so the staleness
      operands never reached it — unknown, which is not the same as "nothing
-     stale" (tests/report-caveats-carried.test.cjs covers the real path). */
-  eq(json.net_worth, { net: 250000, assets: 300000, liabilities: 50000, unconfirmed_balances: null }, 'net worth passes through raw');
+     stale" (tests/report-caveats-carried.test.cjs covers the real path).
+     `card_overlap` (2026-10-20, M2-05) is null: no card is tracked twice. */
+  eq(json.net_worth, { net: 250000, assets: 300000, liabilities: 50000, unconfirmed_balances: null, card_overlap: null }, 'net worth passes through raw');
   ok(md.includes(money(250000)) && md.includes(money(300000)) && md.includes(money(50000)),
     'and the same three figures appear formatted in the Markdown');
 
@@ -273,8 +274,13 @@ const DATA = {
      formats, and the health score carries its own honest gloss in both too. */
   ok(md.includes(i18n.t('report.disclaimer')), 'the Markdown carries the not-financial-advice line');
   eq(json.disclaimer, i18n.t('report.disclaimer'), 'the JSON carries the identical sentence, not a second wording of it');
-  ok(md.includes(i18n.t('report.health.note')), 'the Markdown glosses what the health score is and is not');
-  eq(json.health_score.note, i18n.t('report.health.note'), 'the JSON health_score carries the same gloss');
+  /* The gloss names every part of the score (2026-10-20, M1-08):
+     tests/report-print-rules.test.cjs holds it against PILLARS. */
+  const healthGloss = i18n.t('report.health.noteParts', {
+    parts: require('../src/health-math').PILLARS.map(p => i18n.t(`dash.health.why.name.${p.key}`)).join(' · '),
+  });
+  ok(md.includes(healthGloss), 'the Markdown glosses what the health score is and is not');
+  eq(json.health_score.note, healthGloss, 'the JSON health_score carries the same gloss');
 
   /* M4 (2026-08-29 audit) — a drawn-down savings/investment account is
      disclosed the same way views/savings.js's own growthTile() already
@@ -295,7 +301,7 @@ const DATA = {
        way to ask what it was measured without, and "no answer" and "nothing
        excluded" must not look the same. */
     other_currencies: [], net_worth_other_currencies: [],
-    note: i18n.t('report.health.note'),
+    note: healthGloss,
   });
   ok(md.includes('72'), 'the score appears in the Markdown too');
 
@@ -345,12 +351,15 @@ const DATA = {
   const expectedBudget = [
     `| ${i18n.t('report.col.category')} | ${i18n.t('report.col.type')} | ${i18n.t('report.col.budget')} | ${i18n.t('report.col.actual')} | ${i18n.t('report.col.remaining')} |`,
     '|---|---|---:|---:|---:|',
-    `| Salary | income | ${money(40000)} | ${money(45000)} | ${money(-5000)} |`,
+    /* M1-03 (2026-10-20): an income row beyond its plan says so in the
+       Budget page's own words — "-5000" next to "income" still read as an
+       overspend to the reader the document is for. */
+    `| Salary | income | ${money(40000)} | ${money(45000)} | ${i18n.t('bud.remaining.incomeMore', { amount: money(5000) })} |`,
     `| Move to savings | transfer | ${money(10000)} | ${money(0)} | ${money(10000)} |`,
     `| Groceries | expense | ${money(5000)} | ${money(1200)} | ${money(3800)} |`,
   ].join('\n');
   ok(md.includes(expectedBudget),
-    'Budget vs Actual is byte-exact: income over budget reads -5000 next to "income" — not a bare, ambiguous overspend — ' +
+    'Budget vs Actual is byte-exact: income over budget reads "R 5000.00 more than planned" — not a bare, ambiguous overspend — ' +
     'and the transfer row is visibly a transfer, not a category nothing was spent on');
 
   /* C2 — the orphaned row is marked, in order, amounts unchanged. */
@@ -365,10 +374,12 @@ const DATA = {
   eq(tableBodyRows(md, i18n.t('report.section.budgetActual')).length, 3, 'three budget rows, none dropped, none duplicated');
   eq(tableBodyRows(md, i18n.t('report.section.category')).length, 2, 'two category rows, none dropped, none duplicated');
 
+  /* `direction` (2026-10-20, M1-03): which way an income row's signed
+     remaining points; null on every other row. */
   eq(json.budgets_vs_actuals, [
-    { category: 'Salary', type: 'income', budget: 40000, actual: 45000, remaining: -5000, orphaned: false },
-    { category: 'Move to savings', type: 'transfer', budget: 10000, actual: 0, remaining: 10000, orphaned: false },
-    { category: 'Groceries', type: 'expense', budget: 5000, actual: 1200, remaining: 3800, orphaned: false },
+    { category: 'Salary', type: 'income', budget: 40000, actual: 45000, remaining: -5000, direction: 'more_than_planned', orphaned: false },
+    { category: 'Move to savings', type: 'transfer', budget: 10000, actual: 0, remaining: 10000, direction: null, orphaned: false },
+    { category: 'Groceries', type: 'expense', budget: 5000, actual: 1200, remaining: 3800, direction: null, orphaned: false },
   ], 'JSON carries the same three rows, same order, same type field the Markdown just proved — plus R5\'s orphaned flag, false here');
   eq(json.categories, [
     { category: 'Groceries', amount: 1200, percent: 80, orphaned: false },

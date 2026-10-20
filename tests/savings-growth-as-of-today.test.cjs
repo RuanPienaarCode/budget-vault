@@ -248,7 +248,9 @@ const FUND_ROWS = [row('2025-03-01', 5000), row('2026-09-03', 1500), row('2026-1
       && String(n.children[0] && n.children[0].textContent) === name);
     const fund = flat(card('Fund'));
     ok(fund.includes('put in R36500 · ▲ R5000'), `the card states put in and growth on one as-of (got "${fund}")`);
-    ok(/measured on R41500 — your 2026-08-12 balance plus 1 transaction since/.test(fund),
+    /* The date is prose, so it reads "Aug 12" (ctx.dateText), not the ISO
+       cell (2026-10-20 audit, D2-11). */
+    ok(/measured on R41500 — your Aug 12 balance plus 1 transaction since/.test(fund),
       `and says what it measured on, since that is not the balance typed (got "${fund}")`);
     ok(!/records begin/.test(fund), 'a fund whose records start on time carries no gap caveat');
 
@@ -264,7 +266,8 @@ const FUND_ROWS = [row('2025-03-01', 5000), row('2026-09-03', 1500), row('2026-1
        a total R1 500 above the balances on screen, unexplained, is the page
        contradicting itself. */
     const sub = flat($('#savingsGrowthSub'));
-    ok(/as of today — R1500 more than the stated balances, from transactions recorded since/.test(sub),
+    // In cents beside the cents total since the 2026-10-20 audit (D2-03).
+    ok(/as of today — R1500\.00 more than the stated balances, from transactions recorded since/.test(sub),
       `the chart names the roll-forward its total includes (got "${sub}")`);
   } finally { unpin(); }
 

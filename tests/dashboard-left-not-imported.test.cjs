@@ -83,15 +83,16 @@ const discRows = body => find(body, n => n.tagName === 'TR' && find(n, x => hasC
     const fibre = rows.find(r => /^Fibre/.test(r)) || '';
     const gym = rows.find(r => /^Gym/.test(r)) || '';
     const stream = rows.find(r => /^Stream/.test(r)) || '';
-    ok(/due 2026-10-01 — not imported yet/.test(fibre), `Fibre is named as not imported yet: ${fibre}`);
-    ok(/due 2026-10-01 — not imported yet/.test(gym), `Gym is named as not imported yet: ${gym}`);
+    /* Prose dates (ctx.dateText) since the 2026-10-20 audit, D2-11. */
+    ok(/due Oct 1 — not imported yet/.test(fibre), `Fibre is named as not imported yet: ${fibre}`);
+    ok(/due Oct 1 — not imported yet/.test(gym), `Gym is named as not imported yet: ${gym}`);
     ok(/usually about R 300/.test(gym), `and priced from its charges: ${gym}`);
-    ok(/expected 2026-10-15/.test(stream) && !/not imported/.test(stream), `Stream is simply still to come: ${stream}`);
+    ok(/expected Oct 15/.test(stream) && !/not imported/.test(stream), `Stream is simply still to come: ${stream}`);
 
     const com = metaOf(body, 'left-committed');
     ok(/3 debit orders · 2 not imported yet/.test(com), `the committed tile counts the held orders: ${com}`);
     const cashMeta = metaOf(body, 'left-cash');
-    ok(/2 accounts · as of 2026-09-26/.test(cashMeta), `the cash figure names its earliest import: ${cashMeta}`);
+    ok(/2 accounts · as of Sep 26/.test(cashMeta), `the cash figure names its earliest import: ${cashMeta}`);
   }
 
   /* ---- 2. NEGATIVE CONTROL: the card imported past the 1st -------------
@@ -103,7 +104,7 @@ const discRows = body => find(body, n => n.tagName === 'TR' && find(n, x => hasC
     const body = nodes.get('#leftBody');
     eq(figNumber(body, 'left-committed'), 700, 'Fibre 600 + Stream 100: Gym is missing, not held');
     ok(!discRows(body).some(r => /^Gym/.test(r)), `Gym is not listed: ${t('#leftBody')}`);
-    ok(/as of 2026-09-26/.test(metaOf(body, 'left-cash')), 'the cheque account still dates the cash figure');
+    ok(/as of Sep 26/.test(metaOf(body, 'left-cash')), 'the cheque account still dates the cash figure');
   }
 
   /* ---- 3. a charge that landed is cash, not committed ------------------ */
@@ -115,7 +116,7 @@ const discRows = body => find(body, n => n.tagName === 'TR' && find(n, x => hasC
     eq(figNumber(body, 'left-committed'), 100, 'both orders were imported, so only Stream is still to come');
     ok(!/not imported/.test(metaOf(body, 'left-committed')), 'and nothing is counted as held');
     eq(figNumber(body, 'left-cash'), 20650 - 900, 'the two charges are in cash now, once');
-    ok(/as of 2026-10-01/.test(metaOf(body, 'left-cash')), 'and the cash figure is dated by the newer import');
+    ok(/as of Oct 1/.test(metaOf(body, 'left-cash')), 'and the cash figure is dated by the newer import');
   }
 
   /* ---- 4. no as-of line when the cash figure is current to today ------- */

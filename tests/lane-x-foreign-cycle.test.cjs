@@ -38,7 +38,8 @@ const ok = (c, m) => { assert.ok(c, m); checks++; };
     eq(bands.length, 1, 'one foreign band');
     const txt = bands[0].replace(/[  ]/g, ' ');
     ok(/€ ?500 on the card this cycle, of the € ?4 000 that settles it/.test(txt), `the band states the card spend against the settling income: ${txt}`);
-    ok(/€ ?3 500 of headroom before the 2026-08-25 settlement\./.test(txt), `and the headroom, in euro: ${txt}`);
+    /* The settlement date reads as prose (ctx.dateText, 2026-10-20 audit D2-11). */
+    ok(/€ ?3 500 of headroom before the Aug 25 settlement\./.test(txt), `and the headroom, in euro: ${txt}`);
     ok(!/R ?\d/.test(txt), 'with no rand anywhere in a euro band');
     /* The three balancing terms are untouched. */
     ok(/in your accounts € ?6 000/.test(txt) && /actually free € ?6 000/.test(txt), `cash and free are as before: ${txt}`);
@@ -57,7 +58,7 @@ const ok = (c, m) => { assert.ok(c, m); checks++; };
     f[`${B}/Transactions/EuroCard/2026-07.md`] = tx([['2026-07-06', 'Lidl', 'Groceries', -5000]]);
     const M = await renderDash(f, { today: '2026-07-15', period: '2026-07' });
     const txt = bandOf(M)[0].replace(/[  ]/g, ' ');
-    ok(/€ ?1 000 MORE than the income that settles it on 2026-08-25\./.test(txt), `the over case uses the over sentence: ${txt}`);
+    ok(/€ ?1 000 MORE than the income that settles it on Aug 25\./.test(txt), `the over case uses the over sentence: ${txt}`);
   }
 
   console.log(`PASS - lane X, foreign band discloses its own settlement cycle (${checks} checks).`);

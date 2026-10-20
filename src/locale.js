@@ -285,7 +285,12 @@ const PROFILES = {
         msgs.push({ ok: true, text: `Capital gains ${fmt(gains)} are under the ${fmt(lim.cgt)} annual exclusion.` });
       }
 
-      return msgs.concat(reconcileAssessed(this, figures, t, ZA_INCOME_CODES, currency));
+      /* M2-10 (audit of 20 Oct 2026): `this.currency`, like every callout
+         above. This passed the household's `currency` until then, so on a
+         rupiah-budgeting za vault the interest callout read "R 23 800,00"
+         and the assessment check under it "Rp 400 000,00" — a figure off the
+         ITA34, a rand document, labelled in the one currency it is not in. */
+      return msgs.concat(reconcileAssessed(this, figures, t, ZA_INCOME_CODES, this.currency));
     },
     seasonMsgs(t) {
       const msgs = [];
@@ -751,4 +756,32 @@ function localeFor(code) {
   return PROFILES[raw] || PROFILES.other;
 }
 
-module.exports = { PROFILES, COUNTRY_ORDER, localeFor };
+/* A bare decimal in the household's own decimal mark, for a figure that is not
+   money: an interest rate ("22,25%"), a ratio ("2,1 / 3"). Audit of
+   20 Oct 2026 — pages built these with v.toFixed(dp), which prints a full stop
+   in every locale, so a South African sentence carried "R 1 234,56" and
+   "22.25%" side by side: two decimal marks for one reader.
+
+   Called as decimalText(rate, 2, locale()). Exactly v.toFixed(dp) with its '.'
+   swapped for loc.decimal and nothing else — no grouping (a rate or a ratio
+   never reaches a thousand, and a ratio beside a count must not read
+   "1 234,5"), no symbol, no percent sign; the caller's sentence owns those.
+   `loc` is anything carrying `decimal` (a profile from localeFor, or a bare
+   {decimal}); without one the full stop stands.
+
+   Two guards, both the house rules currency.js formatAmount already keeps:
+   a non-finite value reads as 0 at the places asked for ("0,00", never "NaN"),
+   and the minus is decided from the ROUNDED digits, so -0.001 at two places
+   is "0,00", not "-0,00" — a minus must not outlive the rounding that erased
+   its number. A negative that survives the rounding keeps its hyphen-minus,
+   as toFixed writes it. Pure. */
+function decimalText(v, dp, loc) {
+  const places = Number.isInteger(dp) && dp >= 0 && dp <= 20 ? dp : 0;
+  const n = Number(v);
+  const fixed = (Number.isFinite(n) ? n : 0).toFixed(places);
+  const unsigned = Number(fixed) === 0 ? fixed.replace('-', '') : fixed;
+  const mark = loc && typeof loc.decimal === 'string' && loc.decimal ? loc.decimal : '.';
+  return unsigned.replace('.', mark);
+}
+
+module.exports = { PROFILES, COUNTRY_ORDER, localeFor, decimalText };

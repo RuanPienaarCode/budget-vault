@@ -306,8 +306,10 @@ const FILES = {
   const overCard = ctx.accountUtilisation(card(-31000, 30000));
   eq(overCard.over, true, 'past the limit is over');
   eq(overCard.available, -1000, 'and the shortfall is reported as negative headroom');
-  eq(ctx.accountUtilisation(card(500, 30000)), { used: 0, pct: 0, over: false, near: false, available: 30000 },
-    'a card sitting IN CREDIT has used nothing — not a negative share of its limit');
+  /* `available` is the limit PLUS the credit (2026-10-20 audit, M2-12): the
+     R500 in credit is spendable on top of the limit. It used to read 30000. */
+  eq(ctx.accountUtilisation(card(500, 30000)), { used: 0, pct: 0, over: false, near: false, available: 30500 },
+    'a card sitting IN CREDIT has used nothing — not a negative share of its limit — and has its credit to spend too');
   eq(ctx.accountUtilisation(card(-5000, null)), null, 'no limit recorded means no bar to draw');
   eq(ctx.accountUtilisation(card(-5000, 0)), null, 'and a zero limit cannot be divided by');
   eq(ctx.accountUtilisation(card(-5000, 30000, 'checking')), null, 'an overdrawn cheque account is not a credit card');

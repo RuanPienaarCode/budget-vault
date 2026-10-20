@@ -96,21 +96,24 @@ const rowOf = (table, name) => all(table, n => n.tagName === 'TR').find(tr => tx
     const flat = M.S.debts.find(d => d.name === 'Flat abroad');
     const flatRow = rowOf(M.nodes.get('#debtTable'), 'Flat abroad');
     const a = amortise(flat.balance, flat.rate, debtMonthly(flat));
-    eq(txt(flatRow.children[8]), txt({ textContent: eur(a.interest, 0) }),
+    /* In cents since the 2026-10-20 audit (D2-18): the column sits in a
+       table whose Balance, Payment and Extra cells all keep theirs. */
+    eq(txt(flatRow.children[8]), txt({ textContent: eur(a.interest) }),
       'the euro bond\'s Interest still to pay is in euro');
     const exp = expectedBalance(flat, '2026-10-07');
     ok(exp && Math.abs(flat.balance - exp.expected) > Math.max(50, flat.original * 0.02), 'fixture: the schedule chip renders');
     const chip = all(flatRow, n => has(n, 'caveat-chip-btn'))[0];
     eq(txt(chip), txt({ textContent: `on this plan it would be ${eur(exp.expected, 0)} by now` }),
       'the expected-balance chip is in euro');
-    ok(chip.attrs.title.startsWith(`From ${eur(flat.original)} at 4% paying ${eur(debtMonthly(flat))} a month`),
+    // The rate in the household's decimal mark (2026-10-20 audit, D2-07).
+    ok(chip.attrs.title.startsWith(`From ${eur(flat.original)} at 4,00% paying ${eur(debtMonthly(flat))} a month`),
       `and so is its explanation: ${chip.attrs.title}`);
     ok(!/R\s/.test(txt(flatRow.children[8])) && !/R\s/.test(chip.attrs.title), 'no rand symbol anywhere on the euro row');
 
     const cardRow = rowOf(M.nodes.get('#debtTable'), 'Card');
     const card = M.S.debts.find(d => d.name === 'Card');
     const ca = amortise(card.balance, card.rate, debtMonthly(card));
-    eq(txt(cardRow.children[8]), txt({ textContent: ctx.money(ca.interest, 0) }), 'control: the rand card still reads in rand');
+    eq(txt(cardRow.children[8]), txt({ textContent: ctx.money(ca.interest) }), 'control: the rand card still reads in rand');
   } finally { unpin(); }
   console.log(`PASS ledger-rows-own-currency (${checks} checks)`);
 })().catch(e => { console.error(e); process.exit(1); });

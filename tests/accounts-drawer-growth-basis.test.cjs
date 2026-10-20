@@ -27,7 +27,9 @@ const { stubObsidian, makeCtx, loadInto } = require('./helpers/harness.cjs');
 stubObsidian();
 const { makeDom, descend } = require('./helpers/dom-stub.cjs');
 const { pinClock } = require('./helpers/figures.cjs');
-const i18n = require('../src/i18n');
+/* Sentences spelled through t() are compared in reading form — see
+   readingI18n in tests/helpers/dom-stub.cjs (U+00A0 glue, 20 Oct 2026). */
+const i18n = require('./helpers/dom-stub.cjs').readingI18n(require('../src/i18n'));
 
 let checks = 0;
 const ok = (c, m) => { assert.ok(c, m); checks++; };
@@ -104,7 +106,9 @@ const num = t => Number(String(t).replace(/[^\d.-]/g, ''));
       ok(!(L.invested in d), 'and no bare "Total invested" stands in for the capital it is not');
 
       const row = descend($('#acctTable')).find(n => n._cls.has('acct-goal'));
-      ok(row && String(row.textContent).includes(i18n.t('acct.growthOn', { pct: '+14', amount: 'R 36500' })),
+      /* One decimal in the household's mark, the Savings card's formatter
+         (2026-10-20 audit, D2-10): +13,7%, where this cell used to round to +14. */
+      ok(row && String(row.textContent).includes(i18n.t('acct.growthOn', { pct: '+13,7', amount: 'R 36500' })),
         `the goal cell reads the same return on the same capital (got "${row && row.textContent}")`);
     }
 

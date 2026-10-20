@@ -30,7 +30,7 @@
 const assert = require('assert');
 const { stubObsidian, makeVault } = require('./helpers/harness.cjs');
 stubObsidian();
-const { mountFor, pinClock } = require('./helpers/figures.cjs');
+const { mountFor, pinClock, readable } = require('./helpers/figures.cjs');
 const { find, textOf } = require('./helpers/dash-audit.cjs');
 
 let checks = 0;
@@ -111,7 +111,10 @@ async function heroAndApi(files, today, budgetFolder) {
     eq(got.label, title, `${name}: sanity — and the API answered for that same period`);
     ok(Array.isArray(got.notes) && got.notes.every(n => typeof n === 'string' && n.length > 0),
       `${name}: notes are still plain strings (apiVersion 1)`);
-    eq(got.notes, lines, `${name}: api.notes are the hero's own qualifier lines, every one, in its order`);
+    /* The hero lines are read through textOf, which maps the U+00A0 that
+       glues a figure in a sentence back to a space; the API hands back the
+       same sentence bytes the hero wrote, so it is read the same way. */
+    eq(got.notes.map(readable), lines, `${name}: api.notes are the hero's own qualifier lines, every one, in its order`);
     lit += lines.length;
     seen[name] = lines.length;
   }

@@ -474,7 +474,7 @@ module.exports = {
     one: 'Sa part de ventilation part avec elle.',
     other: 'Ses {count} parts de ventilation partent avec elle.',
   },
-  'tx.delete.part': 'Ceci est une part d\'une ventilation : les parts ne feront plus la ligne d\'origine, et la différence quitte les totaux du compte. Décochez « Exclue » sur la ligne d\'origine pour la rétablir.',
+  'tx.delete.part': 'Ceci est une part d\'une ventilation : les parts ne feront plus la ligne d\'origine, et la différence quitte les totaux du compte. Pour la rétablir, choisissez « Annuler la ventilation » sur la ligne d\'origine.',
   'tx.delete.confirm': 'Supprimer la ligne',
   'tx.deleted': {
     one: 'Ligne retirée — enregistrez les modifications pour l\'écrire dans le fichier',
@@ -1127,6 +1127,8 @@ module.exports = {
   'dash.stale.line': '{line} — {age}.',
   'dash.stale.driftUp': ' Les opérations depuis totalisent {amount} de plus.',
   'dash.stale.driftDown': ' Les opérations depuis totalisent {amount} de moins.',
+  'dash.stale.driftUpIncluded': ' Les opérations depuis ajoutent {amount}, déjà comptées dans ces chiffres.',
+  'dash.stale.driftDownIncluded': ' Les opérations depuis retirent {amount}, déjà comptées dans ces chiffres.',
   'dash.stale.btn': 'Vérifier les soldes',
   'dash.stale.aria': 'Vérifier les soldes des comptes sur la page Comptes',
 
@@ -1695,4 +1697,45 @@ module.exports = {
   'settings.exchangeRates.source': 'Source des taux de change',
   'settings.exchangeRates.sourceDesc': 'Lorsque c\'est activé, les taux viennent de open.er-api.com, un service gratuit d\'ExchangeRate-API (exchangerate-api.com). Seul le code de devise à trois lettres figure dans l\'adresse de la requête ; comme toute requête sur internet, elle leur montre aussi votre adresse IP.',
 
+  /* 2026-10-20 audit, Score lane (M1-05, M1-06, M1-07): which income each
+     figure divides by, "all spending" for the inclusive measure, and every
+     part of "Not yet spent" named under it. Machine-assisted, added
+     2026-10-20; not yet read by a first-language reader. */
+  'score.now.wealthBase': 'Aujourd’hui : {amount} de patrimoine net · équivaut à {times} années de revenus du budget ({income} par mois)',
+  'score.now.allSpendHousehold': 'toutes les dépenses (charges fixes comprises) {pct} des revenus du foyer',
+  'score.gap.fixMonthly': 'Épargnez {amount} de plus chaque mois pour atteindre {pct}% de vos revenus du budget.',
+  'score.gap.fixBuild': 'Faites croître votre épargne, vos placements ou votre immobilier de {amount} — ou remboursez autant de dettes — pour atteindre {times} années de revenus du budget.',
+  'score.gap.fixTrim': 'Dépensez {amount} de moins par mois au total, charges fixes comprises, pour ramener vos dépenses sous {pct}% des revenus de votre foyer.',
+  'score.flow.sub.incomeToCome': '{amount} de revenus prévus pas encore arrivés',
+  'score.flow.sub.incomeAbovePlan': '{amount} de revenus de plus que prévu',
+  'score.flow.sub.setAsideOver': '{amount} de plus versés à l’épargne que ce que le plan a mis de côté',
+  'score.flow.sub.alreadySpent': '{amount} que le budget compte déjà comme dépensés',
+  'score.flow.chip.alreadySpentNote': '« Pas encore dépensé », ci-dessus, dépasse « Ensemble » de {amount} : de l’argent encore en main que le budget compte déjà comme dépensé.',
+  /* 2026-10-20 audit, L3 (Report + exports) — M1-04, M1-08, M2-04.
+     Machine-assisted, added 2026-10-20; not native-reviewed. */
+  'report.budget.incomeLeftOut': {
+    one: '{count} période sur les {total} comparées n\'a aucun revenu dans son budget : {names}. Les revenus budgétés, et chaque ligne de revenu dans budget et réel, ne couvrent que les périodes dont le budget prévoit ce revenu ; les revenus ci-dessus couvrent toutes les périodes.',
+    other: '{count} périodes sur les {total} comparées n\'ont aucun revenu dans leur budget : {names}. Les revenus budgétés, et chaque ligne de revenu dans budget et réel, ne couvrent que les périodes dont le budget prévoit ce revenu ; les revenus ci-dessus couvrent toutes les périodes.',
+  },
+  'report.health.noteParts': 'Un seul chiffre formé des parties que montre la page Score ({parts}) — une estimation approximative à partir des chiffres de ce vault, pas une évaluation professionnelle.',
+  'bx.doc.headlineHeading': 'Revenus et dépenses par période',
+  'bx.doc.income': 'Revenus',
+  'bx.doc.spent': 'Dépenses',
+  'bx.doc.uncategorised': 'Non catégorisé',
+  'bx.doc.refunds': 'Remboursements non déduits',
+  /* 2026-10-20 audit fix wave, lane L4 (Accounts) — machine-assisted, not
+     native-reviewed. acct.where.subStop: the ring caption with its closing
+     stop, for when the other-currency sentence follows it (D1-15).
+     acct.overlap: the Accounts page's own card-overlap sentence — its hero
+     leaves Debt-page rows out, so the double count is in net worth on the
+     Savings page and the Dashboard, not "above" (M2-06). */
+  'acct.where.subStop': 'Part de ce que détiennent ces comptes.',
+  'acct.overlap': 'Comptes de carte suivis : {accounts} · dettes de carte suivies : {debts} — si une carte figure dans les deux, elle est comptée deux fois dans la valeur nette de la page Épargne et placements et du Tableau de bord.',
+  /* 2026-10-20 audit fix wave, lane L6 (Transactions, Plan, Onboarding) —
+     machine-assisted, not native-reviewed. plan.env.sub: the line over the
+     Plan's spending buckets, through t() so its figures are glued (D1-05). */
+  'plan.env.sub': {
+    one: '{count} enveloppe · {placed} réparti sur {pot}',
+    other: '{count} enveloppes · {placed} répartis sur {pot}',
+  },
 };

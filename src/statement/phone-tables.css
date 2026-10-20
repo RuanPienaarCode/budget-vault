@@ -170,20 +170,31 @@
   }
   .budget-app-root #svcTable[role='table'] > tbody > tr > td:nth-child(6)::before { margin-bottom: 0; }
   .budget-app-root #svcTable[role='table'] > tbody > tr > td:nth-child(7) { align-self: center; justify-self: end; }
+  /* The group bar is ONE band: its two cells touch. The card-row rule above
+     gives every row a 12px grid gap, and the second-cell rule a -6px top
+     margin (written for a service's own second line), and both reached this
+     flex row too: the bar drew as two grey boxes with a white gap, the total
+     6px higher than the name (2026-10-20 audit, D1-22, measured at 375px). The
+     total may wrap at its spaces: since the same wave a group total can carry
+     other currencies beside it ("R 528,50 a month · plus € 10,25 a month"),
+     and a nowrap line that long would squeeze the group name to nothing. */
   .budget-app-root #svcTable[role='table'] > tbody > tr.type-row {
     display: flex;
     align-items: stretch;
     justify-content: space-between;
+    gap: 0;
     padding: 0;
     border-bottom: 0;
   }
   .budget-app-root #svcTable[role='table'] > tbody > tr.type-row > td {
     display: block;
+    margin: 0;
     padding: 0.6rem 0.5rem;
     border-top: 1px solid var(--border-color);
     border-bottom: 1px solid var(--border-color);
   }
   .budget-app-root #svcTable[role='table'] > tbody > tr.type-row > td:first-child { flex: 1 1 auto; font-size: var(--st-micro); }
+  .budget-app-root #svcTable[role='table'] > tbody > tr.type-row > td:last-child:not(:first-child) { white-space: normal; text-align: right; }
 
   /* ---- Tax steps: a compact card, two lines. Line 1 is the tick and the step:
           status pill | step name | remove. Line 2 is the two fields: due | notes,
@@ -424,16 +435,19 @@
   display: flex;
   align-items: stretch;
   justify-content: space-between;
+  gap: 0;
   padding: 0;
   border-bottom: 0;
 }
 .is-phone .budget-app-root #svcTable[role='table'] > tbody > tr.type-row > td {
   display: block;
+  margin: 0;
   padding: 0.6rem 0.5rem;
   border-top: 1px solid var(--border-color);
   border-bottom: 1px solid var(--border-color);
 }
 .is-phone .budget-app-root #svcTable[role='table'] > tbody > tr.type-row > td:first-child { flex: 1 1 auto; font-size: var(--st-micro); }
+.is-phone .budget-app-root #svcTable[role='table'] > tbody > tr.type-row > td:last-child:not(:first-child) { white-space: normal; text-align: right; }
 
 /* ---- Tax steps: a compact card, two lines. Line 1 is the tick and the step:
         status pill | step name | remove. Line 2 is the two fields: due | notes,

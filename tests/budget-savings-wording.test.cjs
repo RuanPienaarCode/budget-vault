@@ -22,7 +22,7 @@
 const assert = require('assert');
 const { stubObsidian } = require('./helpers/harness.cjs');
 stubObsidian();
-const { mountFor, pinClock } = require('./helpers/figures.cjs');
+const { mountFor, pinClock, readable } = require('./helpers/figures.cjs');
 const { find, textOf } = require('./helpers/dash-audit.cjs');
 const i18n = require('../src/i18n');
 
@@ -59,11 +59,12 @@ const FILES = {
     const strip = M.nodes.get('#budTotalsTop');
     const frag = find(strip, n => n.attrs && n.attrs['data-fig'] === 'bud-budgeted-setaside')[0];
     ok(frag, 'the Budgeted tile names its set-aside fragment');
-    const words = i18n.t('bud.total.setAsidePlanned', { amount: ctx.money(planned, 0) });
+    // Read as textOf reads the tile: the U+00A0 gluing the figure maps to a space.
+    const words = readable(i18n.t('bud.total.setAsidePlanned', { amount: ctx.money(planned, 0) }));
     ok(words !== 'bud.total.setAsidePlanned' && /planned for savings/.test(words),
       `the tile has a wording of its own that says the figure is planned: ${words}`);
     eq(textOf(frag).replace(/^ · /, ''), words, 'and it prints the PLANNED figure under it');
-    ok(textOf(frag) !== i18n.t('dash.stat.setAside', { amount: ctx.money(planned) }),
+    ok(textOf(frag) !== readable(i18n.t('dash.stat.setAside', { amount: ctx.money(planned) })),
       'not the hero\'s paid wording any more');
 
     /* The page's own sentence names the same Y — the tile and the sentence now

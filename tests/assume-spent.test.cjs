@@ -133,8 +133,10 @@ async function mount(files = FILES, period = '2026-07') {
     ctx.renderDashboard();
     const dash = $('#dashBudget').textContent;
     ok(dash.includes(CARRY), 'the Dashboard category table still lists the carried row');
-    // budget 2500, actual 2500 -> remaining 0.00, and no red.
-    ok(dash.includes('R 0.00'),
+    // budget 2500, actual 2500 -> the Budget page's own words for a carried row
+    // ("already spent", 2026-10-20 audit D2-05: the Dashboard's Remaining cell
+    // reads the Budget page's sentences now), and no red.
+    ok(dash.includes('already spent') && !dash.includes('R 2500.00 left'),
       'the Dashboard shows the carried row as fully consumed rather than fully available');
   }
 

@@ -15,7 +15,9 @@
        (--text-muted) and through the fills (the progress bar), never through
        opacity on the cell.
      - `.badge-debt` in the light theme: #c2410c on its 14% orange tint over the
-       pale tile, 4.13:1.
+       pale tile, 4.13:1. (Since the 2026-10-20 audit, D2-23, the debt badge
+       reads the warning tokens, the same family as the Budget table's debt
+       dot; section 2 below now measures those tokens on their own fill.)
      - `.badge-giving` in the dark theme: #e83e8c on its 14% pink tint, 4.47:1.
      - inline `code` chips: --ink-faint on the chip's 7% tint over the pale tile,
        4.39:1 and 4.49:1.
@@ -86,17 +88,22 @@ for (const r of rules) {
   ok(c && c.value === 'var(--text-muted)', `a settled row is quieter through its ink token: ${R} .debt-settled td { color: var(--text-muted) }, found ${c ? c.value : 'nothing'}`);
 }
 
-/* ---- 2. light theme: the debt badge ---- */
+/* ---- 2. light theme: the debt badge ----
+   The badge reads the warning ink on the warning fill (2026-10-20 audit,
+   D2-23). Those two are semantic tokens, the same under every palette, and the
+   light fill is opaque, so one pair to measure: the root's own values. */
 {
-  const d = lastDecl(s => s === `${R}:not(.bud-dark) .badge-debt`, [], 'color');
-  ok(d, 'the light-theme .badge-debt colour rule exists');
-  if (d) {
-    const fg = hex(d.value);
-    for (const t of tokenSets.light) for (const base of LIGHT_BASES(t)) {
-      const bg = mix(base, hex('#f97316'), 0.14);   // the badge's own 14% orange tint
-      const q = ratio(fg, bg);
-      ok(q >= 4.5, `light .badge-debt ${d.value} on its tint over ${t.name} ${base.map(Math.round)} is ${q.toFixed(2)}:1 (< 4.5) at ${locate(d.r.line)}`);
-    }
+  const ink = lastDecl(s => s === `${R} .badge-debt`, [], 'color');
+  const fill = lastDecl(s => s === `${R} .badge-debt`, [], 'background');
+  ok(ink && ink.value === 'var(--color-warning-ink)' && fill && fill.value === 'var(--color-warning-light)',
+    `.badge-debt reads the warning tokens (ink + fill), found ${ink && ink.value} on ${fill && fill.value}`);
+  ok(!lastDecl(s => s === `${R}:not(.bud-dark) .badge-debt`, [], 'color'), 'no light-theme hex override is left on .badge-debt');
+  const rootTok = p => lastDecl(s => s === R, [], p);
+  const fg = rootTok('--color-warning-ink'), bg = rootTok('--color-warning-light');
+  ok(fg && bg && /^#/.test(fg.value) && /^#/.test(bg.value), 'the light root states the warning ink and fill as hex');
+  if (fg && bg) {
+    const q = ratio(hex(fg.value), hex(bg.value));
+    ok(q >= 4.5, `light .badge-debt ${fg.value} on ${bg.value} is ${q.toFixed(2)}:1 (< 4.5)`);
   }
 }
 

@@ -38,6 +38,15 @@ const { budgetRowStatus, budgetSpent } = require('./money-flow');
 const { splitRole } = require('./tx-role');
 const { stamp, LENSES } = require('./ledger');
 const { EXPORT_DIR, safeName, transactionsCsv } = require('./exporter');
+/* The share rule every "% used" in the app follows — see modelToDoc's Used
+   column (2026-10-20 audit, D2-09). */
+const { sharePercentLabel } = require('./share-percents');
+/* incomeDirection — the Budget page's three states for an income row (short of
+   plan, past it, exactly on it, to the cent), the one rule the Report already
+   words its income rows by; the PDF's Remaining reads it too (2026-10-20
+   audit, D2-05 / M1-03). report.js is pure and does not require this module,
+   so there is no cycle. */
+const { incomeDirection } = require('./report');
 
 /* The six spans the dialog offers, in calendar MONTHS — the same unit
    trend-math.js's periodsForMonths() converts for a weekly or fortnightly pay
@@ -171,8 +180,13 @@ const centsRow = r => ({ ...r, budget: cents(r.budget), actual: cents(r.actual),
 const spentOf = (s, given) => cents(given !== undefined && given !== null
   ? given
   : budgetSpent({ spend: s.spend, setAside: s.setAside }));
+/* `refunds` — every refund the budget lens kept (ledger.js tally, the
+   summaryInRange(start, end).refunds the Budget page's "R X in refunds not
+   taken off this figure" names), rounded here with the rest: gross `spend`,
+   and so `spent`, does not take them off, and the headline must say by how
+   much (2026-10-20 audit, M2-03, M2-04). */
 const centsSummary = (s, spent) => (s
-  ? { ...s, income: cents(s.income), spend: cents(s.spend), uncatSpend: cents(s.uncatSpend), spent: spentOf(s, spent) }
+  ? { ...s, income: cents(s.income), spend: cents(s.spend), uncatSpend: cents(s.uncatSpend), spent: spentOf(s, spent), refunds: cents(s.refunds) }
   : null);
 
 /* Per-type subtotals over the rows actually shown. `remaining` comes from
@@ -306,15 +320,20 @@ function buildModel({ periods, content, categories, includeTx, generated, curren
     subByType.set(s.type, cur);
   }
 
+  /* The period's own income/spend/uncategorised line is a statement about the
+     WHOLE period. Under a category filter it would sit above a table it no
+     longer describes, so it is withheld rather than mislabelled. Built once
+     per period, here, for both places that print it — the PDF's line over
+     each period table and the workbook's About sheet (`headlines`), which
+     holds it whatever the content, because the Summary sheet's category rows
+     leave uncategorised spend out in either (2026-10-20 audit, M2-04). */
+  const heads = list.map(p => (only ? null : centsSummary(p.summary, p.spent)));
   const budgets = content === 'full'
     ? list.map((p, i) => ({
       period: { key: p.key, name: p.name, title: p.title, start: p.start, end: p.end },
       rows: shown[i],
       subtotals: subtotalsOf(shown[i]),
-      /* The period's own income/spend/uncategorised line is a statement about
-         the WHOLE period. Under a category filter it would sit above a table
-         it no longer describes, so it is withheld rather than mislabelled. */
-      summary: only ? null : centsSummary(p.summary, p.spent),
+      summary: heads[i],
       /* The sentences the Budget page and the Dashboard hero print beside this
          period's Spent — what its assume-spent rows put into it and what a
          fund paid for outside it ([{ key, text, inline }], worded by the view
@@ -368,6 +387,12 @@ function buildModel({ periods, content, categories, includeTx, generated, curren
       periodFrom: first ? first.start : null, periodTo: last ? last.end : null,
     } : null,
     inProgress: inProgress && list.some(p => p.key === inProgress) ? inProgress : null,
+    /* Each period's headline — { key, name, income, spent, uncatSpend,
+       refunds } — read off the very objects `budgets[i].summary` holds. Empty
+       under a category filter, for the reason the line is withheld there. */
+    headlines: list.map((p, i) => (heads[i]
+      ? { key: p.key, name: p.name, income: heads[i].income, spent: heads[i].spent, uncatSpend: heads[i].uncatSpend, refunds: heads[i].refunds }
+      : null)).filter(Boolean),
     summary: { rows: summaryRows, subtotals: [...subByType.values()].map(finish).sort((a, b) => rank(a.type) - rank(b.type)) },
     budgets, transactions, foreignSymbols,
   };
@@ -479,6 +504,12 @@ const LABELS = {
   noteExactThrough: 'The range ends on {to}; the figures run through {through}, the day this was made.',
   sheetExact: 'Exact dates',
   sheetSummary: 'Summary', sheetBudget: 'Budget', sheetTransactions: 'Transactions', sheetAbout: 'About',
+  /* The About sheet's headline table (2026-10-20 audit, M2-04). */
+  /* An income row's Remaining in the PDF — the Budget page's own words
+     (bud.remaining.*), handed in translated by the view (D2-05). */
+  incomeMore: '{amount} more than planned', incomeToCome: '{amount} still to come', incomeAsPlanned: 'received as planned',
+  headlineHeading: 'Income and spending by period', income: 'Income', spent: 'Spent',
+  uncategorised: 'Uncategorised', refunds: 'Refunds not taken off',
 };
 const fill = (s, vars) => String(s).replace(/\{(\w+)\}/g, (m, k) => (k in vars ? String(vars[k]) : m));
 const labelsOf = over => Object.assign({}, LABELS, over || {});
@@ -514,11 +545,17 @@ function caveats(model, L) {
 /* The per-period sentences, each led by the period (or the exact window) it
    is about — for the About sheet, where nothing else says which period an
    assume-spent provision or a fund payout belongs to. */
+/* The refunds sentence is the one left out: it qualifies the Spent figure on
+   the PDF's line ("… this figure"), and on this sheet the headline table
+   carries the same amount in a column of its own, beside the Spent it is not
+   taken off — a sentence pointing at "this figure" from a row of its own would
+   point at nothing. */
 function periodCaveats(model) {
   const out = [];
-  for (const b of model.budgets) for (const c of b.caveats || []) out.push(`${b.period.name}: ${c.text}`);
+  const said = c => c.key !== 'refunds';
+  for (const b of model.budgets) for (const c of (b.caveats || []).filter(said)) out.push(`${b.period.name}: ${c.text}`);
   const x = model.exact;
-  if (x) for (const c of x.caveats || []) out.push(`${x.from} to ${x.through}: ${c.text}`);
+  if (x) for (const c of (x.caveats || []).filter(said)) out.push(`${x.from} to ${x.through}: ${c.text}`);
   return out;
 }
 
@@ -626,6 +663,21 @@ function modelToSheets(model, { symbolFor, labels } = {}) {
     for (const t of model.transactions) rows.push([t.date, t.desc || '', t.label || '', t.cat || '', sym(t), m(t.amount), txFlag(t, L), t.note || '']);
     sheets.push({ name: L.sheetTransactions, rows, freezeRows: 1, widths: [12, 40, 18, 22, 9, 14, 14, 30] });
   }
+  /* THE HEADLINE, as numbers (2026-10-20 audit, M2-04). The PDF prints each
+     period's "Income · Spent · Uncategorised" line over its table; the
+     workbook printed it nowhere, and its Summary sheet lists category rows
+     only — so a tax-year workbook that left a fifth of the year's spend out as
+     uncategorised said nothing about it. One row per period (the running one
+     marked, as on every other sheet), and the exact-dates window first when
+     there is one, as the PDF puts it first: what came in, Spent (the Budget
+     page's Total spent, the PDF line's), what of the spend sits under no
+     category, and the refunds that figure does not take off. Read off the
+     model's own headline objects — the PDF's — so the two renderings print
+     one figure. Withheld under a category filter, as the PDF line is. */
+  const headline = [];
+  const x = model.exact;
+  if (x && x.totals) headline.push([`${x.from} to ${x.through}`, m(x.totals.income), m(x.totals.spent), m(x.totals.uncatSpend), m(x.totals.refunds)]);
+  for (const h of model.headlines || []) headline.push([lab(h), m(h.income), m(h.spent), m(h.uncatSpend), m(h.refunds)]);
   const about = [
     [{ v: model.content === 'full' ? L.title : L.titleSummary, s: 'bold' }],
     [L.range, model.rangeLabel],
@@ -633,12 +685,21 @@ function modelToSheets(model, { symbolFor, labels } = {}) {
     [L.currency, model.currency],
     [L.categories, model.filtered ? model.categories.join(', ') : L.allCategories],
     [],
+    ...(headline.length ? [
+      [{ v: L.headlineHeading, s: 'bold' }],
+      head([L.period, L.income, L.spent, L.uncategorised, L.refunds]),
+      ...headline,
+      [],
+    ] : []),
     ...exactNotes(model, L).map(c => [c]),
     ...caveats(model, L).map(c => [c]),
     ...periodCaveats(model).map(c => [c]),
     ...(model.transactions ? [[L.noteTx]] : []),
   ];
-  sheets.push({ name: L.sheetAbout, rows: about, widths: [16, 60] });
+  /* Column A holds the labels and the period names (a window's "2026-03-01 to
+     2027-02-28" is 24 characters); B to E the headline's figures. A sentence
+     in column A runs on over the empty cells beside it, as it always did. */
+  sheets.push({ name: L.sheetAbout, rows: about, widths: [26, 16, 16, 16, 20] });
   return sheets;
 }
 
@@ -652,7 +713,7 @@ function modelToSheets(model, { symbolFor, labels } = {}) {
    Past PDF_MAX_PERIOD_COLS periods the month columns are dropped and the page
    SAYS so: pdf.js will shrink a table's type to fit, but fifteen money columns
    on A4 shrink past reading, and an "all" export can be sixty. */
-function modelToDoc(model, { money, rowMoney, plainMoney, labels } = {}) {
+function modelToDoc(model, { money, rowMoney, plainMoney, labels, decimal } = {}) {
   const L = labelsOf(labels);
   /* Every amount reaches the injected formatter through `cents`, the helper
      the CSV and the workbook print through — formatAmount's toFixed then
@@ -749,13 +810,34 @@ function modelToDoc(model, { money, rowMoney, plainMoney, labels } = {}) {
        "remaining" figures. Said once, and the column left blank. */
     const planned = b.rows.some(r => Number(r.budget) > 0);
     if (!planned && b.rows.length) blocks.push({ type: 'note', text: L.noteNoBudget });
-    const rem = x => (planned && showsRemaining(x) ? fmt(x.remaining) : '');
+    /* An INCOME row with a plan — and an income subtotal, which is one that
+       happens to be a sum — in the Budget page's words, never a signed
+       figure (2026-10-20 audit, D2-05, the Report's M1-03 in this rendering):
+       "R -2 000,00" under a pay line that beat its plan read as an overspend,
+       and income still to come read like money left to spend. Same rule as
+       the page and the Report (incomeDirection), same keys. The PDF only:
+       the workbook and the CSV keep the signed number, which a spreadsheet
+       adds up and a sentence in a money column would turn into zero. */
+    const rem = x => {
+      if (!(planned && showsRemaining(x))) return '';
+      if (x.type !== 'income' || !(Number(x.budget) > 0)) return fmt(x.remaining);
+      const dir = incomeDirection(x.remaining);
+      if (dir === 'as_planned') return L.incomeAsPlanned;
+      return fill(dir === 'more_than_planned' ? L.incomeMore : L.incomeToCome, { amount: fmt(Math.abs(Number(x.remaining) || 0)) });
+    };
+    /* Used, by the share rule (2026-10-20 audit, D2-09). A bare Math.round put
+       997 of a 1 000 budget at "100%" beside a Remaining still above zero, and
+       a real R 3 at "0%" — the two boundaries where a whole percent states the
+       opposite of the truth. sharePercentLabel keeps the whole percent
+       everywhere else and adds the decimal only there, in the household's
+       mark (`decimal`, handed in by the view; a point without one). */
+    const usedOf = r => (Number(r.budget) > 0
+      ? `${sharePercentLabel((Number(r.actual) || 0) / Number(r.budget), decimal || '.')}%` : '');
     const tRows = [], bold = [];
     for (const g of grouped(b.rows, b.subtotals)) {
       if (g.row) {
         const r = g.row;
-        tRows.push([r.cat, r.type || '', fmt(r.budget), fmt(r.actual), rem(r),
-          Number(r.budget) > 0 ? `${Math.round((Number(r.actual) || 0) / Number(r.budget) * 100)}%` : '']);
+        tRows.push([r.cat, r.type || '', fmt(r.budget), fmt(r.actual), rem(r), usedOf(r)]);
       } else {
         const t = g.sub;
         bold.push(tRows.length);

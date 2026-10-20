@@ -139,11 +139,12 @@ atAuditDate(async () => {
   const btnLabels = figBtns.map(b => textOf(b));
   ok(btnLabels.some(t => /of essential spending covered/.test(t)),
     'the emergency-cover tile is now a real button — audit finding #4');
-  ok(btnLabels.some(t => /of income saved/.test(t)),
+  /* "of budget income" since the 2026-10-20 audit: the base the Score names. */
+  ok(btnLabels.some(t => /of budget income saved/.test(t)),
     'the saving-rate tile is now a real button too — audit finding #4');
 
   const emergencyBtn = figBtns.find(b => /of essential spending covered/.test(textOf(b)));
-  const savingBtn = figBtns.find(b => /of income saved/.test(textOf(b)));
+  const savingBtn = figBtns.find(b => /of budget income saved/.test(textOf(b)));
   emergencyBtn.click();
   ok(switchViewCalls.includes('accounts'),
     'and clicking it routes to Accounts, where emergency_fund: is set — audit finding #4');
@@ -153,7 +154,7 @@ atAuditDate(async () => {
 
   /* Debt and score were already links — pinned so this file would catch a
      regression on THEM too, not only on the two that were fixed. */
-  const debtBtn = figBtns.find(b => /of income to debt interest/.test(textOf(b)));
+  const debtBtn = figBtns.find(b => /of budget income to debt interest/.test(textOf(b)));
   const scoreBtn = figBtns.find(b => /financial score/.test(textOf(b)));
   ok(debtBtn && scoreBtn, 'debt and score remain real buttons (unchanged by this fix)');
 

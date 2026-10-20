@@ -10,7 +10,8 @@ const { csvCell } = require('../csv');
 const { askFields, askSplit, confirmModal } = require('../modal');
 const { transactionsCsv, categoriesCsv, transactionsMarkdown, categoriesMarkdown, exportPaths, appendTransactionsLog } = require('../exporter');
 const { ISO_DATE, todayIso, nowLocalMinute } = require('../dates');
-const { symbolOf } = require('../currency');
+const { symbolOf, formatSigned } = require('../currency');
+const { localeFor } = require('../locale');
 const { applySplit, splitRole, splitShortfall, SPLIT_PARENT, isSplitPart } = require('../tx-role');
 const { prepareRules, matchRule } = require('../rules');
 /* Namespace import: this file binds `t` as a local (`const t = $('#txTable')`). */
@@ -67,6 +68,52 @@ module.exports = function registerTransactions(ctx) {
   };
   const rowSymbolIsOneChar = r => Array.from(rowPrintedSymbol(r)).length === 1;
 
+  /* A row amount is a FLOW, and prints in the one form this app gives a signed
+     flow: "−R 50,00" / "+R 410,00", the sign BEFORE the symbol, a true minus
+     (U+2212) rather than a hyphen (2026-10-20 audit, D2-04, D1-12, MT-02).
+
+     The column used to mix two forms. Income read "+R 410,00", the plus drawn
+     by a CSS ::before; spending read "R -50,00" — money()'s BALANCE form, the
+     hyphen after the symbol — while the Dashboard and the Accounts page print
+     the same kind of figure as "−R 3 922". currency.js's header states the
+     rule: a balance prints "R -500", a signed flow prints through
+     formatSigned. A transaction is money that moved, not a balance. The plus
+     was also generated content, so it was in no textContent: a copied column,
+     a test and most screen readers read income and spending as "R 410,00"
+     and "R -50,00".
+
+     formatSigned writes the minus and never a plus. The plus is added by the
+     SAME rounding rule, not a second one: a positive amount carries a plus
+     exactly when its negation would carry formatSigned's minus — so a figure
+     that rounds to nothing ("R 0,00") carries neither, which is the line
+     formatSigned draws ("a minus must not outlive the rounding that erased
+     the number it belonged to") applied to both signs.
+
+     The symbol is the one rowMoney() prints for this row (the account's own
+     when it differs from the household's, the household's otherwise), so a
+     euro row reads "−€ 900,00", never rand. formatSigned prints its digits
+     through currency.js formatAmount, which is byte-for-byte controller.js's
+     formatMoney (tests/controller-money.test.cjs holds the two together), so
+     the separators cannot drift from the money() the rest of the page uses.
+
+     Display only. The Amount the file holds is never touched by any of this:
+     serializeTxFile writes the number (or its raw text) as it was read. */
+  const rowFlowSymbol = r => {
+    const sym = r ? rowSymbol(r) : '';
+    const household = (S.settings || {}).currency;
+    return !sym || sym === household || typeof ctx.moneyIn !== 'function' ? household : sym;
+  };
+  function rowFlow(v, r) {
+    const n = Number.isFinite(Number(v)) ? Number(v) : 0;
+    /* ctx.locale is controller.js's localeFor(S.settings.country), resolved
+       per call; the same expression stands in where a ctx was built without
+       it, so the separators are the country's either way. */
+    const loc = typeof ctx.locale === 'function' ? ctx.locale() : localeFor((S.settings || {}).country);
+    const sym = rowFlowSymbol(r);
+    const text = formatSigned(sym, n, 2, loc);
+    return n > 0 && formatSigned(sym, -n, 2, loc) !== text ? `+${text}` : text;
+  }
+
   /* Is this row's Amount a cell the loader could not read AT ALL — as opposed
      to one merely written in a non-canonical format ("1 234,56", "R1,234.56")
      that normalizeAmount reads correctly and the loader keeps in amountRaw for
@@ -84,15 +131,36 @@ module.exports = function registerTransactions(ctx) {
      does this for a balance (acct.balance.unreadable). The cell cannot be
      fixed here — the amount is the one column this table never edits — so the
      chip names the file that can. `num` stays the first class: the figures
-     harness addresses the cell as td.num[4]. */
+     harness addresses the cell as td.num[4] (and a readable amount's figure as
+     td.num[4]/span.tx-amt, its sign being the cell's own text before it). */
   function amountCell(item) {
-    const r = item._row;
+    /* The ITEM, not item._row: the item is the row as filteredRows() hands it
+       out, the same values plus the account `label` it was read from, and
+       rowSymbol() resolves the row's currency from that label. The raw row
+       carries no label, so this cell used to resolve every row to the
+       household's symbol — a €900 hotel bill on a euro account printed as
+       "R -900,00", the very assertion rowSymbol's own header says this page
+       must never make (found beside 2026-10-20 audit D2-04). The amount is
+       never edited on this page, so the item's copy of it is the row's. */
+    const r = item;
     if (amountUnreadable(r)) {
       return el('td', { class: 'num text-warning' }, r.amountRaw, ' ',
         caveatChip(i18n.t('tx.amount.unreadable'),
           i18n.t('tx.amount.unreadableWhy', { raw: r.amountRaw, file: txFileRel(item._file.label, item._file.month) })));
     }
-    return el('td', { class: `num${r.amount > 0 ? ' text-success' : ''}${rowSymbolIsOneChar(r) ? ' st-cur1' : ''}` }, rowMoney(r.amount, r));
+    /* The sign is the cell's own TEXT, ahead of the figure, and the figure is
+       a span that starts with the currency symbol. The statement sheet mutes
+       the symbol with ::first-letter (src/statement/transactions.css), which
+       takes the FIRST letter of the box it is set on; set on the whole cell it
+       would now shrink the sign. It is set on .tx-amt instead, whose first
+       letter is the symbol whatever the sign. The cell reads "−R 50,00" as one
+       string to anything that reads text. A figure that rounds to nothing has
+       no sign at all. */
+    const text = rowFlow(r.amount, r);
+    const sign = text.charAt(0) === '+' || text.charAt(0) === '−' ? text.charAt(0) : '';
+    return el('td', { class: `num${r.amount > 0 ? ' text-success' : ''}${rowSymbolIsOneChar(r) ? ' st-cur1' : ''}` },
+      sign ? [sign] : [],
+      el('span', { class: 'tx-amt' }, text.slice(sign.length)));
   }
 
   /* Category changes made here teach the auto-categoriser too (not just the
@@ -588,10 +656,11 @@ module.exports = function registerTransactions(ctx) {
           }
           mark();
         }, i18n.t('tx.aria.category', { date: r.date, desc: r.desc }))),
-        /* Weight, colour and the sign of an income row are the statement
-           stylesheet's (src/statement/transactions.css): spending sits at 500
-           in the text colour, income is green. No inline weight here, because
-           an inline style would beat the stylesheet. `num` stays the first
+        /* Weight and colour are the statement stylesheet's
+           (src/statement/transactions.css): spending sits at 500 in the text
+           colour, income is green. No inline weight here, because an inline
+           style would beat the stylesheet. The sign is the cell's own text now
+           (amountCell, rowFlow), not the stylesheet's. `num` stays the first
            class: the figures harness addresses this cell as td.num[4]. */
         amountCell(item),
         el('td', {}, excludedCell(item, mark)),
@@ -657,10 +726,17 @@ module.exports = function registerTransactions(ctx) {
        applySplit refuses the same case as the authority on roles; this is the
        half that says so. */
     if (splitRole(r.split)) return toast(i18n.t('tx.split.part'), true);
+    /* The dialog prints the line it is splitting and the running remainder
+       ("Unallocated: …", "Allocated … — balanced") through the formatter it is
+       handed. Both are parts of this row's flow, so they print as one
+       (rowFlow, 2026-10-20 audit, D2-04) — and in the row's OWN symbol, read
+       off the item, which carries the account label the raw row does not: it
+       was handed the household's money(), so a €900 line was offered for
+       splitting as "R -900,00". */
     const parts = await askSplit(app, {
       tx: { date: r.date, desc: r.desc, label: item.label, amount: r.amount, cat: r.cat },
       categories: S.categories.map(c => c.name),
-      money,
+      money: v => rowFlow(v, item),
     });
     if (!parts) return;
 
@@ -773,7 +849,7 @@ module.exports = function registerTransactions(ctx) {
        "R0.00 unaccounted" to every healthy split would teach the reader to
        stop reading the clause that matters. */
     const label = i18n.t('tx.split.chip', { count: parts.length })
-      + (gap ? ' · ' + i18n.t('tx.split.chipGap', { amount: rowMoney(Math.abs(gap), r) }) : '');
+      + (gap ? ' · ' + i18n.t('tx.split.chipGap', { amount: rowMoney(Math.abs(gap), item) }) : '');
     /* A real <button>, so it is in the tab order and takes the focus ring for
        free. caveat-chip-btn rather than a class of its own: it is dom.js's own
        pill button, already legible in both themes with a :focus-visible
@@ -815,7 +891,7 @@ module.exports = function registerTransactions(ctx) {
     const parts = splitPartsOf(f, r);
     const go = await confirmModal(app, {
       title: i18n.t('tx.unsplit.title'),
-      message: i18n.t('tx.unsplit.msg', { count: parts.length, desc: r.desc, amount: rowMoney(r.amount, r) }),
+      message: i18n.t('tx.unsplit.msg', { count: parts.length, desc: r.desc, amount: rowFlow(r.amount, item) }),
       confirmText: i18n.t('tx.unsplit.action'),
     });
     if (!go) return;
@@ -906,7 +982,7 @@ module.exports = function registerTransactions(ctx) {
     const go = await confirmModal(app, {
       title: i18n.t('tx.delete.title'),
       message: i18n.t('tx.delete.msg', {
-        date: r.date, desc: r.desc, amount: rowMoney(r.amount, r), file: txFileRel(f.label, f.month),
+        date: r.date, desc: r.desc, amount: rowFlow(r.amount, item), file: txFileRel(f.label, f.month),
       }) + ' ' + detail,
       confirmText: i18n.t('tx.delete.confirm'),
     });
@@ -1353,7 +1429,9 @@ module.exports = function registerTransactions(ctx) {
     if (!S.txFiles[key]) S.txFiles[key] = { label, month, rows: [], dirty: false, fmRaw: TX_FM };
     S.txFiles[key].rows.push(row);
     renderTransactions();
-    toast(i18n.t('tx.add.done', { amount: money(amount), account: label, month }));
+    /* The row just added, named as the flow it is and in its account's own
+       symbol (rowFlow) — the form the table it lands in prints it in. */
+    toast(i18n.t('tx.add.done', { amount: rowFlow(amount, { label }), account: label, month }));
   }
 
   /* Guarded per-file, deliberately not around the whole loop-plus-learn: a

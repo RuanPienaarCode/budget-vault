@@ -29,7 +29,8 @@ function tile(nodes) {
   const btn = find(nodes.get('#dashPositionKpis'), n => n.attrs && n.attrs['data-fig'] === 'pos-owed')[0];
   const mini = btn && btn._parent;
   const sub = mini ? find(mini, n => n._cls && n._cls.has('s'))[0] : null;
-  return { value: textOf(btn), sub: textOf(sub), say: btn ? btn.attrs['aria-label'] : '' };
+  // getAttribute, not attrs[]: the stub reads U+00A0 (a glued figure) back as a space.
+  return { value: textOf(btn), sub: textOf(sub), say: btn ? btn.getAttribute('aria-label') : '' };
 }
 
 (async () => {

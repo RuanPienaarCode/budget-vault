@@ -39,6 +39,9 @@ const { pinClock } = require('./helpers/figures.cjs');
 const { mountFor, createReport, section, kids, text } = require('./helpers/report-page.cjs');
 const { SEED, B, TODAY, PERIOD } = require('./figures/household.cjs');
 const report = require('../src/report');
+/* Headings read through t(): they are the language's words, and moved to
+   sentence case on 2026-10-20 (D2-20). */
+const i18n = require('../src/i18n');
 
 let checks = 0;
 const ok = (c, m) => { assert.ok(c, m); checks++; };
@@ -71,7 +74,7 @@ async function run(files, opts, pill = 'current') {
     const { ctx } = r.M;
     const printed = ctx.moneyIn('€', 200300, 0);
     ok(/200.300/.test(printed) && !/200300/.test(printed), `fixture: the app groups it — "${printed}"`);
-    const nw = section(r.md, 'Net Worth');
+    const nw = section(r.md, i18n.t('report.section.netWorth'));
     ok(nw.includes(`Plus ${printed} held in other currencies`), `the Report prints it the same way — got "${nw.replace(/\n+/g, ' | ')}"`);
     ok(!/200300/.test(r.md), 'and nowhere ungrouped');
   }
@@ -117,7 +120,7 @@ async function run(files, opts, pill = 'current') {
     eq(active, [], `no image survives anywhere in the document — ${active.slice(0, 2).join(' || ')}`);
     ok(!r.md.includes(`![s](${P})`), 'the payload is not present raw');
     ok(r.md.includes('\\!\\[s\\](https://attacker.example/p.png)'), 'it is present as text: escaped, so the reader sees what the household typed');
-    const detail = section(r.md, 'Transaction Detail');
+    const detail = section(r.md, i18n.t('report.section.transactions'));
     const row = detail.split('\n').find(l => l.includes('Dollar shop'));
     /* escMdText writes a pipe as &#124;, so every "|" left in a row is a cell edge. */
     eq(row.split('|').length, detail.split('\n').find(l => l.startsWith('| Date')).split('|').length,
