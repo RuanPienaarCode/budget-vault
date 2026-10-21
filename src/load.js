@@ -5,7 +5,7 @@ const { TFile } = require('obsidian');
 const { TYPE_ORDER, overspendLag, emergencyTarget, inputMode } = require('./constants');
 const { periodDaysOrZero } = require('./dates');
 const { parseNum, normalizeAmount } = require('./amount');
-const { normalizeCode, normalizeCadence } = require('./fx');
+const { normalizeCode, normalizeCadence, currencyConflict } = require('./fx');
 const { parseFrontmatter, parseMdTableWithSeparator, unescMd,
   splitAroundTable, extraContent, headingOf, findTable } = require('./markdown');
 const { parseDelimited, sniffDelimiter, uncsvCell } = require('./csv');
@@ -333,14 +333,8 @@ module.exports = function registerLoad(ctx) {
         /* ADR-0007 · currency_conflict is decided at load. A home symbol with a foreign code was
            HOME to currency.js and FOREIGN to fx.js (R1 000 vs R17 985,61); flagged here, where
            both halves are in scope, only for the contradictory case. */
-        ...(((sym, code) => {
-          const home = String(S.settings.currency || '').trim();
-          const homeCode = normalizeCode(S.settings.currency_code);
-          const claimsHome = !sym || sym === home;
-          return (claimsHome && code && homeCode && code !== homeCode)
-            ? { currency_conflict: { symbol: sym || home, code, homeCode } }
-            : {};
-        })(String(fm.currency || '').trim(), normalizeCode(fm.currency_code))),
+        ...((clash => (clash ? { currency_conflict: clash } : {}))(
+          currencyConflict(fm.currency, fm.currency_code, S.settings.currency, S.settings.currency_code))),
         /* Warnings this account has been told to stay quiet about — `true`, or
            a list like [no-transactions, unconfirmed]. Kept as the raw string;
            acct-status.js owns what the words mean, so there is one parser

@@ -185,6 +185,21 @@ function normalizeCode(v) {
   return /^[A-Z]{3}$/.test(s) ? s : '';
 }
 
+/* An account whose two currency fields contradict each other: a symbol that
+   claims the household's currency (or says nothing, which means the same) and
+   a code that names another. Returns what the badge needs to say, or null.
+
+   ADR-0007 decides this at load, where both halves are in scope; the account
+   dialogs decide it again through this same function after a save, so a code
+   typed into the form is judged by the one rule a reload would apply. */
+function currencyConflict(symbol, code, homeSymbol, homeCode) {
+  const sym = String(symbol == null ? '' : symbol).trim();
+  const home = String(homeSymbol == null ? '' : homeSymbol).trim();
+  const own = normalizeCode(code), hc = normalizeCode(homeCode);
+  const claimsHome = !sym || sym === home;
+  return claimsHome && own && hc && own !== hc ? { symbol: sym || home, code: own, homeCode: hc } : null;
+}
+
 /* The code an ACCOUNT's balance is denominated in, or '' when this vault has
    not said enough for anyone to know.
 
@@ -395,7 +410,7 @@ function canConvert(settings, table) {
 module.exports = {
   STALE_AFTER_DAYS, REFRESH_AFTER_DAYS, normalizeCadence, refreshAfterDays, refreshDue,
   RETRY_AFTER_FAILURE_MS, requestAllowed,
-  codeForCountry, CODE_BY_SYMBOL, codeForSymbol, daysBetweenIso, normalizeCode, codeOf, normalizeTable,
+  codeForCountry, CODE_BY_SYMBOL, codeForSymbol, daysBetweenIso, normalizeCode, codeOf, currencyConflict, normalizeTable,
   rateBetween, convert, stalenessOf, convertAccounts, canConvert,
   MAX_CROSS_RATE,
 };
