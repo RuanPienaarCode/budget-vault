@@ -22,6 +22,9 @@ const { balanceReadable } = require('../figures');
 /* isForeign beside them for the money sorters below: they ask splitByCurrency's
    own question of one account at a time. */
 const { symbolOf, isForeign, splitByCurrency: splitAccounts, primaryTotal, otherHoldings } = require('../currency');
+/* The account's currency CODE, for the two dialogs: read the way load.js reads
+   it, and judged against the symbol by the same rule. */
+const { normalizeCode, codeForSymbol, currencyConflict } = require('../fx');
 /* What an account is worth against what was put into it, derived from its own
    transactions rather than a stale hand-typed total_invested. Shared with
    views/savings.js — see savings-math.js's own header for why
@@ -233,6 +236,48 @@ module.exports = function registerAccounts(ctx) {
       ] }]
     : []);
 
+  /* The symbol and the code, side by side on both dialogs. The symbol's
+     description depends on whether exchange rates are on: off, a symbol only
+     relabels; on, the code below it is what gets the account converted.
+
+     The code's placeholder is a hint, never a value: the household's code for
+     an account in the household currency, or the one code an unambiguous
+     symbol names (€ is EUR; $ names four, so it suggests nothing). Leaving it
+     greyed out rather than prefilled means OK on an untouched dialog writes
+     no code nobody chose. */
+  const currencyFields = a => {
+    const sym = String((a && a.currency) || '').trim();
+    const hint = isForeign(a, S.settings.currency) ? codeForSymbol(sym) : normalizeCode(S.settings.currency_code);
+    return [
+      { key: 'currency', label: i18n.t('acct.field.currency'), type: 'text', value: a ? a.currency : undefined,
+        placeholder: S.settings.currency,
+        desc: i18n.t(S.settings.exchange_rates ? 'acct.field.currencyDescRates' : 'acct.field.currencyDesc',
+          { symbol: S.settings.currency }) },
+      { key: 'currency_code', label: i18n.t('acct.field.currencyCode'), type: 'text',
+        value: a ? a.currency_code : undefined, placeholder: hint,
+        desc: i18n.t('acct.field.currencyCodeDesc') },
+    ];
+  };
+  /* The typed code, upper-cased, or '' for blank — and `null` for something
+     that is not a three-letter code. normalizeCode alone would turn "RMB " into
+     "RMB" but "yuan" into '', and '' means "remove the line": a typo would
+     quietly delete the code the reader was trying to set. So a non-empty entry
+     that normalises to nothing is refused, and the dialog saves nothing. */
+  const readCode = raw => {
+    const typed = String(raw == null ? '' : raw).trim();
+    if (!typed) return '';
+    return normalizeCode(typed) || null;
+  };
+  /* Re-decide the symbol/code contradiction after a save, through the rule
+     load.js applies. Without it a code typed into the dialog would sit
+     un-judged until the next reload: counted at par in the meantime if it
+     contradicts the symbol, or still badged after the reader fixed it. */
+  const restampConflict = a => {
+    const clash = currencyConflict(a.currency, a.currency_code, S.settings.currency, S.settings.currency_code);
+    if (clash) a.currency_conflict = clash;
+    else delete a.currency_conflict;
+  };
+
   /* Which optional fields belong to which kind of account.
 
      The form used to offer all eleven to every type, so opening a cash wallet
@@ -293,6 +338,11 @@ module.exports = function registerAccounts(ctx) {
     // Absent means "the household's", so an account left on the default keeps
     // a frontmatter block free of a line that says nothing.
     currency: a => (a.currency ? yamlStr(a.currency) : null),
+    /* Absent means "the symbol's own currency": the household's code for a
+       household account, unconvertible for a foreign one (fx.js codeOf). The
+       model holds only normalised codes, so a hand-typed line the loader could
+       not read stays '' on both sides of the diff and is never rewritten. */
+    currency_code: a => (a.currency_code ? yamlStr(a.currency_code) : null),
     // Written raw, not through yamlStr: the value is either `true` or a YAML
     // flow list, and quoting either would turn it into a string that reads
     // back as one unrecognised word and mutes nothing.
@@ -664,9 +714,7 @@ module.exports = function registerAccounts(ctx) {
         desc: i18n.t('acct.field.numberDesc') },
       { key: 'tx_label', label: i18n.t('acct.field.folder'), type: 'text', value: a.tx_label,
         desc: i18n.t('acct.field.folderDesc', { name: a.name }) },
-      { key: 'currency', label: i18n.t('acct.field.currency'), type: 'text', value: a.currency,
-        placeholder: S.settings.currency,
-        desc: i18n.t('acct.field.currencyDesc', { symbol: S.settings.currency }) },
+      ...currencyFields(a),
       { key: 'budget', label: i18n.t('acct.field.counts'), type: 'select',
         value: a.in_budget ? 'yes' : 'no',
         options: [{ value: 'yes', label: i18n.t('acct.counts.yes') },
@@ -686,6 +734,10 @@ module.exports = function registerAccounts(ctx) {
        real option still beats a bare "Invalid type" for whoever hits it. */
     if (!ACCT_TYPES.includes(r.type)) {
       return toast(i18n.t('acct.err.type', { field: i18n.t('acct.field.type'), example: i18n.t('acctType.savings') }), true);
+    }
+    const code = readCode(r.currency_code);
+    if (code === null) {
+      return toast(i18n.t('acct.err.code', { field: i18n.t('acct.field.currencyCode'), example: 'CNY' }), true);
     }
     /* Only the fields this dialog actually SHOWED are read back. A field the
        type hid was never on screen, so treating its absent result as "the user
@@ -719,6 +771,7 @@ module.exports = function registerAccounts(ctx) {
     /* Blank means "the household's" — stored as empty, which FM_WRITERS turns
        into a removed key rather than a line asserting the default. */
     a.currency = (r.currency || '').trim();
+    a.currency_code = code;
     /* Serialised in WARNINGS order rather than the order the toggles happened
        to be flipped, so switching one off and back on again does not rewrite
        the line and show up as a diff in a file the reader syncs. `true` when
@@ -763,6 +816,9 @@ module.exports = function registerAccounts(ctx) {
       Object.assign(a, before);
       return;
     }
+    // After the write, not before: a failed save puts `before` back, and
+    // Object.assign cannot take away a flag that `before` never had.
+    restampConflict(a);
     // ctx.render, not renderAccounts: a type change moves the account between
     // groups here AND changes whether Savings & Investments shows it at all.
     ctx.render();
@@ -2515,6 +2571,7 @@ module.exports = function registerAccounts(ctx) {
     // collects and then throws away.
     if (a.owner) lines.push(`owner: ${yamlStr(a.owner)}`);
     if (a.currency) lines.push(`currency: ${yamlStr(a.currency)}`);
+    if (a.currency_code) lines.push(`currency_code: ${yamlStr(a.currency_code)}`);
     if (a.ignore_warnings) lines.push(`ignore_warnings: ${a.ignore_warnings}`);
     lines.push(`balance: ${a.balance.toFixed(2)}`);
     if (a.balance_updated) lines.push(`balance_updated: ${a.balance_updated}`);
@@ -2583,9 +2640,7 @@ module.exports = function registerAccounts(ctx) {
       { key: 'institution', label: i18n.t('acct.field.institution'), type: 'text', placeholder: i18n.t('acct.new.institutionPlaceholder') },
       ...ownerField(defaults && defaults.owner),
       { key: 'balance', label: i18n.t('acct.field.balance'), type: 'number', value: '0' },
-      { key: 'currency', label: i18n.t('acct.field.currency'), type: 'text',
-        placeholder: S.settings.currency,
-        desc: i18n.t('acct.field.currencyDesc', { symbol: S.settings.currency }) },
+      ...currencyFields(null),
       ...(opt.includes('goal_amount')
         ? [{ key: 'goal_amount', label: i18n.t('acct.field.goalOpt'), type: 'number',
           desc: i18n.t('acct.field.goalOptDesc') }] : []),
@@ -2608,6 +2663,11 @@ module.exports = function registerAccounts(ctx) {
     if (S.accounts.some(a => a.name.toLowerCase() === name.toLowerCase())) { toast(i18n.t('acct.err.exists'), true); return null; }
     if (!ACCT_TYPES.includes(r.type)) {
       toast(i18n.t('acct.err.type', { field: i18n.t('acct.field.type'), example: i18n.t('acctType.savings') }), true);
+      return null;
+    }
+    const code = readCode(r.currency_code);
+    if (code === null) {
+      toast(i18n.t('acct.err.code', { field: i18n.t('acct.field.currencyCode'), example: 'CNY' }), true);
       return null;
     }
 
@@ -2641,6 +2701,7 @@ module.exports = function registerAccounts(ctx) {
       owner: (r.owner || '').trim(),
       account_number: '', tx_label: '',
       currency: (r.currency || '').trim(),
+      currency_code: code,
       // Nothing muted on a fresh account: the warnings are how a new account
       // gets set up, so starting them off would hide the very prompts that
       // tell the reader to link a folder and import something.
@@ -2660,6 +2721,7 @@ module.exports = function registerAccounts(ctx) {
     // below is never pushed into S.accounts, so a failed write never leaves
     // the app showing an account with no file behind it.
     if (!(await saveAccount(acct))) return null;
+    restampConflict(acct);
     // Match the setup wizard: pre-create the account's transactions folder so
     // it's importable and visible in the file explorer right away.
     await ensureFolder(relPath(`Transactions/${name}`));
