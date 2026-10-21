@@ -3,6 +3,27 @@
 All notable changes to Budget Vault. Versions match the plugin version in
 `manifest.json` and the release tag exactly (no `v` prefix).
 
+## 1.55.0 — 2026-10-21
+
+Accounts held in another currency can now be converted without editing the
+account's note by hand.
+
+### Added
+
+- **A Currency code field on the account forms.** Edit account and New account
+  ask for the three-letter code (CNY, USD, EUR) under Currency. Exchange rates
+  need the code to convert an account, because one symbol can mean several
+  currencies. A typed code is saved in capitals, a blank clears it, and
+  anything that isn't a three-letter code is refused rather than quietly
+  deleting the code you had.
+
+### Changed
+
+- **The Currency field no longer says "nothing is converted" while exchange
+  rates are on.** It points you to the currency code instead.
+- **A code that contradicts the account's symbol is flagged as soon as you
+  save,** not after the next reload.
+
 ## 1.54.0 — 2026-10-20
 
 An audit of 1.53.0 for math, totals and design. Adding up the raw files still
