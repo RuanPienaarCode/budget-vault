@@ -112,11 +112,14 @@ function destinationProblem(folder, { configDir, budgetFolder } = {}) {
    WRITE side: the watcher reports what it saw (observeChange), and a write to
    a file the page has not read since refuses instead of overwriting.
 
-   Two records, both kept on the PLUGIN object (the same place `_lastWrite`
-   lives, for the same reason: main.js's Settings.md updater and the setup
-   wizard build their own io and must see the same facts as the view's):
+   Two records:
 
-     own    path -> [{ h, at }]   what THIS app wrote there, as a content hash.
+     own    path -> [{ h, at, by }] what THIS app wrote there, as a content
+                                  hash. Kept on the PLUGIN object (the same
+                                  place `_lastWrite` lives, for the same reason:
+                                  main.js's Settings.md updater and the setup
+                                  wizard build their own io and must be
+                                  recognised as this app by the view's).
                                   An event whose file now holds exactly one of
                                   those hashes is our own echo and is ignored;
                                   anything else is somebody else's edit.
@@ -125,11 +128,24 @@ function destinationProblem(folder, { configDir, budgetFolder } = {}) {
                                   2 s of ANY write (L3-02): a phone edit that
                                   arrived just after a Save was never loaded,
                                   and the next Save deleted it.
+                                  `by` is the io that wrote, and a write by
+                                  ANOTHER VIEW is not this view's echo: two
+                                  Budget tabs each hold their own load-time
+                                  copy, so tab A's Save is somebody else's edit
+                                  to tab B. Read as B's own, B never reloaded
+                                  and its next Save put B's old copy back over
+                                  A's — after A had said "Saved" (22 Oct 2026,
+                                  "the plan edit is gone later"). Writes by an
+                                  io that is no view (main.js, the wizard) stay
+                                  every view's echo, as before.
      stale  path -> { seq, folder } paths changed (or moved, or deleted) by
-                                  someone else since the page last read them.
-                                  Cleared per path by readFile (the caller now
-                                  holds the file's current bytes) and wholesale
-                                  by a completed full reload.
+                                  someone else since THIS io last read them —
+                                  one record per io, not per plugin, for the
+                                  same two-tab reason: B seeing A's write must
+                                  not refuse A's next Save of a file A holds
+                                  current. Cleared per path by readFile (the
+                                  caller now holds the file's current bytes)
+                                  and wholesale by a completed full reload.
 
    Hashes, not content: a month of transactions is tens of kilobytes and the
    record only has to answer "is this the thing I wrote". A 53-bit hash plus
@@ -151,7 +167,7 @@ function hashText(str) {
 }
 function ledgerOf(plugin) {
   if (!plugin._writeLedger) {
-    plugin._writeLedger = { own: new Map(), stale: new Map(), seq: 0, pending: new Set(), listeners: new Set() };
+    plugin._writeLedger = { own: new Map(), pending: new Set() };
   }
   return plugin._writeLedger;
 }
@@ -164,7 +180,10 @@ function ledgerOf(plugin) {
 const FRESH_WRITERS = ['settings.md', 'exchange rates.md'];
 const isTextPath = p => /\.(md|csv|txt|json)$/i.test(p);
 
-function makeIo({ vault, plugin }) {
+/* `view: true` is the io a Budget view watches the vault through (registerIo
+   below); main.js and the wizard build theirs without it. See the ledger's
+   `by` above for what the difference decides. */
+function makeIo({ vault, plugin }, { view = false } = {}) {
   // Write-guard timestamp lives on the plugin (not this closure) so writes made
   // outside the view — the Settings.md updater in main.js — can stamp it too and
   // be recognised as our own, suppressing a redundant watcher reload.
@@ -175,6 +194,11 @@ function makeIo({ vault, plugin }) {
      the ledger above — but lastWriteAt() is still published and must not lie. */
   const stampWrite = () => { plugin._lastWrite = Date.now(); };
   const L = ledgerOf(plugin);
+  /* This io's identity in the shared own-record, and its private records. */
+  const me = { view };
+  const rec = { stale: new Map(), seq: 0, listeners: new Set() };
+  // An own-record entry is this io's echo if this io wrote it, or no view did.
+  const mine = e => e.by === me || !(e.by && e.by.view);
 
   const basePath = () => normalizePath(plugin.settings.budgetFolder);
   const relPath = p => normalizePath(basePath() + '/' + p);
@@ -190,7 +214,7 @@ function makeIo({ vault, plugin }) {
     const k = keyOf(path);
     const now = Date.now();
     const list = (L.own.get(k) || []).filter(e => now - e.at < OWN_TTL_MS);
-    const entry = { h: mark, at: now };
+    const entry = { h: mark, at: now, by: me };
     list.push(entry);
     if (list.length > 8) list.shift();
     L.own.set(k, list);
@@ -205,7 +229,7 @@ function makeIo({ vault, plugin }) {
   }
   function ownIs(path, mark) {
     const now = Date.now();
-    return (L.own.get(keyOf(path)) || []).some(e => e.h === mark && now - e.at < OWN_TTL_MS);
+    return (L.own.get(keyOf(path)) || []).some(e => e.h === mark && now - e.at < OWN_TTL_MS && mine(e));
   }
   /* A delete event for something beneath a folder this app trashed. */
   function ownGone(path) {
@@ -213,19 +237,19 @@ function makeIo({ vault, plugin }) {
     const k = keyOf(path) + '/';
     const now = Date.now();
     for (const [p, list] of L.own) {
-      if (k.startsWith(p + '/') && list.some(e => e.h === GONE && now - e.at < OWN_TTL_MS)) return true;
+      if (k.startsWith(p + '/') && list.some(e => e.h === GONE && now - e.at < OWN_TTL_MS && mine(e))) return true;
     }
     return false;
   }
 
   /* ---- stale record ---- */
   function markStale(path, folder) {
-    L.stale.set(keyOf(path), { seq: ++L.seq, folder: !!folder });
+    rec.stale.set(keyOf(path), { seq: ++rec.seq, folder: !!folder });
   }
   function staleHit(path) {
     const k = keyOf(path);
-    if (L.stale.has(k)) return true;
-    for (const [p, v] of L.stale) if (v.folder && k.startsWith(p + '/')) return true;
+    if (rec.stale.has(k)) return true;
+    for (const [p, v] of rec.stale) if (v.folder && k.startsWith(p + '/')) return true;
     return false;
   }
   const isFreshWriter = rel => FRESH_WRITERS.includes(foldSeg(rel));
@@ -249,7 +273,7 @@ function makeIo({ vault, plugin }) {
     const err = new Error(message);
     err.code = 'STALE';
     err.rel = rel;
-    for (const fn of Array.from(L.listeners)) { try { fn({ rel, path: relPath(rel) }); } catch (e) { /* a listener must not mask the refusal */ } }
+    for (const fn of Array.from(rec.listeners)) { try { fn({ rel, path: relPath(rel) }); } catch (e) { /* a listener must not mask the refusal */ } }
     return err;
   }
   /* Throws STALE when somebody else changed, moved or deleted this path since
@@ -315,15 +339,15 @@ function makeIo({ vault, plugin }) {
      staleClear(mark) once it has completed. Only marks made BEFORE the mark
      are cleared — a change that lands while the reload is reading is newer
      than what the reload read and must survive it. */
-  const staleMark = () => L.seq;
+  const staleMark = () => rec.seq;
   function staleClear(mark) {
-    for (const [k, v] of Array.from(L.stale)) if (v.seq <= mark) L.stale.delete(k);
-    return L.stale.size;
+    for (const [k, v] of Array.from(rec.stale)) if (v.seq <= mark) rec.stale.delete(k);
+    return rec.stale.size;
   }
   const isStaleFile = rel => staleHit(relPath(rel));
   function onStaleWrite(fn) {
-    L.listeners.add(fn);
-    return () => { L.listeners.delete(fn); };
+    rec.listeners.add(fn);
+    return () => { rec.listeners.delete(fn); };
   }
 
   async function ensureFolder(path) {
@@ -342,7 +366,7 @@ function makeIo({ vault, plugin }) {
        reason to refuse. (Writers that read first — the rules file, the deleted
        log, the Settings updater — rely on this; load-time writers never call
        it between the load and the Save.) */
-    L.stale.delete(keyOf(path));
+    rec.stale.delete(keyOf(path));
     return text;
   }
   // Defence in depth: refuse any write that resolves outside the budget
@@ -761,7 +785,7 @@ function makeIo({ vault, plugin }) {
 }
 
 function registerIo(ctx) {
-  ctx.provide(makeIo(ctx));
+  ctx.provide(makeIo(ctx, { view: true }));
 }
 
 module.exports = registerIo;
