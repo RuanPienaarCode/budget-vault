@@ -203,4 +203,53 @@ const text = rf.serializeReceipt(receipt);
     '6: and every barcode (or name) behind the row, for re-filing');
 }
 
+/* ---- 7. the trend over periods ----------------------------------------- */
+{
+  const mk = (rel, date, items) => ({ rel, store: 'S', date, time: '10:00', total: 0, items });
+  const line = (name, amount, category, discount = 0) => ({ barcode: '', name, amount, discount, category, healthy: false });
+  const rs = [
+    mk('a', '2026-01-10', [line('Beef', 100, 'Meat & fish'), line('Milk', 30, 'Dairy & eggs', -5)]),
+    mk('b', '2026-03-05', [line('Beef', 120, 'Meat & fish'), line('Wine', 90, 'Wine & alcohol')]),
+    mk('c', '2026-03-20', [line('Milk', 32, 'Dairy & eggs')]),
+    mk('d', '2026-05-01', [line('Beef', 999, 'Meat & fish')]),       // outside every period below
+  ];
+  const periods = [
+    { key: '2026-01', start: '2026-01-01', end: '2026-01-31' },
+    { key: '2026-02', start: '2026-02-01', end: '2026-02-28' },
+    { key: '2026-03', start: '2026-03-01', end: '2026-03-31' },
+  ];
+  const t = rf.foodTrend(rs, periods);
+  eq(t.covered, [true, false, true], '7: a period with no receipt is a gap, not a zero');
+  eq(t.totals, [125, null, 242], '7: what was paid per period, null where nothing was saved');
+  eq(t.categories, ['Meat & fish', 'Wine & alcohol', 'Dairy & eggs'], '7: biggest over the window first');
+  eq(t.series['Meat & fish'], [100, null, 120], '7: one value per period');
+  eq(t.series['Dairy & eggs'], [25, null, 32], '7: after discounts');
+  eq(t.series['Wine & alcohol'], [0, null, 90], '7: a real zero in a covered period stays zero');
+  eq(t.categories.reduce((a, c) => a + t.series[c][2], 0), t.totals[2], '7: categories add up to the period total');
+
+  eq(rf.priceChange([{ date: '2026-01-10', amount: 17.99 }, { date: '2026-03-01', amount: 21.99 }], '2026-01-01'),
+    { first: 17.99, last: 21.99, change: 4, pct: 0.2223, n: 2 }, '7: first to last price inside the window');
+  eq(rf.priceChange([{ date: '2025-12-01', amount: 15 }, { date: '2026-02-01', amount: 18 }], '2026-01-01'),
+    { first: 18, last: 18, change: 0, pct: 0, n: 1 }, '7: a purchase before the window is not its starting price');
+  eq(rf.priceChange([], '2026-01-01'), null, '7: nothing bought in the window');
+}
+
+/* ---- 8. against last period ------------------------------------------- */
+{
+  const mk = (rel, date, items) => ({ rel, store: 'S', date, time: '10:00', total: 0, items });
+  const line = (name, amount, discount = 0) => ({ barcode: '', name, amount, discount, category: 'Pantry', healthy: false });
+  const rs = [
+    mk('a', '2026-01-10', [line('Honey', 90), line('Oats', 36.99)]),
+    mk('b', '2026-02-05', [line('Honey', 95), line('Honey', 95), line('Rice', 40)]),
+  ];
+  const jan = rf.foodSummary(rs, '2026-01-01', '2026-01-31');
+  const feb = rf.foodSummary(rs, '2026-02-01', '2026-02-28');
+  const v = rf.versusLastPeriod(feb, jan);
+  const honey = feb.items.find(i => i.name === 'Honey');
+  eq(v.get(honey.key), { spent: 90, price: 90, spentChange: 100, priceChange: 5 },
+    '8: R90 last month at R90; R190 this month at R95 — R100 more, R5 dearer');
+  eq(v.get(feb.items.find(i => i.name === 'Rice').key), null, '8: not bought last month');
+  ok(!feb.items.some(i => i.name === 'Oats'), '8: a product only bought last month is not a row this month');
+}
+
 console.log(`PASS receipt-file (${checks} checks)`);

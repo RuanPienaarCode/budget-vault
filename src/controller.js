@@ -538,6 +538,7 @@ function mountApp(view) {
     receipts: [],              // [{rel, store, date, time, total, items}]
     foodItems: null,           // Map(key -> {barcode, name, category, healthy}) from Receipts/Food Items.md
     foodFilter: null,          // Food page {cat, q}, seeded by views/food.js
+    foodOpen: null,            // Food page: the Items row whose price chart is open
     period: null,
     view: 'dashboard',
     pendingImport: null,

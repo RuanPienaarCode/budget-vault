@@ -67,6 +67,10 @@ const DEFAULT_SETTINGS = {
      key would put one there. Same plugin-data-not-Settings.md reasoning as the
      two above. */
   splitCompareRange: '3m',
+  /* The Food page's chart window — 3M, 6M or 1Y. Its own key for the same
+     reason as the two above, and only those three: receipts start the day a
+     household starts keeping them, so a 5Y pill would be four empty years. */
+  chartFoodRange: '6m',
 };
 
 /* Public feedback form — bug reports and feature requests. Opened in the

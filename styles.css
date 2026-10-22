@@ -359,6 +359,7 @@ body.is-tablet .budget-app-root button:where(.env-name) { padding: 5px 0; }
 body.is-tablet .budget-app-root button:where(.ei-name) { padding: 4px 0; }
 body.is-tablet .budget-app-root button:where(.env-add) { padding: 4px 11px; }
 body.is-tablet .budget-app-root button:where(.food-cat-row) { padding: 8px 10px; }
+body.is-tablet .budget-app-root button:where(.food-item-name) { padding: 0; }
 body.is-tablet .budget-app-root button:where(.report-btn) { padding: 0.55rem 1.5rem; }
 body.is-tablet .budget-app-root button:where(.note-chip) { padding: 2px 7px; }
 body.is-tablet .budget-app-root button:where(.score-ring-mid) { padding: 0 18%; }
@@ -4289,6 +4290,26 @@ body.is-tablet .budget-app-root button:where(.dock-btn) { padding: 6px 10px; }
 .budget-app-root .food-chk { text-align: center; }
 .budget-app-root .food-price-move { font-size: 12px; font-weight: 600; white-space: nowrap; }
 .budget-app-root .food-items-table select { min-width: 130px; }
+/* Over time: the chart, and a legend that doubles as its readout. */
+.budget-app-root .food-trend-chart svg { display: block; width: 100%; height: auto; }
+.budget-app-root .food-legend { display: grid; gap: 6px; margin-top: 12px; }
+.budget-app-root .food-legend-head { font-size: 12.5px; }
+.budget-app-root .food-legend-row { display: grid; grid-template-columns: 12px 1fr auto 64px; align-items: center; gap: 10px; }
+.budget-app-root .food-legend-dot { width: 12px; height: 12px; border-radius: 3px; }
+.budget-app-root .food-legend-n { min-width: 0; overflow-wrap: break-word; }
+.budget-app-root .food-legend-v { font-weight: 600; text-align: right; font-variant-numeric: tabular-nums; }
+.budget-app-root .food-legend-d { text-align: right; font-size: 12.5px; font-variant-numeric: tabular-nums; }
+/* A product's name opens its price chart, so it is a button styled as text. */
+.budget-app-root .food-item-name {
+  padding: 0; border: 0; background: none; cursor: pointer; font: inherit; color: inherit;
+  text-align: start; justify-content: flex-start; text-decoration: underline;
+  text-decoration-color: var(--line-soft); text-underline-offset: 3px;
+}
+.budget-app-root .food-items-table tr.is-open td { border-bottom-color: transparent; }
+.budget-app-root .food-items-table tr.food-item-detail td { padding-top: 0; }
+.budget-app-root .food-price-detail { padding: 4px 0 10px; }
+.budget-app-root .food-price-sum { margin: 0 0 6px; font-size: 13.5px; }
+.budget-app-root .food-price-svg { display: block; width: 100%; max-width: 640px; height: auto; }
 @media (hover: hover) {
   .budget-app-root .food-cat-row:hover { background: var(--color-primary-light); }
 }
