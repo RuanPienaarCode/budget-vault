@@ -358,6 +358,7 @@ body.is-tablet .budget-app-root button:where(.plan-seg) { padding: 6px 15px; }
 body.is-tablet .budget-app-root button:where(.env-name) { padding: 5px 0; }
 body.is-tablet .budget-app-root button:where(.ei-name) { padding: 4px 0; }
 body.is-tablet .budget-app-root button:where(.env-add) { padding: 4px 11px; }
+body.is-tablet .budget-app-root button:where(.food-cat-row) { padding: 8px 10px; }
 body.is-tablet .budget-app-root button:where(.report-btn) { padding: 0.55rem 1.5rem; }
 body.is-tablet .budget-app-root button:where(.note-chip) { padding: 2px 7px; }
 body.is-tablet .budget-app-root button:where(.score-ring-mid) { padding: 0 18%; }
@@ -371,6 +372,10 @@ body.is-tablet .budget-app-root button:where(.sav-sheet-fence) { padding-top: 10
   body.is-tablet .budget-app-root button:where(.sav-row) { padding: 12px; }
 }
 body.is-tablet .budget-app-root button:where(.sav-worth-btn) { padding: 8px 2px; }
+body.is-tablet .budget-app-root button:where(.dock-btn) { padding: 6px 10px; }
+@media (max-width: 600px) {
+  body.is-tablet .budget-app-root button:where(.dock-btn) { padding: 6px 2px; }
+}
 /* The split dialog is a Modal, outside .budget-app-root, so it cannot use the
    block above; its delete button is (0,1,0) against the host's (0,2,1) and
    loses on an iPad. (0,2,1) here is enough: the plugin's sheet loads after
@@ -3696,6 +3701,7 @@ body.is-tablet .budget-app-root button:where(.sav-worth-btn) { padding: 8px 2px;
   .budget-app-root .drawer-close:focus,
   .budget-app-root .drawer-link:focus,
   .budget-app-root .topbar-icon-btn:focus,
+  .budget-app-root .dock-btn:focus,
   .budget-app-root .btn-ghost:focus,
   .budget-app-root .btn-gradient:focus { outline: 2px solid var(--color-primary); outline-offset: 2px; }
 
@@ -4259,6 +4265,118 @@ body.is-tablet .budget-app-root button:where(.sav-worth-btn) { padding: 8px 2px;
 .budget-app-root .plan-free.is-over .free-fig { color: var(--color-danger-ink); }
 .budget-app-root .plan-free p { font-size: 13px; color: var(--text-muted); margin: 8px 0 0; max-width: 56ch; }
 .budget-app-root .plan-free .free-acts { display: flex; gap: 9px; flex-wrap: wrap; margin-top: 16px; }
+
+/* ---- Food ---------------------------------------------------------------
+   Category rows are buttons (tap one to filter the Items table), laid out as
+   a four-column grid so the bars line up down the card: name, bar, amount,
+   share. On a phone the bar takes its own line under the name rather than
+   squeezing to a sliver beside it. */
+.budget-app-root .food-cats { display: flex; flex-direction: column; gap: 4px; }
+.budget-app-root .food-cat-row {
+  display: grid; grid-template-columns: minmax(110px, 1.2fr) 3fr auto 44px;
+  align-items: center; gap: 12px; width: 100%;
+  padding: 8px 10px; border: 1px solid transparent; border-radius: var(--radius-sm);
+  background: none; color: var(--text-primary); cursor: pointer; text-align: start;
+  justify-content: stretch;
+}
+.budget-app-root .food-cat-row.is-active { border-color: var(--color-primary); background: var(--color-primary-light); }
+.budget-app-root .food-cat-name { font-weight: 600; min-width: 0; overflow-wrap: break-word; }
+.budget-app-root .food-cat-bar { display: block; height: 8px; border-radius: 4px; background: var(--line-soft); overflow: hidden; }
+.budget-app-root .food-cat-fill { display: block; height: 100%; border-radius: 4px; background: var(--color-primary); }
+.budget-app-root .food-cat-amt { font-variant-numeric: tabular-nums; font-weight: 600; text-align: right; }
+.budget-app-root .food-cat-pct { font-variant-numeric: tabular-nums; text-align: right; font-size: 12.5px; }
+.budget-app-root .food-empty { margin: 6px 0; }
+.budget-app-root .food-chk { text-align: center; }
+.budget-app-root .food-price-move { font-size: 12px; font-weight: 600; white-space: nowrap; }
+.budget-app-root .food-items-table select { min-width: 130px; }
+@media (hover: hover) {
+  .budget-app-root .food-cat-row:hover { background: var(--color-primary-light); }
+}
+@media (max-width: 640px) {
+  .budget-app-root .food-cat-row { grid-template-columns: 1fr auto 40px; row-gap: 6px; }
+  .budget-app-root .food-cat-bar { grid-column: 1 / -1; grid-row: 2; }
+  /* Both tables fold into one card per row on a phone: the six-column
+     Items table scrolled sideways and hid Spent and Last price, the two
+     figures a reader opens it for. Each figure carries its own caption
+     from data-label (views/food.js calls tableCells). */
+  .budget-app-root .food-items-table thead,
+  .budget-app-root .food-receipts-table thead { display: none; }
+  .budget-app-root .food-items-table tbody tr,
+  .budget-app-root .food-receipts-table tbody tr {
+    display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 8px 12px;
+    padding: 12px 16px; border-bottom: 1px solid var(--line-soft);
+  }
+  .budget-app-root .food-items-table tbody td,
+  .budget-app-root .food-receipts-table tbody td { display: block; padding: 0; border: 0; text-align: start; }
+  .budget-app-root .food-items-table tbody td:nth-child(1) { grid-column: 1 / -1; font-weight: 600; }
+  .budget-app-root .food-items-table tbody td:nth-child(2) { grid-column: 1 / 3; }
+  .budget-app-root .food-items-table tbody td.food-chk { display: flex; align-items: center; justify-content: flex-end; }
+  .budget-app-root .food-items-table tbody td:nth-child(n+4)[data-label]::before,
+  .budget-app-root .food-receipts-table tbody td:nth-child(n+3)[data-label]::before {
+    content: attr(data-label); display: block; font-size: 12px; font-weight: 500; color: var(--text-muted);
+  }
+  .budget-app-root .food-receipts-table tbody td:nth-child(2) { grid-column: 2 / -1; font-weight: 600; }
+  .budget-app-root .food-receipts-table tbody td:nth-child(4) { grid-column: 2 / 4; }
+  .budget-app-root .food-receipts-table tbody td:nth-child(5) { grid-column: 1 / -1; }
+  .budget-app-root .food-items-table tbody td[colspan],
+  .budget-app-root .food-receipts-table tbody td[colspan] { grid-column: 1 / -1; }
+}
+
+/* The Add receipt dialog. A modal lives outside .budget-app-root, so these
+   are namespaced .bv-receipt-* and lean on Obsidian's own tokens — the same
+   arrangement as .budget-split-* above. The line grid is six columns on a
+   desktop and folds to two lines per receipt line on a phone: item across
+   the top, the figures and the category under it. */
+/* .modal and the class together: Obsidian's own `.modal { width:
+   var(--dialog-width) }` is the same single class, and which of two equal
+   rules wins then depends on load order — 560px in the preview harness. */
+.modal.bv-receipt-modal { width: min(860px, 96vw); }
+.bv-receipt-hint { font-size: 13px; line-height: 1.5; opacity: .75; margin: 0 0 10px; }
+.bv-receipt-paste {
+  width: 100%; min-height: 180px; font-family: var(--font-monospace, monospace); font-size: 12.5px;
+}
+.bv-receipt-head { display: grid; grid-template-columns: 2fr 1.3fr .8fr 1fr; gap: 10px; margin-bottom: 10px; }
+.bv-receipt-field { display: flex; flex-direction: column; gap: 3px; min-width: 0; }
+.bv-receipt-field .l { font-size: 12px; opacity: .7; }
+.bv-receipt-field input { width: 100%; }
+.bv-receipt-problems {
+  margin: 0 0 10px; padding: 8px 12px 8px 28px; font-size: 13px; line-height: 1.45;
+  border-radius: 6px; background: var(--background-modifier-hover, rgba(128,128,128,.1));
+  border-left: 3px solid var(--text-warning, #d4a017);
+}
+.bv-receipt-lines {
+  display: flex; flex-direction: column; gap: 6px;
+  max-height: 46vh; overflow-y: auto; -webkit-overflow-scrolling: touch; margin-bottom: 8px;
+}
+.bv-receipt-line {
+  display: grid; grid-template-columns: minmax(0, 2.4fr) 86px 86px minmax(0, 1.4fr) 54px 32px;
+  gap: 6px; align-items: center;
+}
+.bv-receipt-line-h { font-size: 12px; opacity: .6; font-weight: 600; }
+.bv-receipt-line input.num { text-align: right; font-variant-numeric: tabular-nums; }
+.bv-receipt-line input[type='text'], .bv-receipt-line input:not([type]) { width: 100%; }
+.bv-receipt-line select { width: 100%; min-width: 0; }
+.bv-receipt-chk { display: flex; justify-content: center; }
+.bv-receipt-foot { margin-top: 6px; font-size: 13.5px; font-weight: 600; font-variant-numeric: tabular-nums; }
+/* Host tokens, as .budget-split-foot does: the plugin's .text-success lives
+   under .budget-app-root, which a modal is outside of. */
+.bv-receipt-ok { color: var(--text-success, #2e9b64); }
+.bv-receipt-off { color: var(--text-error, #e5534b); }
+@media (max-width: 640px) {
+  .bv-receipt-head { grid-template-columns: 1fr 1fr; }
+  .bv-receipt-line-h { display: none; }
+  /* Six controls in three rows: the item across the top; price, discount
+     and the healthy box; then the category and the remove button. Placed
+     explicitly — auto-placement put the category picker in the 44px cell. */
+  .bv-receipt-line {
+    grid-template-columns: 1fr 1fr 44px; padding-bottom: 8px;
+    border-bottom: 1px solid var(--background-modifier-border, rgba(128,128,128,.2));
+  }
+  .bv-receipt-line > :nth-child(1) { grid-column: 1 / -1; }
+  .bv-receipt-line > :nth-child(4) { grid-column: 1 / 3; grid-row: 3; }
+  .bv-receipt-line > :nth-child(5) { grid-column: 3; grid-row: 2; }
+  .bv-receipt-line > :nth-child(6) { grid-column: 3; grid-row: 3; }
+}
 
 /* ---- Notes -------------------------------------------------------------
    A list of prose, so it is a stack of cards rather than a table: a note has
@@ -5729,6 +5847,105 @@ body.is-tablet .budget-app-root button:where(.sav-worth-btn) { padding: 8px 2px;
   .budget-app-root #acctOwners,
   .budget-app-root #acctFilters,
   .budget-app-root .acct-toolbar { margin-left: 16px; margin-right: 16px; max-width: calc(100% - 32px); }
+}
+
+/* ============================================================
+   FLOATING DOCK — shell.js #bvDock, wired in controller.js syncDock()
+   A pill that hovers over the bottom of the page on every screen size: the
+   open page's Save (so a long table does not need a scroll back to its
+   header to save) and four page shortcuts, icon over label. Absolute inside
+   .budget-app-root, which is the positioned, overflow-hidden frame the
+   scroll region lives in, so it stays put while the page scrolls under it.
+   Below the drawer overlay (250) so the open drawer covers it; below the
+   toast (400), which is lifted clear of it instead.
+   ============================================================ */
+.budget-app-root {
+  --bv-dock-h: 64px;
+  --bv-dock-bottom: max(16px, calc(10px + env(safe-area-inset-bottom, 0px)));
+  /* The pill's edge. --border-color (9% / 8%) vanishes against the glass it
+     sits on, so the dock gets a hairline about twice as strong, per theme. */
+  --bv-dock-edge: rgba(15,23,32,.18);
+}
+.budget-app-root.bud-dark { --bv-dock-edge: rgba(255,255,255,.18); }
+.budget-app-root .bv-dock {
+  position: absolute;
+  left: 50%; bottom: var(--bv-dock-bottom);
+  transform: translateX(-50%);
+  z-index: 190;
+  display: flex; align-items: stretch; gap: 2px;
+  height: var(--bv-dock-h);
+  padding: 5px;
+  border-radius: 22px;
+  border: 1px solid var(--bv-dock-edge);
+  background: var(--surface-glass-hi);
+  -webkit-backdrop-filter: blur(20px); backdrop-filter: blur(20px);
+  box-shadow: var(--shadow-md), var(--shadow-sm);
+}
+.budget-app-root .dock-btn {
+  display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 3px;
+  min-width: 76px; height: 100%;
+  padding: 6px 10px;
+  border: 0; border-radius: 17px;
+  background: transparent; box-shadow: none;
+  color: var(--text-muted);
+  font: inherit; font-size: 11px; font-weight: 600; line-height: 1.2;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+  transition: background 0.15s, color 0.15s;
+}
+.budget-app-root .dock-btn .ico svg { width: 20px; height: 20px; }
+.budget-app-root .dock-btn .dock-l { max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.budget-app-root .dock-btn[aria-current="page"] { color: var(--color-primary); background: var(--color-primary-light); }
+.budget-app-root .dock-btn:focus-visible { outline: 2px solid var(--color-primary); outline-offset: 2px; }
+@media (hover: hover) {
+  .budget-app-root .dock-btn:not(:disabled):hover { color: var(--color-primary); background: var(--color-primary-light); }
+}
+/* Save sits last, past a hairline, in the app's primary gradient while there
+   is something to save; dimmed (but still there, so the dock keeps one width
+   across every page and under the thumb mid-edit) while there is not. */
+.budget-app-root .dock-save { position: relative; margin-left: 9px; }
+.budget-app-root .dock-save::before {
+  content: ''; position: absolute; left: -6px; top: 10px; bottom: 10px;
+  width: 1px; background: var(--border-color);
+}
+.budget-app-root .dock-save:not(:disabled),
+.budget-app-root .dock-save:not(:disabled):hover {
+  color: #fff;
+  background: linear-gradient(135deg, var(--color-accent), var(--color-primary));
+}
+.budget-app-root.bud-dark .dock-save:not(:disabled),
+.budget-app-root.bud-dark .dock-save:not(:disabled):hover { color: var(--ink-on-accent); }
+.budget-app-root .dock-save:disabled { opacity: 0.45; cursor: default; }
+
+/* Clear the dock: the last row of every page scrolls up past it, and a toast
+   rises above it rather than landing behind it. */
+.budget-app-root.has-dock .main-content {
+  padding-bottom: calc(var(--bv-dock-bottom) + var(--bv-dock-h) + 2rem);
+}
+.budget-app-root.has-dock #toast {
+  bottom: calc(var(--bv-dock-bottom) + var(--bv-dock-h) + 10px);
+}
+
+/* Phone: the dock spans the width (a 16px gutter each side) and sits above
+   Obsidian's own floating toolbar, which --bud-bottom-chrome already measures
+   for the toast. Each slot starts at its own label's width and the spare
+   room is shared out, so "Transactions" gets the width "Plan" does not need
+   (equal fifths cut it to "Transact…" at 375px); a label longer than even
+   that, in a longer language, truncates rather than pushing a slot off. */
+@media (max-width: 600px) {
+  .budget-app-root { --bv-dock-bottom: var(--bud-bottom-chrome); }
+  .budget-app-root .bv-dock { left: 12px; right: 12px; transform: none; }
+  .budget-app-root .dock-btn { flex: 1 1 auto; min-width: 0; padding: 6px 2px; }
+  .budget-app-root .dock-save { margin-left: 7px; }
+}
+/* A phone on its side is wider than 600px but keeps Obsidian's floating
+   toolbar along the bottom, so the dock keeps clearing it. Floating a little
+   too high on a build without the toolbar costs nothing; sitting under it
+   would hide Save. */
+@media (min-width: 601px) {
+  body.is-phone .budget-app-root {
+    --bv-dock-bottom: calc(env(safe-area-inset-bottom, 0px) + var(--mobile-navbar-height, 60px) + 16px);
+  }
 }
 /* ============================================================
    STATEMENT TYPE — the foundation (October 2026, "Option 3").
@@ -7430,6 +7647,7 @@ body.is-tablet .budget-app-root button:where(.sav-worth-btn) { padding: 8px 2px;
   .budget-app-root .left-cycle .lc-s,
   .budget-app-root .left-disc .dd,
   .budget-app-root .left-src,
+  .budget-app-root .dock-btn,
   .budget-app-root .health-fig .lm,
   .budget-app-root .imp-map-hint,
   .budget-app-root .mini .s2,
@@ -8106,6 +8324,7 @@ body.is-tablet .budget-app-root button:where(.sav-worth-btn) { padding: 8px 2px;
   body.is-phone .budget-app-root .left-cycle .lc-s,
   body.is-phone .budget-app-root .left-disc .dd,
   body.is-phone .budget-app-root .left-src,
+  body.is-phone .budget-app-root .dock-btn,
   body.is-phone .budget-app-root .health-fig .lm,
   body.is-phone .budget-app-root .imp-map-hint,
   body.is-phone .budget-app-root .mini .s2,

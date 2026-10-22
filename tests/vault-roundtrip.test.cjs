@@ -475,5 +475,41 @@ const FILES = {
       'and a SECOND load -> save cycle keeps the tags — nothing about dropping the BOM re-corrupts them');
   }
 
+  /* ---- receipts + Food Items.md (22 Oct 2026) ------------------------------
+     The REAL loadReceipts over files the REAL serializers wrote, then a
+     re-file through refileReceiptText and a second load. Awkward on purpose:
+     a pipe in a product name, a barcode-less line, a discount, and a stray
+     markdown file in Receipts/ that is not a receipt and must not load as one. */
+  {
+    const rf = require('../src/receipt-file');
+    const receipt = {
+      store: 'Checkers | Sampletown', date: '2026-07-04', time: '10:05', total: 89.98,
+      items: [
+        { barcode: '6000000000011', name: 'MILK | FCRM 2L', amount: 40, discount: -10, category: 'Dairy & eggs', healthy: false },
+        { barcode: '', name: 'Farm eggs', amount: 59.98, discount: 0, category: 'Dairy & eggs', healthy: true },
+      ],
+    };
+    const map = new Map([['6000000000011', { barcode: '6000000000011', name: 'MILK | FCRM 2L', category: 'Dairy & eggs', healthy: false }]]);
+    const rel = rf.receiptPath(receipt);
+    const files = { ...FILES,
+      [`${B}/${rel}`]: rf.serializeReceipt(receipt),
+      [`${B}/${rf.FOOD_ITEMS_FILE}`]: rf.serializeFoodItems(map),
+      [`${B}/Receipts/2026-07/A note about the braai.md`]: '# Not a receipt\n\nJust words.\n',
+    };
+    const sR = await loadInto(makeCtx(files));
+    eq(sR.receipts.length, 1, 'receipts: the one receipt loads, the stray note in Receipts/ does not');
+    const got = sR.receipts[0];
+    eq([got.rel, got.store, got.date, got.time, got.total], [rel, receipt.store, receipt.date, receipt.time, receipt.total],
+      'receipts: frontmatter through the real loader');
+    eq(got.items.map(i => [i.barcode, i.name, i.amount, i.discount, i.category, i.healthy]),
+      receipt.items.map(i => [i.barcode, i.name, i.amount, i.discount, i.category, i.healthy]),
+      'receipts: every cell through the real loader, the escaped pipe included');
+    eq(sR.foodItems.get('6000000000011').category, 'Dairy & eggs', 'receipts: Food Items.md loads as the map');
+
+    const refiled = rf.refileReceiptText(files[`${B}/${rel}`], '6000000000011', { category: 'Milk' });
+    const sR2 = await loadInto(makeCtx({ ...files, [`${B}/${rel}`]: refiled }));
+    eq(sR2.receipts[0].items.map(i => i.category), ['Milk', 'Dairy & eggs'], 'receipts: a re-file survives a second real load, other rows untouched');
+  }
+
   console.log(`PASS — full vault round-trip through the REAL loader + serializers (${checks} assertions).`);
 })().catch(e => { console.error(e); process.exit(1); });

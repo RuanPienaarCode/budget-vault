@@ -32,6 +32,7 @@ module.exports = {
   'nav.transactions': '取引',
   'nav.budgets': '予算',
   'nav.plan': '資金計画',
+  'nav.food': '食費',
   'nav.notes': 'メモ',
   'nav.savings': '貯蓄と投資',
   'nav.accounts': '口座',

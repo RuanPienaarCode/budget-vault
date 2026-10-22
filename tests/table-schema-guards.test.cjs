@@ -40,6 +40,8 @@ const FROZEN = {
   services: ['name', 'provider', 'amount', 'cycle', 'next', 'category', 'active', 'notes', 'currency'],
   debts: ['name', 'lender', 'type', 'balance', 'original', 'rate', 'payment', 'extra', 'start', 'category', 'status', 'notes', 'currency'],
   transactions: ['date', 'desc', 'cat', 'amount', 'excluded', 'note', 'split'],
+  receiptItems: ['barcode', 'name', 'amount', 'discount', 'category', 'healthy'],
+  foodItems: ['barcode', 'name', 'category', 'healthy'],
 };
 
 eq(Object.keys(SCHEMAS).sort(), Object.keys(FROZEN).sort(),

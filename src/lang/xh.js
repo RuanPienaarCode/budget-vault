@@ -37,6 +37,7 @@ module.exports = {
   'nav.transactions': 'Iintengiselwano',
   'nav.budgets': 'Ibhajethi',
   'nav.plan': 'Isicwangciso',
+  'nav.food': 'Ukutya',
   'nav.notes': 'Amanqaku',
   'nav.savings': 'Imali egciniweyo notyalo-mali',
   'nav.accounts': 'Iiakhawunti',

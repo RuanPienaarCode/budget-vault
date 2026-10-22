@@ -165,8 +165,12 @@ const TRANSLATED_VIEWS = new Set(['dashboard', 'score', 'transactions', 'budgets
    view returns 0 for exactly these ten and only these ten). Reported as a
    finding, not silently folded in without comment — see the dispatch
    summary. */
-const EXPECTED_ENGLISH_ONLY = ['notes', 'savings', 'debts', 'owed', 'services', 'tax', 'loans', 'import'];
-eq(EXPECTED_ENGLISH_ONLY.length, 8, 'the declared English-only backlog is exactly 8 views (plan and assets were translated in the 3 Sep 2026 mobile redesign) — translating one shrinks this list');
+const EXPECTED_ENGLISH_ONLY = ['notes', 'food', 'savings', 'debts', 'owed', 'services', 'tax', 'loans', 'import'];
+/* Grew once, from 8 to 9, on purpose: the Food page (22 Oct 2026) shipped
+   English-only, like Notes before it — its vocabulary is the till slip's own
+   (XTRASAVE, Vitality HealthyFood), which is South African and English on the
+   paper. Every other change to this count is a translation shrinking it. */
+eq(EXPECTED_ENGLISH_ONLY.length, 9, 'the declared English-only backlog is exactly 9 views (plan and assets were translated in the 3 Sep 2026 mobile redesign; food arrived English-only on 22 Oct 2026) — translating one shrinks this list');
 for (const v of EXPECTED_ENGLISH_ONLY) {
   ok(!TRANSLATED_VIEWS.has(v), `'${v}' cannot be in both TRANSLATED_VIEWS and EXPECTED_ENGLISH_ONLY`);
 }
@@ -344,7 +348,7 @@ async function mountView() {
   // 'report' right after 'dashboard' — see views-render.test.cjs's mountAll
   // for why the order is load-bearing.
   for (const f of ['dashboard', 'report', 'score', 'transactions', 'budgets', 'plan', 'accounts', 'savings',
-    'assets', 'debts', 'owed', 'services', 'tax', 'loans', 'import']) {
+    'assets', 'debts', 'owed', 'services', 'tax', 'loans', 'import', 'food']) {
     require(`../src/views/${f}`)(ctx);
   }
   return { ctx, nodes };

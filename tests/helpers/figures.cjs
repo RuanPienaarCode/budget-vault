@@ -191,7 +191,7 @@ async function mountFor(files, { period, settings, budgetFolder } = {}) {
      published by dashboard.js's ctx.provide(). Same order controller.js uses,
      load-bearing in both places. */
   for (const f of ['dashboard', 'report', 'score', 'transactions', 'budgets', 'plan', 'accounts',
-    'savings', 'assets', 'debts', 'owed', 'services', 'tax', 'loans', 'import']) {
+    'savings', 'assets', 'debts', 'owed', 'services', 'tax', 'loans', 'import', 'food']) {
     require(`../../src/views/${f}`)(ctx);
   }
   return { ctx, S, nodes, raws: recorder.seen, restore: recorder.restore };

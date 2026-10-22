@@ -20,6 +20,7 @@ const { isRealIsoDate } = require('./dates');
 const { parseOwners } = require('./owners');
 const { parseGroups, parseNonEssential, typeOrder, typeRank } = require('./groups');
 const { NOTES_DIR, parseNote, sortNotes } = require('./note-file');
+const { RECEIPTS_DIR, FOOD_ITEMS_FILE, parseReceiptFile, parseFoodItems } = require('./receipt-file');
 
 /* ADR-0007 · fmNum: absent or unreadable is null, never 0. NOT parseNum — its fallback
    of 0 is a figure the file never claimed. */
@@ -797,6 +798,35 @@ module.exports = function registerLoad(ctx) {
     if (!S.period || !periodKeyValid(S.period)) S.period = currentPeriod();
 
     await loadNotes();
+    await loadReceipts();
+  }
+
+  /* Receipts/ — one file per till slip, read the way Notes are: under, not
+     in (a household files them by month), in parallel, and a slip that
+     cannot be read is skipped rather than taking the budget down. Nothing
+     here feeds a budget total: the bank line is the figure, the receipt is
+     its itemised account. Food Items.md lives in the same folder and is the
+     one file under it that is not a receipt. Exposed on ctx because
+     views/food.js re-reads after every write. */
+  async function loadReceipts() {
+    const files = mdFilesUnder(RECEIPTS_DIR);
+    const texts = await Promise.all(files.map(f => vault.cachedRead(f).catch(() => null)));
+    const base = basePath();
+    const receipts = [];
+    S.foodItems = new Map();
+    files.forEach((f, i) => {
+      if (texts[i] == null) return;
+      const rel = f.path.slice(base.length + 1);
+      if (rel === FOOD_ITEMS_FILE) {
+        S.foodItems = parseFoodItems(texts[i]);
+        return;
+      }
+      const fm = parseFrontmatter(texts[i]).fm;
+      if (String(fm.kind || '').trim().toLowerCase() !== 'receipt') return;
+      receipts.push(parseReceiptFile(texts[i], rel));
+    });
+    receipts.sort((a, b) => b.date.localeCompare(a.date) || String(b.time).localeCompare(String(a.time)));
+    S.receipts = receipts;
   }
 
   /* ADR-0007 · A note that cannot be read is skipped. Per-file catch, so one bad note cannot
@@ -843,5 +873,5 @@ module.exports = function registerLoad(ctx) {
     return `${folder}/${month}.md`;
   }
 
-  ctx.provide({ loadVault, loadNotes, txSegment, txFileRel });
+  ctx.provide({ loadVault, loadNotes, loadReceipts, txSegment, txFileRel });
 };

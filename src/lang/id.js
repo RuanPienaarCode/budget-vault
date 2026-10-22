@@ -41,6 +41,7 @@ module.exports = {
   'nav.transactions': 'Transaksi',
   'nav.budgets': 'Anggaran',
   'nav.plan': 'Rencana',
+  'nav.food': 'Makanan',
   'nav.notes': 'Catatan',
   'nav.report': 'Laporan',
   'nav.savings': 'Tabungan dan investasi',
