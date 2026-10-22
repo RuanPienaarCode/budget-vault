@@ -39,6 +39,8 @@ module.exports = {
   'nav.tax': 'Steuern',
   'nav.loans': 'Kreditrechner',
   'nav.import': 'CSV importieren',
+  'dock.nav': 'Schnellmenü',
+  'dock.save': 'Speichern',
   'nav.reload': 'Vom Datenträger neu laden',
   'nav.pluginSettings': 'Plugin-Einstellungen',
 

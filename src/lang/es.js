@@ -40,6 +40,8 @@ module.exports = {
   'nav.tax': 'Impuestos',
   'nav.loans': 'Calculadoras de préstamos',
   'nav.import': 'Importar CSV',
+  'dock.nav': 'Menú rápido',
+  'dock.save': 'Guardar',
   'nav.reload': 'Recargar desde el disco',
   'nav.pluginSettings': 'Ajustes del plugin',
 

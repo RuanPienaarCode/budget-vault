@@ -38,6 +38,8 @@ module.exports = {
   'nav.tax': 'Belasting',
   'nav.loans': 'Leningsberekenaars',
   'nav.import': 'Voer CSV in',
+  'dock.nav': 'Snelkieslys',
+  'dock.save': 'Stoor',
   'nav.reload': 'Herlaai vanaf skyf',
   'nav.pluginSettings': 'Inpropinstellings',
 

@@ -713,6 +713,10 @@ function mountApp(view) {
        this view hides it; connectVault's own hide/show pair above stays in
        charge of the not-yet-loaded case. */
     $('#periodPill').classList.toggle('hidden', v === 'report');
+    for (const b of $$('.dock-btn[data-dock-view]')) {
+      if (b.dataset.dockView === v) b.setAttribute('aria-current', 'page');
+      else b.removeAttribute('aria-current');
+    }
     closeDrawer();
     render();
     /* Move focus to the new route's heading. closeDrawer() puts it back on the
@@ -776,7 +780,46 @@ function mountApp(view) {
        fallback stamps tabindex on the nodes it can see — so freshly built rows
        would be tabbable behind the gate. Re-assert; it's idempotent. */
     if (locked) setInert($('.bud-scroll'), true);
+    syncDock();
   }
+  /* ----------------------------- floating dock ---------------------------
+     The dock's Save stands in for the open page's own Save button rather than
+     saving anything itself: eight pages each own a dirty check, a write and a
+     toast, and a second path to any of them is a second place for the two to
+     disagree. So the dock only mirrors — hidden on a page with no Save (or
+     whose Save is inside a hidden block, as Tax's is before a year exists),
+     disabled while the page's is, and a click is a click on the page's. */
+  function pageSaveBtn() {
+    const b = $(`#view-${S.view} button[id$="Save"]`);
+    return b && !b.closest('.hidden') ? b : null;
+  }
+  function syncDock() {
+    const dock = $('#bvDock'), mine = $('#dockSave');
+    if (!dock || !mine) return;
+    dock.classList.toggle('hidden', !S.loaded);
+    root.classList.toggle('has-dock', !!S.loaded);
+    const page = S.loaded ? pageSaveBtn() : null;
+    const hide = !page, off = !page || page.disabled;
+    // Written only on change: the observer below watches `disabled` across the
+    // whole root, so an unconditional write here would wake it again forever.
+    if (mine.classList.contains('hidden') !== hide) mine.classList.toggle('hidden', hide);
+    if (mine.disabled !== off) mine.disabled = off;
+    const label = page ? page.textContent.trim() : '';
+    if (mine.getAttribute('aria-label') !== label) mine.setAttribute('aria-label', label);
+  }
+  /* Registered with the reload reset like the pages' own buttons. The observer
+     would catch the pages going dark anyway, but registering means a reload
+     never depends on it: no MutationObserver, still no lit Save over edits the
+     reload just threw away. */
+  ctx.registerSaveButton('#dockSave');
+  /* The pages flip their Save's `disabled` on every keystroke into a field, far
+     from render(), so render() alone would leave the dock one edit behind. */
+  // Guarded for the bare-node harnesses that mount this controller over a stub
+  // DOM with no MutationObserver; render() still keeps the dock in step there.
+  const dockObserver = typeof MutationObserver === 'function'
+    ? new MutationObserver(recs => { if (recs.some(r => r.target.id !== 'dockSave')) syncDock(); })
+    : null;
+  if (dockObserver) dockObserver.observe(root, { subtree: true, attributes: true, attributeFilter: ['disabled'] });
   /* ---------------------- drawer + theme (app shell) --------------------- */
   function openDrawer() {
     const d = $('#appDrawer');
@@ -863,11 +906,13 @@ function mountApp(view) {
       await doReloadFromDisk();
     } catch (e) {
       S.loaded = false;
+      syncDock();
       $('#connectErr').textContent = e.message || String(e);
       return;
     }
     if (!S.categories.length && !Object.keys(S.txFiles).length) {
       S.loaded = false;
+      syncDock();
       for (const sec of $$('main > section')) sec.classList.add('hidden');
       $('#view-connect').classList.remove('hidden');
       $('#periodPill').classList.add('hidden');
@@ -929,6 +974,7 @@ function mountApp(view) {
     // plugin's floor is iOS 15.0, where the attribute is inert itself.
     setInert($('.topbar'), true);
     setInert($('.bud-scroll'), true);
+    setInert($('#bvDock'), true);
     // Making an ancestor inert blurs whatever had focus, so on a re-lock focus
     // would otherwise land on <body> with nothing to Tab to but the gate.
     focusEnter();
@@ -941,6 +987,7 @@ function mountApp(view) {
     $('#splashGate').classList.add('hidden');
     setInert($('.topbar'), false);
     setInert($('.bud-scroll'), false);
+    setInert($('#bvDock'), false);
     // First unlock: this is where the vault is actually read. Later unlocks
     // land back on the view that was already rendered. Either way focus has to
     // be moved off the gate button that just went away — returning early on the
@@ -1103,6 +1150,13 @@ function mountApp(view) {
   for (const b of $$('.drawer-link[data-view]')) {
     b.addEventListener('click', () => { if (S.loaded) switchView(b.dataset.view); else closeDrawer(); });
   }
+  for (const b of $$('.dock-btn[data-dock-view]')) {
+    b.addEventListener('click', () => { if (S.loaded) switchView(b.dataset.dockView); });
+  }
+  $('#dockSave').addEventListener('click', () => {
+    const page = pageSaveBtn();
+    if (page && !page.disabled) page.click();
+  });
   $('#reloadLink').addEventListener('click', async () => {
     if (!S.loaded) return closeDrawer();
     // Same guard connectVault() already gives the FIRST read of the vault —
@@ -1261,6 +1315,7 @@ function mountApp(view) {
       clearTimeout(S._noteQ);
       const t = $('#toast');
       if (t) clearTimeout(t._h);
+      if (dockObserver) dockObserver.disconnect();
     },
     // Dirty-aware reload used by settings changes (plugin.reloadViews): decline
     // rather than silently discard unsaved edits. The file watcher calls

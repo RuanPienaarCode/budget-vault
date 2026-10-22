@@ -52,6 +52,8 @@ module.exports = {
   'nav.tax': 'Pajak',
   'nav.loans': 'Kalkulator pinjaman',
   'nav.import': 'Impor CSV',
+  'dock.nav': 'Menu cepat',
+  'dock.save': 'Simpan',
   'nav.reload': 'Muat ulang dari disk',
   'nav.pluginSettings': 'Pengaturan plugin',
 

@@ -349,6 +349,10 @@ body.is-tablet .budget-app-root button:where(.sav-sheet-fence) { padding-top: 10
   body.is-tablet .budget-app-root button:where(.sav-row) { padding: 12px; }
 }
 body.is-tablet .budget-app-root button:where(.sav-worth-btn) { padding: 8px 2px; }
+body.is-tablet .budget-app-root button:where(.dock-btn) { padding: 6px 10px; }
+@media (max-width: 600px) {
+  body.is-tablet .budget-app-root button:where(.dock-btn) { padding: 6px 2px; }
+}
 /* The split dialog is a Modal, outside .budget-app-root, so it cannot use the
    block above; its delete button is (0,1,0) against the host's (0,2,1) and
    loses on an iPad. (0,2,1) here is enough: the plugin's sheet loads after
@@ -3674,6 +3678,7 @@ body.is-tablet .budget-app-root button:where(.sav-worth-btn) { padding: 8px 2px;
   .budget-app-root .drawer-close:focus,
   .budget-app-root .drawer-link:focus,
   .budget-app-root .topbar-icon-btn:focus,
+  .budget-app-root .dock-btn:focus,
   .budget-app-root .btn-ghost:focus,
   .budget-app-root .btn-gradient:focus { outline: 2px solid var(--color-primary); outline-offset: 2px; }
 
@@ -5707,4 +5712,99 @@ body.is-tablet .budget-app-root button:where(.sav-worth-btn) { padding: 8px 2px;
   .budget-app-root #acctOwners,
   .budget-app-root #acctFilters,
   .budget-app-root .acct-toolbar { margin-left: 16px; margin-right: 16px; max-width: calc(100% - 32px); }
+}
+
+/* ============================================================
+   FLOATING DOCK — shell.js #bvDock, wired in controller.js syncDock()
+   A pill that hovers over the bottom of the page on every screen size: the
+   open page's Save (so a long table does not need a scroll back to its
+   header to save) and four page shortcuts, icon over label. Absolute inside
+   .budget-app-root, which is the positioned, overflow-hidden frame the
+   scroll region lives in, so it stays put while the page scrolls under it.
+   Below the drawer overlay (250) so the open drawer covers it; below the
+   toast (400), which is lifted clear of it instead.
+   ============================================================ */
+.budget-app-root {
+  --bv-dock-h: 64px;
+  --bv-dock-bottom: max(16px, calc(10px + env(safe-area-inset-bottom, 0px)));
+}
+.budget-app-root .bv-dock {
+  position: absolute;
+  left: 50%; bottom: var(--bv-dock-bottom);
+  transform: translateX(-50%);
+  z-index: 190;
+  display: flex; align-items: stretch; gap: 2px;
+  height: var(--bv-dock-h);
+  padding: 5px;
+  border-radius: 22px;
+  border: 1px solid var(--border-color);
+  background: var(--surface-glass-hi);
+  -webkit-backdrop-filter: blur(20px); backdrop-filter: blur(20px);
+  box-shadow: var(--shadow-md), var(--shadow-sm);
+}
+.budget-app-root .dock-btn {
+  display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 3px;
+  min-width: 76px; height: 100%;
+  padding: 6px 10px;
+  border: 0; border-radius: 17px;
+  background: transparent; box-shadow: none;
+  color: var(--text-muted);
+  font: inherit; font-size: 11px; font-weight: 600; line-height: 1.2;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+  transition: background 0.15s, color 0.15s;
+}
+.budget-app-root .dock-btn .ico svg { width: 20px; height: 20px; }
+.budget-app-root .dock-btn .dock-l { max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.budget-app-root .dock-btn[aria-current="page"] { color: var(--color-primary); background: var(--color-primary-light); }
+.budget-app-root .dock-btn:focus-visible { outline: 2px solid var(--color-primary); outline-offset: 2px; }
+@media (hover: hover) {
+  .budget-app-root .dock-btn:not(:disabled):hover { color: var(--color-primary); background: var(--color-primary-light); }
+}
+/* Save sits last, past a hairline, in the app's primary gradient while there
+   is something to save; dimmed (but still there, so the dock does not change
+   width under the thumb mid-edit) while there is not. */
+.budget-app-root .dock-save { position: relative; margin-left: 9px; }
+.budget-app-root .dock-save::before {
+  content: ''; position: absolute; left: -6px; top: 10px; bottom: 10px;
+  width: 1px; background: var(--border-color);
+}
+.budget-app-root .dock-save:not(:disabled),
+.budget-app-root .dock-save:not(:disabled):hover {
+  color: #fff;
+  background: linear-gradient(135deg, var(--color-accent), var(--color-primary));
+}
+.budget-app-root.bud-dark .dock-save:not(:disabled),
+.budget-app-root.bud-dark .dock-save:not(:disabled):hover { color: var(--ink-on-accent); }
+.budget-app-root .dock-save:disabled { opacity: 0.45; cursor: default; }
+
+/* Clear the dock: the last row of every page scrolls up past it, and a toast
+   rises above it rather than landing behind it. */
+.budget-app-root.has-dock .main-content {
+  padding-bottom: calc(var(--bv-dock-bottom) + var(--bv-dock-h) + 2rem);
+}
+.budget-app-root.has-dock #toast {
+  bottom: calc(var(--bv-dock-bottom) + var(--bv-dock-h) + 10px);
+}
+
+/* Phone: the dock spans the width (a 16px gutter each side) and sits above
+   Obsidian's own floating toolbar, which --bud-bottom-chrome already measures
+   for the toast. Each slot starts at its own label's width and the spare
+   room is shared out, so "Transactions" gets the width "Plan" does not need
+   (equal fifths cut it to "Transact…" at 375px); a label longer than even
+   that, in a longer language, truncates rather than pushing a slot off. */
+@media (max-width: 600px) {
+  .budget-app-root { --bv-dock-bottom: var(--bud-bottom-chrome); }
+  .budget-app-root .bv-dock { left: 12px; right: 12px; transform: none; }
+  .budget-app-root .dock-btn { flex: 1 1 auto; min-width: 0; padding: 6px 2px; }
+  .budget-app-root .dock-save { margin-left: 7px; }
+}
+/* A phone on its side is wider than 600px but keeps Obsidian's floating
+   toolbar along the bottom, so the dock keeps clearing it. Floating a little
+   too high on a build without the toolbar costs nothing; sitting under it
+   would hide Save. */
+@media (min-width: 601px) {
+  body.is-phone .budget-app-root {
+    --bv-dock-bottom: calc(env(safe-area-inset-bottom, 0px) + var(--mobile-navbar-height, 60px) + 16px);
+  }
 }
