@@ -3,6 +3,48 @@
 All notable changes to Budget Vault. Versions match the plugin version in
 `manifest.json` and the release tag exactly (no `v` prefix).
 
+## 1.56.0 — 2026-10-22
+
+A Food page that splits grocery spend into what was actually bought, a
+floating dock with Save and four page shortcuts, and a fix for edits lost
+when two Budget tabs were open.
+
+### Added
+
+- **A Food page** (menu: Budget → Food). For the period in the header it shows
+  spend by category — meat & fish, dairy, cheese, fruit & veg, snacks &
+  chocolate, wine and the rest — every product with how often it was bought,
+  what it cost and whether its price moved, the discounts on the slips, the
+  share that was Vitality HealthyFood, and how much of the period's grocery
+  spend on the bank has a receipt behind it. Change a product's category once
+  and every receipt carrying it follows.
+- **Add receipt.** Paste the text of a till slip — on an iPhone or Mac, press
+  and hold on the photo, Select All, Copy — and check every line in an
+  editable table before saving. Checkers slips are read line by line,
+  XTRASAVE discounts, voided lines and (V) marks included, and checked against
+  the slip's own total, line count and "Today you saved". Any other shop's
+  slip is read too (prices without an R, weights, "26 Aug 2026"), or a list
+  typed by hand. Three examples show what to paste; a few cents of till
+  rounding can be recorded in one tap. Nothing leaves the device.
+- **Receipts are plain notes** in `Receipts/<YYYY-MM>/`, one per slip, and
+  `Receipts/Food Items.md` remembers how each product is filed. The bank
+  transaction stays one row and its budget figures do not move: a receipt is
+  matched to its bank line by amount and date, so a slip saved before the
+  statement is imported links itself when the statement arrives.
+- **A floating dock** at the bottom of every page: Transactions, Budget,
+  Accounts and Plan, plus the open page's own Save, so a long table no longer
+  means scrolling back up to save it.
+
+### Fixed
+
+- **A Save in one Budget tab could be undone by another.** With two Budget
+  views open, the second treated the first one's write as its own, kept its
+  old copy, and wrote it back on its next Save. Each view now tells its own
+  writes from another's: the other tab reloads, and a Save over a stale copy
+  is refused with a notice instead of overwriting.
+- **The dock's edge is visible** in light and dark, and it keeps one width as
+  you switch pages.
+
 ## 1.55.0 — 2026-10-21
 
 Accounts held in another currency can now be converted without editing the

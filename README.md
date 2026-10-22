@@ -35,6 +35,7 @@ Put your vault in iCloud Drive, Obsidian Sync, Dropbox or Syncthing and your bud
 - **Report** — a one-note financial report (Markdown and/or JSON), for a month, a year or any span
 - **Budget export** — your budget as a PDF, an Excel workbook or CSV, for the last month, quarter, year, a tax year or any two dates
 - **Accounts, assets, debt, owed money, services, tax, savings and loan calculators** — a screen each
+- **Food** — paste a till slip's text (Live Text on iPhone or Mac) and see what the groceries actually were: meat, dairy, cheese, snacks, wine, by category and by product, with discounts, the healthy share and price changes. Checkers slips are read line by line; any other shop's, or a list typed by hand, too. The bank line stays one transaction — the receipt sits beside it.
 - **Notes** — ordinary notes that can point at a category or an account
 - **Several currencies** — accounts in other currencies are named beside your totals, and added into them if you switch on exchange rates (see above)
 - **Twelve languages** — English, Afrikaans, Deutsch, Español, Français, हिन्दी, Bahasa Indonesia, 日本語, Português, isiXhosa, 中文 and isiZulu; set separately from the country
@@ -77,6 +78,7 @@ Finances/Budget/
 ├── Transactions/
 │   └── <Account>/YYYY-MM.md
 ├── Data/Categorisation Rules.csv
+├── Receipts/            one file per till slip (YYYY-MM/), plus Food Items.md
 ├── Tax/
 ├── Debts.md
 ├── Owed Money.md
