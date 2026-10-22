@@ -243,18 +243,26 @@ module.exports = function registerFood(ctx) {
     ctx.render();
   }
 
-  /* Re-file one product everywhere it appears. */
+  /* Re-file one Items row everywhere it appears. A row is a product NAME
+     (receipt-file.js rowKey), so it can stand for several barcodes — every
+     one of them is remembered and rewritten, or the next receipt carrying
+     the other barcode would arrive filed the old way. */
   async function refile(it, change) {
-    const next = { barcode: it.barcode, name: it.name, category: change.category ?? it.category, healthy: change.healthy ?? it.healthy };
+    const category = change.category ?? it.category;
+    const healthy = change.healthy ?? it.healthy;
     try {
-      await rememberItems([next]);
-      const key = itemKey(it);
+      await rememberItems(it.members.map(m => ({ ...m, category, healthy })));
+      const keys = new Set(it.members.map(itemKey));
       for (const r of S.receipts) {
-        if (!r.items.some(x => itemKey(x) === key)) continue;
-        const text = await readFile(r.rel);
+        if (!r.items.some(x => keys.has(itemKey(x)))) continue;
+        let text = await readFile(r.rel);
         if (text == null) continue;
-        const out = refileReceiptText(text, key, change);
-        if (out != null) await writeFile(r.rel, out);
+        let changed = false;
+        for (const key of keys) {
+          const out = refileReceiptText(text, key, change);
+          if (out != null) { text = out; changed = true; }
+        }
+        if (changed) await writeFile(r.rel, text);
       }
     } catch (e) {
       toast(`Could not re-file ${it.name}: ${e.message || e}`, true);

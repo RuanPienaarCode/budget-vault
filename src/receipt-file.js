@@ -276,6 +276,37 @@ function matchReceipts(receipts, txs) {
   return out;
 }
 
+/* The Items table's row for a line: its product NAME, folded — not its
+   barcode. The same tin from two suppliers carries two barcodes, and two
+   "TOM ONION 410G" rows read to a household as a duplicate (Ruan, 22 Oct
+   2026). The barcodes are kept as the row's `members`, which is what
+   re-filing the row writes to. Filing itself (Food Items.md, the receipt's
+   Category cell) stays per barcode. */
+const nameKey = it => '#' + fold(it.name);
+
+/* Rows are joined both ways: one barcode under two spellings (an OCR
+   misread, a renamed product) is still one product, and so are two
+   barcodes under one name. Union-find over barcode and name keys; a row's
+   key is whichever of its keys was seen first. */
+function rowKeysFor(receipts) {
+  const parent = new Map();
+  const find = k => {
+    if (!parent.has(k)) parent.set(k, k);
+    let r = k;
+    while (parent.get(r) !== r) r = parent.get(r);
+    parent.set(k, r);
+    return r;
+  };
+  for (const r of receipts) {
+    for (const it of r.items) {
+      const a = find(nameKey(it));
+      const b = find(itemKey(it));
+      if (a !== b) parent.set(b, a);
+    }
+  }
+  return it => find(nameKey(it));
+}
+
 /* What the receipts dated inside [start, end] (ISO, inclusive) say was
    bought. Every figure is what was PAID — price plus its discount — so a
    category total agrees with the slip total it came from. */
@@ -290,11 +321,12 @@ function foodSummary(receipts, start, end) {
      has one price per month, and a history cut at the period edge could
      never show it moving. Up to `end`, never past it — a later slip is not
      history yet for the period being looked at. */
+  const rowKey = rowKeysFor(byDate);
   const history = new Map();
   for (const r of byDate) {
     if (r.date > end) break;
     for (const it of r.items) {
-      const k = itemKey(it);
+      const k = rowKey(it);
       if (!history.has(k)) history.set(k, []);
       history.get(k).push({ date: r.date, amount: it.amount || 0 });
     }
@@ -312,9 +344,10 @@ function foodSummary(receipts, start, end) {
       const c = cats.get(cat) || { category: cat, amount: 0, lines: 0 };
       c.amount += paid; c.lines++;
       cats.set(cat, c);
-      const k = itemKey(it);
-      const p = products.get(k) || { key: k, barcode: it.barcode || '', name: it.name, category: cat, healthy: !!it.healthy, amount: 0, count: 0, prices: history.get(k) || [] };
+      const k = rowKey(it);
+      const p = products.get(k) || { key: k, barcode: it.barcode || '', name: it.name, category: cat, healthy: !!it.healthy, amount: 0, count: 0, prices: history.get(k) || [], members: new Map() };
       p.amount += paid; p.count++;
+      p.members.set(itemKey(it), { barcode: it.barcode || '', name: it.name });
       /* The latest receipt names it — a slip that spelled it better wins. */
       p.name = it.name || p.name; p.category = cat; p.healthy = !!it.healthy;
       products.set(k, p);
@@ -323,7 +356,7 @@ function foodSummary(receipts, start, end) {
   const byCategory = [...cats.values()].map(c => ({ ...c, amount: r2(c.amount) }))
     .sort((a, b) => b.amount - a.amount || a.category.localeCompare(b.category));
   const items = [...products.values()].map(p =>
-    ({ ...p, amount: r2(p.amount), lastPrice: p.prices.length ? p.prices[p.prices.length - 1].amount : 0 })).sort((a, b) => b.amount - a.amount || a.name.localeCompare(b.name));
+    ({ ...p, members: [...p.members.values()], amount: r2(p.amount), lastPrice: p.prices.length ? p.prices[p.prices.length - 1].amount : 0 })).sort((a, b) => b.amount - a.amount || a.name.localeCompare(b.name));
   spend = r2(spend);
   return {
     receipts: inRange.length,

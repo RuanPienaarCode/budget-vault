@@ -166,7 +166,7 @@ const text = rf.serializeReceipt(receipt);
     ['Snacks & chocolate', 105], ['Bakery', 40], ['Dairy & eggs', 30], ['Fruit & veg', 30],
   ], '6: by category, biggest first, ties by name');
   eq(s.byCategory.reduce((a, c) => a + c.amount, 0), s.spend, '6: categories add up to spend');
-  const choc = s.items.find(i => i.key === '6000000000035');
+  const choc = s.items.find(i => i.members.some(m => m.barcode === '6000000000035'));
   eq([choc.count, choc.amount, choc.lastPrice], [2, 105, 55], '6: one product across two slips, latest price');
 
   /* Newest-first input (the loader's order) must not let the OLDEST slip name
@@ -175,12 +175,32 @@ const text = rf.serializeReceipt(receipt);
     { barcode: '6000000000035', name: 'CHOC OLD NAME', amount: 45, discount: 0, category: 'Other', healthy: false },
   ] };
   const s2 = rf.foodSummary([r2, r1, jan], '2026-02-01', '2026-02-28');
-  const c2 = s2.items.find(i => i.key === '6000000000035');
+  const c2 = s2.items.find(i => i.members.some(m => m.barcode === '6000000000035'));
+  eq(s2.items.filter(i => i.members.some(m => m.barcode === '6000000000035')).length, 1, '6: one barcode under two spellings is still one row');
   eq([c2.name, c2.category], ['CHOC SLAB 80G', 'Snacks & chocolate'], '6: the newest slip names and files the product');
   eq(c2.prices.map(p => p.amount), [45, 50, 55], '6: price history includes January, outside the period');
   eq(c2.count, 2, '6: but the counts stay inside the period');
   const s3 = rf.foodSummary([r2, r1, jan], '2026-01-01', '2026-01-31');
   eq(s3.items[0].prices.map(p => p.amount), [45], '6: and never runs past the period end');
+
+  /* One row per product NAME (Ruan, 22 Oct 2026): the same tin from two
+     suppliers carries two barcodes, and two "TOM ONION 410G" rows read as a
+     duplicate. The row keeps every barcode behind it, so re-filing it can
+     reach all of them. */
+  const tinA = { ...r1, rel: 'tA', date: '2026-02-02', items: [
+    { barcode: '6000000000101', name: 'TOM ONION 410G', amount: 17.99, discount: 0, category: 'Pantry', healthy: false },
+  ] };
+  const tinB = { ...r1, rel: 'tB', date: '2026-02-05', items: [
+    { barcode: '6000000000202', name: 'Tom Onion  410g', amount: 21.99, discount: 0, category: 'Pantry', healthy: false },
+    { barcode: '', name: 'tom onion 410G', amount: 19.99, discount: 0, category: 'Pantry', healthy: false },
+  ] };
+  const s4 = rf.foodSummary([tinB, tinA], '2026-02-01', '2026-02-28');
+  const tins = s4.items.filter(i => rf.fold(i.name) === 'tom onion 410g');
+  eq(tins.length, 1, '6: same name, different barcodes — one Items row');
+  eq([tins[0].count, tins[0].amount], [3, 59.97], '6: counting every line under that name');
+  eq(tins[0].prices.map(p => p.amount), [17.99, 21.99, 19.99], '6: one price history across the barcodes, oldest first');
+  eq(tins[0].members.map(m => rf.itemKey(m)).sort(), ['#tom onion 410g', '6000000000101', '6000000000202'],
+    '6: and every barcode (or name) behind the row, for re-filing');
 }
 
 console.log(`PASS receipt-file (${checks} checks)`);
