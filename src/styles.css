@@ -5727,7 +5727,11 @@ body.is-tablet .budget-app-root button:where(.dock-btn) { padding: 6px 10px; }
 .budget-app-root {
   --bv-dock-h: 64px;
   --bv-dock-bottom: max(16px, calc(10px + env(safe-area-inset-bottom, 0px)));
+  /* The pill's edge. --border-color (9% / 8%) vanishes against the glass it
+     sits on, so the dock gets a hairline about twice as strong, per theme. */
+  --bv-dock-edge: rgba(15,23,32,.18);
 }
+.budget-app-root.bud-dark { --bv-dock-edge: rgba(255,255,255,.18); }
 .budget-app-root .bv-dock {
   position: absolute;
   left: 50%; bottom: var(--bv-dock-bottom);
@@ -5737,7 +5741,7 @@ body.is-tablet .budget-app-root button:where(.dock-btn) { padding: 6px 10px; }
   height: var(--bv-dock-h);
   padding: 5px;
   border-radius: 22px;
-  border: 1px solid var(--border-color);
+  border: 1px solid var(--bv-dock-edge);
   background: var(--surface-glass-hi);
   -webkit-backdrop-filter: blur(20px); backdrop-filter: blur(20px);
   box-shadow: var(--shadow-md), var(--shadow-sm);
@@ -5762,8 +5766,8 @@ body.is-tablet .budget-app-root button:where(.dock-btn) { padding: 6px 10px; }
   .budget-app-root .dock-btn:not(:disabled):hover { color: var(--color-primary); background: var(--color-primary-light); }
 }
 /* Save sits last, past a hairline, in the app's primary gradient while there
-   is something to save; dimmed (but still there, so the dock does not change
-   width under the thumb mid-edit) while there is not. */
+   is something to save; dimmed (but still there, so the dock keeps one width
+   across every page and under the thumb mid-edit) while there is not. */
 .budget-app-root .dock-save { position: relative; margin-left: 9px; }
 .budget-app-root .dock-save::before {
   content: ''; position: absolute; left: -6px; top: 10px; bottom: 10px;
