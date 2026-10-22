@@ -210,6 +210,61 @@ const typed = [
   eq(r.problems, [], '10: and the slip still adds up');
 }
 
+/* ---- 11. a butcher-style slip: no R, quantity lines, a word date -------- */
+/* The shape a small shop's till prints (and the first non-Checkers slip
+   imported, 26 Aug 2026, had): the product on one line, then "weight @ price
+   total" under it, no currency symbol anywhere, "Sub Total" rather than
+   TOTAL, and the date spelled "26 Aug 2026". Synthetic figures. */
+const butcher = [
+  'Sample The Butcher',
+  'COPY OF RECEIPT',
+  'Date :14 Feb 2026',
+  'Time :09:15:42',
+  'Station :1',
+  'Trans# :12345',
+  'TAX INVOICE',
+  '----------------------------------',
+  'Free Range Biltong',
+  '  0.250 @   100.00        100.00',
+  'FR BEEF SHIN',
+  '  1.05 @   150.00         150.00',
+  'Pork Neck Roll',
+  '  2.4 @   200.05          200.05',
+  '----------------------------------',
+  'Sub Total               450.00',
+  'E.F.T                   450.00',
+  'Change                    0.00',
+  'Corner of Sample Avenue & Test Road',
+  'Telephone/Whatsapp 000-000-0000',
+].join('\n');
+{
+  const r = parseReceiptText(butcher);
+  eq(r.format, 'generic', '11: not a Checkers slip');
+  eq([r.store, r.date, r.time, r.total], ['Sample The Butcher', '2026-02-14', '09:15', 450], '11: shop, word date, time, Sub Total');
+  eq(r.items.map(i => [i.name, i.amount]), [['Free Range Biltong', 100], ['FR BEEF SHIN', 150], ['Pork Neck Roll', 200.05]],
+    '11: each product takes the line total under it — not the weight, not the unit price');
+  eq(r.problems, [{ code: 'rounding', items: 450.05, total: 450, diff: -0.05 }],
+    '11: a few cents the till rounded off is named as rounding, not as a misread');
+}
+{
+  /* Live Text on a photo breaks the columns onto lines of their own. */
+  const split = butcher.replace(/^ {2}([\d.]+) @ +([\d.]+) +([\d.]+)$/gm, '$1 @\n$2\n$3')
+    .replace(/^(Sub Total|E\.F\.T|Change) +([\d.]+)$/gm, '$1\n$2');
+  const r = parseReceiptText(split);
+  eq(r.total, 450, '11: the total read from the line under its label');
+  eq(r.items.map(i => [i.name, i.amount]), [['Free Range Biltong', 100], ['FR BEEF SHIN', 150], ['Pork Neck Roll', 200.05]],
+    '11: the same slip with every figure on its own line');
+}
+
+/* ---- 12. a hand-typed list --------------------------------------------- */
+{
+  const typedList = ['Farm stall', '2026-03-01', 'Eggs 18 75', 'Honey 500g 89.90', 'Spinach 2 x 12.50  25.00', 'Total 189.90'].join('\n');
+  const r = parseReceiptText(typedList);
+  eq(r.items.map(i => [i.name, i.amount]), [['Eggs 18', 75], ['Honey 500g', 89.9], ['Spinach 2 x 12.50', 25]],
+    '12: one product per line, whole rands allowed, the line total wins over "2 x 12.50"');
+  eq([r.total, r.problems], [189.9, []], '12: and it adds up');
+}
+
 /* ---- 8. a known barcode's confirmed name ------------------------------- */
 {
   const mangled = typed.replace('CHOC SLAB 80G', 'CH0C SLAR 8OG');

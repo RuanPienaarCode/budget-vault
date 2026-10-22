@@ -100,6 +100,8 @@ const titleCase = s => s.toLowerCase().replace(/\b[a-z]/g, c => c.toUpperCase())
    prints "Savings at 17-09-2026", a dash date that is the loyalty balance's
    as-of, not the purchase, and taking it would file the receipt in the wrong
    week. ISO is accepted for typed and generic receipts. */
+const MONTHS = ['jan', 'feb', 'mar', 'apr', 'may', 'jun', 'jul', 'aug', 'sep', 'oct', 'nov', 'dec'];
+
 function findDate(lines) {
   for (const l of lines) {
     const m = l.match(/\b(\d{1,2})\/(\d{1,2})\/(\d{2}|\d{4})\b/);
@@ -112,6 +114,19 @@ function findDate(lines) {
   for (const l of lines) {
     const m = l.match(/\b(\d{4})-(\d{2})-(\d{2})\b/);
     if (m && validIso(m[0])) return m[0];
+  }
+  /* "26 Aug 2026" / "Aug 26, 2026" — the small-shop tills print the month
+     as a word. */
+  for (const l of lines) {
+    let m = l.match(/\b(\d{1,2})\s+([A-Za-z]{3})[a-z]*\.?,?\s+(\d{4})\b/);
+    let d, mon, y;
+    if (m) [, d, mon, y] = m;
+    else if ((m = l.match(/\b([A-Za-z]{3})[a-z]*\.?\s+(\d{1,2}),?\s+(\d{4})\b/))) [, mon, d, y] = m;
+    const mi = mon ? MONTHS.indexOf(mon.toLowerCase()) : -1;
+    if (mi >= 0) {
+      const iso = `${y}-${String(mi + 1).padStart(2, '0')}-${d.padStart(2, '0')}`;
+      if (validIso(iso)) return iso;
+    }
   }
   for (const l of lines) {
     if (/savings at/i.test(l)) continue;
@@ -351,33 +366,107 @@ function parseCheckers(lines, known) {
   return { format: 'checkers', store, total, count: slipCount, items, problems };
 }
 
+/* Any other shop. Read the way a person reads a slip they have never seen:
+
+     - the products sit between the header and the totals — after the first
+       "TAX INVOICE" or dashed line when there is one, up to the first
+       Total / Sub Total / payment line;
+     - a product's price is the LAST money figure before the next product,
+       so "0.250 @ 100.00   100.00" under "Free Range Biltong" gives 100.00,
+       and so does the same slip with every figure on a line of its own
+       (Live Text on a photo splits columns that way);
+     - a money figure has two decimals or none, with or without an R —
+       "0.250" kg and "2.4" kg never are, and a line ending in "@" is a
+       weight waiting for its price;
+     - a negative figure is a discount on the product above it.
+
+   The total is the slip's TOTAL, else its Sub Total, else what was paid
+   (EFT, card, amount due). A slip whose lines miss that by under 10c is
+   reported as rounding — a till rounding to the nearest 10c, as the first
+   butcher slip imported here did — not as a misread line. */
+const MONEY_TAIL = /(?:^|\s)(-?)R?\s?(\d{1,3}(?:[ ,]\d{3})+|\d+)(?:[.,](\d{2}))?\s*[A-Z]?$/;
+const SEPARATOR = /^[-=_*~.]{5,}$/;
+const DATE_OR_TIME = /\b\d{1,2}[:h]\d{2}\b|\b\d{4}-\d{2}-\d{2}\b|\b\d{1,2}[/.-]\d{1,2}[/.-]\d{2,4}\b|\b\d{1,2}\s+[A-Za-z]{3}[a-z]*\.?\s+\d{4}\b/;
+const PAID_LINE = /\b(E\.?\s*F\.?\s*T|CARD|AMOUNT\s+DUE|BALANCE\s+DUE|TENDER(?:ED)?|CREDIT|DEBIT)\b/i;
+
+function moneyTail(line) {
+  const m = line.match(MONEY_TAIL);
+  if (!m) return null;
+  const whole = m[2].replace(/[ ,]/g, '');
+  const v = Number(whole) + (m[3] ? Number(m[3]) / 100 : 0);
+  return { text: line.slice(0, m.index).trim(), value: m[1] === '-' ? -v : v };
+}
+const hasWords = s => /[A-Za-z]{2,}/.test(s.replace(/\b\d+(?:[.,]\d+)?\s*(?:@|x|kg|g)\b/gi, ''));
+
+function genericTotal(lines) {
+  /* The figure on the label's own line, or — Live Text puts a column on
+     lines of its own — on the line under it. */
+  const pick = re => {
+    for (let i = 0; i < lines.length; i++) {
+      if (!re.test(lines[i])) continue;
+      const own = moneyTail(lines[i]);
+      if (own && own.value > 0 && hasWords(own.text)) return own.value;
+      const next = lines[i + 1] && moneyTail(lines[i + 1]);
+      if (next && next.value > 0 && !hasWords(next.text)) return next.value;
+    }
+    return null;
+  };
+  return pick(/^(?!.*SUB\s*TOTAL).*\bTOTAL\b/i) ?? pick(/SUB\s*TOTAL/i) ?? pick(PAID_LINE);
+}
+
 function parseGeneric(lines) {
+  const store = lines.find(l => hasWords(l) && !moneyTail(l) && !DATE_OR_TIME.test(l)) || lines[0] || '';
+  let start = lines.indexOf(store) + 1;
+  const head = lines.findIndex(l => /TAX\s*INVOICE/i.test(l) || SEPARATOR.test(l));
+  if (head >= 0) start = Math.max(start, head + 1);
   const items = [];
-  let total = null;
-  for (const l of lines) {
-    const t = tailPrice(l);
-    if (!t) continue;
-    if (GENERIC_SKIP.test(t.text)) {
-      if (total == null && /\bTOTAL\b/i.test(t.text) && !/SUB\s*TOTAL/i.test(t.text) && t.value > 0) total = t.value;
+  let pending = null;
+  for (let i = start; i < lines.length; i++) {
+    const l = lines[i];
+    if (SEPARATOR.test(l) || /TAX\s*INVOICE/i.test(l)) continue;
+    if (GENERIC_SKIP.test(l) || PAID_LINE.test(l)) {
+      if (items.length) break;      // the totals: the product block is over
+      continue;                     // a header line above it
+    }
+    if (DATE_OR_TIME.test(l) && !items.length && !pending) continue;
+    if (/[@x×]\s*$/i.test(l)) continue;           // "0.268 @" — weight, price follows
+    const t = moneyTail(l);
+    if (t && !hasWords(t.text)) {
+      /* A figure with no product words: the price of the product above,
+         or a discount on it. The last one before the next product wins. */
+      if (t.value < 0) {
+        const last = items[items.length - 1];
+        if (last) last.discount = roundCents(last.discount + t.value);
+      } else if (pending) {
+        pending.amount = t.value;
+      }
       continue;
     }
-    if (!t.text) continue;
-    if (t.value < 0 && items.length) {
+    if (t && t.value < 0) {
       const last = items[items.length - 1];
-      last.discount = roundCents(last.discount + t.value);
-      continue;
+      if (last) { last.discount = roundCents(last.discount + t.value); continue; }
     }
-    let name = t.text;
+    let name = t ? t.text : l;
     const healthy = HEALTHY_TAIL.test(name);
     name = name.replace(HEALTHY_TAIL, '').trim();
-    if (cents(t.value) === 0) continue;
-    items.push({ barcode: '', name, amount: t.value, discount: 0, healthy });
+    pending = { barcode: '', name, amount: t ? t.value : null, discount: 0, healthy };
+    items.push(pending);
   }
+  const kept = items.filter(it => it.amount == null || cents(it.amount) !== 0);
+  const total = genericTotal(lines);
   const problems = [];
-  if (total != null && cents(itemsTotal(items)) !== cents(total)) {
-    problems.push({ code: 'sum-mismatch', items: itemsTotal(items), total });
+  const unpriced = kept.filter(it => it.amount == null).length;
+  if (unpriced) problems.push({ code: 'unpriced', n: unpriced });
+  if (total != null && !unpriced) {
+    const got = itemsTotal(kept);
+    const diff = roundCents(total - got);
+    if (diff !== 0) {
+      problems.push(Math.abs(diff) < 0.1
+        ? { code: 'rounding', items: got, total, diff }
+        : { code: 'sum-mismatch', items: got, total });
+    }
   }
-  return { format: 'generic', store: lines[0] || '', total, count: null, items, problems };
+  return { format: 'generic', store, total, count: null, items: kept, problems };
 }
 
 /* What the items add up to — prices plus their discounts. */

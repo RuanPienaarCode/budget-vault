@@ -83,7 +83,7 @@ module.exports = function registerFood(ctx) {
 
     const tile = kpiTiles($('#foodKpis'));
     tile('Spent on receipts', money(sum.spend), '', `${sum.receipts} receipt${sum.receipts === 1 ? '' : 's'} this period`);
-    tile('Xtra Savings', money(sum.saved), sum.saved > 0 ? 'text-success' : '', 'XTRASAVE discounts on the slips');
+    tile('Discounts', money(sum.saved), sum.saved > 0 ? 'text-success' : '', 'XTRASAVE, specials and till rounding');
     tile('Healthy', sum.spend > 0 ? `${Math.round(sum.healthyShare * 100)}%` : '—', '',
       sum.spend > 0 ? `${money(sum.healthy)} on (V) HealthyFood lines` : 'no receipts this period');
     const covTile = tile('With a receipt', foodSpend > 0 ? `${Math.round((covered / foodSpend) * 100)}%` : '—', '',
