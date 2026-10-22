@@ -369,7 +369,81 @@ function foodSummary(receipts, start, end) {
   };
 }
 
+/* Spend per food category per period, for the Food page's chart.
+
+   `periods`: [{ key, start, end }] oldest first. A period holding no receipt
+   at all is NOT covered and gets null everywhere — the receipts start when the
+   household started saving them, and drawing the months before that as zero
+   would chart a frugality that never happened (the Dashboard trend's rule).
+   Inside a covered period a category with nothing bought is a real 0.
+   Categories come biggest-first over the whole window, so the chart's legend
+   and its colours are stable as the range changes.
+   -> { covered[], totals[], categories[], series: { [category]: values[] } } */
+function foodTrend(receipts, periods) {
+  const covered = periods.map(() => false);
+  const sums = periods.map(() => new Map());
+  const overall = new Map();
+  for (const r of receipts) {
+    if (!r.date) continue;
+    const i = periods.findIndex(p => r.date >= p.start && r.date <= p.end);
+    if (i < 0) continue;
+    covered[i] = true;
+    for (const it of r.items) {
+      const cat = it.category || OTHER;
+      const paid = paidOf(it);
+      sums[i].set(cat, (sums[i].get(cat) || 0) + paid);
+      overall.set(cat, (overall.get(cat) || 0) + paid);
+    }
+  }
+  const categories = [...overall.keys()]
+    .sort((a, b) => overall.get(b) - overall.get(a) || a.localeCompare(b));
+  const series = {};
+  for (const cat of categories) series[cat] = sums.map((m, i) => (covered[i] ? r2(m.get(cat) || 0) : null));
+  const totals = sums.map((m, i) => (covered[i] ? r2([...m.values()].reduce((a, v) => a + v, 0)) : null));
+  return { covered, totals, categories, series };
+}
+
+/* How one product's shelf price moved inside a window: its first purchase on
+   or after `start` against its latest. A purchase before the window is not
+   its starting price — "up 20% over 3 months" has to mean those 3 months.
+   Price, not paid: a discount is a deal, not the shelf price changing.
+   -> { first, last, change, pct, n } or null when nothing was bought. */
+function priceChange(prices, start) {
+  const inWindow = (prices || []).filter(p => p.date >= start)
+    .sort((a, b) => a.date.localeCompare(b.date));
+  if (!inWindow.length) return null;
+  const first = inWindow[0].amount;
+  const last = inWindow[inWindow.length - 1].amount;
+  const change = r2(last - first);
+  return { first, last, change, pct: first ? Math.round((change / first) * 10000) / 10000 : 0, n: inWindow.length };
+}
+
+/* Each Items row of one period against the same product in the period
+   before: what was spent on it then, at what price, and how this period
+   differs. Rows are matched by the same key foodSummary gives them, which
+   is stable across periods because rowKeysFor joins over every receipt.
+   -> Map(row key -> { spent, price, spentChange, priceChange } | null when
+   the product was not bought last period). */
+function versusLastPeriod(current, previous) {
+  const prev = new Map(previous.items.map(it => [it.key, it]));
+  const out = new Map();
+  for (const it of current.items) {
+    const p = prev.get(it.key);
+    if (!p) { out.set(it.key, null); continue; }
+    /* The last price PAID in that period, not the history's latest — the
+       history runs up to the period's end, which is where p sits already. */
+    const price = p.lastPrice;
+    out.set(it.key, {
+      spent: p.amount, price,
+      spentChange: r2(it.amount - p.amount),
+      priceChange: r2(it.lastPrice - price),
+    });
+  }
+  return out;
+}
+
 module.exports = {
+  foodTrend, priceChange, versusLastPeriod,
   RECEIPTS_DIR, FOOD_ITEMS_FILE, FOOD_CATEGORIES, OTHER,
   guessCategory, fold, itemKey, suggestFiling, mergeFoodItems, coverage,
   parseFoodItems, serializeFoodItems,

@@ -435,6 +435,16 @@ const SHELL_HTML = `
         <div class="mini-grid mini-kpis-4 mb-4" id="foodKpis"></div>
         <div class="card mb-4">
           <div class="card-h" style="align-items:center">
+            <div><h2>Over time</h2><div class="sub" id="foodTrendSub">What was paid per period, by category</div></div>
+            <div id="foodTrendRange"></div>
+          </div>
+          <div class="body-pad">
+            <div class="food-trend-chart" id="foodTrendChart"></div>
+            <div class="food-legend" id="foodTrendLegend"></div>
+          </div>
+        </div>
+        <div class="card mb-4">
+          <div class="card-h" style="align-items:center">
             <div><h2>By category</h2><div class="sub">What was paid, after XTRASAVE &middot; tap one to list its items</div></div>
             <div class="row">
               <button class="btn-gradient" id="foodAdd"><span class="ico" data-ico="plus"></span> Add receipt</button>
@@ -455,7 +465,7 @@ const SHELL_HTML = `
           </div>
           <div class="table-responsive">
             <table class="table food-items-table" id="foodItemsTable">
-              <thead><tr><th>Item</th><th>Category</th><th>Healthy</th><th class="num">Bought</th><th class="num">Spent</th><th class="num">Last price</th></tr></thead>
+              <thead><tr><th>Item</th><th>Category</th><th>Healthy</th><th class="num">Bought</th><th class="num">Spent</th><th class="num">Last month</th><th class="num">Last price</th></tr></thead>
               <tbody id="foodItemsBody"></tbody>
             </table>
           </div>
