@@ -101,6 +101,15 @@ function parseFoodItems(text) {
   return map;
 }
 
+/* What follows a table: nothing, or ONE blank line and then the text. The
+   blank line is content — a line straight under a table is another row of
+   it in GFM and in Obsidian's reader, so a note the reader wrote under a
+   receipt became a broken table row the first time a product was re-filed. */
+function afterTable(trail) {
+  const t = trail == null ? '' : String(trail).replace(/^\s+/, '');
+  return t ? ['', t] : [''];
+}
+
 function serializeFoodItems(map, { lead = null, trail = null } = {}) {
   const rows = [...map.values()].sort((a, b) =>
     (a.category || '').localeCompare(b.category || '') || (a.name || '').localeCompare(b.name || ''));
@@ -112,7 +121,7 @@ function serializeFoodItems(map, { lead = null, trail = null } = {}) {
     'every receipt carrying that barcode follows it.', '',
   ].join('\n');
   return [head, ...(lead != null ? [''] : []), h, sep, ...rows.map(r => rowLine(SCHEMAS.foodItems, r)),
-    ...(trail != null ? [trail.replace(/^\s+/, '')] : ['']), ].join('\n').replace(/\n*$/, '\n');
+    ...afterTable(trail)].join('\n').replace(/\n*$/, '\n');
 }
 
 /* The category and healthy flag a fresh line arrives with, before anyone
@@ -192,7 +201,7 @@ function serializeReceipt(r, { lead = null, trail = null } = {}) {
   ].join('\n');
   const rows = r.items.map(it => rowLine(SCHEMAS.receiptItems, it));
   return [head, ...(lead != null ? [''] : []), h, sep, ...rows,
-    ...(trail != null ? [trail.replace(/^\s+/, '')] : ['']), ].join('\n').replace(/\n*$/, '\n');
+    ...afterTable(trail)].join('\n').replace(/\n*$/, '\n');
 }
 
 function parseReceiptFile(text, rel) {

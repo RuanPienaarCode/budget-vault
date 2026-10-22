@@ -58,6 +58,12 @@ const text = rf.serializeReceipt(receipt);
   const lead = withExtras.slice(0, withExtras.indexOf('| Barcode'));
   ok(out.startsWith(lead), '2: everything above the table kept byte for byte');
   ok(out.trimEnd().endsWith('Bought for the braai.'), '2: everything below the table kept');
+  /* A line straight under a table is another ROW of it in GFM and in
+     Obsidian's reader, so the blank line between them is content too. */
+  ok(/\|\n\nBought for the braai\./.test(out), '2: and the blank line that keeps it out of the table');
+  ok(/\|\n\nA note\.\n$/.test(rf.serializeReceipt(receipt, { trail: 'A note.\n' })), '2: a fresh trail gets one too');
+  ok(/\|\n\nKeep me\.\n$/.test(rf.serializeFoodItems(new Map([['1', { barcode: '1', name: 'X', category: 'Other', healthy: false }]]), { lead: '---\nkind: food-items\n---', trail: '\nKeep me.\n' })),
+    '2: Food Items.md the same');
   eq(rf.refileReceiptText(withExtras, '6000000000035', { category: 'Snacks & chocolate' }), null,
     '2: no change, no write');
   const byName = rf.refileReceiptText(text, rf.itemKey({ name: 'bread |  BROWN' }), { category: 'Pantry' });
