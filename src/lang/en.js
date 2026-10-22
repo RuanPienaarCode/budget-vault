@@ -32,6 +32,7 @@ module.exports = {
   'nav.transactions': 'Transactions',
   'nav.budgets': 'Budget',
   'nav.plan': 'Plan',
+  'nav.food': 'Food',
   'nav.notes': 'Notes',
   'nav.report': 'Report',
   'nav.savings': 'Savings & investments',

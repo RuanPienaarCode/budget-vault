@@ -362,6 +362,11 @@ number	2025	-	noteAbout/option[21]
 number	2025	-	noteAbout/option[22]
 number	2025	-	noteAbout/option[23]
 
+## food
+money	R 0,00	0	foodKpis/div.mini[0]/div.v[1]
+number	0	-	foodKpis/div.mini[0]/div.s[2]
+money	R 0,00	0	foodKpis/div.mini[1]/div.v[1]
+
 ## report
 number	3	-	reportPeriodPills/div.chart-range/button.chart-range-btn[1]
 number	12	-	reportPeriodPills/div.chart-range/button.chart-range-btn[2]

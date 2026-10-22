@@ -42,6 +42,7 @@ module.exports = {
   'nav.transactions': 'Imisebenzi yemali',
   'nav.budgets': 'Isabelomali',
   'nav.plan': 'Uhlelo',
+  'nav.food': 'Ukudla',
   'nav.notes': 'Amanothi',
   'nav.savings': 'Imali elondoloziwe notshalomali',
   'nav.accounts': 'Ama-akhawunti',

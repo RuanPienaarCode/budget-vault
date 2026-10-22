@@ -60,6 +60,9 @@ const SHELL_HTML = `
     <button class="drawer-link" data-view="plan">
       <span class="di"><span class="ico" data-ico="target|goal|crosshair"></span></span><span data-i18n="nav.plan">Plan</span>
     </button>
+    <button class="drawer-link" data-view="food">
+      <span class="di"><span class="ico" data-ico="shopping-basket|shopping-cart"></span></span><span data-i18n="nav.food">Food</span>
+    </button>
     <button class="drawer-link" data-view="notes">
       <span class="di"><span class="ico" data-ico="notebook-pen|sticky-note|file-text"></span></span><span data-i18n="nav.notes">Notes</span>
     </button>
@@ -421,6 +424,51 @@ const SHELL_HTML = `
                split balances, so a finished plan gets no shelf standing there
                saying "R 0.00 left" — the same rule the Accounts deck follows. -->
           <div class="plan-free hidden" id="planFree"></div>
+        </div>
+      </section>
+
+      <section id="view-food" class="hidden">
+        <div class="financial-period-banner">
+          <h1 class="financial-period-banner-title" data-i18n="nav.food">Food</h1>
+          <div class="sub-note">What your grocery receipts say you bought &middot; one markdown file per slip, in <code>Receipts/</code></div>
+        </div>
+        <div class="mini-grid mini-kpis-4 mb-4" id="foodKpis"></div>
+        <div class="card mb-4">
+          <div class="card-h" style="align-items:center">
+            <div><h2>By category</h2><div class="sub">What was paid, after XTRASAVE &middot; tap one to list its items</div></div>
+            <div class="row">
+              <button class="btn-gradient" id="foodAdd"><span class="ico" data-ico="plus"></span> Add receipt</button>
+            </div>
+          </div>
+          <div class="body-pad body-pad-tight food-cats" id="foodCats"></div>
+        </div>
+        <div class="card mb-4">
+          <div class="card-h"><div><h2>Items</h2><div class="sub">Change a category once and every receipt with that product follows</div></div></div>
+          <div class="body-pad body-pad-tight">
+            <div class="row note-filters">
+              <label class="sr-only" for="foodCatFilter">Show category</label>
+              <select class="form-select form-select-sm" id="foodCatFilter"></select>
+              <label class="sr-only" for="foodSearch">Search items</label>
+              <input class="form-control form-control-sm" id="foodSearch" type="search" placeholder="Search items…"
+                     autocomplete="off" autocorrect="off" spellcheck="false">
+            </div>
+          </div>
+          <div class="table-responsive">
+            <table class="table food-items-table" id="foodItemsTable">
+              <thead><tr><th>Item</th><th>Category</th><th>Healthy</th><th class="num">Bought</th><th class="num">Spent</th><th class="num">Last price</th></tr></thead>
+              <tbody id="foodItemsBody"></tbody>
+            </table>
+          </div>
+        </div>
+        <div class="card">
+          <div class="card-h"><div><h2>Receipts</h2><div class="sub">Each slip is matched to its bank line by amount and date</div></div></div>
+          <div class="table-responsive">
+            <table class="table food-receipts-table" id="foodReceiptsTable">
+              <thead><tr><th>Date</th><th>Shop</th><th class="num">Total</th><th>Bank line</th><th></th></tr></thead>
+              <tbody id="foodReceiptsBody"></tbody>
+            </table>
+          </div>
+          <div class="body-pad body-pad-tight text-muted" id="foodReceiptsNote"></div>
         </div>
       </section>
 

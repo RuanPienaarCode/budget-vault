@@ -43,6 +43,7 @@ module.exports = {
   'nav.transactions': 'Transações',
   'nav.budgets': 'Orçamento',
   'nav.plan': 'Plano',
+  'nav.food': 'Comida',
   'nav.notes': 'Notas',
   'nav.report': 'Relatório',
   'nav.savings': 'Poupança e investimentos',

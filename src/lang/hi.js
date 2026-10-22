@@ -42,6 +42,7 @@ module.exports = {
   'nav.transactions': 'लेन-देन',
   'nav.budgets': 'बजट',
   'nav.plan': 'योजना',
+  'nav.food': 'भोजन',
   'nav.notes': 'नोट्स',
   'nav.report': 'रिपोर्ट',
   'nav.savings': 'बचत और निवेश',

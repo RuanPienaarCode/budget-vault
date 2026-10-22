@@ -71,13 +71,13 @@ const DISPATCH = (() => {
   for (const m of chunk.matchAll(/(\w+):\s*ctx\.(render\w+)/g)) out.push({ view: m[1], fn: m[2] });
   return out;
 })();
-ok(DISPATCH.length === 16, `all 16 dispatched views are still parsed out of controller.js (found ${DISPATCH.length})`);
+ok(DISPATCH.length === 17, `all 17 dispatched views are still parsed out of controller.js (found ${DISPATCH.length})`);
 
 // 'report' right after 'dashboard' — see views-render.test.cjs's mountAll for
 // why the order is load-bearing (views/report.js reads dashboard.js's own
 // ctx.provide()'d budgetVsActualRows/categorySpendRows at register time).
 const VIEW_MODULES = ['dashboard', 'report', 'score', 'transactions', 'budgets', 'plan', 'accounts', 'savings',
-  'assets', 'debts', 'owed', 'services', 'tax', 'loans', 'import'];
+  'assets', 'debts', 'owed', 'services', 'tax', 'loans', 'import', 'food'];
 
 /* #76 item 2 — `Number.prototype.toFixed` switches to exponential notation at
    1e21 regardless of the decimals argument, which is what the ctx.money mock

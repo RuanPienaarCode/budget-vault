@@ -88,3 +88,19 @@ private copy of the old order. Nothing fails until a user's data is already wron
 After this ADR, that edit is impossible to make in one place: the column exists only
 in the schema, both halves move together, and the tripwire demands the author say out
 loud that history is being rewritten.
+
+## Amendment, 22 Oct 2026 — two receipt tables
+
+The scope grows from five tables to seven: `receiptItems` (one file per till slip
+under `Receipts/<YYYY-MM>/`) and `foodItems` (`Receipts/Food Items.md`), for the
+Food page. Both are single flat tables, so they fit the engine with no new hooks,
+and both are on the frozen tripwire from their first release.
+
+Their reader is `src/receipt-file.js` (`parseReceiptFile`, `parseFoodItems`), not
+`load.js` — the one place `rowToObject` is called outside the loader. Deliberately:
+re-filing a product on the Food page reads a receipt back, changes one column and
+writes it, and that read has to be the loader's own read or the two would drift
+exactly the way this ADR exists to stop. `load.js` calls those same two functions,
+so there is still one door per table. Neither table holds transaction rows; the
+bank line a receipt belongs to is derived on load and reached only through
+`tx-role.js`, so the rule this ADR's "one door" bullet protects is unchanged.

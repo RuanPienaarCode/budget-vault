@@ -91,7 +91,7 @@ async function mountAll(files = FILES, period = '2026-07') {
   // budgetVsActualRows/categorySpendRows off ctx at register time, and both
   // are published by dashboard.js's own ctx.provide().
   for (const f of ['dashboard', 'report', 'score', 'transactions', 'budgets', 'plan', 'accounts', 'savings',
-    'assets', 'debts', 'owed', 'services', 'tax', 'loans', 'import']) {
+    'assets', 'debts', 'owed', 'services', 'tax', 'loans', 'import', 'food']) {
     require(`../src/views/${f}`)(ctx);
   }
   return { ctx, S, nodes };
@@ -160,7 +160,7 @@ async function mountAll(files = FILES, period = '2026-07') {
   {
     const names = DISPATCH.map(d => d.view);
     for (const v of ['dashboard', 'transactions', 'budgets', 'plan', 'savings', 'accounts',
-      'assets', 'debts', 'owed', 'services', 'tax', 'loans', 'import']) {
+      'assets', 'debts', 'owed', 'services', 'tax', 'loans', 'import', 'food']) {
       ok(names.includes(v), `"${v}" is still one of the views this file sweeps`);
     }
     eq(new Set(names).size, names.length, 'no view is dispatched twice');

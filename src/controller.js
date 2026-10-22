@@ -39,6 +39,7 @@ const registerTax = require('./views/tax');
 const registerLoans = require('./views/loans');
 const registerImport = require('./views/import');
 const registerNotes = require('./views/notes');
+const registerFood = require('./views/food');
 const registerReport = require('./views/report');
 
 /* The pure core of money formatting, pulled out of moneyIn() so it is
@@ -531,6 +532,12 @@ function mountApp(view) {
     // total. The Notes page's own filter state is seeded by views/notes.js,
     // which owns its shape.
     notes: [],
+    // Receipts/ — one file per till slip, filled by loadVault's loadReceipts.
+    // Like notes, nothing here feeds a budget total: the bank line is the
+    // figure, the receipt its itemised account (views/food.js).
+    receipts: [],              // [{rel, store, date, time, total, items}]
+    foodItems: null,           // Map(key -> {barcode, name, category, healthy}) from Receipts/Food Items.md
+    foodFilter: null,          // Food page {cat, q}, seeded by views/food.js
     period: null,
     view: 'dashboard',
     pendingImport: null,
@@ -548,6 +555,7 @@ function mountApp(view) {
     _q: 0,                     // transactions-search debounce timer handle
     _acctQ: 0,                 // accounts-search debounce timer handle
     _noteQ: 0,                 // notes-search debounce timer handle
+    _foodQ: 0,                 // Food items-search debounce timer handle
   };
 
   function toast(msg, bad = false) {
@@ -672,6 +680,9 @@ function mountApp(view) {
      order is belt-and-braces rather than load-bearing. loadVault calls
      ctx.loadNotes(), which is late-bound for the same reason. */
   registerNotes(ctx);
+  /* After period (periodRange, currentPeriod, catType, dateText) and io;
+     loadVault calls ctx.loadReceipts, which load.js publishes itself. */
+  registerFood(ctx);
   registerDashboard(ctx);
   // After dashboard, whose budgetVsActualRows/categorySpendRows it reads —
   // the report page's whole reason for existing is never re-deriving those.
@@ -770,7 +781,7 @@ function mountApp(view) {
     $('#periodLabel').textContent = ctx.periodTitle(S.period);
     ({ dashboard: ctx.renderDashboard, score: ctx.renderScore,
        transactions: ctx.renderTransactions, budgets: ctx.renderBudgets,
-       plan: ctx.renderPlan, notes: ctx.renderNotes, report: ctx.renderReport,
+       plan: ctx.renderPlan, notes: ctx.renderNotes, food: ctx.renderFood, report: ctx.renderReport,
        savings: ctx.renderSavings, accounts: ctx.renderAccounts, assets: ctx.renderAssets,
        debts: ctx.renderDebts, owed: ctx.renderOwed,
        services: ctx.renderServices,
@@ -1263,6 +1274,13 @@ function mountApp(view) {
     const q = e.target.value;
     clearTimeout(S._noteQ);
     S._noteQ = setTimeout(() => { S.noteFilter.q = q; ctx.renderNotes(); }, 200);
+  });
+  $('#foodAdd').addEventListener('click', () => ctx.addFoodReceipt());
+  $('#foodCatFilter').addEventListener('change', e => { S.foodFilter.cat = e.target.value; ctx.renderFood(); });
+  $('#foodSearch').addEventListener('input', e => {
+    const q = e.target.value;
+    clearTimeout(S._foodQ);
+    S._foodQ = setTimeout(() => { S.foodFilter.q = q; ctx.renderFood(); }, 200);
   });
   $('#reportCreate').addEventListener('click', ctx.createReport);
   $('#reportCopyNow').addEventListener('click', ctx.copyReportNow);

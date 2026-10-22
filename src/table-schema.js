@@ -699,6 +699,46 @@ const SCHEMAS = {
       },
     ],
   },
+
+  /* Receipts/<YYYY-MM>/<date> <store> <time>.md — one row per product line
+     on the till slip (receipt-file.js). Amount is the price the slip printed;
+     Discount the XTRASAVE that followed it, negative, blank when there was
+     none — a column of 0.00s on a forty-line slip buries the five that
+     matter. Paid is Amount + Discount and is never stored, so the two cells a
+     reader can check against the paper are the only two there are. */
+  receiptItems: {
+    columns: [
+      text('barcode', 'Barcode'),
+      text('name', 'Item'),
+      money('amount', 'Amount'),
+      {
+        key: 'discount', header: 'Discount', align: 'right',
+        read: c => {
+          const a = parseNum(c || '0');
+          return a.readable ? { discount: a.value || 0 } : { discount: 0, discountRaw: a.raw };
+        },
+        write: r => (r.discountRaw != null && !r.discount ? r.discountRaw
+          : r.discount ? r.discount.toFixed(2) : ''),
+      },
+      text('category', 'Category'),
+      /* `v` read as yes because it is the slip's own mark for a Vitality
+         HealthyFood line, and a reader typing what the paper says types v. */
+      flag('healthy', 'Healthy', { on: [...TRUE_WORDS, 'v'], absent: false, words: ['yes', ''] }),
+    ],
+  },
+
+  /* Receipts/Food Items.md — how each product is filed, keyed by barcode
+     (or by name for a line typed without one). The memory that makes the
+     second receipt cheaper than the first: categorise CLOVR FCRM 2L once and
+     every later slip that carries its barcode arrives already filed. */
+  foodItems: {
+    columns: [
+      text('barcode', 'Barcode'),
+      text('name', 'Item'),
+      text('category', 'Category'),
+      flag('healthy', 'Healthy', { on: [...TRUE_WORDS, 'v'], absent: false, words: ['yes', ''] }),
+    ],
+  },
 };
 
 /* The whole document for the four flat single-table files (transactions
