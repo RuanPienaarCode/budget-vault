@@ -43,6 +43,8 @@ module.exports = {
   'nav.tax': 'Tax',
   'nav.loans': 'Loan calculators',
   'nav.import': 'Import CSV',
+  'dock.nav': 'Quick menu',
+  'dock.save': 'Save',
   'nav.reload': 'Reload from disk',
   'nav.pluginSettings': 'Plugin settings',
 

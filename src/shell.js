@@ -939,6 +939,31 @@ const SHELL_HTML = `
     </main>
   </div>
 
+  <!-- The floating dock. Its first job is the Save button: every editing page
+       keeps its own Save in the card header, which on a long table is a scroll
+       back to the top after the last edit. The dock's Save is not a second save
+       path — controller.js clicks the page's own button, so the dirty check,
+       the write and the toast stay exactly where they were. The four pages
+       beside it are the ones a household opens most. Outside .bud-scroll so
+       it floats over the page instead of scrolling with it. -->
+  <nav class="bv-dock hidden" id="bvDock" aria-label="Quick menu" data-i18n-aria="dock.nav">
+    <button type="button" class="dock-btn" data-dock-view="transactions">
+      <span class="ico" data-ico="arrow-left-right"></span><span class="dock-l" data-i18n="nav.transactions">Transactions</span>
+    </button>
+    <button type="button" class="dock-btn" data-dock-view="budgets">
+      <span class="ico" data-ico="bookmark"></span><span class="dock-l" data-i18n="nav.budgets">Budget</span>
+    </button>
+    <button type="button" class="dock-btn" data-dock-view="accounts">
+      <span class="ico" data-ico="landmark"></span><span class="dock-l" data-i18n="nav.accounts">Accounts</span>
+    </button>
+    <button type="button" class="dock-btn" data-dock-view="plan">
+      <span class="ico" data-ico="target|goal|crosshair"></span><span class="dock-l" data-i18n="nav.plan">Plan</span>
+    </button>
+    <button type="button" class="dock-btn dock-save hidden" id="dockSave" disabled>
+      <span class="ico" data-ico="save|check"></span><span class="dock-l" data-i18n="dock.save">Save</span>
+    </button>
+  </nav>
+
   <div id="toast" role="status" aria-live="polite"></div>
 `;
 

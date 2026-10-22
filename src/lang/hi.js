@@ -53,6 +53,8 @@ module.exports = {
   'nav.tax': 'कर',
   'nav.loans': 'लोन कैलकुलेटर',
   'nav.import': 'CSV आयात करें',
+  'dock.nav': 'त्वरित मेनू',
+  'dock.save': 'सहेजें',
   'nav.reload': 'डिस्क से फिर पढ़ें',
   'nav.pluginSettings': 'प्लगइन सेटिंग्स',
 

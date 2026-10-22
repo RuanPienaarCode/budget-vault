@@ -153,7 +153,10 @@ const signed = s => (/^\s*[−-]/.test(s) ? -1 : 1) * Math.abs(digits(s.replace(
     });
 
     const fresh = await renderDash(mk(false), { today: '2026-09-29' });
-    eq(fresh.ctx.currentPeriod(), '2026-10', 'fixture: the running period is 2026-10');
+    /* renderDash unpins the clock before it returns, so a bare currentPeriod()
+       here read the wall clock and the sanity check went red the day a real
+       22nd rolled the period over (22 Oct 2026). Ask about the fixture's day. */
+    eq(fresh.ctx.currentPeriod('2026-09-29'), '2026-10', 'fixture: the running period is 2026-10');
     const hero = fresh.t('#heroCard');
     ok(!/Over budget/.test(hero), `no over-budget verdict against a plan that does not exist: ${hero}`);
     ok(!/0% of the/.test(hero) && !/of the R 0 income/.test(hero), 'no percentage of a R 0 income');

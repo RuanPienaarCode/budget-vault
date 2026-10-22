@@ -47,6 +47,8 @@ module.exports = {
   'nav.tax': 'Irhafu',
   'nav.loans': 'Izibali zemali-mboleko',
   'nav.import': 'Ngenisa i-CSV',
+  'dock.nav': 'Imenyu ekhawulezayo',
+  'dock.save': 'Gcina',
   'nav.reload': 'Layisha kwakhona kwidiski',
   'nav.pluginSettings': 'Iisetingi zeplagini',
 

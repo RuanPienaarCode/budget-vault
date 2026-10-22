@@ -42,6 +42,8 @@ module.exports = {
   'nav.tax': '税金',
   'nav.loans': 'ローン計算機',
   'nav.import': 'CSV を取り込む',
+  'dock.nav': 'クイックメニュー',
+  'dock.save': '保存',
   'nav.reload': 'ディスクから再読み込み',
   'nav.pluginSettings': 'プラグイン設定',
 

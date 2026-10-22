@@ -42,6 +42,8 @@ module.exports = {
   'nav.tax': '税务',
   'nav.loans': '贷款计算器',
   'nav.import': '导入 CSV',
+  'dock.nav': '快捷菜单',
+  'dock.save': '保存',
   'nav.reload': '从磁盘重新加载',
   'nav.pluginSettings': '插件设置',
 

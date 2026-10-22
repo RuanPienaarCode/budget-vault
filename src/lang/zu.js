@@ -52,6 +52,8 @@ module.exports = {
   'nav.tax': 'Intela',
   'nav.loans': 'Izibali zemali-mboleko',
   'nav.import': 'Ngenisa i-CSV',
+  'dock.nav': 'Imenyu esheshayo',
+  'dock.save': 'Londoloza',
   'nav.reload': 'Layisha kabusha kudiski',
   'nav.pluginSettings': 'Izilungiselelo zeplagi',
 

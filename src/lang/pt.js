@@ -54,6 +54,8 @@ module.exports = {
   'nav.tax': 'Impostos',
   'nav.loans': 'Simuladores de empréstimo',
   'nav.import': 'Importar CSV',
+  'dock.nav': 'Menu rápido',
+  'dock.save': 'Salvar',
   'nav.reload': 'Recarregar do disco',
   'nav.pluginSettings': 'Configurações do plugin',
 
