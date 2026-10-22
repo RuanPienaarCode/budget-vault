@@ -959,7 +959,7 @@ const SHELL_HTML = `
     <button type="button" class="dock-btn" data-dock-view="plan">
       <span class="ico" data-ico="target|goal|crosshair"></span><span class="dock-l" data-i18n="nav.plan">Plan</span>
     </button>
-    <button type="button" class="dock-btn dock-save hidden" id="dockSave" disabled>
+    <button type="button" class="dock-btn dock-save" id="dockSave" disabled>
       <span class="ico" data-ico="save|check"></span><span class="dock-l" data-i18n="dock.save">Save</span>
     </button>
   </nav>

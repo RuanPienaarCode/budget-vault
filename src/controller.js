@@ -786,9 +786,11 @@ function mountApp(view) {
      The dock's Save stands in for the open page's own Save button rather than
      saving anything itself: eight pages each own a dirty check, a write and a
      toast, and a second path to any of them is a second place for the two to
-     disagree. So the dock only mirrors — hidden on a page with no Save (or
-     whose Save is inside a hidden block, as Tax's is before a year exists),
-     disabled while the page's is, and a click is a click on the page's. */
+     disagree. So the dock only mirrors — disabled while the page's is, and on
+     a page with no Save (or whose Save is inside a hidden block, as Tax's is
+     before a year exists), and a click is a click on the page's. It is never
+     hidden: a Save that came and went would change the dock's width with
+     every page switch. */
   function pageSaveBtn() {
     const b = $(`#view-${S.view} button[id$="Save"]`);
     return b && !b.closest('.hidden') ? b : null;
@@ -799,13 +801,17 @@ function mountApp(view) {
     dock.classList.toggle('hidden', !S.loaded);
     root.classList.toggle('has-dock', !!S.loaded);
     const page = S.loaded ? pageSaveBtn() : null;
-    const hide = !page, off = !page || page.disabled;
+    const off = !page || page.disabled;
     // Written only on change: the observer below watches `disabled` across the
     // whole root, so an unconditional write here would wake it again forever.
-    if (mine.classList.contains('hidden') !== hide) mine.classList.toggle('hidden', hide);
     if (mine.disabled !== off) mine.disabled = off;
-    const label = page ? page.textContent.trim() : '';
-    if (mine.getAttribute('aria-label') !== label) mine.setAttribute('aria-label', label);
+    // With no page Save the button's own "Save" names it; an empty aria-label
+    // would leave it nameless.
+    const label = page ? page.textContent.trim() : null;
+    if (mine.getAttribute('aria-label') !== label) {
+      if (label) mine.setAttribute('aria-label', label);
+      else mine.removeAttribute('aria-label');
+    }
   }
   /* Registered with the reload reset like the pages' own buttons. The observer
      would catch the pages going dark anyway, but registering means a reload
