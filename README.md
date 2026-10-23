@@ -4,6 +4,11 @@
 ![Obsidian](https://img.shields.io/badge/Obsidian-%E2%89%A51.8.0-7c3aed)
 ![Mobile ready](https://img.shields.io/badge/mobile-iOS%20%26%20Android-blue)
 
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="docs/onboarding/onboarding-dark.webp">
+  <img src="docs/onboarding/onboarding-light.webp" width="960" alt="Budget Vault in five steps: the welcome screen, the setup wizard choosing a name, currency and payday, a bank CSV imported and sorted into categories, a budget with every rand given a job, and a plan placing a bonus and a tax refund into spending buckets.">
+</picture>
+
 Most budgeting apps ask you to upload your bank statements and trust someone else's server with them. Budget Vault doesn't.
 
 Every account, budget and transaction is a plain markdown file in your own vault, on your own devices. There is no company database, no account to create, and nothing to export when you leave — the files are already yours.
@@ -133,6 +138,10 @@ No supported bank? Build your own CSV with `Date`, `Title` and `Amount` columns 
 ```
 
 Then toggle the plugin off and on.
+
+The animation at the top of this page is [docs/onboarding/onboarding-motion.html](docs/onboarding/onboarding-motion.html) —
+open it in a browser to watch it with controls, or in 9:16 for phones. After changing a scene, re-record the
+images with `scripts/record-onboarding.cjs` (its header lists what it needs).
 
 ### Design notes
 

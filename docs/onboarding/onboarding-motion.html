@@ -1,0 +1,729 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Budget Vault Onboarding</title>
+<!-- The onboarding motion graphic. Open this file in a browser to watch it.
+     The animated images the README shows are recorded from it by
+     scripts/record-onboarding.cjs; re-run that after changing a scene.
+     Query flags: ?format=portrait (9:16), ?record (stage only, no autoplay,
+     exposes window.bvSeek for frame-by-frame capture). -->
+<style>
+/* The repo's own bundled Geist, so the page works offline and needs no font host. */
+@font-face {
+  font-family: 'Geist';
+  src: url('../../assets/fonts/geist-latin-wght-normal.woff2') format('woff2');
+  font-weight: 100 900;
+  font-display: swap;
+}
+html { color-scheme: light; }
+body { margin: 0; }
+[hidden] { display: none !important; }
+/* Layout: one 16:9 (or 9:16) stage scaled to fit, caption left and product visual right, controls beneath. */
+:root {
+  --bg: #e8edea; --stage: #f5f8f6; --surface: #ffffff; --surface-2: #eff3f1;
+  --ink: #13211d; --ink-2: #4f6059; --ink-3: #8a9892;
+  --line: rgba(19,33,29,.08); --line-2: rgba(19,33,29,.15);
+  --green: #2c6b57; --green-ink: #ffffff; --mint: #cfe4da; --mint-soft: #e7f2ec;
+  --gold: #a6843f; --gold-soft: #f4ecdb; --clay: #b06f5b;
+  --glow-a: rgba(124,190,160,.34); --glow-b: rgba(212,184,124,.22);
+  --shadow: 0 1px 2px rgba(19,33,29,.04), 0 14px 34px -14px rgba(19,33,29,.16);
+  --sans: 'Geist', ui-sans-serif, -apple-system, 'Segoe UI', Roboto, sans-serif;
+  --mono: 'Geist Mono', ui-monospace, 'SF Mono', Menlo, monospace;
+}
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) {
+  --bg: #0b1210; --stage: #101916; --surface: #16211e; --surface-2: #1b2824;
+  --ink: #e4ece8; --ink-2: #a3b2ab; --ink-3: #6d7c76;
+  --line: rgba(255,255,255,.07); --line-2: rgba(255,255,255,.14);
+  --green: #7cc3a6; --green-ink: #0b1210; --mint: #26453b; --mint-soft: #1a2e28;
+  --gold: #d3b274; --gold-soft: #2c2618; --clay: #dc9b87;
+  --glow-a: rgba(80,160,125,.17); --glow-b: rgba(200,165,95,.09);
+  --shadow: 0 1px 2px rgba(0,0,0,.3), 0 18px 40px -18px rgba(0,0,0,.65);
+  color-scheme: dark;
+} }
+:root[data-theme="dark"] {
+  --bg: #0b1210; --stage: #101916; --surface: #16211e; --surface-2: #1b2824;
+  --ink: #e4ece8; --ink-2: #a3b2ab; --ink-3: #6d7c76;
+  --line: rgba(255,255,255,.07); --line-2: rgba(255,255,255,.14);
+  --green: #7cc3a6; --green-ink: #0b1210; --mint: #26453b; --mint-soft: #1a2e28;
+  --gold: #d3b274; --gold-soft: #2c2618; --clay: #dc9b87;
+  --glow-a: rgba(80,160,125,.17); --glow-b: rgba(200,165,95,.09);
+  --shadow: 0 1px 2px rgba(0,0,0,.3), 0 18px 40px -18px rgba(0,0,0,.65);
+  color-scheme: dark;
+}
+
+body { background: var(--bg); color: var(--ink); font-family: var(--sans); -webkit-font-smoothing: antialiased; }
+.page {
+  max-width: 1240px; margin: 0 auto; display: grid; gap: 18px;
+  padding-block: 36px 56px;
+  padding-left: max(16px, env(safe-area-inset-left, 0px));
+  padding-right: max(16px, env(safe-area-inset-right, 0px));
+}
+.head h1 { font-size: 20px; font-weight: 600; letter-spacing: -.01em; margin: 0; }
+.head p { margin: 4px 0 0; color: var(--ink-2); font-size: 14px; line-height: 1.5; max-width: 64ch; }
+
+.wrap {
+  position: relative; width: 100%; max-width: 100%; aspect-ratio: 16 / 9;
+  border-radius: 22px; overflow: hidden; background: var(--stage);
+  border: 1px solid var(--line); box-shadow: var(--shadow);
+}
+.wrap.portrait { aspect-ratio: 9 / 16; max-width: min(100%, 440px); justify-self: center; }
+.stage { position: absolute; left: 0; top: 0; width: 1280px; height: 720px; transform-origin: 0 0; }
+.portrait .stage { width: 720px; height: 1280px; }
+
+.glow { position: absolute; border-radius: 50%; pointer-events: none; }
+.g1 { width: 760px; height: 760px; left: -260px; top: -320px; background: radial-gradient(circle, var(--glow-a), transparent 68%); }
+.g2 { width: 820px; height: 820px; right: -300px; bottom: -380px; background: radial-gradient(circle, var(--glow-b), transparent 68%); }
+
+.scene { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; gap: 72px; padding: 56px 80px; }
+.portrait .scene { flex-direction: column; gap: 52px; padding: 80px 64px; }
+.ghost { position: absolute; width: 0; height: 0; overflow: hidden; }
+
+.cap { width: 400px; flex: none; display: grid; gap: 18px; }
+.portrait .cap { width: 560px; }
+.eyebrow { font-size: 15px; font-weight: 500; letter-spacing: .14em; text-transform: uppercase; color: var(--green); display: flex; gap: 12px; align-items: center; }
+.eyebrow .n { font-family: var(--mono); letter-spacing: .04em; color: var(--ink-3); }
+.cap h2 { font-size: 54px; line-height: 1.04; letter-spacing: -.03em; font-weight: 600; margin: 0; text-wrap: balance; }
+.cap p { font-size: 21px; line-height: 1.5; color: var(--ink-2); margin: 0; text-wrap: pretty; }
+.vis { width: 560px; flex: none; position: relative; }
+.portrait .vis { zoom: 1.06; }
+.portrait .cap h2 { font-size: 64px; }
+.portrait .cap p { font-size: 24px; }
+.portrait .welcome { zoom: 1.1; }
+.card { background: var(--surface); border: 1px solid var(--line); border-radius: 20px; box-shadow: var(--shadow); }
+.num { font-variant-numeric: tabular-nums; }
+
+/* Welcome */
+.welcome { display: grid; justify-items: center; text-align: center; gap: 22px; }
+.mark { width: 104px; height: 104px; overflow: visible; }
+.mark * { transform-box: fill-box; transform-origin: center; }
+.mark .m-bg { fill: var(--mint-soft); }
+/* The mark is a vault door: hinges on the left, bolts round the rim, a three-spoke wheel.
+   .open rests with the wheel turned and the door swung back on its hinges. */
+.mark .m-box, .mark .m-rim { fill: none; stroke: var(--green); stroke-width: 3; stroke-dasharray: 1; stroke-dashoffset: 0; }
+.mark .m-inside { fill: var(--green); fill-opacity: .2; }
+.mark .m-face { fill: var(--surface); }
+.mark .m-ring, .mark .m-spokes { fill: none; stroke: var(--green); stroke-width: 2.6; stroke-linecap: round; }
+.mark .m-bolts, .mark .m-spin circle:not(.m-ring), .mark .m-hinge { fill: var(--green); }
+.mark .m-door { transform-box: view-box; transform-origin: 23px 52px; }
+.mark .m-spin { transform-box: view-box; transform-origin: 52px 52px; }
+.mark.open .m-door { transform: scaleX(.38); }
+.mark.open .m-spin { transform: rotate(120deg); }
+.wordmark { font-size: 82px; font-weight: 600; letter-spacing: -.04em; line-height: 1; margin: 8px 0 0; }
+.tagline { font-size: 26px; line-height: 1.4; color: var(--ink-2); margin: 0; max-width: 30ch; text-wrap: balance; }
+.pills { list-style: none; margin: 12px 0 0; padding: 0; display: flex; flex-wrap: wrap; justify-content: center; gap: 10px; max-width: 600px; }
+.pills li { display: flex; align-items: center; gap: 9px; font-size: 17px; color: var(--ink-2); padding: 10px 18px; border-radius: 999px; background: var(--surface); border: 1px solid var(--line); }
+.pills li::before { content: ""; width: 7px; height: 7px; border-radius: 50%; background: var(--green); opacity: .75; }
+.hint { font: 15px var(--mono); color: var(--ink-3); margin: 6px 0 0; }
+
+/* Settings */
+.wiz { padding: 24px 28px; display: grid; gap: 18px; }
+.wiz-head { display: flex; justify-content: space-between; align-items: center; font-size: 14px; color: var(--ink-3); }
+.wiz-prog { width: 140px; height: 4px; border-radius: 2px; background: var(--line-2); overflow: hidden; }
+.wiz-prog i { display: block; width: 14.3%; height: 100%; border-radius: 2px; background: var(--green); }
+.field { display: grid; gap: 8px; }
+.field .lb { font-size: 15px; font-weight: 500; }
+.input { height: 46px; border-radius: 12px; border: 1px solid var(--line-2); background: var(--surface-2); display: flex; align-items: center; padding: 0 14px; font-size: 18px; }
+.caret { width: 2px; height: 22px; margin-left: 2px; border-radius: 1px; background: var(--green); }
+.seg { position: relative; display: inline-flex; width: max-content; padding: 4px; border-radius: 12px; background: var(--surface-2); border: 1px solid var(--line); }
+.seg span { position: relative; z-index: 1; width: 132px; height: 38px; display: grid; place-items: center; font-size: 16px; color: var(--ink-2); }
+.seg span.sel { color: var(--ink); font-weight: 500; }
+.seg-pill { position: absolute; left: 4px; top: 4px; width: 132px; height: 38px; border-radius: 9px; background: var(--surface); box-shadow: 0 1px 3px rgba(0,0,0,.08), 0 0 0 1px var(--line-2); }
+.days { position: relative; display: flex; gap: 8px; }
+.days span { width: 52px; height: 44px; border-radius: 11px; display: grid; place-items: center; font: 500 16px var(--mono); color: var(--ink-2); background: var(--surface-2); }
+.days span.sel { color: var(--green); }
+.day-ring { position: absolute; left: 0; top: 0; width: 52px; height: 44px; border-radius: 11px; border: 2px solid var(--green); box-sizing: border-box; transform: translateX(180px); }
+.note { font-size: 14px; color: var(--ink-3); margin: 0; }
+.opts { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.opt { position: relative; border: 1px solid var(--line-2); border-radius: 14px; padding: 13px 16px; display: grid; gap: 3px; }
+.opt b, .opt span { position: relative; }
+.opt b { font-size: 16px; font-weight: 500; }
+.opt span { font-size: 14px; color: var(--ink-3); }
+.opt-sel { position: absolute; inset: -1px; border-radius: 14px; border: 1.5px solid var(--green); background: var(--mint-soft); }
+.tick { position: absolute; right: 12px; top: 12px; width: 22px; height: 22px; border-radius: 50%; background: var(--green); display: grid; place-items: center; }
+.tick svg { width: 12px; height: 12px; fill: none; stroke: var(--green-ink); stroke-width: 2.4; stroke-linecap: round; stroke-linejoin: round; }
+.wiz-foot { display: flex; justify-content: flex-end; gap: 10px; }
+.btn { height: 40px; padding: 0 18px; border-radius: 11px; display: inline-flex; align-items: center; font-size: 15px; font-weight: 500; }
+.btn.ghost-btn { color: var(--ink-2); border: 1px solid var(--line-2); }
+.btn.primary { background: var(--green); color: var(--green-ink); }
+
+/* Import */
+.drop { position: relative; height: 104px; border-radius: 18px; border: 1.5px dashed var(--line-2); background: var(--surface-2); }
+.drop-on { position: absolute; inset: -1.5px; border-radius: 18px; border: 1.5px solid var(--green); background: var(--mint-soft); }
+.z-idle, .z-done { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; gap: 10px; font-size: 16px; color: var(--ink-2); }
+.z-idle { opacity: 0; }
+.z-done { color: var(--ink); }
+.z-done code { font: 500 15px var(--mono); }
+.z-done span { color: var(--ink-3); }
+.file-wrap { position: absolute; left: 50%; top: 50%; width: 230px; margin: -38px 0 0 -115px; z-index: 3; }
+.file { height: 76px; border-radius: 14px; background: var(--surface); border: 1px solid var(--line-2); box-shadow: var(--shadow); display: flex; align-items: center; gap: 12px; padding: 0 16px; opacity: 0; }
+.doc { width: 34px; height: 42px; border-radius: 7px; background: var(--mint); display: grid; place-items: end center; padding-bottom: 6px; box-sizing: border-box; font: 500 9px var(--mono); color: var(--green); letter-spacing: .06em; }
+.file code { font: 500 14px var(--mono); }
+.file small { display: block; font-size: 12px; color: var(--ink-3); margin-top: 2px; }
+.txs { margin-top: 16px; padding: 6px 0; }
+.tx { display: grid; grid-template-columns: 62px 1fr auto 128px; align-items: center; gap: 14px; padding: 12px 22px; font-size: 16px; }
+.tx + .tx { border-top: 1px solid var(--line); }
+.tx .d { font: 13px var(--mono); color: var(--ink-3); }
+.tx .amt { text-align: right; font-weight: 500; font-variant-numeric: tabular-nums; }
+.tx .amt.in { color: var(--green); }
+.tag { font-size: 13px; padding: 5px 11px; border-radius: 999px; background: var(--surface-2); border: 1px solid var(--line); color: var(--ink-2); }
+.tag.t-in { background: var(--mint-soft); border-color: transparent; color: var(--green); }
+.imp-foot { display: flex; align-items: center; gap: 10px; margin-top: 14px; font-size: 15px; color: var(--ink-2); }
+.imp-foot .tick { position: static; width: 20px; height: 20px; }
+
+/* Budget */
+.tiles { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; }
+.tile { padding: 16px 18px; display: grid; gap: 5px; }
+.tile small, .tile em { font-size: 13px; color: var(--ink-3); font-style: normal; }
+.tile b { font-size: 26px; font-weight: 600; letter-spacing: -.02em; }
+.tile.left b { color: var(--green); }
+.cats { margin-top: 12px; padding: 6px 22px 14px; }
+.cat { display: grid; grid-template-columns: 1fr auto; gap: 9px 12px; padding: 13px 0; align-items: baseline; }
+.cat + .cat { border-top: 1px solid var(--line); }
+.cat .nm { font-size: 16px; font-weight: 500; }
+.cat .nm span { font-weight: 400; color: var(--ink-3); margin-left: 8px; font-size: 14px; }
+.cat .st { font-size: 14px; color: var(--ink-2); }
+.cat.over .st { color: var(--clay); }
+.cat.aside .st { color: var(--gold); }
+.bar { grid-column: 1 / -1; height: 8px; border-radius: 4px; background: var(--surface-2); overflow: hidden; }
+.bar i { display: block; height: 100%; border-radius: 4px; background: var(--green); transform-origin: left; }
+.cat.over .bar i { background: var(--clay); }
+.cat.aside .bar i { background: var(--gold); }
+.more { font-size: 14px; color: var(--ink-3); padding-top: 12px; border-top: 1px solid var(--line); display: flex; justify-content: space-between; }
+
+/* Plan */
+.hero { padding: 22px 24px 20px; }
+.hero small { font-size: 14px; color: var(--ink-3); }
+.hero b { display: block; font-size: 58px; font-weight: 600; letter-spacing: -.035em; line-height: 1.08; margin-top: 4px; }
+.hero .of { font-size: 15px; color: var(--ink-2); }
+.split { margin-top: 16px; height: 10px; border-radius: 5px; background: var(--surface-2); overflow: hidden; }
+.split i { display: block; height: 100%; background: var(--green); border-radius: 5px; transform-origin: left; }
+.legend { display: flex; gap: 18px; margin-top: 10px; font-size: 13px; color: var(--ink-3); }
+.legend span { display: flex; align-items: center; gap: 7px; }
+.legend span::before { content: ""; width: 8px; height: 8px; border-radius: 50%; background: var(--green); }
+.legend span + span::before { background: var(--line-2); }
+.row-label { font-size: 13px; letter-spacing: .12em; text-transform: uppercase; color: var(--ink-3); margin: 18px 0 8px; }
+.sources, .buckets { display: grid; gap: 10px; }
+.sources { grid-template-columns: 1fr 1fr; }
+.buckets { grid-template-columns: repeat(3, 1fr); }
+.src { padding: 13px 16px; display: grid; grid-template-columns: auto 1fr auto; gap: 1px 10px; align-items: center; }
+.src .dot { width: 10px; height: 10px; border-radius: 50%; background: var(--green); grid-row: span 2; box-sizing: border-box; }
+.src .dot.exp { background: transparent; border: 2px solid var(--gold); }
+.src b { font-size: 16px; font-weight: 500; }
+.src .v { font-size: 17px; font-weight: 500; color: var(--ink); grid-column: 3; grid-row: 1 / span 2; }
+.src span { font-size: 13px; color: var(--ink-3); }
+.partial { font-size: 13px; color: var(--ink-3); margin: 8px 0 0; }
+.bk { padding: 14px 16px; display: grid; gap: 3px; }
+.bk b { font-size: 15px; font-weight: 500; }
+.bk .v { font-size: 21px; font-weight: 600; letter-spacing: -.015em; color: var(--ink); }
+.bk span { font-size: 12px; color: var(--ink-3); }
+.outro { position: absolute; inset: 0; display: grid; place-content: center; justify-items: center; text-align: center; gap: 20px; opacity: 0; pointer-events: none; }
+.outro .mark { width: 72px; height: 72px; }
+.outro h2 { font-size: 72px; font-weight: 600; letter-spacing: -.04em; line-height: 1; margin: 6px 0 0; }
+.outro p { font-size: 24px; color: var(--ink-2); margin: 0; max-width: 30ch; line-height: 1.4; text-wrap: balance; }
+.outro .btn { height: 52px; padding: 0 26px; border-radius: 14px; font-size: 18px; margin-top: 8px; }
+
+/* Controls */
+.controls { display: flex; flex-wrap: wrap; align-items: center; gap: 10px 14px; }
+.iconbtn { width: 40px; height: 40px; flex: none; border-radius: 12px; border: 1px solid var(--line-2); background: var(--surface); color: var(--ink); display: grid; place-items: center; cursor: pointer; }
+.iconbtn svg { width: 16px; height: 16px; fill: currentColor; }
+.chips { display: flex; gap: 6px; flex: 1 1 340px; min-width: 0; }
+.chip { flex: 1; min-width: 0; display: grid; gap: 8px; padding: 6px 2px; background: none; border: 0; color: var(--ink-3); font: 500 13px var(--sans); text-align: left; cursor: pointer; border-radius: 6px; }
+.chip.on { color: var(--ink); }
+.track { height: 3px; border-radius: 2px; background: var(--line-2); overflow: hidden; }
+.fill { height: 100%; background: var(--green); transform: scaleX(0); transform-origin: left; }
+.chip.done .fill { transform: scaleX(1); }
+.fmt { display: inline-flex; padding: 3px; border-radius: 11px; border: 1px solid var(--line-2); background: var(--surface); }
+.fmt button { border: 0; background: none; font: 500 12px var(--mono); color: var(--ink-3); padding: 7px 10px; border-radius: 8px; cursor: pointer; }
+.fmt button[aria-pressed="true"] { background: var(--surface-2); color: var(--ink); }
+button:focus-visible { outline: 2px solid var(--green); outline-offset: 2px; }
+
+/* ?record: the stage alone, edge to edge, for the recorder. */
+.record .page { max-width: none; padding: 0; gap: 0; }
+.record .head, .record .controls { display: none; }
+.record .wrap, .record .wrap.portrait { max-width: none; border: 0; border-radius: 0; box-shadow: none; }
+</style>
+</head>
+<body>
+
+<main class="page">
+  <header class="head">
+    <h1>Budget Vault onboarding</h1>
+    <p>A 45-second walkthrough for new users: welcome, settings, importing transactions, the budget and the plan. It loops on its own. Pick a scene to jump to it, or switch to 9:16 for phones and stories.</p>
+  </header>
+
+  <div class="wrap" id="wrap">
+    <div class="stage" id="stage" aria-live="off">
+      <div class="glow g1"></div>
+      <div class="glow g2"></div>
+
+      <!-- 1 Welcome -->
+      <section class="scene" data-dur="6500" data-rest="5000" aria-label="Welcome">
+        <div class="welcome">
+          <svg class="mark open" viewBox="0 0 104 104" aria-hidden="true">
+            <rect class="m-bg" x="6" y="6" width="92" height="92" rx="28"/>
+            <rect class="m-box" x="6" y="6" width="92" height="92" rx="28" pathLength="1"/>
+            <circle class="m-inside" cx="52" cy="52" r="29"/>
+            <rect class="m-hinge" x="16" y="39" width="7" height="8" rx="2.5"/>
+            <rect class="m-hinge" x="16" y="57" width="7" height="8" rx="2.5"/>
+            <g class="m-door">
+              <circle class="m-face" cx="52" cy="52" r="29"/>
+              <circle class="m-rim" cx="52" cy="52" r="29" pathLength="1"/>
+              <g class="m-bolts"><circle cx="52" cy="28.5" r="1.8"/><circle cx="68.62" cy="35.38" r="1.8"/><circle cx="75.5" cy="52" r="1.8"/><circle cx="68.62" cy="68.62" r="1.8"/><circle cx="52" cy="75.5" r="1.8"/><circle cx="35.38" cy="68.62" r="1.8"/><circle cx="28.5" cy="52" r="1.8"/><circle cx="35.38" cy="35.38" r="1.8"/></g>
+              <g class="m-wheel"><g class="m-spin"><circle class="m-ring" cx="52" cy="52" r="8.5"/><path class="m-spokes" d="M52 43.5L52 36 M59.36 56.25L65.86 60 M44.64 56.25L38.14 60"/><circle cx="52" cy="33.5" r="2.6"/><circle cx="68.02" cy="61.25" r="2.6"/><circle cx="35.98" cy="61.25" r="2.6"/><circle class="m-hub" cx="52" cy="52" r="3"/></g></g>
+            </g>
+          </svg>
+          <h2 class="wordmark">Budget Vault</h2>
+          <p class="tagline">Your whole budget, living in your vault as plain markdown.</p>
+          <ul class="pills"><li>No accounts</li><li>No cloud</li><li>Syncs wherever your vault goes</li></ul>
+          <p class="hint">About two minutes of setup</p>
+        </div>
+      </section>
+
+      <!-- 2 Settings -->
+      <section class="scene" data-dur="8000" data-rest="6800" aria-label="Settings" hidden>
+        <div class="cap">
+          <span class="eyebrow">Settings <span class="n">1 / 4</span></span>
+          <h2>Set it up once</h2>
+          <p>Your name, your currency and your payday. The wizard asks one question at a time, and you can change any of it later.</p>
+        </div>
+        <div class="vis">
+          <div class="card wiz">
+            <div class="wiz-head"><span>Step 1 of 7</span><span class="wiz-prog"><i></i></span></div>
+            <div class="field"><span class="lb">What should we call you?</span><div class="input"><span class="typed">Sam</span><span class="caret"></span></div></div>
+            <div class="field"><span class="lb">Currency</span><div class="seg"><i class="seg-pill"></i><span class="sel">R&nbsp; Rand</span><span>$&nbsp; Dollar</span><span>€&nbsp; Euro</span></div></div>
+            <div class="field"><span class="lb">When are you paid?</span>
+              <div class="days"><span>22</span><span>23</span><span>24</span><span class="sel">25</span><span>26</span><span>27</span><span>28</span><i class="day-ring"></i></div>
+              <p class="note">Your budget periods run from the 25th to the 24th.</p>
+            </div>
+            <div class="field"><span class="lb">How will you add your spending?</span>
+              <div class="opts">
+                <div class="opt"><i class="opt-sel"></i><b>Bank CSV</b><span>Import a statement</span><i class="tick"><svg viewBox="0 0 12 12"><path d="M2.5 6.2 5 8.6 9.5 3.6"/></svg></i></div>
+                <div class="opt"><b>By hand</b><span>Type it in yourself</span></div>
+              </div>
+            </div>
+            <div class="wiz-foot"><span class="btn ghost-btn">Back</span><span class="btn primary">Next</span></div>
+          </div>
+        </div>
+      </section>
+
+      <!-- 3 Import -->
+      <section class="scene" data-dur="8000" data-rest="6000" aria-label="Import transactions" hidden>
+        <div class="cap">
+          <span class="eyebrow">Import <span class="n">2 / 4</span></span>
+          <h2>Bring in your spending</h2>
+          <p>Drop in your bank's CSV. Budget Vault reads the dates, skips duplicates and sorts each line into a category.</p>
+        </div>
+        <div class="vis">
+          <div class="drop">
+            <i class="drop-on"></i>
+            <div class="z-idle">Drop your bank's CSV here</div>
+            <div class="z-done"><code>statement-oct.csv</code><span>·</span><span class="num"><span class="cnt">26</span> rows read</span></div>
+            <div class="file-wrap"><div class="file"><span class="doc">CSV</span><div><code>statement-oct.csv</code><small>From your bank</small></div></div></div>
+          </div>
+          <div class="card txs">
+            <div class="tx"><span class="d">25 Oct</span><span>Salary</span><span class="tag t-in">Income</span><span class="amt in">+R 28 500,00</span></div>
+            <div class="tx"><span class="d">26 Oct</span><span>Woolworths Food</span><span class="tag">Groceries</span><span class="amt">−R 842,10</span></div>
+            <div class="tx"><span class="d">27 Oct</span><span>Engen Garage</span><span class="tag">Fuel</span><span class="amt">−R 650,00</span></div>
+            <div class="tx"><span class="d">28 Oct</span><span>Netflix</span><span class="tag">Subscriptions</span><span class="amt">−R 199,00</span></div>
+            <div class="tx"><span class="d">29 Oct</span><span>Mugg &amp; Bean</span><span class="tag">Eating out</span><span class="amt">−R 214,50</span></div>
+          </div>
+          <div class="imp-foot"><i class="tick"><svg viewBox="0 0 12 12"><path d="M2.5 6.2 5 8.6 9.5 3.6"/></svg></i><span>24 transactions imported · 2 duplicates skipped</span></div>
+        </div>
+      </section>
+
+      <!-- 4 Budget -->
+      <section class="scene" data-dur="8000" data-rest="6000" aria-label="Budget" hidden>
+        <div class="cap">
+          <span class="eyebrow">Budget <span class="n">3 / 4</span></span>
+          <h2>Give every rand a job</h2>
+          <p>Set a number for each category. As spending lands you see what's left, and anything over shows up early.</p>
+        </div>
+        <div class="vis">
+          <div class="tiles">
+            <div class="card tile"><small>Planned income</small><b class="num">R 28 500</b><em>R 28 500 received so far</em></div>
+            <div class="card tile"><small>Total budgeted</small><b class="num b-bud">R 28 500</b><em class="num b-pct">100% of planned income</em></div>
+            <div class="card tile left"><small>Left to budget</small><b class="num b-left">R 0</b><em>income not yet allocated</em></div>
+          </div>
+          <div class="card cats">
+            <div class="cat"><span class="nm">Groceries<span class="num">R 4 200</span></span><span class="st num">R 1 250 left</span><span class="bar"><i data-r=".702"></i></span></div>
+            <div class="cat"><span class="nm">Fuel<span class="num">R 1 800</span></span><span class="st num">R 560 left</span><span class="bar"><i data-r=".689"></i></span></div>
+            <div class="cat over"><span class="nm">Eating out<span class="num">R 900</span></span><span class="st num">R 60 over</span><span class="bar"><i data-r="1"></i></span></div>
+            <div class="cat"><span class="nm">Giving<span class="num">R 2 850</span></span><span class="st num">R 0 left</span><span class="bar"><i data-r="1"></i></span></div>
+            <div class="cat aside"><span class="nm">Savings<span class="num">R 3 000</span></span><span class="st num">R 3 000 planned for savings</span><span class="bar"><i data-r="1"></i></span></div>
+            <div class="more"><span>7 more categories</span><span class="num">R 15 750</span></div>
+          </div>
+        </div>
+      </section>
+
+      <!-- 5 Plan -->
+      <section class="scene" data-dur="11500" data-rest="6800" aria-label="Plan" hidden>
+        <div class="cap">
+          <span class="eyebrow">Plan <span class="n">4 / 4</span></span>
+          <h2>Plan the money that's coming</h2>
+          <p>Add what funds a plan, received or still expected. Then place it into spending buckets until nothing is left to place.</p>
+        </div>
+        <div class="vis">
+          <div class="card hero">
+            <small>Left to place</small>
+            <b class="num p-left">R 0</b>
+            <span class="of num p-of">of R 8 400 in this plan</span>
+            <div class="split"><i class="p-split"></i></div>
+            <div class="legend"><span>Spoken for</span><span>Not spoken for</span></div>
+          </div>
+          <div class="row-label rl-1">Sources</div>
+          <div class="sources">
+            <div class="card src"><i class="dot"></i><b>Bonus</b><span>in the account</span><span class="v num">R 6 000</span></div>
+            <div class="card src"><i class="dot exp"></i><b>Tax refund</b><span>expected</span><span class="v num">R 2 400</span></div>
+          </div>
+          <p class="partial num">R 6 000 is in the account today, R 2 400 is still expected</p>
+          <div class="row-label rl-2">Spending buckets</div>
+          <div class="buckets">
+            <div class="card bk"><b>Holiday</b><span class="v num">R 4 000</span><span>nothing spent yet</span></div>
+            <div class="card bk"><b>Car service</b><span class="v num">R 1 800</span><span>nothing spent yet</span></div>
+            <div class="card bk"><b>Emergency fund</b><span class="v num">R 2 600</span><span>nothing spent yet</span></div>
+          </div>
+        </div>
+        <div class="outro">
+          <svg class="mark" viewBox="0 0 104 104" aria-hidden="true">
+            <rect class="m-bg" x="6" y="6" width="92" height="92" rx="28"/>
+            <rect class="m-box" x="6" y="6" width="92" height="92" rx="28" pathLength="1"/>
+            <circle class="m-inside" cx="52" cy="52" r="29"/>
+            <rect class="m-hinge" x="16" y="39" width="7" height="8" rx="2.5"/>
+            <rect class="m-hinge" x="16" y="57" width="7" height="8" rx="2.5"/>
+            <g class="m-door">
+              <circle class="m-face" cx="52" cy="52" r="29"/>
+              <circle class="m-rim" cx="52" cy="52" r="29" pathLength="1"/>
+              <g class="m-bolts"><circle cx="52" cy="28.5" r="1.8"/><circle cx="68.62" cy="35.38" r="1.8"/><circle cx="75.5" cy="52" r="1.8"/><circle cx="68.62" cy="68.62" r="1.8"/><circle cx="52" cy="75.5" r="1.8"/><circle cx="35.38" cy="68.62" r="1.8"/><circle cx="28.5" cy="52" r="1.8"/><circle cx="35.38" cy="35.38" r="1.8"/></g>
+              <g class="m-wheel"><g class="m-spin"><circle class="m-ring" cx="52" cy="52" r="8.5"/><path class="m-spokes" d="M52 43.5L52 36 M59.36 56.25L65.86 60 M44.64 56.25L38.14 60"/><circle cx="52" cy="33.5" r="2.6"/><circle cx="68.02" cy="61.25" r="2.6"/><circle cx="35.98" cy="61.25" r="2.6"/><circle class="m-hub" cx="52" cy="52" r="3"/></g></g>
+            </g>
+          </svg>
+          <h2>Ready to go</h2>
+          <p>Open Budget Vault and the setup wizard takes it from here.</p>
+          <span class="btn primary">Run the setup wizard</span>
+        </div>
+      </section>
+    </div>
+  </div>
+
+  <div class="controls">
+    <button class="iconbtn" id="play" type="button" aria-label="Pause"></button>
+    <button class="iconbtn" id="replay" type="button" aria-label="Start again"><svg viewBox="0 0 16 16"><path d="M8 2.5a5.5 5.5 0 1 1-5.2 3.7l1.4.5A4 4 0 1 0 8 4v2L4.8 3.25 8 .5z"/></svg></button>
+    <nav class="chips" id="chips" aria-label="Scenes"></nav>
+    <div class="fmt" role="group" aria-label="Format">
+      <button type="button" id="f169" aria-pressed="true">16:9</button>
+      <button type="button" id="f916" aria-pressed="false">9:16</button>
+    </div>
+  </div>
+</main>
+
+<script>
+(() => {
+  const RM = matchMedia('(prefers-reduced-motion: reduce)').matches;
+  const params = new URLSearchParams(location.search);
+  const RECORD = params.has('record');
+  if (RECORD) document.documentElement.classList.add('record');
+  const EASE = 'cubic-bezier(.22,.61,.36,1)';
+  const SOFT = 'cubic-bezier(.34,1.25,.64,1)';
+  const wrap = document.getElementById('wrap');
+  const stage = document.getElementById('stage');
+  const scenes = [...stage.querySelectorAll('.scene')];
+  const names = ['Welcome', 'Settings', 'Import', 'Budget', 'Plan'];
+  const ICON_PAUSE = '<svg viewBox="0 0 16 16"><rect x="3.5" y="2.5" width="3" height="11" rx="1"/><rect x="9.5" y="2.5" width="3" height="11" rx="1"/></svg>';
+  const ICON_PLAY = '<svg viewBox="0 0 16 16"><path d="M4.5 2.8v10.4a.6.6 0 0 0 .9.5l8.3-5.2a.6.6 0 0 0 0-1L5.4 2.3a.6.6 0 0 0-.9.5z"/></svg>';
+
+  /* ---- animation helpers: everything runs on the Web Animations API so one pause stops it all ---- */
+  const A = (el, kf, at = 0, d = 800, e = EASE) =>
+    el && el.animate(kf, { duration: RM ? 0 : d, delay: RM ? 0 : at, easing: e, fill: 'both' });
+  const rise = (el, at, d = 850, y = 14) =>
+    A(el, [{ opacity: 0, transform: `translateY(${y}px)` }, { opacity: 1, transform: 'none' }], at, d);
+  const fade = (el, at, d = 700) => A(el, [{ opacity: 0 }, { opacity: 1 }], at, d);
+  const easeInOut = p => p < .5 ? 4 * p * p * p : 1 - Math.pow(-2 * p + 2, 3) / 2;
+  const easeOut = p => 1 - Math.pow(1 - p, 3);
+  const fmt = n => 'R ' + Math.round(n).toString().replace(/\B(?=(\d{3})+(?!\d))/g, ' ');
+
+  /* A number tween is a hidden element's animation; reading its progress each frame keeps it in step with pause and scrubbing. */
+  function tween(scene, at, d, fn, ease = easeOut) {
+    const g = document.createElement('i');
+    g.className = 'ghost';
+    scene.appendChild(g);
+    const a = A(g, [{ opacity: 0 }, { opacity: 1 }], at, d, 'linear');
+    const tick = () => {
+      if (a.playState === 'idle') { g.remove(); return; }
+      const p = a.effect.getComputedTiming().progress;
+      fn(ease(p == null ? 0 : p));
+      if (a.playState === 'finished') { fn(ease(1)); g.remove(); return; }
+      requestAnimationFrame(tick);
+    };
+    tick();
+  }
+  const keyed = (keys, ms) => {
+    if (ms <= keys[0][0]) return keys[0][1];
+    for (let i = 1; i < keys.length; i++) {
+      const [t1, v1] = keys[i], [t0, v0] = keys[i - 1];
+      if (ms <= t1) return v0 + (v1 - v0) * easeInOut((ms - t0) / (t1 - t0));
+    }
+    return keys[keys.length - 1][1];
+  };
+  const caption = (s, t0) => s.querySelectorAll('.cap > *').forEach((el, k) => rise(el, t0 + k * 140, 900, 16));
+  /* The vault door draws itself, then opens (wheel unlocks, door swings back)
+     or, for the finish card, swings shut and the wheel turns to lock it. */
+  function drawMark(svg, t0, open) {
+    const $ = c => svg.querySelector(c);
+    A($('.m-bg'), [{ opacity: 0, transform: 'scale(.9)' }, { opacity: 1, transform: 'none' }], t0, 1000);
+    A($('.m-box'), [{ strokeDashoffset: 1 }, { strokeDashoffset: 0 }], t0 + 100, 1300);
+    fade($('.m-inside'), t0 + 300, 600);
+    A($('.m-rim'), [{ strokeDashoffset: 1 }, { strokeDashoffset: 0 }], t0 + 400, 1100);
+    fade($('.m-face'), t0 + 500, 800);
+    svg.querySelectorAll('.m-bolts circle').forEach((b, k) => A(b, [{ opacity: 0, transform: 'scale(.3)' }, { opacity: 1, transform: 'none' }], t0 + 700 + k * 60, 500, SOFT));
+    svg.querySelectorAll('.m-hinge').forEach((h, k) => fade(h, t0 + 900 + k * 100, 500));
+    A($('.m-wheel'), [{ opacity: 0, transform: 'scale(.8)' }, { opacity: 1, transform: 'none' }], t0 + 1000, 900);
+    const door = $('.m-door'), spin = $('.m-spin'), turn = 'cubic-bezier(.65,0,.35,1)';
+    if (open) {
+      A(spin, [{ transform: 'rotate(0deg)' }, { transform: 'rotate(120deg)' }], t0 + 1900, 1000, turn);
+      A(door, [{ transform: 'scaleX(1)' }, { transform: 'scaleX(.38)' }], t0 + 2800, 1200, EASE);
+    } else {
+      A(door, [{ transform: 'scaleX(.38)' }, { transform: 'scaleX(1)' }], t0 + 900, 900, EASE);
+      A(spin, [{ transform: 'rotate(120deg)' }, { transform: 'rotate(0deg)' }], t0 + 1750, 800, turn);
+    }
+  }
+
+  /* ---- scenes ---- */
+  const build = [
+    (s, t0) => {
+      drawMark(s.querySelector('.mark'), t0 + 100, true);
+      rise(s.querySelector('.wordmark'), t0 + 1300, 1000, 18);
+      rise(s.querySelector('.tagline'), t0 + 1800);
+      s.querySelectorAll('.pills li').forEach((li, k) => rise(li, t0 + 2500 + k * 160, 800, 10));
+      fade(s.querySelector('.hint'), t0 + 3500, 900);
+    },
+    (s, t0) => {
+      const q = c => s.querySelector(c);
+      caption(s, t0);
+      rise(q('.wiz'), t0 + 300, 1000, 22);
+      s.querySelectorAll('.wiz > *').forEach((f, k) => rise(f, t0 + 600 + k * 220, 800, 10));
+      const typed = q('.typed');
+      tween(s, t0 + 1500, 650, p => { typed.textContent = 'Sam'.slice(0, Math.round(p * 3)); }, p => p);
+      const caret = q('.caret').animate([{ opacity: 1 }, { opacity: 1, offset: .5 }, { opacity: 0, offset: .55 }, { opacity: 0 }],
+        { duration: 1000, iterations: RM ? 1 : Infinity, delay: RM ? 0 : t0 + 800 });
+      caret.persist && caret.persist();
+      A(q('.seg-pill'), [{ opacity: 0, transform: 'translateX(132px)' }, { opacity: 1, transform: 'translateX(132px)', offset: .3 }, { opacity: 1, transform: 'none' }], t0 + 2300, 1100);
+      A(q('.day-ring'), [{ opacity: 0, transform: 'translateX(0)' }, { opacity: 1, transform: 'translateX(0)', offset: .25 }, { opacity: 1, transform: 'translateX(180px)' }], t0 + 3100, 1400);
+      A(q('.days .sel'), [{ color: 'var(--ink-2)' }, { color: 'var(--green)' }], t0 + 4200, 400);
+      fade(q('.opt-sel'), t0 + 4700, 600);
+      A(q('.opt .tick'), [{ opacity: 0, transform: 'scale(.4)' }, { opacity: 1, transform: 'none' }], t0 + 4850, 700, SOFT);
+      A(q('.btn.primary'), [{ transform: 'none' }, { transform: 'scale(1.05)' }, { transform: 'none' }], t0 + 5700, 1000, 'ease-in-out');
+    },
+    (s, t0) => {
+      const q = c => s.querySelector(c);
+      caption(s, t0);
+      rise(q('.drop'), t0 + 300, 900, 16);
+      A(q('.file-wrap'), [
+        { opacity: 0, transform: 'translate(170px,-150px) rotate(8deg)' },
+        { opacity: 1, transform: 'translate(150px,-130px) rotate(7deg)', offset: .25 },
+        { opacity: 1, transform: 'none' }], t0 + 700, 1400);
+      A(q('.file'), [{ opacity: 1, transform: 'none' }, { opacity: 0, transform: 'scale(.86)' }], t0 + 2150, 600);
+      fade(q('.drop-on'), t0 + 1900, 700);
+      A(q('.z-idle'), [{ opacity: 1 }, { opacity: 0 }], t0 + 1900, 400);
+      fade(q('.z-done'), t0 + 2350, 700);
+      const cnt = q('.cnt');
+      tween(s, t0 + 2400, 1400, p => { cnt.textContent = Math.round(26 * p); });
+      rise(q('.txs'), t0 + 2500, 900, 14);
+      s.querySelectorAll('.tx').forEach((row, k) => {
+        rise(row, t0 + 2700 + k * 200, 700, 8);
+        A(row.querySelector('.tag'), [{ opacity: 0, transform: 'scale(.8)' }, { opacity: 1, transform: 'none' }], t0 + 3100 + k * 200, 650, SOFT);
+      });
+      rise(q('.imp-foot'), t0 + 4400, 800, 8);
+    },
+    (s, t0) => {
+      const q = c => s.querySelector(c);
+      caption(s, t0);
+      s.querySelectorAll('.tile').forEach((t, k) => rise(t, t0 + 300 + k * 140, 900, 14));
+      const bud = q('.b-bud'), pct = q('.b-pct'), left = q('.b-left');
+      tween(s, t0 + 1000, 2800, p => {
+        bud.textContent = fmt(28500 * p);
+        pct.textContent = Math.round(100 * p) + '% of planned income';
+        left.textContent = fmt(28500 * (1 - p));
+      }, easeInOut);
+      rise(q('.cats'), t0 + 800, 900, 14);
+      s.querySelectorAll('.cat').forEach((c, k) => {
+        rise(c, t0 + 1100 + k * 190, 700, 8);
+        const bar = c.querySelector('.bar i');
+        A(bar, [{ transform: 'scaleX(0)' }, { transform: `scaleX(${bar.dataset.r})` }], t0 + 1500 + k * 190, 1500);
+        fade(c.querySelector('.st'), t0 + 2500 + k * 190, 600);
+      });
+      fade(q('.more'), t0 + 2400, 700);
+    },
+    (s, t0) => {
+      const q = c => s.querySelector(c);
+      caption(s, t0);
+      rise(q('.hero'), t0 + 300, 900, 16);
+      const srcs = s.querySelectorAll('.src'), bks = s.querySelectorAll('.bk');
+      const T = t0 + 900;
+      rise(q('.rl-1'), T - 200, 700, 8);
+      rise(srcs[0], T - 100, 800, 10);
+      rise(srcs[1], T + 1000, 800, 10);
+      fade(q('.partial'), T + 1900, 700);
+      rise(q('.rl-2'), T + 2300, 700, 8);
+      [2500, 3600, 4700].forEach((ms, k) => rise(bks[k], T + ms, 800, 10));
+      const left = q('.p-left'), of = q('.p-of'), split = q('.p-split');
+      const pot = [[0, 0], [700, 6000], [1100, 6000], [1800, 8400]];
+      const placed = [[0, 0], [2600, 0], [3200, 4000], [3700, 4000], [4300, 5800], [4800, 5800], [5400, 8400]];
+      tween(s, T, 5400, p => {
+        const ms = p * 5400, P = keyed(pot, ms), D = keyed(placed, ms);
+        left.textContent = fmt(Math.max(0, P - D));
+        of.textContent = 'of ' + fmt(P) + ' in this plan';
+        split.style.transform = `scaleX(${P ? D / P : 0})`;
+      }, p => p);
+      // Outro: the plan settles, then gives way to the finish card.
+      const out = t0 + 7600;
+      [q('.cap'), q('.vis')].forEach(el => A(el, [{ opacity: 1, transform: 'none' }, { opacity: 0, transform: 'scale(.985)' }], out, 800));
+      const o = q('.outro');
+      fade(o, out + 400, 900);
+      drawMark(o.querySelector('.mark'), out + 400);
+      rise(o.querySelector('h2'), out + 900, 1000, 16);
+      rise(o.querySelector('p'), out + 1200, 900, 12);
+      rise(o.querySelector('.btn'), out + 1500, 900, 10);
+    },
+  ];
+
+  /* ---- player ---- */
+  const chipsEl = document.getElementById('chips');
+  const chips = names.map((n, i) => {
+    const b = document.createElement('button');
+    b.type = 'button'; b.className = 'chip';
+    b.innerHTML = `<span>${n}</span><span class="track"><span class="fill"></span></span>`;
+    b.addEventListener('click', () => go(i));
+    chipsEl.appendChild(b);
+    return b;
+  });
+  const playBtn = document.getElementById('play');
+  let current = null, timer = null, playing = !RM && !RECORD;
+
+  const sceneAnims = s => s.getAnimations({ subtree: true });
+  function setPlayIcon() {
+    playBtn.innerHTML = playing ? ICON_PAUSE : ICON_PLAY;
+    playBtn.setAttribute('aria-label', playing ? 'Pause' : 'Play');
+  }
+
+  function go(i) {
+    const prev = current;
+    current = i;
+    scenes.forEach((s, k) => {
+      if (k !== i && k !== prev) { sceneAnims(s).forEach(a => a.cancel()); s.hidden = true; }
+    });
+    if (prev != null && prev !== i && playing) {
+      const ps = scenes[prev];
+      ps.style.zIndex = 1;
+      const out = ps.animate([{ opacity: 1 }, { opacity: 0 }], { duration: RM ? 0 : 600, easing: EASE, fill: 'forwards' });
+      out.onfinish = () => { if (current !== prev) { sceneAnims(ps).forEach(a => a.cancel()); ps.hidden = true; } };
+    } else if (prev != null && prev !== i) {
+      sceneAnims(scenes[prev]).forEach(a => a.cancel()); scenes[prev].hidden = true;
+    }
+    const s = scenes[i];
+    sceneAnims(s).forEach(a => a.cancel());
+    s.querySelectorAll('.ghost').forEach(g => g.remove());
+    s.hidden = false; s.style.zIndex = 2;
+    const t0 = prev == null ? 0 : 350;
+    fade(s, prev == null ? 0 : 200, 800);
+    build[i](s, t0);
+
+    chips.forEach((c, k) => {
+      c.classList.toggle('on', k === i);
+      c.classList.toggle('done', k < i);
+      c.setAttribute('aria-current', k === i ? 'step' : 'false');
+      c.querySelector('.fill').getAnimations().forEach(a => a.cancel());
+    });
+    const dur = +s.dataset.dur;
+    timer = chips[i].querySelector('.fill').animate([{ transform: 'scaleX(0)' }, { transform: 'scaleX(1)' }], { duration: dur, easing: 'linear', fill: 'forwards' });
+    timer.onfinish = () => { if (playing) go((i + 1) % scenes.length); };
+
+    if (!playing) {
+      // Paused: show the scene in its settled state rather than its empty first frame.
+      const rest = +s.dataset.rest;
+      [...sceneAnims(s), timer].forEach(a => { a.currentTime = rest; a.pause(); });
+    }
+  }
+
+  function pause() {
+    playing = false; setPlayIcon();
+    document.getAnimations().forEach(a => { if (a.playState === 'running') a.pause(); });
+  }
+  function resume() {
+    playing = true; setPlayIcon();
+    document.getAnimations().forEach(a => { if (a.playState === 'paused') a.play(); });
+    if (timer && timer.playState === 'finished') go((current + 1) % scenes.length);
+  }
+  playBtn.addEventListener('click', () => playing ? pause() : resume());
+  document.getElementById('replay').addEventListener('click', () => { if (!playing) { playing = true; setPlayIcon(); } go(0); });
+  document.addEventListener('keydown', e => {
+    if (e.target.closest('button')) return;
+    if (e.key === ' ') { e.preventDefault(); playing ? pause() : resume(); }
+    if (e.key === 'ArrowRight') go((current + 1) % scenes.length);
+    if (e.key === 'ArrowLeft') go((current + scenes.length - 1) % scenes.length);
+  });
+
+  /* ---- ambient light, format and scaling ---- */
+  if (!RM) {
+    stage.querySelector('.g1').animate([{ transform: 'translate(0,0)' }, { transform: 'translate(120px,70px)' }], { duration: 14000, iterations: Infinity, direction: 'alternate', easing: 'ease-in-out' });
+    stage.querySelector('.g2').animate([{ transform: 'translate(0,0)' }, { transform: 'translate(-110px,-60px)' }], { duration: 17000, iterations: Infinity, direction: 'alternate', easing: 'ease-in-out' });
+  }
+  const f169 = document.getElementById('f169'), f916 = document.getElementById('f916');
+  function setFormat(portrait) {
+    wrap.classList.toggle('portrait', portrait);
+    f169.setAttribute('aria-pressed', String(!portrait));
+    f916.setAttribute('aria-pressed', String(portrait));
+    fit();
+  }
+  function fit() {
+    const base = wrap.classList.contains('portrait') ? 720 : 1280;
+    stage.style.transform = `scale(${wrap.clientWidth / base})`;
+  }
+  f169.addEventListener('click', () => setFormat(false));
+  f916.addEventListener('click', () => setFormat(true));
+  new ResizeObserver(fit).observe(wrap);
+
+  // Bars rest at their real fill when nothing is animating.
+  stage.querySelectorAll('.bar i').forEach(b => { b.style.transform = `scaleX(${b.dataset.r})`; });
+  setFormat(params.has('format') ? params.get('format') === 'portrait' : innerWidth < 640);
+  setPlayIcon();
+  go(0);
+
+  /* ?record: bvSeek(i, ms, glowMs, fade) holds scene i at ms, crossfading from
+     the previous scene over the first 600ms the way the player does, so a
+     recorder can step through frames at any speed and get identical output. */
+  if (RECORD) {
+    const built = new Set();
+    const clamp = x => Math.min(1, Math.max(0, x));
+    const show = (k, ms, opacity, z) => {
+      const s = scenes[k];
+      if (!built.has(k)) {
+        sceneAnims(s).forEach(a => a.cancel());
+        s.querySelectorAll('.ghost').forEach(g => g.remove());
+        build[k](s, 350);
+        built.add(k);
+      }
+      s.hidden = false;
+      s.style.opacity = opacity;
+      s.style.zIndex = z;
+      sceneAnims(s).forEach(a => { a.currentTime = ms; a.pause(); });
+    };
+    window.bvSeek = (i, ms, glowMs = 0, fade = 1) => {
+      if (timer) timer.cancel();
+      const p = i > 0 && ms < 600 ? i - 1 : null;
+      scenes.forEach((s, k) => {
+        if (k === i || k === p) return;
+        sceneAnims(s).forEach(a => a.cancel());
+        built.delete(k);
+        s.hidden = true;
+      });
+      show(i, ms, easeOut(clamp((ms - 200) / 800)) * fade, 2);
+      if (p != null) show(p, +scenes[p].dataset.dur + ms, 1 - easeOut(ms / 600), 1);
+      stage.querySelectorAll('.glow').forEach(g => g.getAnimations().forEach(a => { a.currentTime = glowMs; a.pause(); }));
+    };
+  }
+})();
+</script>
+</body>
+</html>
