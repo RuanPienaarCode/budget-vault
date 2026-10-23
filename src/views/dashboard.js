@@ -358,8 +358,8 @@ module.exports = function registerDashboard(ctx) {
       const tone = toneOf(tile);
       const ms = motion.count(tile.querySelector('.lv'), { key: `health-${i}`, tone });
       if (tile === scoreTile && ms) {
-        motion.float(tile, { delay: Math.round(ms * 0.6) });
-        motion.flash(tile, tone, 'bud-ring', ms);
+        motion.float(tile, { delay: Math.round(ms * 0.6), key: 'score' });
+        motion.flash(tile, tone, { cls: 'bud-ring', delay: ms, key: 'score' });
       }
     }));
   }
