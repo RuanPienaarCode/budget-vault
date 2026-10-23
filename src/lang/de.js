@@ -141,6 +141,8 @@ module.exports = {
   'wiz.back': 'Zurück',
   'wiz.next': 'Weiter',
   'wiz.letsGo': 'Los geht\'s!',
+  'wiz.motion.pause': 'Animation anhalten',
+  'wiz.motion.play': 'Animation abspielen',
   'wiz.connectBtn': 'Budget verbinden',
   'wiz.createBtn': 'Mein Budget erstellen',
   'wiz.skipped': 'Einrichtung übersprungen — du kannst sie jederzeit erneut starten über Einstellungen → Budget Vault → Einrichtungsassistent starten, oder über die Befehlspalette.',

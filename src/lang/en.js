@@ -157,6 +157,8 @@ module.exports = {
   'wiz.back': 'Back',
   'wiz.next': 'Next',
   'wiz.letsGo': 'Let\'s go!',
+  'wiz.motion.pause': 'Pause the animation',
+  'wiz.motion.play': 'Play the animation',
   'wiz.connectBtn': 'Connect budget',
   'wiz.createBtn': 'Create my budget',
   'wiz.skipped': 'Setup skipped — you can run it again from Settings → Budget Vault → Run setup wizard, or the command palette.',

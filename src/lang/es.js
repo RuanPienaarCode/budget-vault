@@ -142,6 +142,8 @@ module.exports = {
   'wiz.back': 'Atrás',
   'wiz.next': 'Siguiente',
   'wiz.letsGo': '¡Vamos!',
+  'wiz.motion.pause': 'Pausar la animación',
+  'wiz.motion.play': 'Reproducir la animación',
   'wiz.connectBtn': 'Conectar presupuesto',
   'wiz.createBtn': 'Crear mi presupuesto',
   'wiz.skipped': 'Configuración omitida — puedes volver a ejecutarla desde Ajustes → Budget Vault → Ejecutar el asistente, o desde la paleta de comandos.',

@@ -157,6 +157,8 @@ module.exports = {
   'wiz.back': 'पीछे',
   'wiz.next': 'आगे',
   'wiz.letsGo': 'चलिए शुरू करें!',
+  'wiz.motion.pause': 'एनिमेशन रोकें',
+  'wiz.motion.play': 'एनिमेशन चलाएँ',
   'wiz.connectBtn': 'बजट जोड़ें',
   'wiz.createBtn': 'मेरा बजट बनाएँ',
   'wiz.skipped': 'सेटअप छोड़ दिया गया — आप इसे सेटिंग्स → Budget Vault → सेटअप विज़ार्ड चलाएँ से, या कमांड पैलेट से दोबारा चला सकते हैं।',

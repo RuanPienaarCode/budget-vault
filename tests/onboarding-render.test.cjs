@@ -94,6 +94,7 @@ class FakeEl {
   appendChild(n) { this.children.push(n); return n; }
   addClass(...c) { c.forEach(x => this._cls.add(x)); }
   removeClass(...c) { c.forEach(x => this._cls.delete(x)); }
+  toggleClass(c, on) { if (on) this._cls.add(c); else this._cls.delete(c); }
   hasClass(c) { return this._cls.has(c); }
   setAttribute(k, v) { this.attrs[k] = String(v); }
   getAttribute(k) { return k in this.attrs ? this.attrs[k] : null; }
@@ -266,8 +267,25 @@ function walkPath(w, expected, label) {
     ok(planned >= 3, `the plan actually lists the questions (found ${planned})`);
     ok(planned <= 4,
       `the plan must not promise more screens than the shortest path walks (promises ${planned})`);
+    /* The welcome animation (src/welcome-motion.js; tests/welcome-motion.test.cjs
+       pins its own behaviour) opens the screen above the title, prints its
+       figures the way the wizard prints money, and is taken down the moment
+       the reader leaves the screen — a timer left behind would keep cycling
+       scenes inside a dialog that no longer shows them. */
+    const motion = byClass(w.contentEl, 'budget-onb-motion');
+    eq(motion.length, 1, 'the welcome screen opens on the animation');
+    eq(w.contentEl.children[0], motion[0], 'above the welcome title, not under it');
+    ok(textOf(w.contentEl, 'bvm-tile-v').includes('R 28 500'),
+      'its figures are in the wizard\'s currency, grouped the chosen country\'s way');
+    const shown = w.motion;
+    let downed = 0;
+    const realDestroy = shown.destroy;
+    shown.destroy = () => { downed++; realDestroy(); };
 
     walkPath(w, ['welcome', 'name', 'period', 'how', 'rates', 'categories', 'account', 'finish'], 'csv create');
+    eq(downed, 1, 'leaving the welcome screen takes the animation down, once');
+    eq(w.motion, null, 'and the wizard lets go of it');
+    eq(byClass(w.contentEl, 'budget-onb-motion').length, 0, 'no other screen carries it');
 
     w.data.inputMode = 'manual';
     walkPath(w, ['welcome', 'name', 'period', 'how', 'rates', 'firstBudget', 'finish'], 'manual create');
@@ -617,9 +635,13 @@ function walkPath(w, expected, label) {
   {
     const p = makePlugin();
     const w = open(makeApp(), p);
+    let downed = 0;
+    const realDestroy = w.motion.destroy;
+    w.motion.destroy = () => { downed++; realDestroy(); };
     w.close();                              // Escape / tap-outside on the welcome screen
     eq(p.settings.onboarded, false,
       'closing on the welcome screen leaves the wizard to ask again — no decision was made');
+    eq(downed, 1, 'and closing takes the welcome animation down with it');
   }
   {
     const p = makePlugin();
