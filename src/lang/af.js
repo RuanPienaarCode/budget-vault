@@ -140,6 +140,8 @@ module.exports = {
   'wiz.back': 'Terug',
   'wiz.next': 'Volgende',
   'wiz.letsGo': 'Kom ons gaan!',
+  'wiz.motion.pause': 'Onderbreek die animasie',
+  'wiz.motion.play': 'Speel die animasie',
   'wiz.connectBtn': 'Koppel begroting',
   'wiz.createBtn': 'Skep my begroting',
   'wiz.skipped': 'Opstelling oorgeslaan — jy kan dit weer uitvoer vanaf Instellings → Budget Vault → Voer opstelassistent uit, of die bevelpalet.',

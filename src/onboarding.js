@@ -28,7 +28,8 @@
 
 const { Modal, Setting, Notice, normalizePath, TFile, TFolder } = require('obsidian');
 const { PROFILES, COUNTRY_ORDER, localeFor } = require('./locale');
-const { formatAmount } = require('./currency');
+const { formatAmount, formatSigned } = require('./currency');
+const { buildWelcomeMotion } = require('./welcome-motion');
 const { SET_ASIDE_TYPES } = require('./vocabulary');
 /* Namespace import for the same reason settings-tab.js uses one: this file
    binds `t` as a parameter in several `.addText(t => …)` callbacks, so a bare
@@ -194,6 +195,7 @@ class OnboardingWizard extends Modal {
     this.plugin = plugin;
     this.finished = false;
     this.stepIdx = 0;
+    this.motion = null;             // the welcome animation while it is on screen
     this.mode = 'create';           // 'create' | 'connect' — decided by adoptFolder()
     this._prefilledFrom = '';       // the folder prefillFromSettingsMd() last read
     /* Which answers the READER has given, as opposed to which ones this class
@@ -332,6 +334,7 @@ class OnboardingWizard extends Modal {
   // promise here is harmless since nothing reads it — the alternative is a
   // fire-and-forget saveSettings() call with nowhere to attach a catch.
   async onClose() {
+    this.dropMotion();
     this.contentEl.empty();
     if (this.finished) return;
     // Closing on the welcome screen is not a decision — it's a tap outside the
@@ -361,6 +364,7 @@ class OnboardingWizard extends Modal {
     // successful Next) clears it, and the message never outlives the mistake.
     const err = this.error;
     this.error = '';
+    this.dropMotion();
     c.empty();
     const steps = this.steps();
     /* The list can SHRINK underneath the reader: editing the folder on the
@@ -398,6 +402,13 @@ class OnboardingWizard extends Modal {
      easy to miss on a phone, can land behind the modal, and never says which
      field it means. */
   fail(msg) { this.error = msg; this.renderStep(); }
+
+  /* Every re-render and the close go through here first: emptying the
+     content does not stop the animation's timer, and a timer left running
+     would keep cycling scenes in a dialog that no longer shows them. */
+  dropMotion() {
+    if (this.motion) { this.motion.destroy(); this.motion = null; }
+  }
 
   /* Move to a step BY NAME. Index arithmetic is only safe while the list is
      fixed, and it is not: after the folder field flips the mode, index 2 means
@@ -553,6 +564,15 @@ class OnboardingWizard extends Modal {
 
   /* -------------------------------- steps -------------------------------- */
   render_welcome(c) {
+    /* Where the setup leads, shown before it asks anything. Figures go through
+       the same formatter as moneyText(), so they are in the currency and
+       grouping this reader's country already implies. */
+    const loc = () => localeFor(this.data.country);
+    this.motion = buildWelcomeMotion(c, {
+      t: i18n.t,
+      money: (v, d) => formatAmount(this.currencySymbol(), v, d, loc()),
+      signed: (v, d) => (v > 0 ? '+' : '') + formatSigned(this.currencySymbol(), v, d, loc()),
+    });
     c.createEl('h2', { text: i18n.t('wiz.welcome.title') });
     c.createEl('p', { text: i18n.t('wiz.welcome.intro') });
     const intro = c.createEl('p');

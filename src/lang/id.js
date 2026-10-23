@@ -153,6 +153,8 @@ module.exports = {
   'wiz.back': 'Kembali',
   'wiz.next': 'Lanjut',
   'wiz.letsGo': 'Ayo mulai!',
+  'wiz.motion.pause': 'Jeda animasi',
+  'wiz.motion.play': 'Putar animasi',
   'wiz.connectBtn': 'Hubungkan anggaran',
   'wiz.createBtn': 'Buat anggaran saya',
   'wiz.skipped': 'Penyiapan dilewati — Anda bisa menjalankannya lagi lewat Pengaturan → Budget Vault → Jalankan panduan penyiapan, atau lewat palet perintah.',

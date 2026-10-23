@@ -3011,6 +3011,313 @@ body.is-tablet .budget-app-root button:where(.dock-btn) { padding: 6px 10px; }
   .budget-onb-confetti { display: none; }
 }
 
+/* ---- The welcome animation (src/welcome-motion.js) ----------------------
+   A modal, so like every .budget-onb-* rule above it follows Obsidian's theme:
+   surfaces and ink are Obsidian's variables, and only the accents are the
+   plugin's own green, gold and clay, with a darker set under .theme-dark.
+
+   The stage is drawn at 440x280 and scaled to the dialog by --bvm-scale (set by
+   a ResizeObserver). JS only puts .is-on on one scene; every entrance below is
+   a keyframe keyed off it, so re-adding the class replays the scene. Each
+   animation carries var(--bvm-play) as its play state, which .is-paused flips,
+   and the resting styles ARE the last frame: with .is-still, or under reduced
+   motion, the animations are dropped and every scene shows settled. */
+.budget-onb-motion {
+  --bvm-green: #2c6b57; --bvm-on-green: #ffffff; --bvm-mint: #e7f2ec; --bvm-mint-2: #cfe4da;
+  --bvm-gold: #a6843f; --bvm-clay: #b06f5b;
+  --bvm-surface: var(--background-primary, #ffffff);
+  --bvm-ground: var(--background-secondary, #f2f5f3);
+  --bvm-ink: var(--text-normal, #13211d);
+  --bvm-ink-2: var(--text-muted, #52625b);
+  --bvm-line: var(--background-modifier-border, rgba(19, 33, 29, .12));
+  --bvm-ease: cubic-bezier(.22, .61, .36, 1);
+  --bvm-soft: cubic-bezier(.34, 1.25, .64, 1);
+  --bvm-play: running;
+  margin: 0 0 14px;
+}
+.theme-dark .budget-onb-motion {
+  --bvm-green: #7cc3a6; --bvm-on-green: #0b1210; --bvm-mint: #1a2e28; --bvm-mint-2: #26453b;
+  --bvm-gold: #d3b274; --bvm-clay: #dc9b87;
+}
+.budget-onb-motion.is-paused { --bvm-play: paused; }
+.bvm-frame {
+  position: relative; width: 100%; aspect-ratio: 440 / 280; overflow: hidden;
+  border-radius: 14px; border: 1px solid var(--bvm-line);
+  background:
+    radial-gradient(circle at 8% 0%, var(--bvm-mint-2), transparent 46%),
+    radial-gradient(circle at 100% 100%, var(--bvm-mint), transparent 52%),
+    var(--bvm-ground);
+}
+.bvm-stage {
+  position: absolute; left: 0; top: 0; width: 440px; height: 280px;
+  transform: scale(var(--bvm-scale, 1)); transform-origin: 0 0;
+  font-family: 'BV Geist', var(--font-interface, -apple-system, 'Segoe UI', sans-serif);
+  color: var(--bvm-ink); font-size: 12.5px; line-height: 1.35;
+  font-variant-numeric: tabular-nums;
+}
+.bvm-scene {
+  position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center;
+  gap: 8px; padding: 30px 22px 14px; box-sizing: border-box;
+  opacity: 0; visibility: hidden; transition: opacity .45s ease, visibility 0s linear .45s;
+}
+.bvm-scene.is-on { opacity: 1; visibility: visible; transition: opacity .6s ease .15s, visibility 0s; }
+.bvm-label {
+  position: absolute; top: 11px; left: 16px; font-size: 12px; font-weight: 600;
+  letter-spacing: .12em; text-transform: uppercase; color: var(--bvm-green);
+}
+.bvm-card { background: var(--bvm-surface); border: 1px solid var(--bvm-line); border-radius: 10px; box-sizing: border-box; }
+
+/* 1 · Welcome: the vault door opens. */
+.bvm-s1 { gap: 12px; padding-top: 14px; }
+.bvm-mark { width: 76px; height: 76px; }
+.bvm-door { display: block; width: 76px; height: 76px; overflow: visible; }
+.bvm-door * { transform-box: fill-box; transform-origin: center; }
+.bvm-door-bg { fill: var(--bvm-mint); }
+.bvm-door-box, .bvm-door-rim { fill: none; stroke: var(--bvm-green); stroke-width: 3; }
+.bvm-door-inside { fill: var(--bvm-green); fill-opacity: .2; }
+.bvm-door-face { fill: var(--bvm-surface); }
+.bvm-door-ring, .bvm-door-spokes { fill: none; stroke: var(--bvm-green); stroke-width: 2.6; stroke-linecap: round; }
+.bvm-door-bolts circle, .bvm-door-knob, .bvm-door-hinge { fill: var(--bvm-green); }
+.bvm-door-leaf { transform-box: view-box; transform-origin: 23px 52px; transform: scaleX(.38); }
+.bvm-door-spin { transform-box: view-box; transform-origin: 52px 52px; transform: rotate(120deg); }
+.bvm-wordmark { font-size: 30px; font-weight: 600; letter-spacing: -.03em; line-height: 1; }
+
+/* 2 · Settings: the wizard's own three questions, answered. */
+.bvm-wiz { width: 300px; padding: 11px 14px 12px; display: flex; flex-direction: column; gap: 8px; }
+.bvm-wiz-head { display: flex; justify-content: space-between; align-items: center; font-size: 12px; color: var(--bvm-ink-2); }
+.bvm-wiz-prog { width: 70px; height: 3px; border-radius: 2px; background: var(--bvm-line); overflow: hidden; }
+.bvm-wiz-prog span { display: block; width: 14%; height: 100%; background: var(--bvm-green); }
+.bvm-field { display: flex; flex-direction: column; gap: 4px; }
+.bvm-lb { font-size: 12.5px; font-weight: 600; overflow-wrap: break-word; }
+.bvm-input {
+  height: 26px; border-radius: 7px; border: 1px solid var(--bvm-line); background: var(--bvm-ground);
+  display: flex; align-items: center; padding: 0 9px; font-size: 12.5px;
+}
+.bvm-typed { display: inline-block; overflow: hidden; white-space: nowrap; max-width: 3em; vertical-align: bottom; }
+.bvm-caret { width: 1.5px; height: 14px; margin-left: 1px; background: var(--bvm-green); }
+.bvm-days { position: relative; display: flex; gap: 5px; }
+.bvm-day {
+  width: 30px; height: 24px; border-radius: 7px; display: flex; align-items: center; justify-content: center;
+  font-size: 12px; color: var(--bvm-ink-2); background: var(--bvm-ground);
+}
+.bvm-day.is-sel { color: var(--bvm-green); font-weight: 600; }
+.bvm-day-ring {
+  position: absolute; left: 0; top: 0; width: 30px; height: 24px; box-sizing: border-box;
+  border: 1.5px solid var(--bvm-green); border-radius: 7px; transform: translateX(105px);
+}
+.bvm-opts { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
+.bvm-opt { position: relative; border: 1px solid var(--bvm-line); border-radius: 8px; padding: 6px 24px 6px 8px; font-size: 12px; min-height: 34px; box-sizing: border-box; }
+.bvm-opt-text { position: relative; display: block; overflow-wrap: break-word; }
+.bvm-opt-sel { position: absolute; inset: -1px; border-radius: 8px; border: 1.5px solid var(--bvm-green); background: var(--bvm-mint); }
+.bvm-tick { position: absolute; right: 6px; top: 6px; width: 13px; height: 13px; border-radius: 50%; background: var(--bvm-green); }
+.bvm-tick::after {
+  content: ""; position: absolute; left: 4.5px; top: 2.5px; width: 3px; height: 6px;
+  border: solid var(--bvm-on-green); border-width: 0 1.5px 1.5px 0; transform: rotate(45deg);
+}
+
+/* 3 · Import: a statement drops in and sorts itself. */
+.bvm-drop {
+  position: relative; width: 300px; height: 46px; border-radius: 10px; box-sizing: border-box;
+  border: 1.5px dashed var(--bvm-line); background: var(--bvm-surface);
+  display: flex; align-items: center; justify-content: center;
+}
+.bvm-drop-on { position: absolute; inset: -1.5px; border-radius: 10px; border: 1.5px solid var(--bvm-green); background: var(--bvm-mint); }
+.bvm-drop-name { position: relative; font-family: var(--font-monospace, ui-monospace, Menlo, monospace); font-size: 12px; }
+.bvm-file-move { position: absolute; left: 50%; top: 50%; width: 132px; margin: -17px 0 0 -66px; }
+.bvm-file {
+  height: 34px; border-radius: 8px; background: var(--bvm-surface); border: 1px solid var(--bvm-line);
+  box-shadow: 0 6px 16px -8px rgba(0, 0, 0, .3); display: flex; align-items: center; gap: 7px; padding: 0 9px;
+  font-size: 12px; opacity: 0;
+}
+.bvm-file-doc { padding: 2px 4px; border-radius: 4px; background: var(--bvm-mint-2); color: var(--bvm-green); font-size: 12px; font-weight: 600; }
+.bvm-txs { width: 300px; padding: 3px 0; }
+.bvm-tx { display: grid; grid-template-columns: 22px 1fr auto; align-items: center; gap: 8px; padding: 5px 11px; }
+.bvm-tx + .bvm-tx { border-top: 1px solid var(--bvm-line); }
+.bvm-tx-day { font-size: 12px; color: var(--bvm-ink-2); }
+.bvm-tag {
+  justify-self: start; max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  font-size: 12px; padding: 2px 7px; border-radius: 999px; background: var(--bvm-ground); color: var(--bvm-ink-2);
+}
+.bvm-tag.is-in { background: var(--bvm-mint); color: var(--bvm-green); }
+.bvm-amt { font-size: 12.5px; font-weight: 600; text-align: right; white-space: nowrap; }
+.bvm-amt.is-in { color: var(--bvm-green); }
+
+/* 4 · Budget: every category a number, and what is left of it. */
+.bvm-tiles { width: 300px; display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; }
+.bvm-tile { padding: 7px 9px; display: flex; flex-direction: column; justify-content: space-between; gap: 3px; min-width: 0; }
+.bvm-tile-lb { font-size: 12px; line-height: 1.2; color: var(--bvm-ink-2); overflow-wrap: break-word; }
+.bvm-tile-v { font-size: 15px; font-weight: 600; letter-spacing: -.01em; white-space: nowrap; }
+.bvm-t3 .bvm-tile-v { color: var(--bvm-green); }
+.bvm-cats { width: 300px; padding: 2px 11px 6px; }
+.bvm-cat { padding: 6px 0 4px; }
+.bvm-cat + .bvm-cat { border-top: 1px solid var(--bvm-line); }
+.bvm-cat-top { display: flex; justify-content: space-between; gap: 8px; font-size: 12px; margin-bottom: 4px; }
+.bvm-cat-name { font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
+.bvm-cat-st { color: var(--bvm-ink-2); white-space: nowrap; }
+.bvm-cat.is-over .bvm-cat-st { color: var(--bvm-clay); }
+.bvm-bar { height: 5px; border-radius: 3px; background: var(--bvm-ground); overflow: hidden; }
+.bvm-bar span { display: block; height: 100%; border-radius: 3px; background: var(--bvm-green); transform-origin: left center; }
+.bvm-cat.is-over .bvm-bar span { background: var(--bvm-clay); }
+.bvm-w69 { width: 69%; }
+.bvm-w70 { width: 70%; }
+.bvm-w100 { width: 100%; }
+
+/* 5 · Plan: the pot is placed into buckets until nothing is left to place. */
+.bvm-hero { width: 300px; padding: 10px 13px 9px; }
+.bvm-hero-lb, .bvm-hero-of { font-size: 12px; color: var(--bvm-ink-2); }
+.bvm-hero-v { position: relative; height: 32px; }
+.bvm-v { position: absolute; left: 0; top: 0; font-size: 26px; font-weight: 600; letter-spacing: -.03em; line-height: 32px; white-space: nowrap; opacity: 0; }
+.bvm-v4 { opacity: 1; }
+.bvm-split { margin-top: 7px; height: 6px; border-radius: 3px; background: var(--bvm-ground); overflow: hidden; }
+.bvm-split span { display: block; height: 100%; background: var(--bvm-green); border-radius: 3px; transform-origin: left center; }
+.bvm-legend { display: flex; gap: 12px; margin-top: 6px; font-size: 12px; color: var(--bvm-ink-2); }
+.bvm-key { display: flex; align-items: center; gap: 5px; }
+.bvm-key::before { content: ""; width: 6px; height: 6px; border-radius: 50%; background: var(--bvm-line); }
+.bvm-key.is-spoken::before { background: var(--bvm-green); }
+.bvm-buckets { width: 300px; display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; }
+.bvm-bk { padding: 7px 9px; display: flex; flex-direction: column; gap: 1px; min-width: 0; }
+.bvm-bk-name, .bvm-bk-sub { font-size: 12px; line-height: 1.25; overflow-wrap: break-word; }
+.bvm-bk-name { font-weight: 600; }
+.bvm-bk-sub { color: var(--bvm-ink-2); }
+.bvm-bk-v { font-size: 14px; font-weight: 600; white-space: nowrap; }
+
+/* The controls under the picture: pause, and a dot per scene. */
+.bvm-controls { display: flex; align-items: center; justify-content: center; gap: 8px; margin-top: 8px; }
+.bvm-dots { display: flex; gap: 2px; }
+.budget-onb-motion .bvm-controls button.bvm-toggle, .budget-onb-motion .bvm-controls button.bvm-dot {
+  position: relative; padding: 0; margin: 0; border: 0; box-shadow: none; background: transparent;
+  display: inline-flex; align-items: center; justify-content: center; cursor: pointer;
+}
+.budget-onb-motion .bvm-controls button.bvm-toggle { width: 28px; height: 28px; border-radius: 50%; border: 1px solid var(--bvm-line); }
+.budget-onb-motion .bvm-controls button.bvm-toggle::before, .budget-onb-motion .bvm-controls button.bvm-toggle::after {
+  content: ""; width: 3px; height: 10px; margin: 0 1.5px; border-radius: 1px; background: var(--bvm-ink-2);
+}
+.budget-onb-motion .bvm-controls button.bvm-toggle.is-paused::after { display: none; }
+.budget-onb-motion .bvm-controls button.bvm-toggle.is-paused::before {
+  width: 0; height: 0; margin: 0 0 0 2px; border-radius: 0; background: none;
+  border-style: solid; border-width: 5.5px 0 5.5px 9px; border-color: transparent transparent transparent var(--bvm-ink-2);
+}
+.budget-onb-motion .bvm-controls button.bvm-toggle.bvm-gone { display: none; }
+.budget-onb-motion .bvm-controls button.bvm-dot { width: 22px; height: 22px; border-radius: 50%; }
+.budget-onb-motion .bvm-controls button.bvm-dot::before { content: ""; width: 7px; height: 7px; border-radius: 50%; background: var(--bvm-line); transition: background .3s ease, transform .3s ease; }
+.budget-onb-motion .bvm-controls button.bvm-dot[aria-current='true']::before { background: var(--bvm-green); transform: scale(1.25); }
+.budget-onb-motion .bvm-controls button.bvm-toggle:focus-visible, .budget-onb-motion .bvm-controls button.bvm-dot:focus-visible { outline: 2px solid var(--bvm-green); outline-offset: 1px; }
+
+/* The keyframes, and which element plays which, in scene order. */
+@keyframes bvm-rise { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }
+@keyframes bvm-fade { from { opacity: 0; } to { opacity: 1; } }
+@keyframes bvm-fade-out { from { opacity: 1; } to { opacity: 0; } }
+@keyframes bvm-pop { from { opacity: 0; transform: scale(.5); } to { opacity: 1; transform: none; } }
+@keyframes bvm-spin { from { transform: rotate(0deg); } to { transform: rotate(120deg); } }
+@keyframes bvm-swing { from { transform: scaleX(1); } to { transform: scaleX(.38); } }
+@keyframes bvm-type { from { max-width: 0; } to { max-width: 3em; } }
+@keyframes bvm-blink { 0%, 50% { opacity: 1; } 55%, 100% { opacity: 0; } }
+@keyframes bvm-ring { 0% { opacity: 0; transform: translateX(0); } 25% { opacity: 1; transform: translateX(0); } 100% { opacity: 1; transform: translateX(105px); } }
+@keyframes bvm-grow { from { transform: scaleX(0); } to { transform: scaleX(1); } }
+@keyframes bvm-drop {
+  0% { opacity: 0; transform: translate(90px, -60px) rotate(8deg); }
+  25% { opacity: 1; transform: translate(80px, -52px) rotate(7deg); }
+  100% { opacity: 1; transform: none; }
+}
+@keyframes bvm-sink { from { opacity: 1; transform: none; } to { opacity: 0; transform: scale(.85); } }
+@keyframes bvm-v1 { 0%, 10% { opacity: 0; } 16%, 46% { opacity: 1; } 50%, 100% { opacity: 0; } }
+@keyframes bvm-v2 { 0%, 48% { opacity: 0; } 52%, 64% { opacity: 1; } 68%, 100% { opacity: 0; } }
+@keyframes bvm-v3 { 0%, 66% { opacity: 0; } 70%, 82% { opacity: 1; } 86%, 100% { opacity: 0; } }
+@keyframes bvm-v4 { 0%, 84% { opacity: 0; } 88%, 100% { opacity: 1; } }
+@keyframes bvm-split {
+  0%, 46% { transform: scaleX(0); }
+  52%, 64% { transform: scaleX(.476); }
+  70%, 82% { transform: scaleX(.69); }
+  88%, 100% { transform: scaleX(1); }
+}
+
+.budget-onb-motion .is-on .bvm-label { animation: bvm-fade .6s var(--bvm-ease) .1s both var(--bvm-play); }
+.budget-onb-motion .is-on .bvm-door-bg { animation: bvm-pop .9s var(--bvm-ease) .1s both var(--bvm-play); }
+.budget-onb-motion .is-on .bvm-door-box { animation: bvm-fade .7s var(--bvm-ease) .25s both var(--bvm-play); }
+.budget-onb-motion .is-on .bvm-door-inside { animation: bvm-fade .5s var(--bvm-ease) .35s both var(--bvm-play); }
+.budget-onb-motion .is-on .bvm-door-face, .budget-onb-motion .is-on .bvm-door-rim { animation: bvm-fade .6s var(--bvm-ease) .45s both var(--bvm-play); }
+.budget-onb-motion .is-on .bvm-door-bolts circle { animation: bvm-pop .45s var(--bvm-soft) .7s both var(--bvm-play); }
+.budget-onb-motion .is-on .bvm-door-bolts circle:nth-child(2) { animation-delay: .76s; }
+.budget-onb-motion .is-on .bvm-door-bolts circle:nth-child(3) { animation-delay: .82s; }
+.budget-onb-motion .is-on .bvm-door-bolts circle:nth-child(4) { animation-delay: .88s; }
+.budget-onb-motion .is-on .bvm-door-bolts circle:nth-child(5) { animation-delay: .94s; }
+.budget-onb-motion .is-on .bvm-door-bolts circle:nth-child(6) { animation-delay: 1s; }
+.budget-onb-motion .is-on .bvm-door-bolts circle:nth-child(7) { animation-delay: 1.06s; }
+.budget-onb-motion .is-on .bvm-door-bolts circle:nth-child(8) { animation-delay: 1.12s; }
+.budget-onb-motion .is-on .bvm-door-hinge { animation: bvm-fade .5s var(--bvm-ease) .9s both var(--bvm-play); }
+.budget-onb-motion .is-on .bvm-door-wheel { animation: bvm-fade .7s var(--bvm-ease) 1s both var(--bvm-play); }
+.budget-onb-motion .is-on .bvm-door-spin { animation: bvm-spin 1s cubic-bezier(.65, 0, .35, 1) 1.8s both var(--bvm-play); }
+.budget-onb-motion .is-on .bvm-door-leaf { animation: bvm-swing 1.1s var(--bvm-ease) 2.7s both var(--bvm-play); }
+.budget-onb-motion .is-on .bvm-wordmark { animation: bvm-rise .9s var(--bvm-ease) 1s both var(--bvm-play); }
+
+.budget-onb-motion .is-on .bvm-wiz { animation: bvm-rise .8s var(--bvm-ease) .25s both var(--bvm-play); }
+.budget-onb-motion .is-on .bvm-f1 { animation: bvm-rise .7s var(--bvm-ease) .5s both var(--bvm-play); }
+.budget-onb-motion .is-on .bvm-f2 { animation: bvm-rise .7s var(--bvm-ease) .7s both var(--bvm-play); }
+.budget-onb-motion .is-on .bvm-f3 { animation: bvm-rise .7s var(--bvm-ease) .9s both var(--bvm-play); }
+.budget-onb-motion .is-on .bvm-typed { animation: bvm-type .5s steps(3, end) 1.3s both var(--bvm-play); }
+.budget-onb-motion .is-on .bvm-caret { animation: bvm-blink 1s linear .5s infinite both var(--bvm-play); }
+.budget-onb-motion .is-on .bvm-day-ring { animation: bvm-ring 1.3s var(--bvm-ease) 2s both var(--bvm-play); }
+.budget-onb-motion .is-on .bvm-opt-sel { animation: bvm-fade .5s var(--bvm-ease) 3.4s both var(--bvm-play); }
+.budget-onb-motion .is-on .bvm-tick { animation: bvm-pop .6s var(--bvm-soft) 3.55s both var(--bvm-play); }
+
+.budget-onb-motion .is-on .bvm-drop { animation: bvm-rise .8s var(--bvm-ease) .25s both var(--bvm-play); }
+.budget-onb-motion .is-on .bvm-file-move { animation: bvm-drop 1.2s var(--bvm-ease) .6s both var(--bvm-play); }
+.budget-onb-motion .is-on .bvm-file { animation: bvm-sink .5s var(--bvm-ease) 1.9s backwards var(--bvm-play); }
+.budget-onb-motion .is-on .bvm-drop-on { animation: bvm-fade .6s var(--bvm-ease) 1.7s both var(--bvm-play); }
+.budget-onb-motion .is-on .bvm-drop-name { animation: bvm-fade .6s var(--bvm-ease) 2.1s both var(--bvm-play); }
+.budget-onb-motion .is-on .bvm-txs { animation: bvm-rise .8s var(--bvm-ease) 2.3s both var(--bvm-play); }
+.budget-onb-motion .is-on .bvm-tx { animation: bvm-rise .6s var(--bvm-ease) 2.5s both var(--bvm-play); }
+.budget-onb-motion .is-on .bvm-tx.bvm-r2 { animation-delay: 2.68s; }
+.budget-onb-motion .is-on .bvm-tx.bvm-r3 { animation-delay: 2.86s; }
+.budget-onb-motion .is-on .bvm-tx.bvm-r4 { animation-delay: 3.04s; }
+.budget-onb-motion .is-on .bvm-tag { animation: bvm-pop .55s var(--bvm-soft) 2.85s both var(--bvm-play); }
+.budget-onb-motion .is-on .bvm-r2 .bvm-tag { animation-delay: 3.03s; }
+.budget-onb-motion .is-on .bvm-r3 .bvm-tag { animation-delay: 3.21s; }
+.budget-onb-motion .is-on .bvm-r4 .bvm-tag { animation-delay: 3.39s; }
+
+.budget-onb-motion .is-on .bvm-tile { animation: bvm-rise .8s var(--bvm-ease) .25s both var(--bvm-play); }
+.budget-onb-motion .is-on .bvm-tile.bvm-t2 { animation-delay: .38s; }
+.budget-onb-motion .is-on .bvm-tile.bvm-t3 { animation-delay: .51s; }
+.budget-onb-motion .is-on .bvm-cats { animation: bvm-rise .8s var(--bvm-ease) .7s both var(--bvm-play); }
+.budget-onb-motion .is-on .bvm-cat { animation: bvm-rise .6s var(--bvm-ease) .9s both var(--bvm-play); }
+.budget-onb-motion .is-on .bvm-cat.bvm-r2 { animation-delay: 1.06s; }
+.budget-onb-motion .is-on .bvm-cat.bvm-r3 { animation-delay: 1.22s; }
+.budget-onb-motion .is-on .bvm-cat.bvm-r4 { animation-delay: 1.38s; }
+.budget-onb-motion .is-on .bvm-bar span { animation: bvm-grow 1.3s var(--bvm-ease) 1.2s both var(--bvm-play); }
+.budget-onb-motion .is-on .bvm-r2 .bvm-bar span { animation-delay: 1.36s; }
+.budget-onb-motion .is-on .bvm-r3 .bvm-bar span { animation-delay: 1.52s; }
+.budget-onb-motion .is-on .bvm-r4 .bvm-bar span { animation-delay: 1.68s; }
+.budget-onb-motion .is-on .bvm-cat-st { animation: bvm-fade .6s var(--bvm-ease) 2.1s both var(--bvm-play); }
+.budget-onb-motion .is-on .bvm-r2 .bvm-cat-st { animation-delay: 2.26s; }
+.budget-onb-motion .is-on .bvm-r3 .bvm-cat-st { animation-delay: 2.42s; }
+.budget-onb-motion .is-on .bvm-r4 .bvm-cat-st { animation-delay: 2.58s; }
+
+.budget-onb-motion .is-on .bvm-hero { animation: bvm-rise .8s var(--bvm-ease) .25s both var(--bvm-play); }
+.budget-onb-motion .is-on .bvm-v1 { animation: bvm-v1 5s linear .3s both var(--bvm-play); }
+.budget-onb-motion .is-on .bvm-v2 { animation: bvm-v2 5s linear .3s both var(--bvm-play); }
+.budget-onb-motion .is-on .bvm-v3 { animation: bvm-v3 5s linear .3s both var(--bvm-play); }
+.budget-onb-motion .is-on .bvm-v4 { animation: bvm-v4 5s linear .3s both var(--bvm-play); }
+.budget-onb-motion .is-on .bvm-split span { animation: bvm-split 5s var(--bvm-ease) .3s both var(--bvm-play); }
+.budget-onb-motion .is-on .bvm-legend { animation: bvm-fade .6s var(--bvm-ease) .8s both var(--bvm-play); }
+.budget-onb-motion .is-on .bvm-bk { animation: bvm-rise .7s var(--bvm-ease) 2.4s both var(--bvm-play); }
+.budget-onb-motion .is-on .bvm-bk.bvm-b2 { animation-delay: 3.3s; }
+.budget-onb-motion .is-on .bvm-bk.bvm-b3 { animation-delay: 4.2s; }
+
+/* Still: no keyframes and no cross-fade, so every scene shows its last frame.
+   (0,4,0) so it out-ranks every animation rule above, the bolts' included. */
+.budget-onb-motion.is-still .bvm-scene.is-on * { animation: none; }
+.budget-onb-motion.is-still .bvm-scene { transition: none; }
+/* A finger needs a bigger target than a pointer; the dots stay small to look at. */
+@media (pointer: coarse) {
+  .budget-onb-motion .bvm-controls button.bvm-dot { width: 36px; height: 36px; }
+  .budget-onb-motion .bvm-controls button.bvm-toggle { width: 40px; height: 40px; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .budget-onb-motion .bvm-stage .bvm-scene.is-on * { animation: none; }
+  .budget-onb-motion .bvm-stage .bvm-scene { transition: none; }
+  .budget-onb-motion .bvm-controls button.bvm-toggle { display: none; }
+}
+
 /* ---- Split modal ------------------------------------------------------
    Modals render in Obsidian's own container, OUTSIDE .budget-app-root, so
    these cannot be scoped to it. Namespaced .budget-split-* instead — same
@@ -3759,6 +4066,10 @@ body.is-tablet .budget-app-root button:where(.dock-btn) { padding: 6px 10px; }
      Obsidian's own `button { outline: none }` had already removed the native one. */
   .budget-export-modal button.budget-export-pill:focus,
   .budget-export-modal button.budget-export-link:focus { outline: 2px solid var(--interactive-accent, #5b6cff); outline-offset: 2px; }
+
+  /* The welcome animation's pause button and scene dots, in the setup wizard. */
+  .budget-onb-motion .bvm-controls button.bvm-toggle:focus,
+  .budget-onb-motion .bvm-controls button.bvm-dot:focus { outline: 2px solid var(--bvm-green); outline-offset: 1px; }
 }
 
 /* Deferred category cell (Transactions / import review). Renders as a button

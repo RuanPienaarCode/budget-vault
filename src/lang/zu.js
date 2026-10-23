@@ -159,6 +159,8 @@ module.exports = {
   'wiz.back': 'Emuva',
   'wiz.next': 'Okulandelayo',
   'wiz.letsGo': 'Asihambe!',
+  'wiz.motion.pause': 'Misa okwesikhashana isithombe esinyakazayo',
+  'wiz.motion.play': 'Dlala isithombe esinyakazayo',
   'wiz.connectBtn': 'Xhuma isabelomali',
   'wiz.createBtn': 'Dala isabelomali sami',
   'wiz.skipped': 'Ukusetha kweqiwe — ungakwenza futhi kuzilungiselelo → Budget Vault → Sebenzisa umsizi wokusetha, noma kwiphalethi yemiyalo.',

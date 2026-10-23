@@ -142,6 +142,8 @@ module.exports = {
   'wiz.back': '上一步',
   'wiz.next': '下一步',
   'wiz.letsGo': '开始吧！',
+  'wiz.motion.pause': '暂停动画',
+  'wiz.motion.play': '播放动画',
   'wiz.connectBtn': '连接预算',
   'wiz.createBtn': '创建我的预算',
   'wiz.skipped': '已跳过设置 — 你可以随时从「设置 → Budget Vault → 运行设置向导」或命令面板重新运行。',

@@ -142,6 +142,8 @@ module.exports = {
   'wiz.back': '戻る',
   'wiz.next': '次へ',
   'wiz.letsGo': 'はじめる',
+  'wiz.motion.pause': 'アニメーションを一時停止',
+  'wiz.motion.play': 'アニメーションを再生',
   'wiz.connectBtn': '予算に接続',
   'wiz.createBtn': '予算を作成',
   'wiz.skipped': 'セットアップをスキップしました — 設定 → Budget Vault → セットアップウィザードを実行、またはコマンドパレットからいつでも実行できます。',
