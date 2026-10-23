@@ -6298,6 +6298,123 @@ body.is-tablet .budget-app-root button:where(.dock-btn) { padding: 6px 10px; }
     --bv-dock-bottom: calc(env(safe-area-inset-bottom, 0px) + var(--mobile-navbar-height, 60px) + 16px);
   }
 }
+
+/* ---------------------------- dashboard motion ----------------------------
+   src/dash-motion.js counts a figure up, then adds .bud-shine for GLOW_MS; the
+   score tile also gets .bud-ring and a few .bud-mote particles floating up
+   through it, and a bar gets .bud-bar-in while it grows and .bud-sparks at
+   each segment's end. All keyframes, so a hidden pane never freezes a
+   half-drawn frame (see confetti() in views/score.js).
+
+   A SHINE, NOT A HALO. A coloured glow behind dark text on a light card reads
+   as a smudge (Ruan, 23 Oct 2026), so a landed figure keeps its own colour and
+   a band of light sweeps once across its glyphs: the text is drawn as a
+   gradient of currentColor with a light band in it, clipped to the glyphs.
+   Children (a unit like "months", the hero's currency symbol) keep their own
+   fill. The hero is already gradient text, so it gets its own gradient with
+   the band added. Sparks on a bar take the bar segment's colour from their
+   tone class. */
+.budget-app-root .bud-sparks--good { --bud-glow-c: var(--color-primary); }
+.budget-app-root .bud-sparks--fair { --bud-glow-c: var(--color-warning); }
+.budget-app-root .bud-sparks--poor { --bud-glow-c: var(--color-danger); }
+.budget-app-root .bud-sparks--calm { --bud-glow-c: var(--color-accent); }
+.budget-app-root .bud-ring { --bud-glow-c: var(--color-primary); }
+
+.budget-app-root .bud-shine {
+  --bud-band: rgba(255, 255, 255, .85);
+  background-image: linear-gradient(100deg, currentColor 40%, var(--bud-band) 50%, currentColor 60%);
+  background-size: 300% 100%;
+  -webkit-background-clip: text; background-clip: text;
+  -webkit-text-fill-color: transparent;
+  animation: bud-shine-sweep 1s ease-out both;
+}
+.budget-app-root .bud-shine * { -webkit-text-fill-color: initial; }
+/* White figures on the emerald score tile: a white band would vanish, so the
+   band is the pale tint instead. */
+.budget-app-root .health-fig.is-score .bud-shine { --bud-band: var(--color-primary-light); }
+.budget-app-root.bud-dark .bud-shine { --bud-band: rgba(255, 255, 255, .9); }
+.budget-app-root #heroCard .hero-num.bud-shine:not(.hero-num--negative) {
+  background-image: linear-gradient(100deg, var(--color-primary-dark) 0%, var(--color-primary) 40%, var(--bud-band) 50%, var(--color-primary) 60%, var(--color-accent) 100%);
+}
+.budget-app-root #heroCard .hero-num.bud-shine small { -webkit-text-fill-color: var(--text-light); }
+/* The overspent hero pins its red fill on an id rule; outrank it for the sweep. */
+.budget-app-root #heroCard .hero-num.hero-num--negative.bud-shine { -webkit-text-fill-color: transparent; }
+@keyframes bud-shine-sweep {
+  from { background-position: 100% 0; }
+  to   { background-position: 0 0; }
+}
+.budget-app-root .bud-ring { animation: bud-ring 1.3s cubic-bezier(.2, .7, .3, 1) both; }
+@keyframes bud-ring {
+  0%   { box-shadow: 0 0 0 0 transparent; }
+  35%  { box-shadow: 0 0 14px -4px var(--bud-glow-c); }
+  100% { box-shadow: 0 0 0 0 transparent; }
+}
+
+/* Floating motes: a few soft dots rising slowly through the score tile and
+   fading, clipped to its rounded box. White on the emerald tile; the tile's
+   green on the dark theme's glass one. Two slow passes, then taken down. */
+.budget-app-root .bud-float { position: absolute; inset: 0; overflow: hidden; border-radius: inherit; pointer-events: none; z-index: 0; }
+.budget-app-root .health-fig.is-score .health-fig-btn { position: relative; z-index: 1; }
+.budget-app-root .bud-mote {
+  position: absolute; width: var(--bud-size, 3px); height: var(--bud-size, 3px); border-radius: 50%;
+  background: rgba(255, 255, 255, .75); box-shadow: 0 0 6px rgba(255, 255, 255, .5);
+  opacity: 0; animation: bud-mote var(--bud-dur, 3s) ease-in-out 2 both;
+}
+.budget-app-root.bud-dark .bud-mote { background: var(--color-primary); box-shadow: 0 0 6px var(--color-primary); }
+@keyframes bud-mote {
+  0%   { opacity: 0; transform: translate3d(0, 0, 0); }
+  25%  { opacity: .7; }
+  70%  { opacity: .45; }
+  100% { opacity: 0; transform: translate3d(var(--bud-sway, 0), calc(var(--bud-rise, 40px) * -1), 0); }
+}
+
+/* Particles. The layer is a zero-size point (the host's centre for a burst,
+   a bar stop's position for a bar) and each bit flies out from it by its own
+   --bud-dx/--bud-dy. pointer-events none: it floats over tappable tiles. */
+.budget-app-root .bud-sparks { position: absolute; left: 50%; top: 50%; width: 0; height: 0; pointer-events: none; z-index: 3; }
+.budget-app-root .bud-spark {
+  position: absolute; left: 0; top: 0; width: var(--bud-size, 5px); height: var(--bud-size, 5px);
+  margin: calc(var(--bud-size, 5px) / -2) 0 0 calc(var(--bud-size, 5px) / -2);
+  border-radius: 50%; opacity: 0; pointer-events: none;
+  background: var(--bud-glow-c); box-shadow: 0 0 8px var(--bud-glow-c);
+  animation: bud-spark 1.1s cubic-bezier(.15, .75, .3, 1) forwards;
+}
+.budget-app-root .bud-sparks--bar .bud-spark { animation-duration: .7s; }
+@keyframes bud-spark {
+  0%   { opacity: 0; transform: translate3d(0, 0, 0) scale(.3); }
+  15%  { opacity: 1; }
+  100% { opacity: 0; transform: translate3d(var(--bud-dx, 0), var(--bud-dy, 0), 0) scale(1); }
+}
+
+/* Bars: each segment grows from its own left edge, the free segment after the
+   committed one, then a light sweeps across once. scaleX rather than width so
+   the inline widths the view writes are never fought over. */
+.budget-app-root .left-bar.bud-bar-in { position: relative; }
+.budget-app-root .left-bar.bud-bar-in i { transform-origin: left center; animation: bud-seg-in .7s cubic-bezier(.2, .8, .2, 1) both; }
+.budget-app-root .left-bar.bud-bar-in .b-free { animation-delay: .35s; }
+@keyframes bud-seg-in { from { transform: scaleX(0); } }
+.budget-app-root .health-meter.bud-bar-in { position: relative; overflow: hidden; }
+.budget-app-root .left-bar.bud-bar-in::after,
+.budget-app-root .hero-meter.bud-bar-in::after,
+.budget-app-root .health-meter.bud-bar-in::after {
+  content: ''; position: absolute; inset: 0; pointer-events: none;
+  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, .6), transparent);
+  transform: translateX(-100%); animation: bud-shimmer .9s ease-out .75s both;
+}
+@keyframes bud-shimmer { to { transform: translateX(100%); } }
+
+/* dash-motion.js already declines to play under reduced motion; this covers a
+   reader who turns it on while the page is open. */
+@media (prefers-reduced-motion: reduce) {
+  .budget-app-root .bud-shine,
+  .budget-app-root .bud-ring,
+  .budget-app-root .left-bar.bud-bar-in i { animation: none; }
+  .budget-app-root .left-bar.bud-bar-in::after,
+  .budget-app-root .hero-meter.bud-bar-in::after,
+  .budget-app-root .health-meter.bud-bar-in::after,
+  .budget-app-root .bud-float,
+  .budget-app-root .bud-sparks { display: none; }
+}
 /* ============================================================
    STATEMENT TYPE — the foundation (October 2026, "Option 3").
 
