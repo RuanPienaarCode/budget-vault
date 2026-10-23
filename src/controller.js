@@ -707,6 +707,9 @@ function mountApp(view) {
 
   /* ---------------------------- view switching --------------------------- */
   function switchView(v) {
+    /* Arriving on the Dashboard plays its entrance again (src/dash-motion.js);
+       re-rendering it in place — a save, a vault change — does not. */
+    if (v === 'dashboard' && S.view !== v && ctx.replayDashMotion) ctx.replayDashMotion();
     S.view = v;
     for (const b of $$('.drawer-link[data-view]')) {
       if (b.dataset.view === v) b.setAttribute('aria-current', 'page');

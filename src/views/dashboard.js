@@ -37,6 +37,7 @@ const { sharePercents, largestRemainder, sharePercentLabel } = require('../share
    is the single source all three read. Required as a MODULE rather than taken
    off ctx, so neither view depends on the other's registration order. */
 const { assumedActual } = require('../money-flow');
+const { createDashMotion } = require('../dash-motion');
 /* The income row's words ("more than planned" / "still to come" / "received as
    planned") are the Budget page's own, so one row reads the same on both.
    Since the 2026-10-20 audit (D2-05, D1-07) so are every other row's — the
@@ -50,6 +51,21 @@ const { poolAccounts } = require('../vocabulary');
 
 module.exports = function registerDashboard(ctx) {
   const { S, $, app, root, plugin, money, toast, fileAt, periodSummary, budgetTotals, budgetUsed, budgetVsActualRows, categorySpendRows, categoryGap, planFigures, bookFigures, periodTitle, periodMonthName, periodShortLabel, dayLabel, dateText, periodRange, shiftPeriod, currentPeriod, txInPeriod, catType, catAssumeSpent, movedToFunds, accountForLabel, periodsForMonths, trendPeriods, historySpan, elapsedDays, periodSpend, compareTotals, healthSnapshot, locale, ledger, LENSES, periodFigures } = ctx;
+
+  /* Arrival motion — figures count up and glow in their own colour, motes
+     float up through the score tile, the bars grow and spark. Decoration over text that is
+     already final; see src/dash-motion.js. Getters, so a number-format change
+     mid-session is read at the next count. */
+  const motion = createDashMotion({ decimal: () => locale().decimal, group: () => locale().thousands });
+  const TONE_OF = { 'is-good': 'good', 'is-fair': 'fair', 'is-poor': 'poor' };
+  /* Decoration must never cost a card: every motion hook runs through this, so
+     a host without querySelector (the guard tests' DOM) or any other throw
+     leaves the card exactly as rendered. */
+  const decorate = fn => { try { fn(); } catch (e) { /* decoration only */ } };
+  const toneOf = node => {
+    const hit = Object.keys(TONE_OF).find(c => node.classList && node.classList.contains(c));
+    return hit ? TONE_OF[hit] : undefined;
+  };
 
   /* ONE FACT PER LINE (Statement type, Oct 2026). The footnotes under a figure
      used to be a single string joined with ' · '. They are now one block per
@@ -264,9 +280,14 @@ module.exports = function registerDashboard(ctx) {
         earmarked: money(earmarks.total, 0),
         goal: money(goalAmount, 0),
       });
-      emergency.append(el('div', {
+      const meterEl = el('div', {
         class: 'cat-bar health-meter', role: 'img', title: meterTip, 'aria-label': meterTip,
-      }, el('i', { class: `cat-bar-fill${tone}`, style: `width:${fill.toFixed(1)}%` })));
+      }, el('i', { class: `cat-bar-fill${tone}`, style: `width:${fill.toFixed(1)}%` }));
+      emergency.append(meterEl);
+      decorate(() => motion.bar(meterEl, {
+        key: 'health-meter', value: fill, stops: [fill],
+        tones: [tone === '' ? 'good' : tone === ' bg-warning' ? 'fair' : 'poor'], times: [1000],
+      }));
     }
     /* The over-claim, argued rather than corrected: the figure above already
        capped at what the account holds, so the claim itself must stay visible
@@ -332,6 +353,15 @@ module.exports = function registerDashboard(ctx) {
 
     /* The conclusion leads, then the three figures it is drawn from. */
     body.append(el('div', { class: 'health-grid' }, scoreTile, emergency, savingsTile, debtTile));
+
+    [scoreTile, emergency, savingsTile, debtTile].forEach((tile, i) => decorate(() => {
+      const tone = toneOf(tile);
+      const ms = motion.count(tile.querySelector('.lv'), { key: `health-${i}`, tone });
+      if (tile === scoreTile && ms) {
+        motion.float(tile, { delay: Math.round(ms * 0.6) });
+        motion.flash(tile, tone, 'bud-ring', ms);
+      }
+    }));
   }
 
 
@@ -998,6 +1028,13 @@ module.exports = function registerDashboard(ctx) {
       fig(L.short ? 'is-short' : 'is-free', money(Math.abs(dFree ?? L.free), 0),
         i18n.t(L.short ? 'dash.left.short' : 'dash.left.free'), freeParts));
     body.append(grid);
+    /* Each figure counts up; the last one — free or short — glows its verdict. */
+    const LEFT_TONE = { 'is-free': 'good', 'is-short': 'poor' };
+    decorate(() => Array.from(grid.querySelectorAll('.left-fig')).forEach(tile => {
+      const kind = Object.keys(LEFT_TONE).find(c => tile.classList.contains(c));
+      const name = (tile.querySelector('.lv') || {}).dataset;
+      motion.count(tile.querySelector('.lv'), { key: (name && name.fig) || tile.className, tone: kind && LEFT_TONE[kind] });
+    }));
 
     /* One compact band per other currency, under the headline chain. Its own
        cash, its own commitments, its own free figure — the same three terms,
@@ -1168,6 +1205,12 @@ module.exports = function registerDashboard(ctx) {
       },
       el('i', { class: 'b-com', style: `width:${comPct.toFixed(2)}%` }),
       el('i', { class: 'b-free', style: `width:${(100 - comPct).toFixed(2)}%` })));
+      /* Committed grows in, then free after it (CSS .bud-bar-in: 0.7s each,
+         the second 0.35s behind), sparking at each segment's end. */
+      decorate(() => motion.bar(body.lastChild, {
+        key: 'left-bar', value: comPct.toFixed(2),
+        stops: [comPct, 100], tones: ['fair', L.short ? 'poor' : 'good'], times: [700, 1050],
+      }));
     }
 
     /* What is owed on cards, stated beside the figures rather than inside them.
@@ -1942,6 +1985,15 @@ module.exports = function registerDashboard(ctx) {
     }
     const hour = new Date().getHours();
     const greeting = i18n.t(hour < 5 ? 'dash.greet.evening' : hour < 12 ? 'dash.greet.morning' : hour < 18 ? 'dash.greet.afternoon' : 'dash.greet.evening');
+    /* The hero always glows, in its own colour: the green of its gradient, or
+       the red it turns when the budget is overspent (styles.css .bud-shine). */
+    decorate(() => {
+      motion.count(heroNum, { key: 'hero', tone: heroNegative ? 'poor' : 'good', ms: 1100 });
+      Array.from(statCol.querySelectorAll('.sv')).forEach((sv, i) => motion.count(sv, { key: `stat-${i}` }));
+      /* Sparks in the meter's own colour: green fill, or the red of an over meter. */
+      motion.bar(meter, { key: 'hero-meter', value: fillPct, stops: [Number(fillPct)], tones: [heroNegative ? 'poor' : 'good'], times: [600] });
+    });
+
     hero.append(el('div', { class: 'hero-grid' },
       el('div', {},
         S.settings.household ? el('div', { class: 'hero-greet' }, i18n.t('dash.greet.line', { greeting, name: S.settings.household })) : '',
@@ -2963,7 +3015,7 @@ module.exports = function registerDashboard(ctx) {
      views/report.js is the obvious candidate and does not need it today —
      its Net Worth section is built from worth(), which reads stated balances
      and never calls reconcile(). */
-  ctx.provide({ renderDashboard, renderTrend: guardedTrend, renderSplit: guardedSplit, unreadableNote });
+  ctx.provide({ renderDashboard, renderTrend: guardedTrend, renderSplit: guardedSplit, unreadableNote, replayDashMotion: motion.replay });
 };
 
 /* The qualifiers the hero prints beside its figure, as ONE list (2026-10-07
