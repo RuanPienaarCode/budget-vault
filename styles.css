@@ -6311,9 +6311,14 @@ body.is-tablet .budget-app-root button:where(.dock-btn) { padding: 6px 10px; }
    a band of light sweeps once across its glyphs: the text is drawn as a
    gradient of currentColor with a light band in it, clipped to the glyphs.
    Children (a unit like "months", the hero's currency symbol) keep their own
-   fill. The hero is already gradient text, so it gets its own gradient with
-   the band added. Sparks on a bar take the bar segment's colour from their
-   tone class. */
+   fill. The band is its own layer over the figure's colour, transparent at
+   both ends of the sweep, so the figure looks exactly the same the frame the
+   class goes on and the frame it comes off. Sparks on a bar take the bar
+   segment's colour from their tone class.
+
+   CARRIED OVER A RE-RENDER. A render mid-entrance rebuilds the nodes;
+   dash-motion.js starts the new ones part-way, by a negative inline
+   animation-delay (shine, ring) or --bud-skip (bars, read below). */
 .budget-app-root .bud-sparks--good { --bud-glow-c: var(--color-primary); }
 .budget-app-root .bud-sparks--fair { --bud-glow-c: var(--color-warning); }
 .budget-app-root .bud-sparks--poor { --bud-glow-c: var(--color-danger); }
@@ -6322,8 +6327,11 @@ body.is-tablet .budget-app-root button:where(.dock-btn) { padding: 6px 10px; }
 
 .budget-app-root .bud-shine {
   --bud-band: rgba(255, 255, 255, .85);
-  background-image: linear-gradient(100deg, currentColor 40%, var(--bud-band) 50%, currentColor 60%);
-  background-size: 300% 100%;
+  background-image:
+    linear-gradient(100deg, transparent 40%, var(--bud-band) 50%, transparent 60%),
+    linear-gradient(currentColor, currentColor);
+  background-size: 300% 100%, 100% 100%;
+  background-repeat: no-repeat;
   -webkit-background-clip: text; background-clip: text;
   -webkit-text-fill-color: transparent;
   animation: bud-shine-sweep 1s ease-out both;
@@ -6333,15 +6341,12 @@ body.is-tablet .budget-app-root button:where(.dock-btn) { padding: 6px 10px; }
    band is the pale tint instead. */
 .budget-app-root .health-fig.is-score .bud-shine { --bud-band: var(--color-primary-light); }
 .budget-app-root.bud-dark .bud-shine { --bud-band: rgba(255, 255, 255, .9); }
-.budget-app-root #heroCard .hero-num.bud-shine:not(.hero-num--negative) {
-  background-image: linear-gradient(100deg, var(--color-primary-dark) 0%, var(--color-primary) 40%, var(--bud-band) 50%, var(--color-primary) 60%, var(--color-accent) 100%);
-}
-.budget-app-root #heroCard .hero-num.bud-shine small { -webkit-text-fill-color: var(--text-light); }
-/* The overspent hero pins its red fill on an id rule; outrank it for the sweep. */
-.budget-app-root #heroCard .hero-num.hero-num--negative.bud-shine { -webkit-text-fill-color: transparent; }
+/* The hero and the "actually free" figure are restyled by id in
+   src/statement/dashboard.css, which out-ranks this rule; their shine lives
+   there, beside the gradients it sweeps over. */
 @keyframes bud-shine-sweep {
-  from { background-position: 100% 0; }
-  to   { background-position: 0 0; }
+  from { background-position: 100% 0, 0 0; }
+  to   { background-position: 0 0, 0 0; }
 }
 .budget-app-root .bud-ring { animation: bud-ring 1.3s cubic-bezier(.2, .7, .3, 1) both; }
 @keyframes bud-ring {
@@ -6391,7 +6396,12 @@ body.is-tablet .budget-app-root button:where(.dock-btn) { padding: 6px 10px; }
    the inline widths the view writes are never fought over. */
 .budget-app-root .left-bar.bud-bar-in { position: relative; }
 .budget-app-root .left-bar.bud-bar-in i { transform-origin: left center; animation: bud-seg-in .7s cubic-bezier(.2, .8, .2, 1) both; }
-.budget-app-root .left-bar.bud-bar-in .b-free { animation-delay: .35s; }
+.budget-app-root .left-bar.bud-bar-in i { animation-delay: calc(var(--bud-skip, 0ms) * -1); }
+.budget-app-root .left-bar.bud-bar-in .b-free { animation-delay: calc(.35s - var(--bud-skip, 0ms)); }
+/* The meters' own first-paint grow (bud-bar-grow) restarts with every new
+   node; mid-entrance it carries on instead, like the rest. */
+.budget-app-root .hero-meter.bud-bar-in i,
+.budget-app-root .health-meter.bud-bar-in .cat-bar-fill { animation-delay: calc(var(--bud-skip, 0ms) * -1); }
 @keyframes bud-seg-in { from { transform: scaleX(0); } }
 .budget-app-root .health-meter.bud-bar-in { position: relative; overflow: hidden; }
 .budget-app-root .left-bar.bud-bar-in::after,
@@ -6400,6 +6410,7 @@ body.is-tablet .budget-app-root button:where(.dock-btn) { padding: 6px 10px; }
   content: ''; position: absolute; inset: 0; pointer-events: none;
   background: linear-gradient(90deg, transparent, rgba(255, 255, 255, .6), transparent);
   transform: translateX(-100%); animation: bud-shimmer .9s ease-out .75s both;
+  animation-delay: calc(.75s - var(--bud-skip, 0ms));
 }
 @keyframes bud-shimmer { to { transform: translateX(100%); } }
 
@@ -7268,6 +7279,34 @@ body.is-tablet .budget-app-root button:where(.dock-btn) { padding: 6px 10px; }
     color: transparent;
     -webkit-text-fill-color: transparent;
     padding-bottom: .06em;
+  }
+}
+/* The arrival shine (src/dash-motion.js, .bud-shine in src/styles.css) over
+   the two figures above that are restyled here by id. The `background`
+   shorthands above out-rank .bud-shine and reset its size, so the band stood
+   still across the middle of the hero, and on the overspent hero — whose red
+   is a fill with no background behind it — the shine's transparent fill left
+   NOTHING: the figure vanished for the length of the shine and came back
+   (23 Oct 2026). So each states its whole background here, later and at the
+   same rank: the band as its own layer, transparent at both ends of the
+   sweep, over the figure's own gradient or its own solid colour. */
+@supports ((-webkit-background-clip: text) or (background-clip: text)) {
+  .budget-app-root #heroCard .hero-num.bud-shine,
+  .budget-app-root #leftBody .left-fig .lv.bud-shine {
+    background-image:
+      linear-gradient(100deg, transparent 40%, var(--bud-band) 50%, transparent 60%),
+      linear-gradient(currentColor, currentColor);
+    background-size: 300% 100%, 100% 100%;
+    background-repeat: no-repeat;
+    -webkit-background-clip: text;
+    background-clip: text;
+    -webkit-text-fill-color: transparent;
+  }
+  .budget-app-root #heroCard .hero-num.bud-shine:not(.hero-num--negative),
+  .budget-app-root #leftBody .left-fig.is-free .lv.bud-shine {
+    background-image:
+      linear-gradient(100deg, transparent 40%, var(--bud-band) 50%, transparent 60%),
+      linear-gradient(100deg, var(--color-primary-dark) 0%, var(--color-primary) 38%, var(--color-accent) 100%);
   }
 }
 @media (max-width: 860px) {

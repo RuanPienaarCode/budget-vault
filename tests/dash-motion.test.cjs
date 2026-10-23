@@ -12,7 +12,12 @@
      4. reduced motion, a detached node or bare node mean no timer and the
         rendered text untouched;
      5. a figure with a verdict glows (in its own colour, set in CSS) when the
-        count lands, and the glow comes off after.
+        count lands, and the glow comes off after;
+     6. the figure is rewound BEFORE the first paint — never the final figure
+        for a frame, then zero, then the count (the flicker of 23 Oct 2026);
+     7. a re-render mid-entrance (a save, a vault change, the phone syncing)
+        picks the entrance up on the new nodes where the old ones were —
+        never a snap to the end, never a start over.
 
      node tests/dash-motion.test.cjs */
 const assert = require('assert');
@@ -53,10 +58,13 @@ function fakeWin({ reduce = false } = {}) {
 function fig(text) {
   const node = { nodeType: 3, nodeValue: text };
   const cls = new Set();
+  const props = {};
   return {
     node, isConnected: true, childNodes: [node], offsetWidth: 0,
     classList: { add: (...c) => c.forEach(x => cls.add(x)), remove: (...c) => c.forEach(x => cls.delete(x)), contains: c => cls.has(c) },
+    style: { animationDelay: '', setProperty: (k, v) => { props[k] = v; }, removeProperty: k => { delete props[k]; } },
     has: c => cls.has(c),
+    prop: k => props[k],
   };
 }
 
@@ -82,9 +90,7 @@ function fig(text) {
   const el = fig('12 345,67');
   const ms = m.count(el, { key: 'hero', tone: 'good' });
   eq(ms, 900, 'returns its duration when it plays');
-  eq(el.node.nodeValue, '12 345,67', 'text is untouched until the deferred start');
-  win.run(0);
-  eq(el.node.nodeValue, '0,00', 'rewound to the start');
+  eq(el.node.nodeValue, '0,00', 'rewound to the start before anything can paint');
   let last = 0;
   for (let t = 16; t <= 960; t += 16) {
     win.run(t);
@@ -131,8 +137,8 @@ function fig(text) {
   m2.count(gone, { key: 's' });
   gone.isConnected = false;
   live.run(2000);
-  eq(gone.node.nodeValue, '62', 'a node detached before the start is left alone');
-  eq(live.pending(), 0, 'and starts nothing');
+  eq(gone.node.nodeValue, '62', 'a node detached mid-count is put back as rendered');
+  eq(live.pending(), 0, 'and keeps no timer');
 
   const bare = createDashMotion({ win: null });
   const el2 = fig('62');
@@ -140,6 +146,114 @@ function fig(text) {
   eq(el2.node.nodeValue, '62', 'bare node: text untouched');
   eq(bare.count(null, { key: 'x' }), 0, 'no element: no-op');
   eq(bare.count(fig('—'), { key: 'x' }), 0, 'no figure: no-op');
+}
+
+/* ----------- 6. built before it is attached: wait, never snap ----------- */
+{
+  const win = fakeWin();
+  const m = createDashMotion({ win });
+  const el = fig('100');
+  el.isConnected = false;                 // the hero is counted, then appended
+  m.count(el, { key: 'hero' });
+  win.run(160);
+  ok(el.node.nodeValue !== '100', `still counting while detached (${el.node.nodeValue})`);
+  el.isConnected = true;
+  win.run(400);
+  const v = Number(el.node.nodeValue);
+  ok(v > 0 && v < 100, `climbs once attached (${v})`);
+  win.run(1000);
+  eq(el.node.nodeValue, '100', 'and lands');
+}
+
+/* ------------- 7. a re-render mid-entrance carries it over -------------- */
+{
+  const win = fakeWin();
+  const m = createDashMotion({ win });
+  const old = fig('1 000');
+  m.count(old, { key: 'hero', tone: 'good' });
+  win.run(450);
+  const mid = Number(old.node.nodeValue.replace(/\D/g, ''));
+  ok(mid > 0 && mid < 1000, `mid-count (${mid})`);
+  /* The view rebuilds: the old node is gone, a new one holds the final text. */
+  old.isConnected = false;
+  const fresh = fig('1 000');
+  eq(m.count(fresh, { key: 'hero', tone: 'good' }), 900, 'the new node plays on');
+  const picked = Number(fresh.node.nodeValue.replace(/\D/g, ''));
+  ok(picked >= mid && picked - mid < 20, `from where the old one was on the same clock, not zero, not the end (${mid} → ${picked})`);
+  win.run(700);
+  const on = Number(fresh.node.nodeValue.replace(/\D/g, ''));
+  ok(on > 950 && on < 1000, `still on the same clock — not restarted, not finished (${on})`);
+  win.run(920);
+  eq(fresh.node.nodeValue, '1 000', 'lands when the first one would have');
+  ok(fresh.has('bud-shine'), 'and shines');
+  eq(old.node.nodeValue, '1 000', 'the old node is left as rendered');
+  ok(!old.has('bud-shine'), 'and never shines');
+
+  /* A rebuild during the shine: the new node shines on, part-way through. */
+  win.run(1100);
+  fresh.isConnected = false;
+  const late = fig('1 000');
+  m.count(late, { key: 'hero', tone: 'good' });
+  eq(late.node.nodeValue, '1 000', 'already landed');
+  ok(late.has('bud-shine'), 'shining at once, not a bare frame first');
+  ok(/^-\d+ms$/.test(late.style.animationDelay) && parseInt(late.style.animationDelay, 10) <= -150,
+    `the sweep resumes part-way (${late.style.animationDelay})`);
+  win.run(5000);
+  ok(!late.has('bud-shine'), 'and comes off');
+  eq(late.style.animationDelay, '', 'with its delay');
+  eq(m.count(fig('1 000'), { key: 'hero', tone: 'good' }), 0, 'once over, an unchanged figure is still');
+
+  /* A rebuild mid-count with a NEW figure counts on from what is showing. */
+  m.replay();
+  const a = fig('1 000');
+  m.count(a, { key: 'x' });
+  win.run(5450);
+  const at = Number(a.node.nodeValue.replace(/\D/g, ''));
+  a.isConnected = false;
+  const b = fig('2 000');
+  m.count(b, { key: 'x' });
+  const from = Number(b.node.nodeValue.replace(/\D/g, ''));
+  ok(from >= at && from - at < 20, `retargets from the figure on screen (${at} → ${from})`);
+  win.run(7000);
+  eq(b.node.nodeValue, '2 000', 'to the new one');
+}
+
+/* ------------- 8. the ring and the bars carry over the same way ---------- */
+{
+  const win = fakeWin();
+  const m = createDashMotion({ win });
+  const t1 = fig('');
+  m.flash(t1, 'good', { cls: 'bud-ring', delay: 900, key: 'score' });
+  ok(!t1.has('bud-ring'), 'waits its delay');
+  win.run(1000);
+  ok(t1.has('bud-ring'), 'rings');
+  t1.isConnected = false;
+  const t2 = fig('');
+  m.flash(t2, 'good', { cls: 'bud-ring', delay: 900, key: 'score' });
+  ok(t2.has('bud-ring'), 'a rebuilt tile rings at once');
+  eq(t2.style.animationDelay, '-100ms', 'part-way in');
+  win.run(3000);
+  ok(!t2.has('bud-ring'), 'and stops');
+
+  global.document = { createElement: () => ({ setAttribute() {}, append() {}, style: {} }) };
+  try {
+    const b1 = fig('');
+    m.bar(b1, { key: 'bar', value: 40 });
+    ok(b1.has('bud-bar-in'), 'a bar grows');
+    eq(b1.prop('--bud-skip'), undefined, 'from the start');
+    win.run(3300);
+    b1.isConnected = false;
+    const b2 = fig('');
+    m.bar(b2, { key: 'bar', value: 40 });
+    ok(b2.has('bud-bar-in'), 'a rebuilt bar keeps growing');
+    eq(b2.prop('--bud-skip'), '300ms', 'from where the old one was');
+    win.run(6000);
+    ok(!b2.has('bud-bar-in'), 'and settles');
+    eq(b2.prop('--bud-skip'), undefined, 'clean');
+    const b3 = fig('');
+    m.bar(b3, { key: 'bar', value: 40 });
+    ok(!b3.has('bud-bar-in'), 'an unchanged bar after the entrance stays still');
+  } finally { delete global.document; }
 }
 
 console.log(`dash-motion.test.cjs — ${checks} checks OK`);
