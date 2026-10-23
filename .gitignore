@@ -29,5 +29,9 @@ node_modules/
 # came off someone's actual finances and this repo is public.
 tests/figures/live/
 
+# Onboarding video exports (scripts/record-onboarding.cjs --mp4) — made for
+# sharing, too heavy to keep in history. The README's WebPs are committed.
+docs/onboarding/*.mp4
+
 # build tooling
 node_modules/
