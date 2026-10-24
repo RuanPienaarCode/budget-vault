@@ -357,10 +357,11 @@ module.exports = function registerDashboard(ctx) {
     [scoreTile, emergency, savingsTile, debtTile].forEach((tile, i) => decorate(() => {
       const tone = toneOf(tile);
       const ms = motion.count(tile.querySelector('.lv'), { key: `health-${i}`, tone });
-      if (tile === scoreTile && ms) {
-        motion.float(tile, { delay: Math.round(ms * 0.6), key: 'score' });
-        motion.flash(tile, tone, { cls: 'bud-ring', delay: ms, key: 'score' });
-      }
+      /* The motes keep floating for as long as there is a score on screen,
+         not only while it lands: they start 60% into the count when there is
+         one, at once when the figure did not move. */
+      if (tile === scoreTile && H.score) motion.float(tile, { delay: Math.round((ms || 0) * 0.6), key: 'score', loop: true });
+      if (tile === scoreTile && ms) motion.flash(tile, tone, { cls: 'bud-ring', delay: ms, key: 'score' });
     }));
   }
 

@@ -213,8 +213,11 @@ function createDashMotion({ decimal = '.', group = ' ', win = (typeof window !==
   /* A few motes floating slowly up through `host` after `delay` ms, clipped
      to its box — a settling, not a celebration. `host` must be positioned;
      the layer is taken down once both passes of the slowest mote are over.
-     With a `key`, a rebuilt host gets the same motes, mid-float. */
-  function float(host, { pieces = 10, delay = 0, key } = {}) {
+     With `loop` they never stop: the layer stays until the host itself goes
+     (the next render or leaving the page), and its run never ends, so every
+     rebuild of the host joins the same float where it was. With a `key`, a
+     rebuilt host gets the same motes, mid-float. */
+  function float(host, { pieces = 10, delay = 0, key, loop = false } = {}) {
     if (!host || !live() || typeof document === 'undefined') return;
     const motes = [];
     let longest = 0;
@@ -228,14 +231,14 @@ function createDashMotion({ decimal = '.', group = ' ', win = (typeof window !==
     const id = key === undefined ? null : `float:${key}`;
     let run = id && inFlight(id, now);
     if (!run) {
-      run = { start: now + delay, end: now + delay + longest };
+      run = { start: now + delay, end: loop ? Infinity : now + delay + longest };
       if (id) runs.set(id, run);
     }
     const mount = () => {
       if (!host.isConnected) return;
       const skip = Math.max(0, clock() - run.start);
       const layer = document.createElement('div');
-      layer.className = 'bud-float';
+      layer.className = loop ? 'bud-float bud-float--loop' : 'bud-float';
       layer.setAttribute('aria-hidden', 'true');
       for (const { i, dur, wait } of motes) {
         const mote = document.createElement('i');
@@ -246,7 +249,7 @@ function createDashMotion({ decimal = '.', group = ' ', win = (typeof window !==
         layer.append(mote);
       }
       host.insertBefore(layer, host.firstChild);
-      later(() => layer.remove(), longest - skip + 200);
+      if (!loop) later(() => layer.remove(), longest - skip + 200);
     };
     const wait = run.start - now;
     if (wait > 0) later(mount, wait);

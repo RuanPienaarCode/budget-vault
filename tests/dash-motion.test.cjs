@@ -256,4 +256,50 @@ function fig(text) {
   } finally { delete global.document; }
 }
 
+/* ------------- 9. the score's motes: two passes, or a loop -------------- */
+{
+  const made = [];
+  global.document = {
+    createElement: () => {
+      const n = { className: '', style: {}, kids: [], removed: false, setAttribute() {}, append(c) { this.kids.push(c); }, remove() { this.removed = true; } };
+      made.push(n);
+      return n;
+    },
+  };
+  const host = () => ({ isConnected: true, firstChild: null, layers: [], insertBefore(n) { this.layers.push(n); } });
+  const delayOf = mote => parseInt(/animation-delay:(-?\d+)ms/.exec(mote.style.cssText)[1], 10);
+  try {
+    const win = fakeWin();
+    const m = createDashMotion({ win });
+    const once = host();
+    m.float(once, { key: 'once' });
+    eq(once.layers.length, 1, 'the motes mount');
+    ok(!/bud-float--loop/.test(once.layers[0].className), 'not looping unless asked');
+    win.run(60000);
+    ok(once.layers[0].removed, 'and come down after their two passes');
+
+    const h1 = host();
+    m.float(h1, { key: 'score', loop: true, delay: 500 });
+    eq(h1.layers.length, 0, 'a loop waits its delay too');
+    win.run(61000);
+    eq(h1.layers.length, 1, 'then mounts');
+    eq(h1.layers[0].className, 'bud-float bud-float--loop', 'marked as a loop (CSS: infinite)');
+    win.run(600000);
+    ok(!h1.layers[0].removed, 'and is still there ten minutes later');
+    eq(win.pending(), 0, 'with no timer left running for it');
+
+    h1.isConnected = false;
+    const h2 = host();
+    m.float(h2, { key: 'score', loop: true, delay: 500 });
+    eq(h2.layers.length, 1, 'a rebuilt tile gets its motes at once, not after the delay');
+    const firstWait = delayOf(h1.layers[0].kids[0]);
+    ok(delayOf(h2.layers[0].kids[0]) === firstWait - (600000 - 60500), 'joined where the float was, not restarted');
+
+    const quiet = createDashMotion({ win: fakeWin({ reduce: true }) });
+    const h3 = host();
+    quiet.float(h3, { key: 'score', loop: true });
+    eq(h3.layers.length, 0, 'nothing under reduced motion');
+  } finally { delete global.document; }
+}
+
 console.log(`dash-motion.test.cjs — ${checks} checks OK`);
