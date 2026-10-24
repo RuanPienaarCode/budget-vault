@@ -33,29 +33,43 @@ const STOP = new Set([
 /* Lowercase, strip digits and punctuation, collapse whitespace. Digits go
    because a bank suffixes its own reference to the merchant name
    ("FIBRE CO123456789") and those change; the letters do not. */
-/* Memoised on the raw string, because it is a pure function of it and its
-   callers ask the same question over and over: matchCharges runs once PER
-   SERVICE over EVERY outflow, so the Services page and the dashboard's
-   commitments each normalised services × rows descriptions — three regex
-   passes apiece. On a synthetic household ten times the size of the one this
-   was built against (47 accounts, 12 years, 80k rows, 41 services) that was
-   ~1.0 s of a 1.2 s Services render and ~0.9 s of the dashboard's 2.3 s.
-
-   Keyed on the string, not the row: a row edited in place cannot serve a stale
-   answer, because a different description is a different key. The cap bounds
-   memory on a vault whose bank appends a unique reference to every line; past
-   it the map starts again rather than evicting, which costs one re-warm. */
-const NORM_CACHE_MAX = 50000;
-let normCache = new Map();
 function normDesc(s) {
-  const raw = String(s || '');
-  let n = normCache.get(raw);
-  if (n !== undefined) return n;
-  n = raw.toLowerCase().replace(/\d+/g, ' ')
+  return String(s || '').toLowerCase().replace(/\d+/g, ' ')
     .replace(/[^a-z]+/g, ' ').replace(/\s+/g, ' ').trim();
-  if (normCache.size >= NORM_CACHE_MAX) normCache = new Map();
-  normCache.set(raw, n);
-  return n;
+}
+
+/* normDesc for every row of ONE rows array, computed once and reused by every
+   later matchCharges call on the same array. matchCharges runs once PER
+   SERVICE over EVERY outflow, and each caller (views/services.js,
+   committed.js's serviceCommitments and debitOrderCommitments) hands the same
+   array to every service in its loop — so the Services page and the
+   dashboard's commitments each normalised services × rows descriptions, three
+   regex passes apiece. On a synthetic household ten times the size of the one
+   this was built against (47 accounts, 12 years, 80k rows, 41 services) that
+   was ~1.0 s of a 1.2 s Services render and ~0.9 s of the dashboard's 2.3 s.
+
+   Keyed on the ARRAY, held weakly, so the cache dies with the render that
+   built it and needs no cap. A first cut memoised on the description string
+   with a 50k cap, and review measured it slower than no cache at all on a
+   vault whose bank appends a unique reference to every line: each services
+   pass walked past the cap, the reset evicted exactly the keys the next pass
+   asked for, and 80k unique rows took 1.9 s against 1.2 s uncached.
+
+   Each row's raw description is checked against the one its answer was
+   computed from, so a row edited in place, or an array grown since, cannot be
+   served a stale answer. */
+const normsByRows = new WeakMap();
+function normsFor(rows) {
+  let c = normsByRows.get(rows);
+  if (!c) { c = { raw: [], norm: [] }; normsByRows.set(rows, c); }
+  for (let i = 0; i < rows.length; i++) {
+    const d = rows[i] ? rows[i].desc : undefined;
+    if (i < c.raw.length && c.raw[i] === d) continue;
+    c.raw[i] = d;
+    c.norm[i] = normDesc(d);
+  }
+  c.raw.length = c.norm.length = rows.length;
+  return c.norm;
 }
 
 /* The words that identify this service's merchant. Provider first — it is the
@@ -252,9 +266,12 @@ function matchCharges(service, rows, tokens) {
   if (!toks.length) return { charges: [], current: [], related: [], tokens: toks };
 
   const groups = new Map();
-  for (const r of rows || []) {
+  const list = rows || [];
+  const norms = normsFor(list);
+  for (let i = 0; i < list.length; i++) {
+    const r = list[i];
     if (!r || typeof r.amount !== 'number' || r.amount >= 0) continue;   // outflows only
-    const n = normDesc(r.desc);
+    const n = norms[i];
     if (!n) continue;
     if (!toks.some(t => n.includes(t))) continue;
     if (!groups.has(n)) groups.set(n, []);
