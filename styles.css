@@ -6366,6 +6366,9 @@ body.is-tablet .budget-app-root button:where(.dock-btn) { padding: 6px 10px; }
   opacity: 0; animation: bud-mote var(--bud-dur, 3s) ease-in-out 2 both;
 }
 .budget-app-root.bud-dark .bud-mote { background: var(--color-primary); box-shadow: 0 0 6px var(--color-primary); }
+/* The score tile's motes loop for as long as it is on screen (dash-motion.js
+   float({ loop })): the same slow drift, round and round. */
+.budget-app-root .bud-float--loop .bud-mote { animation-iteration-count: infinite; }
 @keyframes bud-mote {
   0%   { opacity: 0; transform: translate3d(0, 0, 0); }
   25%  { opacity: .7; }
