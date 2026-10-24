@@ -33,9 +33,29 @@ const STOP = new Set([
 /* Lowercase, strip digits and punctuation, collapse whitespace. Digits go
    because a bank suffixes its own reference to the merchant name
    ("FIBRE CO123456789") and those change; the letters do not. */
+/* Memoised on the raw string, because it is a pure function of it and its
+   callers ask the same question over and over: matchCharges runs once PER
+   SERVICE over EVERY outflow, so the Services page and the dashboard's
+   commitments each normalised services × rows descriptions — three regex
+   passes apiece. On a synthetic household ten times the size of the one this
+   was built against (47 accounts, 12 years, 80k rows, 41 services) that was
+   ~1.0 s of a 1.2 s Services render and ~0.9 s of the dashboard's 2.3 s.
+
+   Keyed on the string, not the row: a row edited in place cannot serve a stale
+   answer, because a different description is a different key. The cap bounds
+   memory on a vault whose bank appends a unique reference to every line; past
+   it the map starts again rather than evicting, which costs one re-warm. */
+const NORM_CACHE_MAX = 50000;
+let normCache = new Map();
 function normDesc(s) {
-  return String(s || '').toLowerCase().replace(/\d+/g, ' ')
+  const raw = String(s || '');
+  let n = normCache.get(raw);
+  if (n !== undefined) return n;
+  n = raw.toLowerCase().replace(/\d+/g, ' ')
     .replace(/[^a-z]+/g, ' ').replace(/\s+/g, ' ').trim();
+  if (normCache.size >= NORM_CACHE_MAX) normCache = new Map();
+  normCache.set(raw, n);
+  return n;
 }
 
 /* The words that identify this service's merchant. Provider first — it is the
