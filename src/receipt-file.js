@@ -53,6 +53,7 @@ const OTHER = 'Other';
    it meat, BUTTERNUT is veg because BUTTER\b does not match it. No lookbehind
    anywhere (iOS 15 WebKit parses the whole bundle as one; a lookbehind is a
    SyntaxError that takes every page down). */
+/** @type {Array<[string, RegExp]>} */
 const RULES = [
   ['Household', /CHECKOUT BAG|\bBAG CH\b|\b[12]PL\b|TOILET|TISSUE|SERVIETTE|CANDLE|PRICES \d|DETERG|DISHWASH|BLEACH|SPONGE|\bFOIL\b|SOAP\b|BATTER(Y|IES)/],
   ['Wine & alcohol', /WINE|MERLOT|SAUV|SHIRAZ|CABERNET|CHARDON|PINOT|PINOTAGE|\bROSE\b|\bBRUT\b|BEER|LAGER|CIDER|\bGIN\b|VODKA|WHISK|BRANDY|\bRUM\b|SPIRIT/],

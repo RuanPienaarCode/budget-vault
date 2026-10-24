@@ -201,6 +201,9 @@ function layoutDocument(doc, opts) {
   const contentBottom = pageDims.height - MARGIN - FOOTER_BAND;
 
   const pages = [];
+  /* newPage() sets this before anything reads it; the checker cannot follow
+     that into a closure, so it is told the shape (tests/pure-types.test.cjs). */
+  /** @type {{ width: number, height: number, ops: Object[] }} */
   let cur = null;
   let y = MARGIN;
   function newPage() {

@@ -14,7 +14,8 @@
     "reconcile:household": "node scripts/reconcile-page.cjs --household"
   },
   "devDependencies": {
-    "esbuild": "0.25.10"
+    "esbuild": "0.25.10",
+    "typescript": "5.9.3"
   },
   "engines": {
     "node": ">=18"

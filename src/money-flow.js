@@ -25,12 +25,20 @@ const { PILLARS } = require('./health-math');
 const HOUSING_TYPES = new Set(['housing', 'utilities']);
 const SUBSCRIPTION_TYPES = new Set(['insurance', 'services']);
 
+/* Why the one-line JSDoc above each `= {}` function: tests/pure-types.test.cjs
+   type-checks this module, and to the checker a bare `= {}` default declares
+   an object with NO properties, so every destructured name read as an error
+   (40 of them). The types also make a misspelt argument at a call site in
+   the pure set an error — `{ budgetIncom: … }` is caught, where before it
+   silently read as zero. Amounts are `number` even though each goes through
+   Number(): that coercion guards a blank cell, it does not invite strings. */
 /* ADR-0007 · periodFlow inputs. Each argument's source (periodSummary,
    budgetTotals, periodSpend, S.categories, splitFlows, S.debts) is recorded
    there; every argument defaults safely so a new vault returns zeroed bands. */
 /* ADR-0007 · Income base for "allocated". The budget's own income figure is
    the denominator; actual income stands in only with no budgeted income AND a
    finished period (mid-period the Dashboard read 100% and the Score 102%). */
+/** @param {{ budgetIncome?: number, actualIncome?: number, periodFinished?: boolean }} [args] */
 function incomeBaseFor({ budgetIncome, actualIncome, periodFinished } = {}) {
   const planned = Number(budgetIncome) || 0;
   if (planned > 0) { return planned; }
@@ -41,6 +49,7 @@ function incomeBaseFor({ budgetIncome, actualIncome, periodFinished } = {}) {
 /* ADR-0007 · Allocated share is the whole answer, so the two cards cannot
    diverge on the edges: zero budget is 0%, a real budget with no income base
    yet is null. */
+/** @param {{ budgeted?: number, budgetIncome?: number, actualIncome?: number, periodFinished?: boolean }} [args] */
 function allocatedShare({ budgeted, budgetIncome, actualIncome, periodFinished } = {}) {
   const bud = Math.max(0, Number(budgeted) || 0);
   const base = incomeBaseFor({ budgetIncome, actualIncome, periodFinished });
@@ -58,6 +67,7 @@ function allocatedShare({ budgeted, budgetIncome, actualIncome, periodFinished }
 /* ADR-0007 · Budget used is one rule (ADR-0005): (spend − setAside + assumed)
    / budgeted, null with no plan. Every surface reads this directly or via
    period.js's budgetUsed(p); tests/budget-used-one-rule.test.cjs keeps it so. */
+/** @param {{ spend?: number, setAside?: number, assumed?: number, budgeted?: number }} [args] */
 function budgetUsedShare({ spend, setAside, assumed, budgeted } = {}) {
   const bud = Number(budgeted) || 0;
   if (!(bud > 0)) { return null; }
@@ -67,6 +77,7 @@ function budgetUsedShare({ spend, setAside, assumed, budgeted } = {}) {
 /* The numerator of that rule, on its own, because every surface prints the
    rand figure beside the percentage and the two must be one reading:
    gross spend, less set-aside, plus the assume-spent provision. */
+/** @param {{ spend?: number, setAside?: number, assumed?: number }} [args] */
 function budgetSpent({ spend, setAside, assumed } = {}) {
   return Math.max(0, (Number(spend) || 0) - (Number(setAside) || 0)) + Math.max(0, Number(assumed) || 0);
 }
@@ -93,6 +104,7 @@ function assumedProvision(rows, realSpendOf) {
 
 /* ADR-0007 · Budget-vs-actual row status (Phase 3 of ADR-0006). One rule for
    every page printing the table; an assume-spent row is never `unbudgeted`. */
+/** @param {{ budget?: number, actual?: number, type?: string, assumed?: boolean }} [args] */
 function budgetRowStatus({ budget, actual, type, assumed } = {}) {
   const b = Number(budget) || 0;
   const a = Number(actual) || 0;
@@ -110,6 +122,7 @@ function budgetRowStatus({ budget, actual, type, assumed } = {}) {
    parts the donut's note names: uncategorised outgoings, and refunds netted
    inside named categories. Clamped so rounding never invents a negative gap.
    tests/cross-page-consistency.test.cjs pins the identity this expresses. */
+/** @param {{ spend?: number, uncatSpend?: number, rows?: { amount: number }[] }} [args] */
 function categoryGap({ spend, uncatSpend, rows } = {}) {
   const total = (rows || []).reduce((t, r) => t + (Number(r.amount) || 0), 0);
   const notShown = Math.max(0, (Number(spend) || 0) - total);
@@ -126,6 +139,7 @@ function categoryGap({ spend, uncatSpend, rows } = {}) {
    its gap sees nothing missing for that money; the strip's draft never seeds
    a row for it, so the whole amount falls into `uncat` here instead. Two
    honest gaps over two different row populations — ISSUE 96. */
+/** @param {{ spend?: number, namedNetSpend?: number, uncatSpend?: number, unknownSpend?: number }} [args] */
 function budgetStripGap({ spend, namedNetSpend, uncatSpend, unknownSpend } = {}) {
   const total = Number(namedNetSpend) || 0;
   const notShown = Math.max(0, (Number(spend) || 0) - total);
@@ -133,6 +147,14 @@ function budgetStripGap({ spend, namedNetSpend, uncatSpend, unknownSpend } = {})
   return { total, notShown, uncat, netted: notShown - uncat };
 }
 
+/** @param {{
+      income?: number, spentTotal?: number, setAsideSpent?: number, assumedSpent?: number,
+      budgeted?: number, budgetSetAside?: number,
+      spendByCat?: Object<string, number>, grossOutByCat?: Object<string, number>,
+      fixedCats?: Set<string> | string[], catType?: (cat: string) => (string | null),
+      savingContribution?: number, debts?: Object[], household?: string,
+      budgetIncome?: number, periodFinished?: boolean,
+    }} [args] */
 function periodFlow({
   income, spentTotal, setAsideSpent, assumedSpent, budgeted, budgetSetAside, spendByCat, grossOutByCat, fixedCats, catType,
   savingContribution, debts, household, budgetIncome, periodFinished,
