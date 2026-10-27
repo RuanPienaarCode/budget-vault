@@ -670,38 +670,33 @@ body.is-tablet .budget-app-root button:where(.dock-btn) { padding: 6px 10px; }
   }
   .budget-app-root .topbar .brand { display: none; }
 
-  /* The label used to share one row with the three nav buttons and was
-     ellipsised to "Jul 23 – Au…": on an iPhone-width pane that row leaves the
-     label ~87px and "Jul 23 – Aug 22, 2026" needs ~137px, so the one thing
-     the pill exists to say (WHICH range) was the part cut off. The same
-     flex-shrink had also squeezed the buttons from 32px to 20px wide.
-     Two rows instead: the label takes the pill's full width on top and the
-     three buttons sit beneath it, in the same left-to-right order as before
-     (previous, jump to current, next). The label is moved with order:-1 rather
-     than the markup being reordered, so the DOM, tab order and the screen-
-     reader reading order are untouched. A pane too narrow even for the full
-     width wraps the label instead of clipping it. */
+  /* One row: previous | range | jump to current | next, in DOM order.
+     The label used to be ellipsised to "Jul 23 – Au…" because the Import and
+     Report shortcuts beside the avatar left it ~65px on a 414px iPhone 11, and
+     "Oct 22 – Nov 21, 2026" needs ~135px. A two-row pill fixed the clipping
+     but put the buttons on a line of their own under the date. Both shortcuts
+     are also in the drawer, so on a phone they give their 96px back to the
+     pill instead. A pane too narrow even then (a 320px SE) wraps the label
+     inside its own slot, so it is never clipped and the buttons never leave
+     the row. */
+  .budget-app-root .topbar .topbar-icon-btn { display: none; }
   .budget-app-root .header-period-pill {
     flex: 1 1 auto;
     min-width: 0;
     margin-left: 0;
-    flex-wrap: wrap;
     justify-content: space-between;
-    align-content: center;
     gap: 0;
-    padding: 0.2rem 0.35rem;
+    padding: 0.2rem 0.25rem;
     border-radius: 20px;
   }
   .budget-app-root .header-period-pill .pnav-dot { display: none; }
   .budget-app-root .header-period-pill .pnav-label {
-    order: -1;
-    flex: 1 0 100%;
+    flex: 1 1 auto;
     min-width: 0;
     text-align: center;
     white-space: normal;
     font-size: 0.78rem;
     line-height: 1.2;
-    padding-top: 0.1rem;
   }
   .budget-app-root .header-period-pill .pnav-btn { width: 32px; height: 28px; flex: none; }
 }
