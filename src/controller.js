@@ -565,7 +565,14 @@ function mountApp(view) {
     t.textContent = msg;
     t.className = bad ? 'bad' : 'good';
     t.classList.add('show');
-    clearTimeout(t._h); t._h = setTimeout(() => t.classList.remove('show'), 2600);
+    /* Long enough to read. A flat 2.6 s suited "Saved"; it cut off the
+       two-sentence toasts — the drift warning after a balance edit, the
+       "counts as already inside that balance" note after Add transaction —
+       before a reader reached the second sentence. ~55 ms a character is a
+       slow reading pace; short toasts keep the old floor, and a cap stops a
+       paragraph from parking over the page. */
+    const ms = Math.min(9000, Math.max(2600, String(msg).length * 55));
+    clearTimeout(t._h); t._h = setTimeout(() => t.classList.remove('show'), ms);
   }
 
   /* Country locale profile for the configured country (Settings.md `country`,

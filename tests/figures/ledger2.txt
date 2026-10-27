@@ -375,34 +375,37 @@ number	333	-	savingsSections/div.card/div.body-pad[1]/div.sav-list/div.sav-item/
 number	2	-	acctOwners/button.acct-seg[0]/span.acct-seg-n
 number	1	-	acctOwners/button.acct-seg[1]/span.acct-seg-n
 number	1	-	acctOwners/button.acct-seg[2]/span.acct-seg-n
-money	R 35 000,00	35000	acctSummary/div.card[0]/div.hero-num[1]
-money	R 35 000,00	35000	acctSummary/div.card[0]/div.hero-sub[2]
+money	R 63 500,00	63500	acctSummary/div.card[0]/div.hero-num[1]
+money	R 63 500,00	63500	acctSummary/div.card[0]/div.hero-sub[2]
 money	R 0,00	0	acctSummary/div.card[0]/div.hero-sub[2]
 money	R 28 500,00	28500	acctSummary/div.card[0]/div.hero-sub[2]
 number	2	-	acctSummary/div.card[0]/div.acct-hero-facts[3]/div.acct-fact[0]/div.acct-fact-v[1]
 number	2	-	acctSummary/div.card[0]/div.acct-hero-facts[3]/div.acct-fact[1]/div.acct-fact-v[1]
 number	7	-	acctSummary/div.card[0]/div.acct-hero-facts[3]/div.acct-fact[2]/div.acct-fact-v[1]
-money	R 20 000,00	20000	acctSummary/@acct-owner-net
+money	R 48 500,00	48500	acctSummary/@acct-owner-net
 number	1	-	acctSummary/div.card[1]/div.body-pad[1]/button.acct-owner-row[0]/div.acct-owner-sub[1]
 money	R 15 000,00	15000	acctSummary/@acct-owner-net
 number	1	-	acctSummary/div.card[1]/div.body-pad[1]/button.acct-owner-row[1]/div.acct-owner-sub[1]
-money	R 20 000,00	20000	acctSummary/div.card[2]/div.body-pad[1]/svg.donut/path[0]/title
-percent	57%	-	acctSummary/div.card[2]/div.body-pad[1]/svg.donut/path[0]/title
+money	R 48 500,00	48500	acctSummary/div.card[2]/div.body-pad[1]/svg.donut/path[0]/title
+percent	76%	-	acctSummary/div.card[2]/div.body-pad[1]/svg.donut/path[0]/title
 money	R 15 000,00	15000	acctSummary/div.card[2]/div.body-pad[1]/svg.donut/path[1]/title
-percent	43%	-	acctSummary/div.card[2]/div.body-pad[1]/svg.donut/path[1]/title
-money	R 35 000	35000	acctSummary/div.card[2]/div.body-pad[1]/svg.donut/text
-money	R 20 000,00	20000	acctSummary/div.card[2]/div.body-pad[1]/ul.donut-legend/li[0]/span.dl-val[1]
-percent	57%	-	acctSummary/div.card[2]/div.body-pad[1]/ul.donut-legend/li[0]/span.dl-pct[2]
+percent	24%	-	acctSummary/div.card[2]/div.body-pad[1]/svg.donut/path[1]/title
+money	R 63 500	63500	acctSummary/div.card[2]/div.body-pad[1]/svg.donut/text
+money	R 48 500,00	48500	acctSummary/div.card[2]/div.body-pad[1]/ul.donut-legend/li[0]/span.dl-val[1]
+percent	76%	-	acctSummary/div.card[2]/div.body-pad[1]/ul.donut-legend/li[0]/span.dl-pct[2]
 money	R 15 000,00	15000	acctSummary/div.card[2]/div.body-pad[1]/ul.donut-legend/li[1]/span.dl-val[1]
-percent	43%	-	acctSummary/div.card[2]/div.body-pad[1]/ul.donut-legend/li[1]/span.dl-pct[2]
+percent	24%	-	acctSummary/div.card[2]/div.body-pad[1]/ul.donut-legend/li[1]/span.dl-pct[2]
 number	2	-	acctDeck/div.acct-deck-banner/span.acct-deck-banner-txt[1]
 number	2	-	acctFilters/button.acct-seg[0]/span.acct-seg-n
 number	1	-	acctFilters/button.acct-seg[1]/span.acct-seg-n
 number	1	-	acctFilters/button.acct-seg[2]/span.acct-seg-n
 number	2	-	acctFilters/button.acct-seg[3]/span.acct-seg-n
 number	2026	-	acctTable/thead/tr/th.acct-col-drop[2]/button
-money	R 20 000,00	20000	acctTable/@acct-group-total
-money	R 20 000,00	20000	acctTable/@acct-bal
+money	R 48 500,00	48500	acctTable/@acct-group-total
+money	R 48 500,00	48500	acctTable/@acct-bal
+money	R 20 000,00	20000	acctTable/tbody/tr.acct-row[1]/td.num[1]/div.acct-bal-sub
+number	23	-	acctTable/tbody/tr.acct-row[1]/td.num[1]/div.acct-bal-sub
+money	R 28 500,00	28500	acctTable/tbody/tr.acct-row[1]/td.num[1]/div.acct-bal-sub
 money	R 28 500	28500	acctTable/@acct-flow-in
 number	2	-	acctTable/tbody/tr.acct-row[1]/td.acct-col-state[6]/span.acct-row-acts[1]/span.acct-row-why
 money	R 48 500,00	48500	acctTable/tbody/tr.acct-row[1]/td.acct-col-state[6]/span.acct-row-acts[1]/span.acct-row-why

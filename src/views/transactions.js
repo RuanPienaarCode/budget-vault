@@ -1430,8 +1430,21 @@ module.exports = function registerTransactions(ctx) {
     S.txFiles[key].rows.push(row);
     renderTransactions();
     /* The row just added, named as the flow it is and in its account's own
-       symbol (rowFlow) — the form the table it lands in prints it in. */
-    toast(i18n.t('tx.add.done', { amount: rowFlow(amount, { label }), account: label, month }));
+       symbol (rowFlow) — the form the table it lands in prints it in.
+
+       And, when it will NOT move the balance, the reason. reconcile() takes
+       every row dated on or before an account's confirmation date as already
+       inside that figure, so a coffee logged today against a balance typed
+       this morning changes nothing on the Accounts page — the exact surprise
+       in GitHub discussion #124 ("Why transactions don't lower balance?").
+       This is the one moment the app knows the row is new rather than one a
+       confirmation absorbed, so it is the moment to say so; the Accounts
+       drawer says it again for rows already on file. Not the red `bad`
+       toast: the row WAS added, and this is a note about it, not a failure. */
+    const acct = typeof ctx.accountForLabel === 'function' ? ctx.accountForLabel(label) : null;
+    const counted = !(acct && ISO_DATE.test(acct.balance_updated || '') && date <= acct.balance_updated);
+    toast(i18n.t('tx.add.done', { amount: rowFlow(amount, { label }), account: label, month })
+      + (counted ? '' : i18n.t('tx.add.beforeBalance', { account: acct.name, date: ctx.dateText(acct.balance_updated) })));
   }
 
   /* Guarded per-file, deliberately not around the whole loop-plus-learn: a

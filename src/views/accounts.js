@@ -925,8 +925,43 @@ module.exports = function registerAccounts(ctx) {
          retired `balance - total_invested` formula and views/savings.js's
          totalReturn() came to disagree by R60 000 on the same account. */
       const tr = totalReturn(a, rows, poolType, { today: todayIso() });
-      return Object.assign({ a, rows, labels, act, flow: act.inAmt - act.outAmt, group: groupOf(a), tr }, st);
+      return Object.assign({ a, rows, labels, act, flow: act.inAmt - act.outAmt, group: groupOf(a), tr,
+        live: liveBalance(a, st.rec) }, st);
     });
+  }
+
+  /* THE FIGURE THIS PAGE LEADS WITH (GitHub discussion #124, 2 Oct 2026).
+     The row used to print the STATED balance — the `balance:` line, a claim
+     with an age — and park every transaction since in a red "doesn't match"
+     pill. The Dashboard's position tile printed the IMPLIED balance for the
+     same account. A new user added spending to a cheque account, watched the
+     Accounts figure sit still, and asked why transactions don't lower the
+     balance: the one number they looked at was the one that never moves.
+
+     So the page leads with what the transactions say, exactly as
+     impliedAccounts() rolls it for every other page, and the typed figure is
+     still printed under it with its date and the movement since — the
+     disagreement is on screen, nothing is overwritten, and confirming it is
+     still the reader's call. An unreadable balance stays as it is: rolling a
+     fabricated zero forward would print a number nobody ever had. */
+  function liveBalance(a, rec) {
+    if (unreadableBalance(a)) return a.balance;
+    return rec && rec.state === 'drift' ? rec.implied : a.balance;
+  }
+  /* The account as the page reads it: the same object when the figure has not
+     moved (so identity-keyed lookups still find it), a copy carrying the live
+     balance when it has. Never handed to a writer — saveAccount and the
+     dialogs take r.a, the account as loaded. */
+  const liveAcct = r => (r.live === r.a.balance ? r.a : { ...r.a, balance: r.live });
+  /* Every account at its live figure, for the cards that sum S.accounts
+     without a model row to hand — read off the balance book's implied base
+     (figures.js owns rolling balances forward; a page doing it itself is the
+     drift tests/book-balances.test.cjs guards against). Keyed by name back
+     onto S.accounts so the order, and every account the book holds out — an
+     unreadable balance — stay exactly as they were. */
+  function liveAccounts(balances) {
+    const live = new Map([...balances.implied.accounts, ...balances.implied.foreignAccounts].map(x => [x.name, x]));
+    return S.accounts.map(a => live.get(a.name) || a);
   }
 
   /* ------------------------------- band 1 --------------------------------
@@ -1000,11 +1035,13 @@ module.exports = function registerAccounts(ctx) {
        with the Dashboard, Savings and the health score, so this view feeds it
        a narrower account list rather than teaching it a new rule those pages
        never asked for. */
-    /* The balance book (figures.js): stated balances, readable ones only,
-       home currency summed and every other symbol named — the same rule
-       this hero always applied, applied once. */
+    /* The balance book (figures.js): readable ones only, home currency summed
+       and every other symbol named — the same rule this hero always applied,
+       applied once. IMPLIED since the rows began leading with the live figure
+       (liveBalance above): a hero summing typed balances over rows printing
+       live ones is a card that does not add up to the table under it. */
     const { balances } = ctx.bookFigures();
-    const primary = balances.stated.accounts, others = balances.stated.others;
+    const primary = balances.implied.accounts, others = balances.implied.others;
 
     /* ISSUE 30 — the opt-in conversion, finally reaching a screen.
 
@@ -1023,7 +1060,7 @@ module.exports = function registerAccounts(ctx) {
        An account the rate table cannot convert is still named, not folded in
        at par and not dropped: that is `unconvertible`, and it prints as the
        same "held in other currencies" sentence the un-converted view uses. */
-    const conv = ctx.fxConvert ? ctx.fxConvert([...balances.stated.accounts, ...balances.stated.foreignAccounts]) : null;
+    const conv = ctx.fxConvert ? ctx.fxConvert([...balances.implied.accounts, ...balances.implied.foreignAccounts]) : null;
     const convLine = conv ? (() => {
       const parts = conv.converted.map(c =>
         `${ctx.moneyIn(symbolOf({ currency_code: c.code }, S.settings.currency), c.amount, 0)}`);
@@ -1044,16 +1081,16 @@ module.exports = function registerAccounts(ctx) {
       }
       return bits.join('');
     })() : '';
-    /* The sentence under the headline prints the STATED amount, like the
+    /* The sentence under the headline prints the IMPLIED amount, like the
        headline, through the one helper Savings and the Score use (currency.js
-       otherHoldings), and says so when the implied reading — the balance rolled
-       forward through the transactions since — is a different figure. The same
-       USD account read 0 here and 460 on Savings with nothing to tell them
-       apart (audit L8-05). */
-    const held = otherHoldings(others, balances.implied.others, 'stated');
+       otherHoldings), and says so when the typed reading is a different figure.
+       The same USD account read 0 here and 460 on Savings with nothing to tell
+       them apart (audit L8-05); the basis follows the headline, so it is the
+       typed figure that gets named now. */
+    const held = otherHoldings(balances.stated.others, others, 'implied');
     const heldLine = otherCurrenciesLine(held.shown)
       + (held.shown.length && held.differs
-        ? i18n.t('acct.hero.otherAsStated', { list: otherCurrenciesList(held.other) }) : '');
+        ? i18n.t('acct.hero.otherAsImplied', { list: otherCurrenciesList(held.other) }) : '');
     const w = worth(primary, null, null);
     const assets = w.ownedAccounts, liabilities = w.fromAccounts, net = w.net;
     /* Counted over `scoped`, not `rows`. Filtered to one owner, these used to
@@ -1072,14 +1109,16 @@ module.exports = function registerAccounts(ctx) {
       || (S.debts || []).some(d => d.status !== 'paid' && d.balance > 0);
 
     /* ISSUE 88 — figures.js's own contract: a page printing one base of the
-       balance book must be handed the other's drift. This hero prints `net`
-       off STATED balances (balances.stated.accounts above) with no caveat,
-       while the Dashboard's position tile and the Savings chart print IMPLIED
-       for the same accounts and say nothing either — on the vault this was
-       measured against, the gap was some R 17 000, big enough to want an answer.
-       `balances.drift` (figures.js) is exactly `w.net`'s own implied-minus-
-       stated gap, because `net` here is built from the same account list and
-       the same positive-minus-negative rule balanceBook() sums by.
+       balance book must be handed the other's drift. This hero printed `net`
+       off STATED balances with no caveat while the Dashboard's position tile
+       and the Savings chart printed IMPLIED — on the vault this was measured
+       against, the gap was some R 17 000, big enough to want an answer. It
+       prints IMPLIED now (discussion #124), so the other base it is handed is
+       the typed one: the sentence says how far the typed balances sit from the
+       figure above. `balances.drift` (figures.js) is exactly `w.net`'s own
+       implied-minus-stated gap, because `net` here is built from the same
+       account list and the same positive-minus-negative rule balanceBook()
+       sums by.
 
        Own keys, not the Dashboard's stale-note sentence: "since then" has no
        date named on this hero to be "then" — dedicated wording says "since
@@ -1158,9 +1197,10 @@ module.exports = function registerAccounts(ctx) {
         i18n.t('acct.hero.factsScope', { owner: ownerLabel(view().owner, declaredOwners()) })));
     }
 
-    const split = whoseItIs();
+    const live = liveAccounts(balances);
+    const split = whoseItIs(live);
     const overlap = overlapNote();
-    wrap.append(hero, ...(split ? [split] : []), whereItSits(), ...(overlap ? [overlap] : []));
+    wrap.append(hero, ...(split ? [split] : []), whereItSits(live), ...(overlap ? [overlap] : []));
   }
 
   /* Same disclosure the Dashboard and the Savings worth chart already carry —
@@ -1199,7 +1239,7 @@ module.exports = function registerAccounts(ctx) {
 
      Absent entirely in a one-person vault — see ownerInPlay(). A card headed
      "Whose it is" with one row under it answers a question nobody asked. */
-  function whoseItIs() {
+  function whoseItIs(live) {
     if (!ownerInPlay()) return null;
     /* ISSUE 28: sourced the same way the hero and the table's group subtotals
        already are — netByOwner() decides WHICH rows exist and in what order
@@ -1208,9 +1248,10 @@ module.exports = function registerAccounts(ctx) {
        alone, with every other symbol restated beside it. The row used to add
        every balance and hang an asterisk on the result; an asterisk does not
        make R5 000 + ¥3 956 = 8 956 true. */
-    const rows = netByOwner(S.accounts, declaredOwners()).map(r => {
+    /* `live`: at the live figure, like the hero over it — see liveBalance(). */
+    const rows = netByOwner(live, declaredOwners()).map(r => {
       const { primary, others } = splitByCurrency(
-        S.accounts.filter(a => ownerKey(a.owner) === r.key));
+        live.filter(a => ownerKey(a.owner) === r.key));
       return { ...r, net: primaryTotal(primary, S.settings.currency), others };
     });
     if (rows.length < 2) return null;
@@ -1255,9 +1296,11 @@ module.exports = function registerAccounts(ctx) {
      wedge, and a group whose card debt exceeds its cash is a bar-chart problem.
      Rather than drop it silently (which would leave the ring and the hero
      quietly disagreeing), such a group is NAMED under the legend. */
-  function whereItSits() {
+  /* `live`: every account at its live figure, like the hero the ring sits
+     under — see liveBalance(). */
+  function whereItSits(live) {
     const groups = ACCT_GROUPS.map(([key]) => {
-      const accts = S.accounts.filter(a => groupOf(a) === key);
+      const accts = live.filter(a => groupOf(a) === key);
       /* ISSUE 28: this used to be roundedSum(accts) — every balance added
          regardless of its own `currency:`, with an asterisk hung on the
          result. The ring was the last figure on the page still doing it, so
@@ -1291,7 +1334,7 @@ module.exports = function registerAccounts(ctx) {
        "Plus ¥ 3 956 held in other currencies, not converted." — rather than
        the retired "adds accounts held in more than one currency" line, which
        described arithmetic this card no longer does. */
-    const { others: cardOthers } = splitByCurrency(S.accounts);
+    const { others: cardOthers } = splitByCurrency(live);
     const cardOtherLine = otherCurrenciesLine(cardOthers);
 
     /* acct.where.sub is a caption with no closing stop, and the currency line
@@ -1596,7 +1639,7 @@ module.exports = function registerAccounts(ctx) {
   };
   const SORTERS = {
     name:    (x, y, dir) => x.a.name.localeCompare(y.a.name) * dir,
-    balance: moneyOrder(r => r.a.balance),
+    balance: moneyOrder(r => r.live),
     flow:    moneyOrder(r => r.flow),
     stale:   (x, y, dir) => (staleRank(x) - staleRank(y)) * dir,
   };
@@ -1755,14 +1798,14 @@ module.exports = function registerAccounts(ctx) {
        goal at 99,6% read "100%" here while the Savings page, for the same
        account, read "99%". */
     const dec = ctx.locale().decimal;
-    const u = utilisationOf(a);
+    const u = utilisationOf(liveAcct(r));
     if (u) {
       return bar(u.pct, u.over ? 'bg-danger' : u.near ? 'bg-warning' : '',
         u.over ? i18n.t('acct.overLimit', { amount: acctMoney(a, -u.available, 0) })
           : i18n.t('acct.limitOf', { pct: sharePercentLabel(u.pct / 100, dec), amount: acctMoney(a, a.credit_limit, 0) }));
     }
     if (a.goal_amount > 0) {
-      const pct = (a.balance / a.goal_amount) * 100;
+      const pct = (r.live / a.goal_amount) * 100;
       /* Clamped to match the BAR, which is clamped in the same [0,100] range
          two lines up in `bar()` — an overdrawn account with a savings goal
          used to print "−340% of R10 000" beside a bar that could only ever
@@ -1770,7 +1813,7 @@ module.exports = function registerAccounts(ctx) {
          same account. goalPercentLabel clamps the same way, and is the ONE
          rule the Savings goal bar prints by too. */
       return bar(pct, '', i18n.t('acct.goalOf', {
-        pct: goalPercentLabel(a.balance, a.goal_amount, dec), amount: acctMoney(a, a.goal_amount, 0),
+        pct: goalPercentLabel(r.live, a.goal_amount, dec), amount: acctMoney(a, a.goal_amount, 0),
       }));
     }
     /* r.tr.basis !== 'none', not `a.total_invested > 0` — the old gate hid this
@@ -1811,7 +1854,11 @@ module.exports = function registerAccounts(ctx) {
   }
 
   function statePill(r) {
-    const cls = { ok: 'ok', drift: 'danger', stale: 'warn', unreadable: 'warn',
+    /* `drift` is a warning, not an error, since the row leads with the live
+       figure (liveBalance): the number on the row is already the one the
+       transactions give, and the pill is asking the reader to confirm it
+       against a statement — the same kind of question `stale` asks. */
+    const cls = { ok: 'ok', drift: 'warn', stale: 'warn', unreadable: 'warn',
       nodate: 'warn', notx: 'warn', nofolder: 'warn' }[r.state];
     /* `stale` is the only state whose pill states a number, so it is the only
        one that needs a param; every other state — `unreadable` now included —
@@ -1913,13 +1960,25 @@ module.exports = function registerAccounts(ctx) {
     const balLabel = unreadable
       // TODO(i18n): acct.balance.unreadable — 'Can't read "{raw}" — click to fix'
       ? i18n.t('acct.balance.unreadable', { raw: a.balanceRaw })
-      : acctMoney(a, a.balance);
+      : acctMoney(a, r.live);
     const balBtn = el('button', { type: 'button',
-      class: `acct-bal num${unreadable ? ' text-warning' : a.balance < 0 ? ' text-danger' : ''}`,
+      class: `acct-bal num${unreadable ? ' text-warning' : r.live < 0 ? ' text-danger' : ''}`,
       'data-fig': 'acct-bal',
       'aria-label': i18n.t('acct.aria.balance', { name: a.name, amount: balLabel }) },
       balLabel);
     balBtn.addEventListener('click', e => { e.stopPropagation(); editBalance(a); });
+    /* The typed figure, kept on the row whenever the live one has moved off
+       it — with its date and the movement since, so the reader can see both
+       halves of the disagreement without opening the drawer. The date is the
+       one thing that decides which transactions count, and the Confirmed
+       column that also carries it is dropped on a phone. */
+    const balSub = !unreadable && r.live !== a.balance
+      ? el('div', { class: 'acct-bal-sub' }, i18n.t('acct.row.typedAsAt', {
+        stated: acctMoney(a, a.balance),
+        date: ctx.dateText(a.balance_updated),
+        delta: `${r.live >= a.balance ? '+' : '−'}${acctMoney(a, Math.abs(r.live - a.balance))}`,
+      }))
+      : null;
 
     /* The sign is a separate glyph and the magnitude alone goes through
        money(), so a harvest reads +500 where the ledger holds -500. The
@@ -1944,7 +2003,7 @@ module.exports = function registerAccounts(ctx) {
                a trailing separator on every row in a single-person vault. */
             [a.type.replace('_', ' '), a.institution,
               a.owner ? ownerLabel(a.owner, declaredOwners()) : ''].filter(Boolean).join(' · '))))),
-      el('td', { class: 'num' }, balBtn),
+      el('td', { class: 'num' }, balBtn, ...(balSub ? [balSub] : [])),
       el('td', { class: 'num acct-col-drop' }, flowCell),
       el('td', { class: 'acct-col-drop' }, spark || el('span', { class: 'acct-dash' }, '—')),
       el('td', { class: 'acct-col-drop' }, goalCell(r)),
@@ -1986,24 +2045,24 @@ module.exports = function registerAccounts(ctx) {
     const unreadable = unreadableBalance(a);
     const drawerBal = unreadable
       ? i18n.t('acct.balance.unreadable', { raw: a.balanceRaw })
-      : acctMoney(a, a.balance);
+      : acctMoney(a, r.live);
     box.append(el('div', { class: 'acct-drawer-h' },
       el('h3', {}, a.name),
-      el('div', { class: `acct-drawer-v num${unreadable ? ' text-warning' : a.balance < 0 ? ' text-danger' : ''}${acctSymbolIsOneChar(a) ? ' st-cur1' : ''}` }, drawerBal)));
+      el('div', { class: `acct-drawer-v num${unreadable ? ' text-warning' : r.live < 0 ? ' text-danger' : ''}${acctSymbolIsOneChar(a) ? ' st-cur1' : ''}` }, drawerBal)));
 
     const grid = el('div', { class: 'acct-drawer-grid' });
     const f = (label, value) => grid.append(el('div', { class: 'acct-drawer-f' },
       el('div', { class: 'acct-drawer-l' }, label),
       el('div', { class: 'acct-drawer-val num' }, value)));
 
-    const u = utilisationOf(a);
+    const u = utilisationOf(liveAcct(r));
     if (u) {
       f(i18n.t('acct.drawer.limit'), acctMoney(a, a.credit_limit));
       f(i18n.t('acct.drawer.available'), acctMoney(a, u.available));
     }
     if (a.goal_amount > 0) {
       f(i18n.t('acct.drawer.goal'), acctMoney(a, a.goal_amount));
-      f(i18n.t('acct.drawer.toGo'), acctMoney(a, Math.max(0, a.goal_amount - a.balance)));
+      f(i18n.t('acct.drawer.toGo'), acctMoney(a, Math.max(0, a.goal_amount - r.live)));
     }
     /* r.tr.basis !== 'none', not `a.total_invested > 0` — same fix and same
        reasoning as goalCell() above: the old gate hid Growth from an account on
@@ -2089,6 +2148,8 @@ module.exports = function registerAccounts(ctx) {
     if (badges.childElementCount) box.append(badges);
 
     box.append(reconLine(r));
+    const sameDay = sameDayLine(r);
+    if (sameDay) box.append(sameDay);
 
     const acts = el('div', { class: 'acct-drawer-acts' });
     const act = (label, aria, run) => {
@@ -2177,6 +2238,39 @@ module.exports = function registerAccounts(ctx) {
       btn.addEventListener('click', () => editBalance(a));
       line.append(btn);
     }
+    return line;
+  }
+
+  /* Rows dated ON the confirmation day, which reconcile() takes as already
+     inside the figure (see its own note: a stamp that lands on payday). That
+     is right for a bank balance read after the day's postings and wrong for a
+     balance typed first and spent against after — type today's figure, log
+     today's coffee, and the coffee never counts, under a green "agrees". The
+     file cannot say which it was, so the drawer says it and the reader
+     decides (discussion #124).
+
+     The button opens the balance dialog rather than moving the date itself.
+     acceptImplied() stamps the date of the LAST ROW IT ABSORBED, so every
+     account the reader has just confirmed carries same-day rows that really
+     are inside its figure; a one-tap "count these" would add them twice on
+     exactly the accounts that were just put right. In the dialog the reader
+     sees the figure and its date together and sets the date they mean.
+
+     Rows netting nothing are skipped for the same reason reconcile() calls
+     them clean: there is nothing for the date to decide. */
+  function sameDayLine(r) {
+    const a = r.a, sd = r.rec && r.rec.sameDay;
+    if (!sd || !sd.count || !sd.net || unreadableBalance(a)) return null;
+    const line = el('div', { class: 'acct-recon acct-sameday' },
+      el('div', { class: 'acct-recon-txt' }, i18n.t('acct.drawer.sameDay', {
+        count: sd.count,
+        date: ctx.dateText(a.balance_updated),
+        amount: `${sd.net >= 0 ? '+' : '−'}${acctMoney(a, Math.abs(sd.net))}`,
+      })));
+    const btn = el('button', { type: 'button', class: 'acct-recon-btn acct-sameday-btn' },
+      i18n.t('acct.deck.do.nodate'));
+    btn.addEventListener('click', e => { e.stopPropagation(); editBalance(a); });
+    line.append(btn);
     return line;
   }
 
@@ -2386,7 +2480,7 @@ module.exports = function registerAccounts(ctx) {
              only the group's primary-currency accounts, and any other
              currency in the group gets its own small side figure rather than
              being folded in and marked with an asterisk. */
-          const { primary, others } = splitByCurrency(inGroup.map(r => r.a));
+          const { primary, others } = splitByCurrency(inGroup.map(liveAcct));
           const total = primaryTotal(primary, S.settings.currency);
           body.append(el('tr', { class: 'type-row' },
             el('td', { colspan: '8' },

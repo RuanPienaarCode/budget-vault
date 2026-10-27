@@ -174,7 +174,12 @@ const clear = () => { seen.fields.length = 0; seen.confirms.length = 0; };
       await ctx.addTransaction();
       /* The amount is named as the flow it is, "−R 35,00" — the sign before the
          symbol (2026-10-20 audit, D2-04) — not money()'s balance form "R -35,00". */
-      eq(lastToast(ctx), i.t('tx.add.done', { amount: '−' + ctx.money(35), account: 'Cheque', month: '2026-09' }), 'the add toast is translated');
+      /* The row is dated before Cheque's balance date in this household, so
+         the toast also says it counts as already inside that balance
+         (discussion #124) — in German too. */
+      const acct = ctx.accountForLabel('Cheque');
+      eq(lastToast(ctx), i.t('tx.add.done', { amount: '−' + ctx.money(35), account: 'Cheque', month: '2026-09' })
+        + i.t('tx.add.beforeBalance', { account: acct.name, date: ctx.dateText(acct.balance_updated) }), 'the add toast is translated');
       ok(!/^Added/.test(lastToast(ctx)), 'and does not start with English');
 
       filter(ctx, { cat: 'Fuel' });
