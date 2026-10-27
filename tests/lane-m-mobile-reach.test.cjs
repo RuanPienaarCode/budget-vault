@@ -4,7 +4,8 @@
    1. Transactions (868px) and Budget (1013px) rows put Split / Delete / Note /
       Exclude and the assume-spent / fixed / clear / delete buttons past the
       right edge of a ~365px scroller.
-   2. The period pill ellipsised its own label ("Jul 23 – Au…").
+   2. The period pill ellipsised its own label ("Jul 23 – Au…"), then (fixed
+      by a two-row pill) put its buttons on a line under the date.
    3. The Budget export dialog's Export button sat below the fold.
    4. The donut legend cut "Debt Repayments" to "Debt Repa…".
 
@@ -72,7 +73,12 @@ ok(!/clip-path/.test(css), 'no clip-path (the review linter docks it; .sr-only d
 /* --- 2. the period label is never clipped ----------------------------------- */
 const pill = (phone.match(/\.header-period-pill \.pnav-label\s*\{[^}]*\}/) || [''])[0];
 ok(pill && !/text-overflow:\s*ellipsis/.test(pill) && /white-space:\s*normal/.test(pill), 'the phone period label wraps instead of ellipsising');
-ok(/\.header-period-pill\s*\{[^}]*flex-wrap:\s*wrap/.test(phone), 'the pill wraps so the label gets its own row');
+/* One row (27 Oct 2026, iPhone 11): the buttons sit beside the label, never
+   on a line of their own, and the topbar's Import / Report shortcuts (both
+   also in the drawer) give the pill their width on a phone. */
+ok(!/\.header-period-pill\s*\{[^}]*flex-wrap:\s*wrap/.test(phone), 'the pill stays one row: previous, range, current, next');
+ok(!/\.pnav-label\s*\{[^}]*order:/.test(phone) && !/\.pnav-label\s*\{[^}]*flex:\s*1 0 100%/.test(phone), 'the label is not pushed onto a row of its own');
+ok(/\.topbar \.topbar-icon-btn\s*\{\s*display:\s*none/.test(phone), 'the topbar Import / Report shortcuts make room on a phone');
 
 /* --- 3. Export row is pinned, and outranks Obsidian's transparent setting-item */
 const sticky = phone.match(/\.modal\.budget-export-modal \.setting-item\.budget-export-actions:not\(\.setting-item-heading\)\s*\{[^}]*\}/);
