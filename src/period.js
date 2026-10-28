@@ -281,7 +281,14 @@ module.exports = function registerPeriod(ctx) {
     const nonBudget = new Set(), earmarked = new Set(), foreign = new Map();
     const lookup = labelLookup();
     const home = S.settings.currency;
+    /* Each LABEL resolved once, not each file: a folder holds one file per
+       month, so on a twelve-year household the same 47 labels were safeSeg'd
+       ~6 600 times per call, and the dashboard makes this call once per
+       ledger(). Local to the call, so the never-kept rule above still holds. */
+    const seen = new Set();
     for (const f of Object.values(S.txFiles)) {
+      if (seen.has(f.label)) continue;
+      seen.add(f.label);
       const a = lookup(f.label);
       if (!a) continue;
       if (!a.in_budget) nonBudget.add(f.label);

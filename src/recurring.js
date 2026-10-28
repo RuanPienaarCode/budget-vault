@@ -38,6 +38,40 @@ function normDesc(s) {
     .replace(/[^a-z]+/g, ' ').replace(/\s+/g, ' ').trim();
 }
 
+/* normDesc for every row of ONE rows array, computed once and reused by every
+   later matchCharges call on the same array. matchCharges runs once PER
+   SERVICE over EVERY outflow, and each caller (views/services.js,
+   committed.js's serviceCommitments and debitOrderCommitments) hands the same
+   array to every service in its loop — so the Services page and the
+   dashboard's commitments each normalised services × rows descriptions, three
+   regex passes apiece. On a synthetic household ten times the size of the one
+   this was built against (47 accounts, 12 years, 80k rows, 41 services) that
+   was ~1.0 s of a 1.2 s Services render and ~0.9 s of the dashboard's 2.3 s.
+
+   Keyed on the ARRAY, held weakly, so the cache dies with the render that
+   built it and needs no cap. A first cut memoised on the description string
+   with a 50k cap, and review measured it slower than no cache at all on a
+   vault whose bank appends a unique reference to every line: each services
+   pass walked past the cap, the reset evicted exactly the keys the next pass
+   asked for, and 80k unique rows took 1.9 s against 1.2 s uncached.
+
+   Each row's raw description is checked against the one its answer was
+   computed from, so a row edited in place, or an array grown since, cannot be
+   served a stale answer. */
+const normsByRows = new WeakMap();
+function normsFor(rows) {
+  let c = normsByRows.get(rows);
+  if (!c) { c = { raw: [], norm: [] }; normsByRows.set(rows, c); }
+  for (let i = 0; i < rows.length; i++) {
+    const d = rows[i] ? rows[i].desc : undefined;
+    if (i < c.raw.length && c.raw[i] === d) continue;
+    c.raw[i] = d;
+    c.norm[i] = normDesc(d);
+  }
+  c.raw.length = c.norm.length = rows.length;
+  return c.norm;
+}
+
 /* The words that identify this service's merchant. Provider first — it is the
    name the bank prints — then the service name. */
 function serviceTokens(service) {
@@ -232,9 +266,12 @@ function matchCharges(service, rows, tokens) {
   if (!toks.length) return { charges: [], current: [], related: [], tokens: toks };
 
   const groups = new Map();
-  for (const r of rows || []) {
+  const list = rows || [];
+  const norms = normsFor(list);
+  for (let i = 0; i < list.length; i++) {
+    const r = list[i];
     if (!r || typeof r.amount !== 'number' || r.amount >= 0) continue;   // outflows only
-    const n = normDesc(r.desc);
+    const n = norms[i];
     if (!n) continue;
     if (!toks.some(t => n.includes(t))) continue;
     if (!groups.has(n)) groups.set(n, []);
