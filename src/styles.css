@@ -1503,6 +1503,11 @@ body.is-tablet .budget-app-root button:where(.dock-btn) { padding: 6px 10px; }
 }
 .budget-app-root .acct-recon-btn .ico svg { width: 0.8rem; height: 0.8rem; }
 .budget-app-root .acct-recon-btn:focus-visible { outline: 2px solid var(--color-primary); outline-offset: 2px; }
+/* The same-day disclosure sits under the reconciliation line it qualifies, so
+   it drops that line's rule and gap: one block, two sentences. Its button is
+   the quieter of the two — it opens a dialog, it does not change a figure. */
+.budget-app-root .acct-sameday { margin-top: 6px; padding-top: 0; border-top: 0; }
+.budget-app-root .acct-sameday-btn { border-color: var(--border-color); background: none; color: var(--text-primary); }
 
 /* Net-worth staleness caveat. Sits directly under the KPI tiles it qualifies,
    deliberately quiet: it reports the AGE of a figure, not a problem with it.
@@ -1819,7 +1824,7 @@ body.is-tablet .budget-app-root button:where(.dock-btn) { padding: 6px 10px; }
 /* The state rail. A box-shadow inset rather than a border so it cannot shift
    the cell's width and knock the column grid out of alignment. */
 .budget-app-root .table tbody tr.acct-row.is-flag td:first-child { box-shadow: inset 3px 0 0 var(--color-warning); }
-.budget-app-root .table tbody tr.acct-row.is-drift td:first-child { box-shadow: inset 3px 0 0 var(--color-danger); }
+.budget-app-root .table tbody tr.acct-row.is-drift td:first-child { box-shadow: inset 3px 0 0 var(--color-warning); }
 .budget-app-root .acct-cell-name { display: flex; align-items: center; gap: 11px; min-width: 0; }
 /* The account name is the row's identity, so it must never be the column that
    gives way. Every other column in this table is nowrap — figures, dates, the
@@ -1899,6 +1904,13 @@ body.is-tablet .budget-app-root button:where(.dock-btn) { padding: 6px 10px; }
 }
 .budget-app-root .acct-bal:hover { text-decoration: underline; }
 .budget-app-root .acct-bal:focus-visible { outline: 2px solid var(--color-primary); outline-offset: 3px; border-radius: 6px; }
+/* The typed figure under a live one that has moved off it (discussion #124):
+   "R 20 000,00 as at 1 Sep · −R 1 200,00 since". Muted and small, because the
+   figure above it is the answer and this is where it came from. */
+.budget-app-root .acct-bal-sub {
+  margin-top: 2px; font-size: 12px; line-height: 1.35; color: var(--text-muted);
+  font-variant-numeric: tabular-nums; text-align: right;
+}
 .budget-app-root .acct-chip {
   display: inline-flex; align-items: center; gap: 5px;
   font-size: 11.5px; font-weight: 600; padding: 2px 9px; border-radius: 999px;
@@ -6143,7 +6155,7 @@ body.is-tablet .budget-app-root button:where(.dock-btn) { padding: 6px 10px; }
   .budget-app-root #acctTable[role='table'] tr.acct-row > td { border-bottom: 0; }
   .budget-app-root #acctTable[role='table'] tr.acct-row td:first-child { box-shadow: none; }
   .budget-app-root #acctTable[role='table'] tr.acct-row.is-flag { box-shadow: inset 3px 0 0 var(--color-warning); }
-  .budget-app-root #acctTable[role='table'] tr.acct-row.is-drift { box-shadow: inset 3px 0 0 var(--color-danger); }
+  .budget-app-root #acctTable[role='table'] tr.acct-row.is-drift { box-shadow: inset 3px 0 0 var(--color-warning); }
   /* Group bars, the empty state and the drawer span the card. Last, so it
      outranks the nth-child(1) placement above at equal specificity. */
   .budget-app-root #acctTable[role='table'] td[colspan] { display: block; grid-column: 1 / -1; grid-row: auto; }

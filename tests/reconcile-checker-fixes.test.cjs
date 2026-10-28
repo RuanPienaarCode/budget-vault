@@ -132,7 +132,11 @@ const clone = x => JSON.parse(JSON.stringify(x));
     ok(find(r.checks, 'savings', /Σ owned segments/).length === 1 && find(r.checks, 'savings', /Σ owed segments/).length === 1,
       'the two Σ-segment checks run at all (their selector matched nothing, and a .length guard hid that)');
     eq(one(r.checks, 'savings', /KPI "Savings" \(stated\) vs chart/).status, 'info', 'the KPI-vs-chart pair is measurable and differs by the drift');
-    eq(one(r.checks, 'accounts', /Group "Savings" \(stated\)/).pageValue, 15000, 'the Accounts "Savings" group reads the Savings group total, not another group\'s');
+    /* 14 500, the LIVE Savings total — the same figure the Savings worth chart
+       draws — since the Accounts page leads with implied balances
+       (discussion #124). It read the stated 15 000 before; either way it is
+       the Savings group's own total, which is what this line pins. */
+    eq(one(r.checks, 'accounts', /Group "Savings" = Dashboard tile/).pageValue, 14500, 'the Accounts "Savings" group reads the Savings group total, not another group\'s');
   }
 
   /* ---- 4. Cash on hand ---------------------------------------------------- */

@@ -269,6 +269,11 @@ function globals(ctx, S, period, today) {
   const implied = ctx.impliedAccounts();
   const impliedHome = implied.filter(home);
   const statedHome = stated.filter(home);
+  /* What the Accounts page prints since discussion #124: each readable
+     account at its implied (live) balance. Readable by the same test as
+     `stated`, so an unreadable figure is out of both and a live total never
+     carries a fabricated zero rolled forward. */
+  const liveHome = implied.filter(readable).filter(home);
   const W = worth(impliedHome, S.debts, S.assets, cur, S.owed);
   const Wstated = worth(statedHome, null, null);
   const sumPos = list => list.reduce((t, a) => t + Math.max(0, a.balance || 0), 0);
@@ -419,7 +424,9 @@ function globals(ctx, S, period, today) {
     rest: { from: restFrom, TREND: tallyOf(stampedRest, LENSES.TREND), BUDGET: tallyOf(stampedRest, LENSES.BUDGET) },
     worth: { implied: primitives(W), stated: primitives(Wstated), naive, driftSum,
       otherCurrencies: W.otherCurrencies,
-      byTypeStated: byType(statedHome), byTypeImplied: byType(impliedHome), byOwnerStated: byOwner(stated, statedHome) },
+      byTypeStated: byType(statedHome), byTypeImplied: byType(impliedHome), byOwnerStated: byOwner(stated, statedHome),
+      liveNet: Math.round((sumPos(liveHome) - sumNeg(liveHome)) * 100) / 100,
+      byTypeLive: byType(liveHome), byOwnerLive: byOwner(implied.filter(readable), liveHome) },
     book: { drift: book.drift, stale: primitives(book.stale), overdrawn: book.overdrawn,
       unplaced: [...book.unplacedBy.entries()], confirmDay: [...book.confirmDayBy.entries()].map(([k, v]) => [k, v]) },
     accounts, cash, txPage,
@@ -1364,22 +1371,27 @@ function runChecks(G, pages) {
   }
 
   /* ---- accounts -------------------------------------------------------- */
+  /* LIVE balances since discussion #124 (2 Oct 2026): each row leads with the
+     implied figure — the stated one rolled through the transactions since —
+     and the hero, owner rows, donut and group totals sum the same. Until then
+     every check below read STATED, and the group totals were expected to
+     DIFFER from the Dashboard's implied tile; they must agree now. */
   const A = 'accounts';
-  const statedNet = W.naive.statedPositive - W.naive.statedNegative;
-  dom({ page: A, name: 'Hero: accounts total (stated, home currency)', formula: 'worth(stated home accounts, null, null).net', re: /^acctSummary\/div\.card\[0\]\/div\.hero-num/, globalValue: statedNet, globalSource: 'Σ stated home balances' });
+  const liveNet = W.liveNet;
+  dom({ page: A, name: 'Hero: accounts total (live, home currency)', formula: 'worth(implied home accounts, null, null).net', re: /^acctSummary\/div\.card\[0\]\/div\.hero-num/, globalValue: liveNet, globalSource: 'Σ live home balances' });
   {
     /* @acct-owner-net exactly: the foreign "plus $ 1 000" tag is a CHILD of
        this span, and an unanchored match summed it in as another owner. */
     const owners = C.figs(A, /^acctSummary\/@acct-owner-net$/, 'money').map(figValue);
-    C.add({ page: A, name: 'Owner rows sum to the hero', formula: 'Σ per-owner net = accounts total', pageValue: owners.reduce((a, b) => a + b, 0), pageSource: `Σ ${owners.length} owner rows`, globalValue: statedNet, globalSource: 'Σ stated home balances' });
-    column({ page: A, name: 'Owner rows = Σ by owner', formula: 'a.owner; a blank owner buckets under Unassigned, never "joint"', re: /^acctSummary\/@acct-owner-net$/, seam: Object.values(W.byOwnerStated), globalSource: 'Σ stated by owner (this script)' });
+    C.add({ page: A, name: 'Owner rows sum to the hero', formula: 'Σ per-owner net = accounts total', pageValue: owners.reduce((a, b) => a + b, 0), pageSource: `Σ ${owners.length} owner rows`, globalValue: liveNet, globalSource: 'Σ live home balances' });
+    column({ page: A, name: 'Owner rows = Σ by owner', formula: 'a.owner; a blank owner buckets under Unassigned, never "joint"', re: /^acctSummary\/@acct-owner-net$/, seam: Object.values(W.byOwnerLive), globalSource: 'Σ live by owner (this script)' });
   }
-  dom({ page: A, name: 'Donut: total', formula: 'Σ stated home balances', re: /^acctSummary\/div\.card\[2\]\/.*svg\.donut\/text/, globalValue: statedNet, globalSource: 'Σ stated home balances' });
+  dom({ page: A, name: 'Donut: total', formula: 'Σ live home balances', re: /^acctSummary\/div\.card\[2\]\/.*svg\.donut\/text/, globalValue: liveNet, globalSource: 'Σ live home balances' });
   {
     /* The table groups every non-pool type under one "Bank accounts" header. */
     const groups = { bank: 0 };
-    for (const [t, v] of Object.entries(W.byTypeStated)) { if (t === 'savings' || t === 'investment') groups[t] = v; else groups.bank += v; }
-    column({ page: A, name: 'Group totals = Σ by group (bank / savings / investments)', formula: 'type-row totals; bank = every non-pool type', re: /^acctTable\/@acct-group-total$/, seam: Object.values(groups).filter(v => Math.abs(v) >= 0.005), globalSource: 'Σ stated by group (this script)' });
+    for (const [t, v] of Object.entries(W.byTypeLive)) { if (t === 'savings' || t === 'investment') groups[t] = v; else groups.bank += v; }
+    column({ page: A, name: 'Group totals = Σ by group (bank / savings / investments)', formula: 'type-row totals; bank = every non-pool type', re: /^acctTable\/@acct-group-total$/, seam: Object.values(groups).filter(v => Math.abs(v) >= 0.005), globalSource: 'Σ live by group (this script)' });
     for (const [label, type] of [['Savings', 'savings'], ['Investments', 'investment']]) {
       const f = C.figs(A, /^acctTable\/@acct-group-total$/, 'money').find(x => new RegExp(`^${label}`).test(x.context.parent || ''));
       /* accounts.js draws a group only when an account of that kind exists
@@ -1387,19 +1399,19 @@ function runChecks(G, pages) {
          the table as designed. A group missing while an account of the type
          exists is a FAIL. */
       const held = G.accounts.some(a => a.type === type);
-      if (!f && !held) C.checks.push({ page: A, name: `Group "${label}" (stated) vs Dashboard tile (implied)`, formula: 'the Accounts page prints stated balances; the Dashboard position tile prints implied ones',
+      if (!f && !held) C.checks.push({ page: A, name: `Group "${label}" = Dashboard tile (both live)`, formula: 'the Accounts page and the Dashboard position tile both print implied balances',
         pageValue: 0, pageSource: `no ${label} group - no account of type ${type}, and the table draws a group only for a kind it holds`, globalValue: 0, globalSource: `byTypeImplied.${type}`, status: 'pass', delta: null, why: [], kind: 'money', note: '' });
-      else if (!f) C.checks.push({ page: A, name: `Group "${label}" (stated) vs Dashboard tile (implied)`, formula: 'the Accounts page prints stated balances; the Dashboard position tile prints implied ones',
-        pageValue: null, pageSource: `NOT DRAWN although an account of type ${type} exists`, globalValue: W.byTypeImplied[type] || 0, globalSource: `byTypeImplied.${type}`, status: 'fail', delta: null, why: [], kind: 'money', note: '' });
-      else C.add({ page: A, name: `Group "${label}" (stated) vs Dashboard tile (implied)`, formula: 'the Accounts page prints stated balances; the Dashboard position tile prints implied ones', pageValue: figValue(f), pageSource: f ? f.address : `no ${label} group`,
-        globalValue: W.byTypeImplied[type] || 0, globalSource: `byTypeImplied.${type}`, tol: figTol(f), expectDiff: true });
+      else if (!f) C.checks.push({ page: A, name: `Group "${label}" = Dashboard tile (both live)`, formula: 'the Accounts page and the Dashboard position tile both print implied balances',
+        pageValue: null, pageSource: `NOT DRAWN although an account of type ${type} exists`, globalValue: W.byTypeLive[type] || 0, globalSource: `byTypeLive.${type}`, status: 'fail', delta: null, why: [], kind: 'money', note: '' });
+      else C.add({ page: A, name: `Group "${label}" = Dashboard tile (both live)`, formula: 'the Accounts page and the Dashboard position tile both print implied balances', pageValue: figValue(f), pageSource: f ? f.address : `no ${label} group`,
+        globalValue: W.byTypeLive[type] || 0, globalSource: `byTypeLive.${type}`, tol: figTol(f) });
     }
   }
   /* No `!a.foreign` on the seam: the column renders every account in its OWN
      symbol, converting and summing nothing, so narrowing the seam to home
      accounts left the foreign row with no counterpart. `statedRaw == null`
      stays — an unreadable balance renders as prose, not as a money figure. */
-  column({ page: A, name: 'Balance column = stated balances', formula: 'button.acct-bal per row, each in its own currency', re: /^acctTable\/@acct-bal$/, seam: G.accounts.filter(a => a.statedRaw == null).map(a => a.stated), globalSource: 'S.accounts[].balance (readable)' });
+  column({ page: A, name: 'Balance column = live balances', formula: 'button.acct-bal per row, each in its own currency', re: /^acctTable\/@acct-bal$/, seam: G.accounts.filter(a => a.statedRaw == null).map(a => a.implied), globalSource: 'impliedAccounts()[].balance (readable)' });
   {
     /* The chip renders its sign as a separate glyph, so the harvested number is
        a magnitude and a naive compare accepted +500 for a −500. The direction

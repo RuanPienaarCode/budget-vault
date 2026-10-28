@@ -196,21 +196,26 @@ async function mount(files = FILES) {
       ok(!/less\./.test(tile), 'and the "less" wording from the positive case does not leak into this one');
     }
 
-    /* ---- 3c. the Accounts hero prints the STATED book and its own drift ---- */
+    /* ---- 3c. the Accounts hero prints the IMPLIED book and its own drift --- */
+    /* IMPLIED since discussion #124 (2 Oct 2026): the rows lead with the live
+       figure, so the hero over them sums the same. Until then this pinned the
+       STATED 77 000 with "Transactions since your stated balances add up to
+       R 750 more" — the mirror of the sentence below, for the other base. */
     {
       const { ctx, text } = await mountView(FILES, 'accounts');
       ctx.renderAccounts();
       const hero = text('acctSummary');
-      ok(hero.includes('R 77000.00'), `hero: net of stated balances = 20 000 + 50 000 + 10 000 − 3 000 (got: ${hero.slice(0, 200)})`);
+      ok(hero.includes('R 77750.00'), `hero: net of implied balances = stated 77 000 + the 750 since (got: ${hero.slice(0, 200)})`);
       /* balances.drift is 750 for this fixture (implied 77 750 − stated 77 000):
          Emergency Fund +1000, Cheque −250 net to +750 across the whole book —
          the hero prints the WHOLE book's drift, not per type, because `net`
          above is built from every account, not just the pool. This hero
-         prints STATED, so the sign keeps the ORIGINAL sense — a positive
-         drift means transactions since the stated figures netted MORE in. */
+         prints IMPLIED, so the sentence describes the OTHER base, as the
+         Dashboard tile's does: a positive drift means the stated figures read
+         LESS than the number on screen. */
       /* In cents under the cents hero since the 2026-10-20 audit (D2-03 / MT-07). */
-      ok(/Transactions since your stated balances add up to R 750\.00 more\./.test(hero),
-        'the Accounts hero discloses the same drift figures.js computes for the whole book, worded for the base IT prints (stated)');
+      ok(/Your stated balances read R 750\.00 less\./.test(hero),
+        'the Accounts hero discloses the same drift figures.js computes for the whole book, worded for the base IT prints (implied)');
     }
     {
       const quiet = { ...FILES };
@@ -225,12 +230,12 @@ async function mount(files = FILES) {
       const { ctx, text } = await mountView(NEG_FILES, 'accounts');
       ctx.renderAccounts();
       const hero = text('acctSummary');
-      /* NEGATIVE drift here keeps the ORIGINAL sense (this hero prints
-         STATED, unlike the tile above): transactions since the stated
-         figures netted an OUTFLOW, so they add up to less — driftDown. */
-      ok(/Transactions since your stated balances add up to R 1750\.00 less\./.test(hero),
-        'the sign flips correctly on the hero too, and in the opposite direction from the tile\'s wording because this surface prints the OTHER base');
-      ok(!/add up to R 1750(\.00)? more/.test(hero), 'and the "more" wording from the positive case does not leak into this one');
+      /* NEGATIVE drift = implied below stated. This hero prints IMPLIED, like
+         the tile above (discussion #124), so it words it the way the tile
+         does: the stated figures read MORE than the number on screen. */
+      ok(/Your stated balances read R 1750\.00 more\./.test(hero),
+        'the sign flips correctly on the hero too, worded like the tile\'s because both now print the implied base');
+      ok(!/read R 1750(\.00)? less/.test(hero), 'and the "less" wording from the positive case does not leak into this one');
     }
 
     /* ---- 4. the Savings KPIs print the STATED book and say what moved ------ */
