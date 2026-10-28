@@ -254,11 +254,12 @@ function provenFalse(desc, exactShape, mangled) {
     'Net worth: accounts.js\'s hero is the declared exception — worth() called with no debts/assets, on purpose');
   /* 2026-09-09: the readable-accounts filter and the currency split moved
      into figures.js's balance book (one book, two bases), so the hero reads
-     the stated home-currency list off it. The term is unchanged — the same
-     filter, applied ONCE — and both halves are pinned: the hero reads the
-     book, and the book applies the filter this term always pinned. */
-  ok(live.accounts.includes('const primary = balances.stated.accounts, others = balances.stated.others;'),
-    'Net worth: and `primary` is the balance book\'s stated home-currency account list (ITEM 5, applied once in figures.js)');
+     the home-currency list off it. The term is unchanged — the same filter,
+     applied ONCE — and both halves are pinned: the hero reads the book, and
+     the book applies the filter this term always pinned. The IMPLIED list
+     since discussion #124: the rows under the hero lead with the live figure. */
+  ok(live.accounts.includes('const primary = balances.implied.accounts, others = balances.implied.others;'),
+    'Net worth: and `primary` is the balance book\'s implied home-currency account list (ITEM 5, applied once in figures.js)');
   /* 2026-09-29: the predicate is figures.js's exported balanceReadable (one
      rule, imported by the Dashboard and the Accounts page); the book applies it. */
   ok(live.figures.includes('const balanceReadable = a => !(a.balanceRaw != null && normalizeAmount(a.balanceRaw) === null);')

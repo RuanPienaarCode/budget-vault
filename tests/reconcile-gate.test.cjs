@@ -90,7 +90,10 @@ const ok = (c, m) => { assert.ok(c, m); checks++; };
    one is a new place where the app prints two bases, and whether the page says
    so is exactly the question ISSUE 88 is about. */
 const EXPLAINED_DIFFERENCES = [
-  'accounts :: Group "Savings" (stated) vs Dashboard tile (implied)',
+  /* 'accounts :: Group "Savings" (stated) vs Dashboard tile (implied)' was
+     here until discussion #124: the Accounts page leads with implied balances
+     now, so its Savings group and the Dashboard tile print one figure and the
+     pair is an ordinary check that must agree. */
   /* The Savings page's KPI reads STATED balances and its worth chart IMPLIED
      ones; the fixture's emergency fund has drifted, so the two differ by the
      drift. This pair was unmeasurable while the segment lookup depended on a

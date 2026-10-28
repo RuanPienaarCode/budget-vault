@@ -74,9 +74,12 @@ async function pages(files) {
   const p = await pages(withDeposit);
   const money = p.renderAccounts.ctx.moneyIn;
   const typed = money('$', 1000, 0), rolled = money('$', 1500, 0);
-  ok(p.renderAccounts.text.includes(`Plus ${typed} held in other currencies`),
-    `Accounts prints the typed amount, like its headline (got "${p.renderAccounts.text}")`);
-  ok(p.renderAccounts.text.includes(rolled), `and names the rolled-forward one beside it (got "${p.renderAccounts.text}")`);
+  /* Accounts prints the rolled-forward amount since its headline went
+     implied (discussion #124) — all three pages on one basis now, and the
+     typed figure named beside it, exactly as Savings and the Score do. */
+  ok(p.renderAccounts.text.includes(`Plus ${rolled} held in other currencies`),
+    `Accounts prints the rolled-forward amount, like its headline (got "${p.renderAccounts.text}")`);
+  ok(p.renderAccounts.text.includes(typed), `and names the typed one beside it (got "${p.renderAccounts.text}")`);
   ok(p.renderSavings.text.includes(`Plus ${rolled} held in other currencies`),
     `Savings prints the rolled-forward amount (got "${p.renderSavings.text}")`);
   ok(p.renderSavings.text.includes(typed), `and names the typed one (got "${p.renderSavings.text}")`);

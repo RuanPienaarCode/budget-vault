@@ -670,38 +670,33 @@ body.is-tablet .budget-app-root button:where(.dock-btn) { padding: 6px 10px; }
   }
   .budget-app-root .topbar .brand { display: none; }
 
-  /* The label used to share one row with the three nav buttons and was
-     ellipsised to "Jul 23 – Au…": on an iPhone-width pane that row leaves the
-     label ~87px and "Jul 23 – Aug 22, 2026" needs ~137px, so the one thing
-     the pill exists to say (WHICH range) was the part cut off. The same
-     flex-shrink had also squeezed the buttons from 32px to 20px wide.
-     Two rows instead: the label takes the pill's full width on top and the
-     three buttons sit beneath it, in the same left-to-right order as before
-     (previous, jump to current, next). The label is moved with order:-1 rather
-     than the markup being reordered, so the DOM, tab order and the screen-
-     reader reading order are untouched. A pane too narrow even for the full
-     width wraps the label instead of clipping it. */
+  /* One row: previous | range | jump to current | next, in DOM order.
+     The label used to be ellipsised to "Jul 23 – Au…" because the Import and
+     Report shortcuts beside the avatar left it ~65px on a 414px iPhone 11, and
+     "Oct 22 – Nov 21, 2026" needs ~135px. A two-row pill fixed the clipping
+     but put the buttons on a line of their own under the date. Both shortcuts
+     are also in the drawer, so on a phone they give their 96px back to the
+     pill instead. A pane too narrow even then (a 320px SE) wraps the label
+     inside its own slot, so it is never clipped and the buttons never leave
+     the row. */
+  .budget-app-root .topbar .topbar-icon-btn { display: none; }
   .budget-app-root .header-period-pill {
     flex: 1 1 auto;
     min-width: 0;
     margin-left: 0;
-    flex-wrap: wrap;
     justify-content: space-between;
-    align-content: center;
     gap: 0;
-    padding: 0.2rem 0.35rem;
+    padding: 0.2rem 0.25rem;
     border-radius: 20px;
   }
   .budget-app-root .header-period-pill .pnav-dot { display: none; }
   .budget-app-root .header-period-pill .pnav-label {
-    order: -1;
-    flex: 1 0 100%;
+    flex: 1 1 auto;
     min-width: 0;
     text-align: center;
     white-space: normal;
     font-size: 0.78rem;
     line-height: 1.2;
-    padding-top: 0.1rem;
   }
   .budget-app-root .header-period-pill .pnav-btn { width: 32px; height: 28px; flex: none; }
 }
@@ -1508,6 +1503,11 @@ body.is-tablet .budget-app-root button:where(.dock-btn) { padding: 6px 10px; }
 }
 .budget-app-root .acct-recon-btn .ico svg { width: 0.8rem; height: 0.8rem; }
 .budget-app-root .acct-recon-btn:focus-visible { outline: 2px solid var(--color-primary); outline-offset: 2px; }
+/* The same-day disclosure sits under the reconciliation line it qualifies, so
+   it drops that line's rule and gap: one block, two sentences. Its button is
+   the quieter of the two — it opens a dialog, it does not change a figure. */
+.budget-app-root .acct-sameday { margin-top: 6px; padding-top: 0; border-top: 0; }
+.budget-app-root .acct-sameday-btn { border-color: var(--border-color); background: none; color: var(--text-primary); }
 
 /* Net-worth staleness caveat. Sits directly under the KPI tiles it qualifies,
    deliberately quiet: it reports the AGE of a figure, not a problem with it.
@@ -1824,7 +1824,7 @@ body.is-tablet .budget-app-root button:where(.dock-btn) { padding: 6px 10px; }
 /* The state rail. A box-shadow inset rather than a border so it cannot shift
    the cell's width and knock the column grid out of alignment. */
 .budget-app-root .table tbody tr.acct-row.is-flag td:first-child { box-shadow: inset 3px 0 0 var(--color-warning); }
-.budget-app-root .table tbody tr.acct-row.is-drift td:first-child { box-shadow: inset 3px 0 0 var(--color-danger); }
+.budget-app-root .table tbody tr.acct-row.is-drift td:first-child { box-shadow: inset 3px 0 0 var(--color-warning); }
 .budget-app-root .acct-cell-name { display: flex; align-items: center; gap: 11px; min-width: 0; }
 /* The account name is the row's identity, so it must never be the column that
    gives way. Every other column in this table is nowrap — figures, dates, the
@@ -1904,6 +1904,13 @@ body.is-tablet .budget-app-root button:where(.dock-btn) { padding: 6px 10px; }
 }
 .budget-app-root .acct-bal:hover { text-decoration: underline; }
 .budget-app-root .acct-bal:focus-visible { outline: 2px solid var(--color-primary); outline-offset: 3px; border-radius: 6px; }
+/* The typed figure under a live one that has moved off it (discussion #124):
+   "R 20 000,00 as at 1 Sep · −R 1 200,00 since". Muted and small, because the
+   figure above it is the answer and this is where it came from. */
+.budget-app-root .acct-bal-sub {
+  margin-top: 2px; font-size: 12px; line-height: 1.35; color: var(--text-muted);
+  font-variant-numeric: tabular-nums; text-align: right;
+}
 .budget-app-root .acct-chip {
   display: inline-flex; align-items: center; gap: 5px;
   font-size: 11.5px; font-weight: 600; padding: 2px 9px; border-radius: 999px;
@@ -6148,7 +6155,7 @@ body.is-tablet .budget-app-root button:where(.dock-btn) { padding: 6px 10px; }
   .budget-app-root #acctTable[role='table'] tr.acct-row > td { border-bottom: 0; }
   .budget-app-root #acctTable[role='table'] tr.acct-row td:first-child { box-shadow: none; }
   .budget-app-root #acctTable[role='table'] tr.acct-row.is-flag { box-shadow: inset 3px 0 0 var(--color-warning); }
-  .budget-app-root #acctTable[role='table'] tr.acct-row.is-drift { box-shadow: inset 3px 0 0 var(--color-danger); }
+  .budget-app-root #acctTable[role='table'] tr.acct-row.is-drift { box-shadow: inset 3px 0 0 var(--color-warning); }
   /* Group bars, the empty state and the drawer span the card. Last, so it
      outranks the nth-child(1) placement above at equal specificity. */
   .budget-app-root #acctTable[role='table'] td[colspan] { display: block; grid-column: 1 / -1; grid-row: auto; }
