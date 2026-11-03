@@ -168,12 +168,12 @@ const FACTS = {
      and the UI copy has to keep saying so for exactly as long as `verified`
      is null here. */
   'za.prime.rate': {
-    value: 11,
+    value: 10.75,
     unit: 'percent per year',
-    claim: 'South African prime lending rate, used only as a starting value in the loan calculators. Secondary sources put it at 10.50% (repo 7.00%) as of August 2026, but SARB\'s own page is script-rendered and was not read directly, so this is NOT verified and the calculator copy must keep telling the reader to confirm the rate their bank actually offered.',
+    claim: 'South African prime lending rate, used only as a starting value in the loan calculators. The SARB MPC raised the repo rate 25 bp to 7.25% on 23 September 2026 (effective 25 September), taking prime to 10.75% (Moneyweb, https://www.moneyweb.co.za/news/economy/sarb-ups-repo-rate-to-7-25/, read 2026-11-03). SARB\'s own page is script-rendered and was not read directly, so this is NOT verified and the calculator copy must keep telling the reader to confirm the rate their bank actually offered. Next MPC decision: 19 November 2026.',
     source: null,
     verified: null,
-    reviewBy: '2026-11-01',
+    reviewBy: '2026-12-01',
     country: 'za',
   },
   'za.conveyancing.anchors': {

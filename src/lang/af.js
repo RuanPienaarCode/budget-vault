@@ -1032,7 +1032,7 @@ module.exports = {
   'shell.legend.over': 'Oor begroting',
   'shell.legend.income': 'Inkomste',
   'shell.legend.budget': 'Bestedingsbegroting',
-  'shell.tx.search': 'Soek beskrywing…',
+  'shell.tx.search': 'Soek beskrywing of nota…',
   'shell.tx.wholeHistory': 'hele geskiedenis',
   'shell.tx.export': 'Voer uit',
   'shell.tx.deleteFiltered': 'Skrap hierdie rye',

@@ -1034,7 +1034,7 @@ module.exports = {
   'shell.legend.over': 'Por encima del presupuesto',
   'shell.legend.income': 'Ingresos',
   'shell.legend.budget': 'Presupuesto de gastos',
-  'shell.tx.search': 'Buscar descripción…',
+  'shell.tx.search': 'Buscar descripción o nota…',
   'shell.tx.wholeHistory': 'todo el historial',
   'shell.tx.export': 'Exportar',
   'shell.tx.deleteFiltered': 'Eliminar estas filas',

@@ -364,7 +364,7 @@ const LOAN_PROFILES = {
        figure is now the constant the arithmetic above uses, not a second
        spelling of it — the VAT-inclusive caps rounded to the rand exactly as
        the two fee functions round them. */
-    rateNote: f => `This calculator defaults to ${f.decimal(fact('za.prime.rate'), 2)}%. South Africa's prime rate has moved since — confirm today's rate and what your bank actually offered you before relying on any figure here.`,
+    rateNote: f => `This calculator defaults to ${f.decimal(fact('za.prime.rate'), 2)}%, South Africa's prime lending rate when it was last checked (November 2026). Prime moves with every Reserve Bank decision — confirm today's rate and what your bank actually offered you before relying on any figure here.`,
     costsNote: f => 'Estimates only. Transfer duty is arithmetic on the SARS table effective 1 April 2025, checked against sars.gov.za in August 2026; bond registration and transfer costs are interpolated from the guideline conveyancing tariff, which this app has never verified, and will differ from your attorney\'s quote. '
       + `Lender fees are modelled on the National Credit Act caps as read from Government Gazette 39379 (initiation ${f.money(ZA_INIT_CAP_EX_VAT)} + VAT, monthly service fee ${f.money(ZA_SERVICE_FEE_EX_VAT)} + VAT).`,
     feesNote: f => 'Lender fees are modelled on the National Credit Act caps in Government Gazette 39379 of 6 November 2015 — '
