@@ -853,16 +853,16 @@ function runChecks(G, pages) {
        prints "R X more than planned", a magnitude, not "R -X left". */
     .map(r => r.remaining < 0 ? -r.remaining : r.remaining);
   column({ page: D, name: 'Budget table: Budget column = rows', formula: 'budgetVsActualRows[].budget',
-    re: /^dashBudget\/tbody\/tr\[\d+\]\/td\.num\[1\]$/, seam: F.rows.map(r => r.budget).filter(v => v), globalSource: 'periodFigures.rows[].budget (non-zero)' , note: 'zero budgets print blank' });
+    re: /^dashBudget\/tbody\/tr(?:\[\d+\])?\/td\.num\[1\]$/, seam: F.rows.map(r => r.budget).filter(v => v), globalSource: 'periodFigures.rows[].budget (non-zero)' , note: 'zero budgets print blank' });
   column({ page: D, name: 'Budget table: Actual column = rows', formula: 'budgetVsActualRows[].actual',
-    re: /^dashBudget\/tbody\/tr\[\d+\]\/td\.num\[2\]$/, seam: F.rows.map(r => r.actual), globalSource: 'periodFigures.rows[].actual' });
+    re: /^dashBudget\/tbody\/tr(?:\[\d+\])?\/td\.num\[2\]$/, seam: F.rows.map(r => r.actual), globalSource: 'periodFigures.rows[].actual' });
   /* Since the 2026-10-20 audit (D2-05) the Dashboard's Remaining cell is the
      Budget page's own (budgets.js remainingText): "R X over" / "R X left" as
      a magnitude, "already spent" for an assume-spent row inside its
      provision, the income sentences — so it is held to the Budget page's
      seam. It printed the signed "R -X" until then. */
   column({ page: D, name: 'Budget table: Remaining column = rows', formula: 'budgetRowStatus.remaining = budget − actual, printed as the Budget page prints it',
-    re: /^dashBudget\/tbody\/tr\[\d+\]\/td\.num\[4\]$/, seam: drawnBudgetPage, allowExtraZero: true, globalSource: 'periodFigures.rows[].remaining, sign folded for over rows (budgets.js remainingText, shared with the Budget page)' });
+    re: /^dashBudget\/tbody\/tr(?:\[\d+\])?\/td\.num\[4\]$/, seam: drawnBudgetPage, allowExtraZero: true, globalSource: 'periodFigures.rows[].remaining, sign folded for over rows (budgets.js remainingText, shared with the Budget page)' });
   {
     /* `last` is the last bar that PRINTS ANYTHING, not the last bar that prints
        money. A period the vault holds no rows for is drawn with a title of just
@@ -1116,9 +1116,9 @@ function runChecks(G, pages) {
   /* ---- budget page ---------------------------------------------------- */
   const BP = 'budgets';
   column({ page: BP, name: 'Actual column = budgetVsActualRows', formula: 'the same rows the Dashboard table draws; the Budget page draws EVERY category, so extra 0,00 cells are allowed',
-    re: /^budTable\/tbody\/tr\[\d+\]\/td\.num\[3\]$/, seam: F.rows.map(r => r.actual), globalSource: 'periodFigures.rows[].actual', allowExtraZero: true });
+    re: /^budTable\/tbody\/tr(?:\[\d+\])?\/td\.num\[3\]$/, seam: F.rows.map(r => r.actual), globalSource: 'periodFigures.rows[].actual', allowExtraZero: true });
   column({ page: BP, name: 'Remaining column = rows (overspend printed as a magnitude)', formula: 'budgetRowStatus.remaining; "over by R X" prints −remaining where the Dashboard prints the signed figure — same number, opposite sign on the two pages',
-    re: /^budTable\/tbody\/tr\[\d+\]\/td\.num\[2\]\/div\.bud-amt-wrap\/div\.bud-remaining$/, seam: drawnBudgetPage, globalSource: 'periodFigures.rows[].remaining, sign folded for over rows', allowExtraZero: true });
+    re: /^budTable\/tbody\/tr(?:\[\d+\])?\/td\.num\[2\]\/div\.bud-amt-wrap\/div\.bud-remaining$/, seam: drawnBudgetPage, globalSource: 'periodFigures.rows[].remaining, sign folded for over rows', allowExtraZero: true });
   /* The totals strip, drawn twice (top and bottom) from one set of operands. */
   for (const strip of ['budTotalsTop', 'budTotalsBottom']) {
     /* Kept for any tile that has not earned a name yet; every check below
@@ -1272,7 +1272,7 @@ function runChecks(G, pages) {
        harvested as a MAGNITUDE (formatSigned formats the digits of |v|), and
        its sign is read off the cell — the figure's parent, whose text is the
        whole "−R 50,00". */
-    const cells = C.figs(T, /^txTable\/tbody\/tr\[\d+\]\/td\.num\[4\]\/span\.tx-amt$/, 'money');
+    const cells = C.figs(T, /^txTable\/tbody\/tr(?:\[\d+\])?\/td\.num\[4\]\/span\.tx-amt$/, 'money');
     const txSigned = f => {
       const v = figValue(f);
       if (!isNum(v)) return v;
@@ -1469,7 +1469,7 @@ function runChecks(G, pages) {
   {
     const L = 'loans';
     const rows = new Map();
-    for (const f of C.figs(L, /^loanHomeAmort\/tbody\/tr\[\d+\]\/td\.num\[\d\]$/, 'money')) {
+    for (const f of C.figs(L, /^loanHomeAmort\/tbody\/tr(?:\[\d+\])?\/td\.num\[\d\]$/, 'money')) {
       const [, r, c] = f.address.match(/tr\[(\d+)\]\/td\.num\[(\d)\]/);
       (rows.get(r) || rows.set(r, {}).get(r))[c] = figValue(f);
     }

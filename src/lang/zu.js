@@ -1058,7 +1058,7 @@ module.exports = {
   'shell.legend.over': 'Ngaphezu kwesabelomali',
   'shell.legend.income': 'Umholo',
   'shell.legend.budget': 'Isabelomali sokuchitha',
-  'shell.tx.search': 'Sesha incazelo…',
+  'shell.tx.search': 'Sesha incazelo noma inothi…',
   'shell.tx.wholeHistory': 'wonke umlando',
   'shell.tx.export': 'Khipha',
   'shell.tx.deleteFiltered': 'Susa le migqa',

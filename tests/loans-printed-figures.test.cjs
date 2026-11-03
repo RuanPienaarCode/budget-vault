@@ -103,7 +103,9 @@ const rands = s => Number(readable(s).replace(/[^\d,]/g, '').replace(',', '.'));
       const label = descend(homeForm).find(n => n._cls.has('lf-l') && /^Deposit/.test(n.textContent));
       eq(label.textContent, 'Deposit — 13,3%', 'R200 000 down on R1 500 000 reads "13,3%", not "13.3%"');
       const hint = byClass(homeForm, 'lf-h').map(n => n.textContent).find(t => /defaults to/.test(t));
-      ok(hint && hint.includes('defaults to 11,00%'), `the rate hint quotes its default in the decimal comma — got "${hint}"`);
+      /* Read off the facts ledger, so the next rate decision moves this with it. */
+      const prime = String(require('../src/facts').fact('za.prime.rate').toFixed(2)).replace('.', ',');
+      ok(hint && hint.includes(`defaults to ${prime}%`), `the rate hint quotes its default in the decimal comma — got "${hint}"`);
     }
 
     /* ---- D2-26: the statutory notes format money the way money() does ---- */

@@ -1051,7 +1051,7 @@ module.exports = {
   'shell.legend.over': 'बजट से ज़्यादा',
   'shell.legend.income': 'आय',
   'shell.legend.budget': 'खर्च बजट',
-  'shell.tx.search': 'विवरण में खोजें…',
+  'shell.tx.search': 'विवरण या नोट में खोजें…',
   'shell.tx.wholeHistory': 'पूरा इतिहास',
   'shell.tx.export': 'निर्यात',
   'shell.tx.report': 'रिपोर्ट',

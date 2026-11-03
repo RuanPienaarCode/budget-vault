@@ -1052,7 +1052,7 @@ module.exports = {
   'shell.legend.over': 'Acima do orçamento',
   'shell.legend.income': 'Renda',
   'shell.legend.budget': 'Orçamento de gastos',
-  'shell.tx.search': 'Buscar na descrição…',
+  'shell.tx.search': 'Buscar na descrição ou nota…',
   'shell.tx.wholeHistory': 'todo o histórico',
   'shell.tx.export': 'Exportar',
   'shell.tx.report': 'Relatório',

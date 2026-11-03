@@ -1033,7 +1033,7 @@ module.exports = {
   'shell.legend.over': 'Über Budget',
   'shell.legend.income': 'Einnahmen',
   'shell.legend.budget': 'Ausgabenbudget',
-  'shell.tx.search': 'Beschreibung suchen…',
+  'shell.tx.search': 'Beschreibung oder Notiz suchen…',
   'shell.tx.wholeHistory': 'gesamte Historie',
   'shell.tx.export': 'Exportieren',
   'shell.tx.deleteFiltered': 'Diese Zeilen löschen',
