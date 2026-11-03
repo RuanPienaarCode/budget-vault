@@ -3,7 +3,7 @@
 All notable changes to Budget Vault. Versions match the plugin version in
 `manifest.json` and the release tag exactly (no `v` prefix).
 
-## Unreleased
+## 1.57.0 — 2026-11-04
 
 Accounts lead with the live balance, the Food page shows spend over time,
 the welcome screen and the Dashboard move, and a math audit fixes fifteen
