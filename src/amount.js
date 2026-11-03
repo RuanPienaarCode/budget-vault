@@ -98,10 +98,20 @@ function normalizeAmount(raw, opts) {
   // routine across statement exports, and only the trailing form used to be
   // read. Checked before the trailing form so a marker on ONE side of a bare
   // cell is consumed exactly once, from whichever side it's actually on.
+  /* A trailing marker is a WORD (2026-11-03 math audit). Unbounded, it read
+     the "DR" in a trailing "IDR" as debit and left "1.500.000 I", which parsed
+     as nothing. DB is the debit marker some banks print where others print DR;
+     read as a two-letter currency instead, "1,500,000.00 DB" came back
+     POSITIVE. The letter test is done by hand, not with a lookbehind, which
+     iOS WebKit before 16.4 cannot parse at all. The LEADING marker stays as it
+     was: "DrR100", a marker glued to the rand sign, must still read -100. */
   const leadMarker = s.match(/^(cr|dr)\.?\s*/i);
   if (leadMarker) { if (leadMarker[1].toLowerCase() === 'dr') neg = true; s = s.slice(leadMarker[0].length).trim(); }
-  const marker = s.match(/(cr|dr)\.?\s*$/i);
-  if (marker) { if (marker[1].toLowerCase() === 'dr') neg = true; s = s.slice(0, marker.index).trim(); }
+  const marker = s.match(/(cr|dr|db)\.?\s*$/i);
+  if (marker && !/[a-z]/i.test(s.charAt(marker.index - 1))) {
+    if (marker[1].toLowerCase() !== 'cr') neg = true;
+    s = s.slice(0, marker.index).trim();
+  }
   if (s.endsWith('-')) { neg = true; s = s.slice(0, -1).trim(); }
   /* Sign, symbol, sign - because banks write it both ways round. "-R100" puts
      the minus outside the symbol and "R-100" puts it inside, and a single pass

@@ -251,7 +251,12 @@ function reconcile(a, rows, today) {
   /* `since` travels with the verdict so the view can show WHICH rows moved the
      figure. Reporting a delta and then making the reader hunt for its cause is
      most of the work of reconciling left undone. */
-  return { state: 'drift', count: since.length, ahead: ahead.length, unreadable, sameDay, delta, implied: a.balance + delta, since };
+  /* In cents, like the clean test above (2026-11-03 math audit). A card stated
+     at -R500 and settled to the cent implied -2.27e-13, and three callers
+     testing `implied < 0` read that as R0,00 still owed, a card commitment and
+     an overdrawn account on the Debt tile. */
+  const cents = v => Math.round(v * 100) / 100 || 0;
+  return { state: 'drift', count: since.length, ahead: ahead.length, unreadable, sameDay, delta: cents(delta), implied: cents(a.balance + delta), since };
 }
 
 /* How many of a set of accounts are carrying an unconfirmed balance, and the

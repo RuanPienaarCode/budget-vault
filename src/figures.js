@@ -172,7 +172,14 @@ module.exports = function registerFigures(ctx) {
       /* `realSpend` rides along on an assume-spent row only: the Budget page
          says "no transaction expected" when it is 0, and the row's actual
          (the larger of plan and real) cannot tell 0 from "less than plan". */
-      rows.set(b.category, { budget: b.amount, type, actual: assumed ? assumedActual(b.amount, 0) : 0, notes: b.notes, assumed,
+      /* A category budgeted on two rows of the file is budgeted their SUM: the
+         totals (budgetTotalsOf) already add both, and overwriting printed the
+         last row's R1 000 and "R2 500 over" under a hero saying R500 left of
+         R4 000 (2026-11-03 math audit). Only a hand-edited file has two. */
+      const prior = rows.get(b.category);
+      const amount = (prior ? prior.budget : 0) + (Number(b.amount) || 0);
+      rows.set(b.category, { budget: amount, type, actual: assumed ? assumedActual(amount, 0) : 0,
+        notes: prior && prior.notes ? prior.notes : b.notes, assumed,
         ...(assumed ? { realSpend: 0 } : {}) });
     }
     for (const [cat, amt] of Object.entries(sum.byCat)) {

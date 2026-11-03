@@ -53,6 +53,29 @@ const median = arr => {
   return a.length % 2 ? a[m] : (a[m - 1] + a[m]) / 2;
 };
 
+/* ADR-0007 · Days of the month are a circle (ISSUE 74). A cluster inside half
+   the circle is an ordinary median; a wider spread is the circular median, the
+   day minimising the summed circular distance on a 31-day circle — charges on
+   the 31st, 1st, 1st and 31st are billed around the 1st, not the 16th. A tie
+   goes to the lower day; NaN days are dropped; 0 means "no day". Lived in
+   committed.js until the 2026-11-03 math audit found the cadence stepping
+   below needed it too: one definition of "the usual day", imported there. */
+const MONTH_CIRCLE = 31;
+const circularGap = (a, b) => { const x = Math.abs(a - b); return Math.min(x, MONTH_CIRCLE - x); };
+const roundedMedian = arr => Math.round(median(arr));
+function usualDay(days) {
+  const ds = (days || []).filter(d => Number.isFinite(d) && d >= 1 && d <= 31);
+  if (!ds.length) return 0;
+  const lo = Math.min(...ds), hi = Math.max(...ds);
+  if (hi - lo <= 15) return roundedMedian(ds);
+  let best = 0, bestCost = Infinity;
+  for (let d = 1; d <= MONTH_CIRCLE; d++) {
+    const cost = ds.reduce((t, x) => t + circularGap(x, d), 0);
+    if (cost < bestCost) { best = d; bestCost = cost; }
+  }
+  return best;
+}
+
 /* Statistics over one merchant's charges. Amounts are positive magnitudes. */
 function chargeStats(charges) {
   if (!charges || !charges.length) return null;
@@ -163,7 +186,14 @@ function chargeStats(charges) {
        values — so charges on the 10th and the 21st reported day 15.5, which the
        Services tooltip rendered verbatim as "Billed around day 15.5". The amount
        medians must stay unrounded; a date cannot be half a day. */
-    day: Math.round(median(days)),
+    day: usualDay(days),
+    /* The day the NEXT charge is stepped to — the usual day of the last three,
+       not the day the last one happened to land. A debit order on the 31st
+       taken on 28 February is due again on 31 March, not the 28th; a salary
+       paid early on Friday the 23rd because the 25th was a Sunday is due again
+       on the 25th. Stepping from the last date carried every weekend shift and
+       every short month forward into the prediction (2026-11-03 math audit). */
+    cycleDay: usualDay(days.slice(-3)),
     early, late,
     drift: (early && late) ? (late - early) / early : null,
   };
@@ -279,23 +309,12 @@ function nextExpected(stats, cycle) {
      string arithmetic on `last` and hands the result to a view that offers to
      write it into the user's file; "NaN-NaN-NaN" must never get that far. */
   if (!stats || !stats.last || !ISO_DATE.test(stats.last)) return null;
-  const step = STEP_DAYS[cycle];
-  if (step) { return isoFromDayNumber(isoDayNumber(stats.last) + step); }
-  if (cycle === 'annual') {
-    // Same clamp as the monthly branch below: "+1 year, same month/day" WOULD
-    // land on 2029-02-29 for a service last charged 2028-02-29, a date that
-    // does not exist — which is why the clamp is here. It returns 2029-02-28.
-    const [y, m, d] = stats.last.split('-').map(Number);
-    const ny = y + 1;
-    const lastDay = new Date(Date.UTC(ny, m, 0)).getUTCDate();
-    return `${ny}-${String(m).padStart(2, '0')}-${String(Math.min(d, lastDay)).padStart(2, '0')}`;
-  }
-  // Monthly: same day next month, clamped to a short month's last day so
-  // "the 31st" does not roll into the month after.
-  const [y, m, d] = stats.last.split('-').map(Number);
-  const ny = m === 12 ? y + 1 : y, nm = m === 12 ? 1 : m + 1;
-  const lastDay = new Date(Date.UTC(ny, nm, 0)).getUTCDate();
-  return `${ny}-${String(nm).padStart(2, '0')}-${String(Math.min(d, lastDay)).padStart(2, '0')}`;
+  /* One step of addCycles — the SAME arithmetic nextDue and committed.js walk,
+     so the hint, the Dashboard and this cannot disagree about a short month.
+     Monthly lands on the usual day (`cycleDay`, see chargeStats) when there is
+     one; annual keeps the last charge's own month and day, clamped so a
+     2028-02-29 charge comes back on 2029-02-28. */
+  return addCycles(stats.last, cycle, 1, stats.cycleDay);
 }
 
 /* Has this service stopped being charged?
@@ -434,18 +453,35 @@ function comparePriceNow(service, stats, charges) {
    in March instead of drifting to the 28th for good. n = 1 is nextExpected's
    own step, for every cycle (tests/services-next-billing-hint.test.cjs pins
    the agreement); the clamps are the same ones, for the same short months. */
-function addCycles(iso, cycle, n) {
+/* `usual` (monthly only) is the day of the month the charge normally lands
+   on; without one it is iso's own day, which is the old behaviour exactly.
+   It is used only when iso is a SHIFTED regular charge — within USUAL_DRIFT
+   days of the usual day round the month circle: a weekend moves a payday by
+   at most three days, and the 28th of February is three from the 31st. A last
+   charge further off than that is a different charge (a one-off add-on on the
+   28th of a service billed on the 5th), and stepping it to the usual day would
+   invent a month; it keeps its own day. The first cycle is the first month
+   whose day falls more than half a month after iso — so a charge pulled a few
+   days EARLY (the 23rd for the 25th) or across the month end (31 July for
+   1 August) still counts as that month's charge, and the next is the month
+   after. */
+const HALF_MONTH = 15;
+const USUAL_DRIFT = 4;
+function onDay(y, m0, d) {
+  const ny = y + Math.floor(m0 / 12), nm = ((m0 % 12) + 12) % 12 + 1;
+  const lastDay = new Date(Date.UTC(ny, nm, 0)).getUTCDate();
+  return `${ny}-${String(nm).padStart(2, '0')}-${String(Math.min(d, lastDay)).padStart(2, '0')}`;
+}
+function addCycles(iso, cycle, n, usual) {
   const step = STEP_DAYS[cycle];
   if (step) return isoFromDayNumber(isoDayNumber(iso) + step * n);
   const [y, m, d] = iso.split('-').map(Number);
-  let ny = y + n, nm = m;
-  if (cycle !== 'annual') {
-    const k = (m - 1) + n;
-    ny = y + Math.floor(k / 12);
-    nm = (k % 12) + 1;
-  }
-  const lastDay = new Date(Date.UTC(ny, nm, 0)).getUTCDate();
-  return `${ny}-${String(nm).padStart(2, '0')}-${String(Math.min(d, lastDay)).padStart(2, '0')}`;
+  if (cycle === 'annual') return onDay(y + n, m - 1, d);
+  const day = Number.isInteger(usual) && usual >= 1 && usual <= 31 && circularGap(d, usual) <= USUAL_DRIFT ? usual : d;
+  const from = isoDayNumber(iso);
+  let j = 0;
+  while (isoDayNumber(onDay(y, m - 1 + j, day)) - from <= HALF_MONTH) j++;
+  return onDay(y, m - 1 + j + n - 1, day);
 }
 
 /* The next billing date to OFFER the reader: the first cycle date, stepped
@@ -466,7 +502,7 @@ function nextDue(stats, cycle, today) {
   if (!first) return null;
   let date = first, skipped = 0;
   if (ISO_DATE.test(today || '')) {
-    while (date < today) { skipped++; date = addCycles(stats.last, cycle, skipped + 1); }
+    while (date < today) { skipped++; date = addCycles(stats.last, cycle, skipped + 1, stats.cycleDay); }
   }
   return { date, first, skipped, last: stats.last };
 }
@@ -543,22 +579,27 @@ function findRecurringCredit(rows, today) {
     if ((Math.max(...recent) - Math.min(...recent)) / amount > CREDIT_SPREAD) continue;
 
     const last = sorted[sorted.length - 1].date;
+    /* A salary that stopped is not a salary that is coming. Two whole cycles of
+       silence is the same generosity chargeStatus extends to a subscription, and
+       for the same reason: a bank can post late, and this must not go quiet on a
+       payment that is merely a few days behind.
+
+       Tested HERE, before the candidate can win. It used to run once, on the
+       winner: an old employer's larger salary (stopped in June) beat the current
+       smaller one, was then found stale, and the function returned null — so the
+       salary that IS coming was never found, and the Dashboard dropped both the
+       incoming pay and the card's settlement cycle (2026-11-03 math audit). */
+    if (ISO_DATE.test(today || '') && isoDayNumber(today) - isoDayNumber(last) > 62) continue;
+    const days = sorted.map(r => Number(r.date.slice(8, 10)));
     const cand = {
       desc, amount, count: sorted.length, last,
-      day: Math.round(median(sorted.map(r => Number(r.date.slice(8, 10))))),
-      next: nextExpected({ last }, 'monthly'),
+      day: usualDay(days),
+      next: nextExpected({ last, cycleDay: usualDay(days.slice(-3)) }, 'monthly'),
     };
     // The largest repeating credit wins: a household with a salary and a small
     // regular transfer wants the salary named, not the transfer.
     if (!best || cand.amount > best.amount) best = cand;
   }
-  if (!best) return null;
-
-  /* A salary that stopped is not a salary that is coming. Two whole cycles of
-     silence is the same generosity chargeStatus extends to a subscription, and
-     for the same reason: a bank can post late, and this must not go quiet on a
-     payment that is merely a few days behind. */
-  if (ISO_DATE.test(today || '') && isoDayNumber(today) - isoDayNumber(best.last) > 62) return null;
   return best;
 }
 
@@ -576,4 +617,7 @@ module.exports = {
      forward from its last charge with the SAME clamped month arithmetic the
      Services page's hint uses, rather than carrying a third copy of it. */
   addCycles,
+  /* 2026-11-03 math audit. The usual day and its circle, shared with
+     committed.js rather than kept as a second copy there. */
+  usualDay, circularGap, MONTH_CIRCLE,
 };

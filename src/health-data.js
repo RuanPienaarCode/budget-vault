@@ -56,7 +56,7 @@ module.exports = function registerHealthData(ctx) {
   const {
     S, periodSpend, periodSummary, budgetTotals, budgetUsed, accountIndex, ledger, tally, LENSES, catType, declaredCatType,
     periodsForMonths, shiftPeriod, periodRange, currentPeriod,
-    foreignLabels, periodFigures, periodWindowAsOf, txInRange, transfersIntoFunds,
+    foreignLabels, periodFigures, periodWindowAsOf, transfersIntoFunds, pairingRows,
   } = ctx;
 
   /* ADR-0007 · One measure of saved, assembled once. What crossed into the
@@ -80,11 +80,12 @@ module.exports = function registerHealthData(ctx) {
     for (const a of savers) {
       for (const L of ((idx.get(a) || {}).labels || [])) { saverLabels.set(L, a); }
     }
-    const rows = txInRange(window.start, window.stop).filter(t => !foreign.has(t.label));
+    const rows = pairingRows(window).filter(t => !foreign.has(t.label));
     /* 29 Sep 2026 (Ruan): "we don't save 30%": the rate is regular saving from
        normal income. The very assembly movedToFunds uses (period.js): transfers
-       in from the household's own accounts, nothing marked Excluded. */
-    return transfersIntoFunds(rows, saverLabels);
+       in from the household's own accounts, nothing marked Excluded. Rows from
+       a week before the window pair, but only what landed inside it counts. */
+    return transfersIntoFunds(rows, saverLabels, window.start);
   }
 
   function healthSnapshot() {

@@ -14,7 +14,7 @@
 
 const { ISO_DATE, isRealIsoDate, daysBetween: isoDaysBetween, isoDayNumber, isoFromDayNumber } = require('./dates');
 const { isPoolAccount, accountType } = require('./vocabulary');
-const { matchCharges, chargeStats, chargeStatus, addCycles, normDesc, findRecurringCredit, STEP_DAYS } = require('./recurring');
+const { matchCharges, chargeStats, chargeStatus, addCycles, normDesc, findRecurringCredit, STEP_DAYS, usualDay, circularGap } = require('./recurring');
 
 /* ADR-0007 · Whole-month placement window. An instalment with no known
    payment day is only claimed inside a window of 28 days or more. */
@@ -32,32 +32,9 @@ const isCreditCard = a => !!a && accountType(a) === 'credit_card';
 const isSettleCard = a => !!a && !!(a.settleMonthly ?? a.settle_monthly) && isCreditCard(a);
 
 const day = iso => Number(String(iso).slice(8, 10));
-const median = arr => {
-  if (!arr.length) return 0;
-  const a = [...arr].sort((x, y) => x - y);
-  const m = a.length >> 1;
-  return a.length % 2 ? a[m] : Math.round((a[m - 1] + a[m]) / 2);
-};
-/* ADR-0007 · Days of the month are a circle (ISSUE 74). A cluster inside half
-   the circle is an ordinary median; a wider spread is the circular median, the
-   day minimising the summed circular distance on a 31-day circle. The lift-by-31
-   rule this replaces was only right across the month END: payments on the 14th,
-   15th, 16th and one on the 30th gave the 7th, a week early (L2b-03). A tie goes
-   to the lower day; NaN days are dropped. */
-const MONTH_CIRCLE = 31;
-const circularGap = (a, b) => { const x = Math.abs(a - b); return Math.min(x, MONTH_CIRCLE - x); };
-const usualDay = days => {
-  const ds = days.filter(d => Number.isFinite(d) && d >= 1 && d <= 31);
-  if (!ds.length) return 0;
-  const lo = Math.min(...ds), hi = Math.max(...ds);
-  if (hi - lo <= 15) return median(ds);
-  let best = 0, bestCost = Infinity;
-  for (let d = 1; d <= MONTH_CIRCLE; d++) {
-    const cost = ds.reduce((t, x) => t + circularGap(x, d), 0);
-    if (cost < bestCost) { best = d; bestCost = cost; }
-  }
-  return best;
-};
+/* ADR-0007 · Days of the month are a circle (ISSUE 74): `usualDay` and
+   `circularGap` live in recurring.js now, beside the cadence stepping that
+   needs them too (2026-11-03 math audit), and are imported above. */
 
 /* The first date on or after `from` that falls on day-of-month `d`, clamped to
    a short month's last day so "the 31st" does not skip February entirely. */
@@ -240,7 +217,7 @@ function serviceCommitments({ services, rows, from, to, periodStart, accountOfRo
          period, so evidence of one is evidence there is nothing left to come. */
       if (charged.some(c => c.date >= periodStart)) continue;
       const { missed, upcoming } = placeCycle({
-        last: seen && seen.last, typed: typedNext, cycle: s.cycle, from, to, asOf,
+        last: seen && seen.last, usual: seen && seen.cycleDay, typed: typedNext, cycle: s.cycle, from, to, asOf,
         /* Silent for more than two cycles, counted to the day its account is
            known to: the row on the Services page already asks whether it was
            cancelled, and stepping it into a new period would answer that for
@@ -313,13 +290,13 @@ function heldItem({ name, detail, due, unit, n, payer, asOf }) {
    `upcoming` is the first date inside the window; at most one a period. A lapsed
    service yields neither. With no history the typed date is used, never stepped. */
 const MAX_CYCLES = 60;
-function placeCycle({ last, typed, cycle, from, to, asOf, lapsed }) {
+function placeCycle({ last, usual, typed, cycle, from, to, asOf, lapsed }) {
   const missed = [];
   let upcoming = null;
   if (last && ISO_DATE.test(last)) {
     if (lapsed) return { missed, upcoming };
     for (let k = 1; k <= MAX_CYCLES; k++) {
-      const due = addCycles(last, cycle, k);
+      const due = addCycles(last, cycle, k, usual);
       if (due > to) break;
       if (due >= from) { upcoming = due; break; }
       if (asOf && due > asOf) missed.push(due);
@@ -341,7 +318,7 @@ function placeCycle({ last, typed, cycle, from, to, asOf, lapsed }) {
    a debt already counts (rows matched, or its name/category) is left to it. */
 const ORDER_MONTHS = 3;
 const DAY_DRIFT = 4;
-const monthNumber = iso => Number(iso.slice(0, 4)) * 12 + Number(iso.slice(5, 7));
+const ORDER_GAP_MIN = 26, ORDER_GAP_MAX = 35;
 const fold = x => String(x || '').trim().toLowerCase();
 
 function debitOrderCommitments({ rows, services, debts, from, to, periodStart, accountOfRow }) {
@@ -402,8 +379,17 @@ function debitOrderCommitments({ rows, services, debts, from, to, periodStart, a
     if (list.length < ORDER_MONTHS) continue;
     list.sort((a, b) => a.date.localeCompare(b.date));
     const recent = list.slice(-ORDER_MONTHS);
-    const months = recent.map(r => monthNumber(r.date));
-    if (!months.every((m, i) => i === 0 || m === months[i - 1] + 1)) continue;
+    /* About a month apart, not in consecutive CALENDAR months. An order on the
+       1st that the bank collected on Friday 31 July (1 August was a Saturday)
+       read as July, September, October — "a month skipped" — and the order
+       vanished from "still committed" for three months, though the day check
+       below already accepts that one-day shift round the month end (2026-11-03
+       math audit). The 26-35 day band is findRecurringCredit's own. */
+    if (!recent.every((r, i) => {
+      if (i === 0) return true;
+      const gap = isoDaysBetween(recent[i - 1].date, r.date);
+      return gap >= ORDER_GAP_MIN && gap <= ORDER_GAP_MAX;
+    })) continue;
     const newest = recent[recent.length - 1];
     const newestDay = day(newest.date);
     if (recent.some(r => circularGap(day(r.date), newestDay) > DAY_DRIFT)) continue;
@@ -416,7 +402,7 @@ function debitOrderCommitments({ rows, services, debts, from, to, periodStart, a
     const asOf = knownTo(payer, from);
     const seen = chargeStats(list);
     const { missed, upcoming } = placeCycle({
-      last: newest.date, typed: null, cycle: 'monthly', from, to, asOf,
+      last: newest.date, usual: usualDay(recent.map(r => day(r.date))), typed: null, cycle: 'monthly', from, to, asOf,
       lapsed: chargeStatus(seen, 'monthly', asOf || from).state === 'overdue',
     });
     const name = category || String(newest.desc || '').trim();
