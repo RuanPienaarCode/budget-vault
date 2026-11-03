@@ -229,7 +229,10 @@ function totalReturn(account, rows, typeOf, opts) {
   if (hasBaseline) {
     basis = 'measured';
     baseline = a.starting_amount;
-    capitalIn = baseline + f.contributions - f.withdrawals;
+    /* In cents (2026-11-03 math audit): a fund emptied of exactly what was put
+       in summed to 9.09e-13 rather than 0, passed the `capitalIn > 0` gate the
+       return rests on, and printed a return of +9 389 829 301 206 940 %. */
+    capitalIn = Math.round((baseline + f.contributions - f.withdrawals) * 100) / 100 || 0;
     postedGrowth = f.growth;
   } else if (statedBasis) {
     basis = 'stated';
@@ -246,7 +249,7 @@ function totalReturn(account, rows, typeOf, opts) {
     };
   }
 
-  const growth = balance - capitalIn;
+  const growth = Math.round((balance - capitalIn) * 100) / 100 || 0;
 
   /* Growth that no row carries a date for. The chart cannot draw a curve
      through it — see growthSeries — and the card must not imply it arrived
@@ -495,6 +498,14 @@ function couldBeSameMovement(outIso, inIso) {
 function savedFromOutside(rows, saverLabels, catType, opts) {
   const ownLabels = opts && opts.ownLabels ? opts.ownLabels : null;
   const regular = !!(opts && opts.regular);
+  /* `opts.countFrom` (YYYY-MM-DD): rows before it are there to PAIR, not to
+     count. A transfer whose outflow left on the 21st — the last day of a
+     period — and landed in the fund on the 23rd had its legs in two windows,
+     so neither found its partner and the R2 000 was counted in no period
+     (2026-11-03 math audit). The caller hands rows from a little before the
+     window; an inflow dated before countFrom still claims its leg, so that leg
+     cannot be borrowed by a later one, but adds nothing. */
+  const countFrom = opts && typeof opts.countFrom === 'string' ? opts.countFrom : null;
   let savings = 0;
   const labels = saverLabels instanceof Map ? saverLabels : new Map(saverLabels || []);
   const householdRows = rows || [];
@@ -536,8 +547,18 @@ const inflows = [], outflows = [], ownOutflows = [];
     (r.amount > 0 ? inflows : outflows).push({ acct: a, row: r });
   }
 }
+/* With `countFrom`, the rows before it are there only to hold their own legs.
+   They are matched FIRST, and only against legs also dated before countFrom: a
+   pre-window inflow free to take any leg could claim a fund-to-fund move inside
+   the window (and its real partner was then counted again by a later inflow),
+   or, its real partner out of reach, take the next transfer's leg — counting one
+   saving in two periods or in none. Matched this way, the periods add up to the
+   count over their union (2026-11-03 review of the math audit). */
+const early = r => !!countFrom && r.date < countFrom;
+if (countFrom) { inflows.sort((x, y) => (early(y.row) ? 1 : 0) - (early(x.row) ? 1 : 0)); }
 const spent = new Set(), ownSpent = new Set();
 for (const { acct, row } of inflows) {
+  const reach = early(row) ? (o => early(o)) : () => true;
   /* ADR-0007 · Saving is what crossed into the pool from outside it — not
      gross inflow (1.23.0, +R1 250 a month) and not net of every outflow
      (1.23.1, a sinking fund read as dis-saving). Rows read directly. */
@@ -545,6 +566,7 @@ for (const { acct, row } of inflows) {
      equal and opposite, a DIFFERENT pool account, one cancel per outflow,
      couldBeAnInternalLeg and couldBeSameMovement (the 1 Aug / 28 Aug pram). */
   const j = outflows.findIndex((o, i) => !spent.has(i)
+    && reach(o.row)
     && o.acct !== acct
     && couldBeAnInternalLeg(o.row, row)
     && Math.abs(-o.row.amount - row.amount) < 0.005
@@ -559,7 +581,7 @@ for (const { acct, row } of inflows) {
        four days before as its leg, and the real same-day one was left over. */
     let k = -1, best = Infinity;
     ownOutflows.forEach((o, i) => {
-      if (ownSpent.has(i) || !couldBeAnInternalLeg(o, row)
+      if (ownSpent.has(i) || !reach(o) || !couldBeAnInternalLeg(o, row)
         || Math.abs(-o.amount - row.amount) >= 0.005 || !couldBeSameMovement(o.date, row.date)) { return; }
       const gap = Math.abs(daysBetween(o.date, row.date));
       if (gap < best) { best = gap; k = i; }
@@ -569,6 +591,7 @@ for (const { acct, row } of inflows) {
     if (regular && (row.excluded || ownOutflows[k].excluded)) { continue; }
   } else if (regular && row.excluded) { continue; }
 
+  if (countFrom && row.date < countFrom) { continue; }
   savings += row.amount;
 }
   return savings;

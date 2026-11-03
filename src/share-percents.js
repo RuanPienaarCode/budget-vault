@@ -92,4 +92,49 @@ function sharePercentLabel(share, decimalSep) {
   return String(whole);
 }
 
-module.exports = { sharePercents, largestRemainder, sharePercentLabel };
+/* Whole rands for non-negative parts that must sum to a whole-rand target.
+   Starts where largestRemainder starts (each part floored, then the leftover
+   rands to the biggest remainders first, ties to the earlier part), so where
+   largestRemainder can reach the target the result is identical. Unlike it,
+   the leftover may be negative or larger than the number of parts: the target
+   here is a printed figure derived elsewhere (the printed income less the
+   printed "Not yet spent"), which can sit a rand or two either side of the
+   parts' own sum. A part that is nothing is never given a rand (a band of R 0
+   must not print R 1), and no part is taken below zero. Pure.
+
+   Moved here from money-flow.js by the 2026-11-03 math audit, beside
+   largestRemainder, because the Score popup needed it too: its parts are
+   at * shownMax, and shownMax is itself rounded, so two full pillars print
+   27 + 27 = 54 beside a headline of round(53.33) = 53 — Σvalues > target,
+   largestRemainder's documented precondition broken by the caller. */
+function allocateWhole(values, target, caps) {
+  const out = values.map(v => Math.floor(v));
+  let left = Math.round(target) - out.reduce((s, v) => s + v, 0);
+  const live = values.map((v, i) => i).filter(i => values[i] > 0.005);
+  /* `caps` (optional): no part is given a point past its own cap. The Score
+     popup needs it — a full pillar's points may not pass its printed maximum
+     ("spending 27 of 26, lost -1"). When every live part is at its cap, the
+     point goes to a part that still has room, live or not: the parts must
+     still add up to the target, and a target the caps cannot hold is not one
+     a caller may pass. */
+  const room = i => !caps || out[i] < caps[i];
+  while (left !== 0) {
+    const step = left > 0 ? 1 : -1;
+    let best = -1;
+    let pool = step > 0 ? live.filter(room) : live;
+    if (step > 0 && caps && !pool.length) { pool = values.map((v, i) => i).filter(room); }
+    for (const i of pool) {
+      if (out[i] + step < 0) { continue; }
+      /* How far the printed part sits below its truth: give to the most
+         short-changed, take from the most over-paid. Strict comparison, so a
+         tie goes to the earlier part, as largestRemainder breaks it. */
+      if (best < 0 || step * (values[i] - out[i]) > step * (values[best] - out[best])) { best = i; }
+    }
+    if (best < 0) { break; }
+    out[best] += step;
+    left -= step;
+  }
+  return out;
+}
+
+module.exports = { sharePercents, largestRemainder, allocateWhole, sharePercentLabel };

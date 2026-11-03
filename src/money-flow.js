@@ -14,7 +14,7 @@
 const { activeDebts } = require('./worth');
 const { monthlyInterest } = require('./debt-math');
 const { isForeign } = require('./currency');
-const { largestRemainder } = require('./share-percents');
+const { largestRemainder, allocateWhole } = require('./share-percents');
 const { isSetAsideType } = require('./vocabulary');
 const { PILLARS } = require('./health-math');
 
@@ -340,6 +340,15 @@ function periodFlow({
         displayBands = [...spentBands, printedRest];
       }
     }
+  } else if (inc > 0) {
+    /* Spent past income: the three spent bands are allocated to the rounded
+       spend they sum to, not rounded one by one. Rounded alone, 50,35 + 50,35
+       printed 50 + 50 under an income of R101 with no Overspent row, so the
+       bands came to a rand LESS than the income they overran (2026-11-03 math
+       audit). Since spend > income, the rounded spend is never below the
+       rounded income, and the Overspent row below is exactly their gap. */
+    const spentRaw = bandAmounts[0] + bandAmounts[1] + bandAmounts[2];
+    displayBands = [...allocateWhole(bandAmounts.slice(0, 3), roundRand(spentRaw)), roundRand(bandAmounts[3])];
   } else {
     displayBands = bandAmounts.map(roundRand);
   }
@@ -371,36 +380,6 @@ function periodFlow({
     budget: { budgeted: bud + setAside, budgetSpend: bud, setAside, spentTotal: spent, spent: spentByRule, allocatedOfIncome, budgetUsed },
     lefts: { leftInBudget, setAsideToMove, neverBudgeted, incomeToCome, together, alreadySpent, display: displayLefts },
   };
-}
-
-/* Whole rands for non-negative parts that must sum to a whole-rand target.
-   Starts where largestRemainder starts (each part floored, then the leftover
-   rands to the biggest remainders first, ties to the earlier part), so where
-   largestRemainder can reach the target the result is identical. Unlike it,
-   the leftover may be negative or larger than the number of parts: the target
-   here is a printed figure derived elsewhere (the printed income less the
-   printed "Not yet spent"), which can sit a rand or two either side of the
-   parts' own sum. A part that is nothing is never given a rand (a band of R 0
-   must not print R 1), and no part is taken below zero. Pure. */
-function allocateWhole(values, target) {
-  const out = values.map(v => Math.floor(v));
-  let left = Math.round(target) - out.reduce((s, v) => s + v, 0);
-  const live = values.map((v, i) => i).filter(i => values[i] > 0.005);
-  while (left !== 0) {
-    const step = left > 0 ? 1 : -1;
-    let best = -1;
-    for (const i of live) {
-      if (out[i] + step < 0) { continue; }
-      /* How far the printed part sits below its truth: give to the most
-         short-changed, take from the most over-paid. Strict comparison, so a
-         tie goes to the earlier part, as largestRemainder breaks it. */
-      if (best < 0 || step * (values[i] - out[i]) > step * (values[best] - out[best])) { best = i; }
-    }
-    if (best < 0) { break; }
-    out[best] += step;
-    left -= step;
-  }
-  return out;
 }
 
 /* ADR-0007 · Rail segments: PILLARS' weight order, width = shownMax, fill =

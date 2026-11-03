@@ -20,7 +20,17 @@ const { daysSince } = require('./reconcile');
 const { isForeign, symbolOf } = require('./currency');
 
 function outstandingOf(o) {
-  return Math.max(0, (o.amount || 0) - (o.repaid || 0));
+  return Math.max(0, (o.amount || 0) - repaidOf(o));
+}
+
+/* What has come back on this entry, floored at zero like `amount`. A typed
+   -500 (or an accounting "(500)", which amount.js reads as -500) in the Repaid
+   column is a typo, not money going the other way: read raw, it added R500 to
+   what is still owed — more than was ever lent — and took R500 off Recovered,
+   which then printed negative. The Record repayment dialog already refuses
+   anything at or below zero; only a hand-edited file can reach this. */
+function repaidOf(o) {
+  return Math.max(0, o.repaid || 0);
 }
 
 /* Settled is something the arithmetic can CONCLUDE — the page used to offer
@@ -130,7 +140,7 @@ function owedSummary(owed, today, household) {
           + (o.repaid > 0 ? Math.min(o.repaid, amt) : amt));
       } else {
         others.set(sym, (others.get(sym) || 0) + Math.max(0, outstandingOf(o)));
-        const back = Math.min(o.repaid || 0, amt);
+        const back = Math.min(repaidOf(o), amt);
         if (back > 0) { backOthers.set(sym, (backOthers.get(sym) || 0) + back); }
       }
       continue;
@@ -151,7 +161,7 @@ function owedSummary(owed, today, household) {
     }
     // `open` and the age were counted above, for every currency at once.
     outstanding += outstandingOf(o);
-    recovered += Math.min(o.repaid || 0, amt);
+    recovered += Math.min(repaidOf(o), amt);
   }
   return {
     outstanding, recovered, open, entries: list.length, oldestDays,

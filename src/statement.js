@@ -75,7 +75,30 @@ function isoParts(y, mo, d) {
    apart from constants.js's MONTHS, which is the reverse — an array of short
    names for DISPLAY. Two things called MONTHS with opposite directions is a
    trap for whoever next reaches for one from the wrong import. */
-const MONTH_NUM = { jan: 1, feb: 2, mar: 3, apr: 4, may: 5, jun: 6, jul: 7, aug: 8, sep: 9, oct: 10, nov: 11, dec: 12 };
+/* Not English only (2026-11-03 math audit): the app ships Afrikaans, German,
+   Indonesian, Spanish, French and Portuguese, and their statements print
+   "22 Okt 2026", "22 Mei 2026", "22 Mär 2026", "22 déc. 2026" — every row in
+   those months was skipped as unparseable while Jan, Feb and Jun read fine.
+   Looked up on the whole word first, then its first four and three letters,
+   so French "juin"/"juil" stay apart where "jui" alone could not. No key
+   means two months anywhere in this table. */
+const MONTH_NUM = {
+  jan: 1, feb: 2, mar: 3, apr: 4, may: 5, jun: 6, jul: 7, aug: 8, sep: 9, oct: 10, nov: 11, dec: 12,
+  // af
+  mrt: 3, maa: 3, mei: 5, okt: 10, des: 12,
+  // de
+  'mär': 3, mrz: 3, mai: 5, dez: 12,
+  // id
+  agu: 8, agt: 8,
+  // es / pt
+  ene: 1, abr: 4, ago: 8, dic: 12, fev: 2, set: 9, out: 10,
+  // fr
+  'fév': 2, avr: 4, juin: 6, juil: 7, 'aoû': 8, 'déc': 12,
+};
+const monthNum = word => {
+  const w = word.toLowerCase();
+  return MONTH_NUM[w] || MONTH_NUM[w.slice(0, 4)] || MONTH_NUM[w.slice(0, 3)] || null;
+};
 /* dayFirst picks the reading of ambiguous XX/YY/YYYY dates: true → DD/MM
    (SA, UK, AU, EU), false → MM/DD (US, CA). Unambiguous values (13+ in the
    month slot) are corrected either way. */
@@ -102,9 +125,9 @@ function parseStatementDate(raw, dayFirst = true) {
   if (m) return isoParts(+m[1], +m[2], +m[3]);
   // DD Mon YYYY, separated ("24 Jul 2021") or run together ("24Jul2021" — how
   // Nedbank's cheque-account export writes every date).
-  m = s.match(/^(\d{1,2})[ -]?([A-Za-z]{3,})[ -]?(\d{4})$/);
+  m = s.match(/^(\d{1,2})[ -]?(\p{L}{3,})\.?[ -]?(\d{4})$/u);
   if (m) {
-    const mo = MONTH_NUM[m[2].slice(0, 3).toLowerCase()];
+    const mo = monthNum(m[2]);
     if (mo) return isoParts(+m[3], mo, +m[1]);
   }
   /* No last-resort `new Date(s)`. It used to sit here and it was the one path

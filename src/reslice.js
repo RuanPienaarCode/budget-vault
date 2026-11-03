@@ -34,6 +34,13 @@ const { roundCents: sharedRoundCents } = require('./amount');
    two files a month apart on a 14-day cycle reads as 28 — which is why the
    caller must be able to say "unknown" rather than guess: one file gives no gap
    at all, and that is the common case for someone who switched immediately. */
+/* Gaps shorter than the shortest cycle a vault can have are not cycles at all:
+   they are the payday MOVING. A 14-day cycle re-anchored from Friday 2 October
+   to Sunday 4 October leaves files two days apart, and the smallest-gap rule
+   read that as a 2-day old cycle and scaled rent by 7 (R5 000 → R35 000)
+   (2026-11-03 math audit). dates.js refuses a period under 7 days for the same
+   reason. */
+const MIN_CYCLE_DAYS = 7;
 function inferIntervalFromKeys(keys) {
   const days = (keys || [])
     .filter(k => typeof k === 'string' && ISO_DATE.test(k))
@@ -42,7 +49,7 @@ function inferIntervalFromKeys(keys) {
   let best = null;
   for (let i = 1; i < days.length; i++) {
     const gap = days[i] - days[i - 1];
-    if (gap > 0 && (best === null || gap < best)) best = gap;
+    if (gap >= MIN_CYCLE_DAYS && (best === null || gap < best)) best = gap;
   }
   return best;
 }

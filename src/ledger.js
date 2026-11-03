@@ -28,6 +28,7 @@
    hands to stamp() is the only way household facts reach it. */
 
 const { isSetAsideType } = require('./vocabulary');
+const { roundCents } = require('./amount');
 const { splitRole, SPLIT_PARENT, SPLIT_PART } = require('./tx-role');
 
 /* ------------------------------------------------------------------------
@@ -270,6 +271,18 @@ function tally(stamped, lens) {
   /* A plain object, as periodSpend's `whole` always was — tests and the trend
      chart compare it structurally. `byCat` above stays null-prototyped, as
      summaryInRange's did, for the category-named-"constructor" case. */
+  /* Every money figure leaves here in whole cents (2026-11-03 math audit).
+     They are float sums of cent values, and IEEE 754 leaves a hair either side:
+     762,37 + 398,97 + 9,66 is 1171.0000000000002, which read as "over" a
+     R1 171 budget and printed "R 0,00 over" in red; a category refunded in
+     full netted 2.27e-13 and showed as unbudgeted spend with a R0,00 donut
+     slice. Rounded once at the source, every `>`, `<` and `=== 0` downstream
+     compares money, not noise. amount.js's roundCents, the rounding the exports
+     and the report already use, so a half-cent row rounds the same way here as
+     there; `|| 0` folds a -0. */
+  const cents = v => roundCents(v) || 0;
+  for (const k of Object.keys(byCat)) byCat[k] = cents(byCat[k]);
+  for (const k of Object.keys(grossOutByCat)) grossOutByCat[k] = cents(grossOutByCat[k]);
   const spendByCat = {};
   const blankIsSpend = lens.uncategorised === 'spend';
   let consumption = 0, fixed = 0, netIncome = 0;
@@ -283,12 +296,14 @@ function tally(stamped, lens) {
   }
   return {
     lens: lens.name, count, kept,
-    income, spend, net, setAside, byCat, grossOutByCat, inflow, outflow,
-    refunds: Math.round(refunds * 100) / 100,
-    uncategorised, uncatSpend, uncatIncome, unknown,
+    income: cents(income), spend: cents(spend), net: cents(net), setAside: cents(setAside),
+    byCat, grossOutByCat, inflow: cents(inflow), outflow: cents(outflow),
+    refunds: cents(refunds),
+    uncategorised, uncatSpend: cents(uncatSpend), uncatIncome: cents(uncatIncome),
+    unknown: { ...unknown, spend: cents(unknown.spend), income: cents(unknown.income) },
     foreign: { count: foreignHere.size, labels: [...foreignHere.keys()], symbols: [...new Set(foreignHere.values())] },
     fundedFromSavings,
-    spendByCat, consumption, fixed, netIncome,
+    spendByCat, consumption: cents(consumption), fixed: cents(fixed), netIncome: cents(netIncome),
   };
 }
 

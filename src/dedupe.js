@@ -63,6 +63,13 @@ const MIN_PREFIX = 8;
    matches on the merchant stem underneath — only the verb itself stops
    counting as evidence. */
 const VERB_PREFIXES = [
+  /* South African banks' own boilerplate (2026-11-03 math audit): without
+     these, "FNB App Payment To Alice" and "…To Bob" shared 20 characters of
+     verb and nothing else, cleared the 8-character bar, and a R500 to Dad was
+     unticked as a near-copy of a R500 to Mom from the previous export. */
+  'FNB APP PAYMENT TO', 'BANKING APP PAYMENT TO', 'BANKING APP PAYMENT', 'APP PAYMENT TO',
+  'RECURRING CARD PURCHASE', 'IMMEDIATE TRF TO', 'IMMEDIATE TRANSFER TO',
+  'DEBIT ORDER', 'PREPAID AIRTIME', 'PREPAID ELECTRICITY', 'PREPAID DATA',
   'INTERNET PAYMENT TO', 'IMMEDIATE PAYMENT TO', 'EFT PAYMENT TO',
   'PAYSHAP PAYMENT TO', 'PAYSHAP TO', 'PAYMENT TO',
   'CARD PURCHASE', 'POS PURCHASE', 'INTERNET PURCHASE', 'ONLINE PURCHASE',
