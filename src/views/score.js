@@ -16,12 +16,13 @@
 
 const { el, icoEl } = require('../dom');
 const i18n = require('../i18n');
-const { scoreBand, SCORE_BANDS, FULL_MARKS, PILLARS } = require('../health-math');
+const { scoreBand, SCORE_BANDS, PILLARS } = require('../health-math');
 const { periodFlow, railSegments } = require('../money-flow');
 const { sharePercentLabel } = require('../share-percents');
 const { formatSigned, otherHoldings } = require('../currency');
 const { otherCurrencyNet, worth } = require('../worth');
 const { decimalText } = require('../locale');
+const { yearsNumber: yearsNumberOf, gapSentence } = require('../health-copy');
 
 /* A pillar counts as "going well" a little below the top. Demanding 100% would
    put a household at 97% of its target in the same list as one at 4%, which is
@@ -41,16 +42,9 @@ module.exports = function registerScore(ctx) {
      "2.1" for the same number (audit L2a-N09). The shared locale.js helper
      since 2026-10-20, so "-0,0" cannot outlive its rounding here either. */
   const decimalNumber = (v, places) => decimalText(v, places, locale());
-  /* Years of income, to one place like the months of cover beside it (two
-     places sat beside one, "2,40 years" by "3,9 months": 2026-10-20 audit D1-15). One place must not
-     round a household UP onto the target it has not reached: 2,96 years printed
-     "3,0 years" beside a gap saying "to reach 3 years". Short of the target, a
-     reading that would land on it is cut to the place below instead. */
-  const yearsNumber = v => {
-    const target = FULL_MARKS.netWorthMultiple;
-    return v < target && Math.round(v * 10) / 10 >= target
-      ? decimalNumber(Math.floor(v * 10) / 10, 1) : decimalNumber(v, 1);
-  };
+  /* Years of income, to one place — the rule lives in health-copy.js, shared
+     with the Dashboard's Financial health card. */
+  const yearsNumber = v => yearsNumberOf(v, locale());
 
   function renderScore() {
     const hero = $('#scoreHero');
@@ -574,20 +568,10 @@ module.exports = function registerScore(ctx) {
       /* The concrete step, when there is a figure for it. scoreBreakdown works
          out the gap; this only chooses the sentence. */
       if (p.gap) {
-        const g = p.gap;
-        const amount = money(g.amount, 0);
-        /* Each sentence names the income its figure was measured against
-           (2026-10-20 audit, M1-05/M1-06): the saving and net-worth gaps are
-           shares of BUDGET income, the trim is all spending — fixed bills
-           included, since that is what health-math.js's consumption measure
-           holds — against HOUSEHOLD income. "Day-to-day living" named the flow
-           card's Living costs band, which leaves fixed bills out. */
-        row.append(el('p', { class: 'score-gap-do' },
-          g.kind === 'fund' ? i18n.t('dash.health.why.fixFund', { amount, target })
-            : g.kind === 'monthly' ? i18n.t('score.gap.fixMonthly', { amount, pct: Math.round(FULL_MARKS.savingsRate * 100) })
-              : g.kind === 'interest' ? i18n.t('dash.health.why.fixInterest', { amount })
-                : g.kind === 'trim' ? i18n.t('score.gap.fixTrim', { amount, pct: Math.round(FULL_MARKS.consumptionFloor * 100) })
-                  : i18n.t('score.gap.fixBuild', { amount, times: FULL_MARKS.netWorthMultiple })));
+        /* The sentence itself is chosen in health-copy.js, shared with the
+           Dashboard card's "most points lost" line. It names the income each
+           figure was measured against (2026-10-20 audit, M1-05/M1-06). */
+        row.append(el('p', { class: 'score-gap-do' }, gapSentence(p.gap, { money, target })));
       }
 
       /* And the part a figure cannot give: how anyone actually does this.

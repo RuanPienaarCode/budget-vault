@@ -82,6 +82,7 @@ const HOST_SIDE = new Map([
   ['i18n.js',                'reads window/navigator for the locale'],
   ['owners.js',              'requires i18n.js for its labels'],
   ['report.js',              'requires i18n.js for its labels'],
+  ['health-copy.js',         'requires i18n.js for the sentences the Score page and the Dashboard share'],
   ['figures.js',             'requires owners.js, so i18n.js'],
   ['budget-export.js',       'requires report.js, so i18n.js'],
 ]);

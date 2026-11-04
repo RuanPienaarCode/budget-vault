@@ -8,7 +8,9 @@ const { typeOrder, typeRank } = require('../groups');
 const i18n = require('../i18n');
 const { stalenessSummary, isStale } = require('../reconcile');
 const { whatsLeft, isSettleCard } = require('../committed');
-const { scoreBand } = require('../health-math');
+const { scoreBand, pillarRows, scoreScale } = require('../health-math');
+const { gapSentence, yearsNumber } = require('../health-copy');
+const { decimalText } = require('../locale');
 const { todayIso, isRealIsoDate } = require('../dates');
 const { balanceReadable, printedRemainder, printedParts, usedToneClass } = require('../figures');
 const { worth, cardOverlap, otherCurrencyNet } = require('../worth');
@@ -187,184 +189,209 @@ module.exports = function registerDashboard(ctx) {
         : i18n.t('dash.health.subNone');
     }
 
-    /* A tile with a `to` becomes a real <button> that routes there. These
-       four figures are summaries of pages that argue them in full, and a
-       reader who wants more from one of them wants that page — not a popup
-       restating it on the page they are already on. No aria-label: the
-       button's own text ("58 financial score steady") already reads as the
-       thing being activated, and a label would talk over it. */
-    const fig = (cls, value, label, meta, to) => {
-      const kids = [
+    /* The score slab is a real <button> that routes to the Score page: a
+       summary of a page that argues the number in full, and a reader who wants
+       more wants that page, not a popup restating it where they already are.
+       No aria-label: the button's own text ("70 financial score steady") already
+       reads as the thing being activated, and a label would talk over it. */
+    const slab = (cls, value, label, meta, extra) => el('div', { class: `health-fig ${cls} is-link` },
+      el('button', { type: 'button', class: 'health-fig-btn', onclick: () => ctx.switchView('score') },
         el('div', { class: 'lv num' }, value),
         el('div', { class: 'll' }, label),
-        meta ? el('div', { class: 'lm' }, meta) : ''];
-      return to
-        ? el('div', { class: `health-fig ${cls} is-link` },
-          el('button', { type: 'button', class: 'health-fig-btn', onclick: () => ctx.switchView(to) }, ...kids))
-        : el('div', { class: `health-fig ${cls}` }, ...kids);
-    };
-    /* sharePercentLabel, not a bare Math.round — ISSUE 37. The debt tile's own
-       meta line prints the rand figure this share is OF ("R 148 a month"), so a
-       share that rounds to "0%" puts two opposite claims on one tile. The same
+        meta ? el('div', { class: 'lm' }, meta) : '',
+        extra || ''));
+    /* sharePercentLabel, not a bare Math.round — ISSUE 37. The debt row's own
+       fact prints the rand figure this share is OF ("R 148 a month"), so a
+       share that rounds to "0%" puts two opposite claims on one line. The same
        helper the budget tiles below already use for the 100% boundary. */
     const pct = r => `${sharePercentLabel(r, locale().decimal)}%`;
-
-    /* Emergency cover. The meter fills toward the target and re-tones at the
-       halfway mark — under half a fund is a different fact from nearly-there,
-       and colour is how this dashboard says so elsewhere (hero, cat-bars). */
-    /* The unit rides WITH the figure rather than only in the label below it.
-       "3.9" alone is the one tile whose number means nothing on sight — the
-       other three are a percentage or a score, which read as themselves — so a
-       reader meeting the card for the first time had to look down a line to
-       learn what 3.9 counted. Set smaller and lighter, the way the hero already
-       carries its currency symbol. */
-    /* Audit finding #4: with debt and score both routing and emergency/saving
-       not, a grid of four tiles read as two buttons and two dead ends —
-       inconsistent enough to look broken rather than intentional. Emergency
-       cover is set and tracked on the Accounts page (`emergency_fund:` on an
-       account's frontmatter, health-math.js's own comment on resolveEarmarks);
-       the saving rate is read off contributions into savings/investment
-       accounts, which is also where a household actually goes to act on it —
-       see score.js's own GAP_DESTS, which sends its `saving` gap to the same
-       page for the same reason. */
-    const emergency = H.months !== null
-      ? fig(H.months >= target ? 'is-good' : H.months >= target / 2 ? 'is-fair' : 'is-poor',
-        /* A REAL space, not only the margin below it: the tile's accessible
-           name is its text content, and "3.9months" is what a screen reader
-           would have said.
-
-           The separator between the whole and fractional digit comes from
-           the country profile (locale().decimal), not from toFixed()'s own
-           output — toFixed(1) always writes a literal '.', which is correct
-           for en-US but wrong for the default za profile (","), and every
-           OTHER number on this card is money, run through money() which
-           already makes this same substitution. Left as toFixed()'s raw
-           string, this was the one figure on the card reading "3.9" beside
-           "R 1 234,50" and "13%". */
-        [H.months.toFixed(1).replace('.', locale().decimal), ' ', el('small', {}, i18n.t('dash.health.monthsUnit'))],
-        i18n.t('dash.health.months'),
-        i18n.t('dash.health.monthsMeta', { count: target, amount: money(earmarks.total, 0) }), 'accounts')
-      /* `months` (health-math.js) goes null in two different situations that
-         `needHistory` used to say the same thing about: no counted trailing
-         period at all (H.countedPeriods === 0 — genuinely no income history
-         yet, needHistory is right), OR six real periods counted with essential
-         spend of EXACTLY ZERO in every one of them (H.monthlyEssential === 0 —
-         every category this household spent from is typed something other than
-         essential). The second case is not a history problem; more months would
-         not fix it. Distinguished on H.countedPeriods rather than re-deriving
-         "was every period essential-free" here, because health-math.js already
-         computed and named that condition once (avg.essential === 0). */
-      : fig('', '—', i18n.t('dash.health.months'),
-        !earmarks.any ? i18n.t('dash.health.setup')
-          : H.countedPeriods > 0 && H.monthlyEssential === 0 ? i18n.t('dash.health.noEssential')
-            : i18n.t('dash.health.needHistory'), 'accounts');
-    if (H.months !== null) {
-      const fill = Math.min(100, (H.months / target) * 100);
-      /* The same bar component the budget table fills, and the same three
-         tones: emerald at the target, amber past halfway, red below it. */
-      const tone = H.months >= target ? '' : H.months >= target / 2 ? ' bg-warning' : ' bg-danger';
-      /* What the bar is a picture OF: the money set aside against the money the
-         goal actually asks for. The tile above says the goal in months, which
-         is the unit to plan in, but not what it costs — and the bar's own
-         fullness is the one place that figure belongs.
-
-         A native `title` rather than a styled tooltip, per the rule in
-         views/savings.js: it works under a touch-and-hold on a phone and is
-         read by a screen reader, which a CSS-only tooltip is not. So the bar
-         stops being decorative — it now carries the only copy of this figure,
-         and `aria-hidden` would hide exactly that. role="img" plus the same
-         text as its label is what createChart already does for a chart. */
-      const goalAmount = target * H.monthlyEssential;
-      const meterTip = i18n.t('dash.health.meterTip', {
-        count: target,
-        earmarked: money(earmarks.total, 0),
-        goal: money(goalAmount, 0),
-      });
-      const meterEl = el('div', {
-        class: 'cat-bar health-meter', role: 'img', title: meterTip, 'aria-label': meterTip,
-      }, el('i', { class: `cat-bar-fill${tone}`, style: `width:${fill.toFixed(1)}%` }));
-      emergency.append(meterEl);
-      decorate(() => motion.bar(meterEl, {
-        key: 'health-meter', value: fill, stops: [fill],
-        tones: [tone === '' ? 'good' : tone === ' bg-warning' ? 'fair' : 'poor'], times: [1000],
-      }));
-    }
-    /* The over-claim, argued rather than corrected: the figure above already
-       capped at what the account holds, so the claim itself must stay visible
-       or the reader has no way to know their instruction was not followed. */
-    if (earmarks.over.length) {
-      emergency.append(el('div', { class: 'lm text-danger' },
-        i18n.t('dash.health.over', { name: earmarks.over[0].name })));
-    }
+    const decimalNumber = (v, places) => decimalText(v, places, locale());
 
     /* A window where more came out of savings than went in is a real thing to
        report, but not as a negative SHARE — "-19% of income saved" cannot be
-       true of anybody. The tile shows 0% (nothing was saved, which is the
-       honest reading) and the sub-line says which way the money actually went.
-       Same rule as the Score page's own saving line; see its comment. */
+       true of anybody. Said the way round it happened. Same rule as the Score
+       page's own saving line; see its comment. */
     const drawingDown = H.savingsRate !== null && H.monthlySavings < 0;
-    const savingsTile = H.savingsRate !== null
-      ? fig(drawingDown ? 'is-poor'
-        : H.savingsRate >= 0.2 ? 'is-good' : H.savingsRate >= 0.1 ? 'is-fair' : 'is-poor',
-      pct(drawingDown ? 0 : H.savingsRate),
-      i18n.t('dash.health.savings'),
-      drawingDown
-        ? i18n.t('dash.health.savingDown', { amount: money(Math.abs(H.monthlySavings), 0) })
-        : i18n.t('dash.health.perMonth', { amount: money(H.monthlySavings, 0) }), 'savings')
-      : fig('', '—', i18n.t('dash.health.savings'), i18n.t('dash.health.needHistory'), 'savings');
 
-    /* Zero interest with an income to measure against is a fact worth its own
-       word — "debt-free" reads as an achievement where "0%" reads as a rounding
-       error. The share being null (no income history) still shows the monthly
-       cost when there is one: the rand figure is real even when the ratio
-       cannot be. */
-    /* "Debt-free" is a claim about the household; "none recorded" is a claim
-       about the vault. Saying the first when only the second is known is the
-       one place this tile could mislead, and it costs a word to be right. */
-    /* A THIRD state sits between those two: debts are recorded but not one of
-       them states a rate, so what they cost is unknown rather than nothing.
-       Without this branch a null interest fell straight through to "debt-free"
-       and the tile congratulated a household carrying R250 000. */
+    /* Debt's second half. Zero interest with an income to measure against is a
+       fact worth its own word — "debt-free" reads as an achievement where "0%"
+       reads as a rounding error — but "debt-free" is a claim about the
+       household and "none recorded" a claim about the vault; saying the first
+       when only the second is known is the one place this line could mislead.
+       A THIRD state sits between them: debts are recorded but not one states a
+       rate, so what they cost is unknown rather than nothing, and a null
+       interest must not fall through to "debt-free" on a household carrying
+       R250 000. */
     const debtMeta = debtInterest > 0 ? i18n.t('dash.health.perMonth', { amount: money(debtInterest, 0) })
       : debtInterest === null ? i18n.t('dash.health.debtNoRate')
         : snap.debtsRecorded ? i18n.t('dash.health.debtFree')
           : i18n.t('dash.health.debtNone');
-    const debtTile = H.interestShare !== null
-      ? fig(H.interestShare <= 0 ? 'is-good' : H.interestShare < 0.05 ? 'is-fair' : 'is-poor',
-        pct(H.interestShare),
-        i18n.t('dash.health.debt'),
-        debtMeta, 'debts') : fig('', '—', i18n.t('dash.health.debt'), debtMeta, 'debts');
+
+    /* The muted line under each pillar's name: the figures the four old tiles
+       carried (cover, saving rate, interest share), plus the two the card never
+       showed (spending, net worth), worded as the Score page words them. Driven
+       by the METRICS, not by whether the pillar is in the breakdown: a vault can
+       have a real cover figure and still too little else to score, and the row
+       should say what it can. Where the figure is null the line says why. */
+    const factFor = key => {
+      if (key === 'reserves') {
+        if (H.months !== null) {
+          /* The separator between the whole and fractional digit comes from
+             the country profile (decimalText), not from toFixed(): toFixed(1)
+             always writes a literal '.', right for en-US and wrong for the
+             default za profile (","), and every OTHER number here is money. */
+          return i18n.t('dash.health.fact.reserves', {
+            count: target, months: decimalNumber(H.months, 1), amount: money(earmarks.total, 0),
+          });
+        }
+        /* `months` goes null in two different situations that needHistory used
+           to say the same thing about: no counted trailing period at all
+           (genuinely no income history yet), or counted periods with essential
+           spend of EXACTLY ZERO in every one (every category typed something
+           other than essential) — not a history problem; more months would not
+           fix it. Told apart on H.countedPeriods rather than re-derived. */
+        return !earmarks.any ? i18n.t('dash.health.setup')
+          : H.countedPeriods > 0 && H.monthlyEssential === 0 ? i18n.t('dash.health.noEssential')
+            : i18n.t('dash.health.needHistory');
+      }
+      if (key === 'saving') {
+        if (H.savingsRate === null) { return i18n.t('dash.health.needHistory'); }
+        return drawingDown
+          ? i18n.t('dash.health.savingDown', { amount: money(Math.abs(H.monthlySavings), 0) })
+          : i18n.t('dash.health.fact.saving', { pct: pct(H.savingsRate), amount: money(H.monthlySavings, 0) });
+      }
+      if (key === 'debt') {
+        return H.interestShare !== null
+          ? `${i18n.t('dash.health.fact.debt', { pct: pct(H.interestShare) })} · ${debtMeta}`
+          : debtMeta;
+      }
+      if (key === 'spending') {
+        /* Fixed bills and budget used, in the Score page's own words
+           (score.now.*). The household-income base is named because both shares
+           divide by it, not by the budget income the saving line uses. */
+        const bits = [];
+        if (H.fixedShare !== null) { bits.push(i18n.t('score.now.fixedHousehold', { pct: pct(H.fixedShare) })); }
+        if (H.budgetUsed !== null) { bits.push(i18n.t('score.now.budget', { pct: pct(H.budgetUsed) })); }
+        if (!bits.length && H.consumptionShare !== null) {
+          bits.push(i18n.t('score.now.allSpendHousehold', { pct: pct(H.consumptionShare) }));
+        }
+        return bits.length ? bits.join(' · ') : i18n.t('dash.health.needHistory');
+      }
+      return H.netWorthMultiple !== null
+        ? i18n.t('dash.health.fact.wealth', { amount: money(H.netWorth || 0, 0), times: yearsNumber(H.netWorthMultiple, locale()) })
+        : i18n.t('dash.health.needHistory');
+    };
+
+    /* Where each row goes. Reserves and saving keep the pages the old tiles
+       routed to (the Accounts page is where `emergency_fund:` is set; the saving
+       rate is read off contributions into savings accounts, where a household
+       goes to act on it), debt its own page. Spending goes to Budget, where the
+       fixed-bill toggle that feeds a third of it lives; what you own to Savings,
+       where net worth's moving parts are (the Score page's GAP_DESTS agrees on
+       that one). */
+    const ROW_TO = { reserves: 'accounts', saving: 'savings', debt: 'debts', spending: 'budgets', wealth: 'savings' };
+    const BAR_TONE = { good: '', fair: ' bg-warning', poor: ' bg-danger' };
+    const clampPct = v => Math.max(0, Math.min(100, v * 100)).toFixed(1);
+
+    /* The facts start with a figure or a lowercase fragment shared with the
+       Score page ("fixed bills 48% of household income"); under a bold name
+       they read as a line of their own, so the first letter is raised. */
+    const sentenceCase = text => (text ? text.charAt(0).toLocaleUpperCase() + text.slice(1) : text);
+
+    const bd = snap.breakdown;
+    const row = r => {
+      const name = i18n.t(`dash.health.why.name.${r.key}`);
+      /* The bar is a picture of the points: its TRACK is as long as the pillar
+         is worth (so the reader sees where the missing points went), its fill is
+         the share of those points earned. role="img" with the same words the
+         Score page's rail uses, so the figure is not only colour and length. */
+      const bar = r.measured
+        ? el('div', {
+          class: 'cat-bar health-track', role: 'img', style: `width:${clampPct(r.track)}%`,
+          'aria-label': i18n.t('score.gap.railAria', { name, points: r.shownPoints, max: r.shownMax }),
+        }, el('i', { class: `cat-bar-fill${BAR_TONE[r.tone]}`, style: `width:${clampPct(r.at)}%` }))
+        : el('div', {
+          class: 'cat-bar health-track is-empty', role: 'img', style: `width:${clampPct(r.track)}%`,
+          'aria-label': i18n.t('dash.health.pillarUnmeasured', { name }),
+        });
+      return el('button', {
+        type: 'button', class: `health-row${r.measured ? '' : ' is-unmeasured'}`, 'data-pillar': r.key,
+        onclick: () => ctx.switchView(ROW_TO[r.key]),
+      },
+      el('div', { class: 'hr-name' },
+        el('b', {}, name),
+        el('span', { class: 'hr-fact' }, sentenceCase(factFor(r.key))),
+        /* The over-claim, argued rather than corrected: the cover figure
+           already capped at what the account holds, so the claim itself must
+           stay visible or the reader has no way to know their instruction was
+           not followed. */
+        r.key === 'reserves' && earmarks.over.length
+          ? el('span', { class: 'hr-fact hr-over text-danger' }, i18n.t('dash.health.over', { name: earmarks.over[0].name }))
+          : ''),
+      el('div', { class: 'hr-bar' }, bar),
+      /* "—", not "0": a pillar the vault cannot measure has not earned nothing. */
+      r.measured
+        ? el('div', { class: 'hr-pts num' }, el('b', {}, String(r.shownPoints)), ` / ${r.shownMax}`)
+        : el('div', { class: 'hr-pts num' }, el('b', {}, '—')));
+    };
 
     /* One band lookup for the colour AND the word — health-math owns the
-       thresholds now, so the tile and the popup explaining it cannot disagree
+       thresholds, so the slab, its scale and the Score page cannot disagree
        about whether 79 is steady. */
     const BAND_TONE = { strong: 'is-good', steady: 'is-fair', attention: 'is-poor' };
     const band = H.score ? scoreBand(H.score.value) : null;
-    /* Routes to the Score page rather than opening the explainer popup it
-       used to carry. That popup held a heading, three scored rows and an
-       instruction — the whole of which the Score page now says better, in the
-       ring's own legend, since the standalone "How the score is built" card
-       was folded into it. Two surfaces explaining one number is how they come
-       to disagree about it; the tile states the figure and hands off. */
+    /* The scale under "steady": the three bands as wide as the stretch of 0-100
+       each covers, the one the score is in lit, a marker at the score. Inside the
+       button so the whole slab is one target, and hidden from assistive tech —
+       the band word above it says the same thing in words. */
+    const scale = H.score ? scoreScale(H.score.value) : null;
+    const bandScale = scale
+      ? el('div', { class: 'health-band', 'aria-hidden': 'true' },
+        el('div', { class: 'band-bar' },
+          ...scale.zones.map(z => el('span', { class: z.on ? 'on' : '', style: `flex:${z.span}` })),
+          el('b', { style: `left:${scale.at}%` })),
+        el('div', { class: 'band-l' },
+          ...scale.zones.map(z => el('span', { style: `flex:${z.span}` }, i18n.t(`dash.health.${z.key}`)))))
+      : '';
     const scoreTile = H.score
-      ? fig(`${BAND_TONE[band]} is-score`, String(H.score.value),
-        i18n.t('dash.health.score'), i18n.t(`dash.health.${band}`), 'score')
-      : fig('is-score', '—', i18n.t('dash.health.score'), i18n.t('dash.health.needHistory'), 'score');
+      ? slab(`${BAND_TONE[band]} is-score`, String(H.score.value),
+        i18n.t('dash.health.score'), i18n.t(`dash.health.${band}`), bandScale)
+      : slab('is-score', '—', i18n.t('dash.health.score'), i18n.t('dash.health.needHistory'));
 
-    /* The conclusion leads, then the three figures it is drawn from. */
-    body.append(el('div', { class: 'health-grid' }, scoreTile, emergency, savingsTile, debtTile));
+    /* "Most points lost" names the biggest loss the breakdown found, with the
+       Score page's own sentence for what to do about it; `drag` is null when
+       every measurable pillar is already full, and a line naming a "biggest
+       drag" that costs nothing would be a lie, so that case congratulates. */
+    const drag = bd && bd.drag;
+    const dragLine = !bd ? ''
+      : drag
+        ? el('p', { class: 'health-drag' },
+          el('b', {}, i18n.t('dash.health.drag', {
+            name: i18n.t(`dash.health.why.name.${drag.key}`), lost: drag.shownLost, max: drag.shownMax,
+          })),
+          ' ', gapSentence(drag.gap, { money, target }))
+        : el('p', { class: 'health-drag is-clear' }, i18n.t('dash.health.dragNone'));
 
-    [scoreTile, emergency, savingsTile, debtTile].forEach((tile, i) => decorate(() => {
-      const tone = toneOf(tile);
-      const ms = motion.count(tile.querySelector('.lv'), { key: `health-${i}`, tone });
+    const panel = el('div', { class: 'health-panel' },
+      el('div', { class: 'health-panel-head' },
+        el('span', {}, H.score ? i18n.t('dash.health.panel.title', { score: H.score.value }) : i18n.t('dash.health.score')),
+        el('span', {}, i18n.t('dash.health.panel.points'))),
+      ...pillarRows(bd).map(row),
+      dragLine);
+
+    /* The conclusion leads, then the five parts it is drawn from. */
+    body.append(el('div', { class: 'health-split' }, scoreTile, panel));
+
+    decorate(() => {
+      const tone = toneOf(scoreTile);
+      const ms = motion.count(scoreTile.querySelector('.lv'), { key: 'health-0', tone });
       /* The motes keep floating for as long as there is a score on screen,
          not only while it lands: they start 60% into the count when there is
          one, at once when the figure did not move. */
-      if (tile === scoreTile && H.score) motion.float(tile, { delay: Math.round((ms || 0) * 0.6), key: 'score', loop: true });
-      if (tile === scoreTile && ms) motion.flash(tile, tone, { cls: 'bud-ring', delay: ms, key: 'score' });
-    }));
+      if (H.score) motion.float(scoreTile, { delay: Math.round((ms || 0) * 0.6), key: 'score', loop: true });
+      if (ms) motion.flash(scoreTile, tone, { cls: 'bud-ring', delay: ms, key: 'score' });
+    });
   }
-
 
   /* ROWS THIS PAGE COULD NOT PLACE, said out loud wherever an implied balance
      is printed.

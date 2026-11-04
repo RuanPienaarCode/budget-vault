@@ -1329,6 +1329,22 @@ module.exports = {
   'dash.health.strong': 'strong',
   'dash.health.steady': 'steady',
   'dash.health.attention': 'needs attention',
+  /* The Financial health card's pillar panel (variant B, Nov 2026). Names come from
+     dash.health.why.name.*, the points aria from score.gap.railAria and the fix sentence
+     under the footer from the same keys the Score page uses, so the two pages say the
+     same thing. xh and zu carry English here until a native reviewer reaches them. */
+  'dash.health.panel.title': 'What the {score} is made of',
+  'dash.health.panel.points': 'points earned / possible',
+  'dash.health.fact.reserves': {
+    one: '{months} of {count} month covered · {amount}',
+    other: '{months} of {count} months covered · {amount}',
+  },
+  'dash.health.fact.saving': '{pct} of budget income · {amount} a month',
+  'dash.health.fact.debt': '{pct} of budget income to interest',
+  'dash.health.fact.wealth': '{amount} net worth · {times} years of budget income',
+  'dash.health.drag': 'Most points lost: {name} ({lost} of {max}).',
+  'dash.health.dragNone': 'Every part is earning full marks. Well done.',
+  'dash.health.pillarUnmeasured': '{name}: not measured yet',
   /* The explanation popup. It answers three questions in order — what the score
      is, where this household's points went, and what to do next — because a
      reader who opens it is asking the third one and will not find it under a

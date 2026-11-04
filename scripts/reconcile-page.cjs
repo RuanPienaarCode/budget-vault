@@ -1004,15 +1004,17 @@ function runChecks(G, pages) {
       }
     }
   }
-  /* The health card: three figures off healthSnapshot(). */
+  /* The health card: three figures off healthSnapshot(), now the fact lines of the
+     Emergency cover row (button.health-row[0]) and the Saving row ([1]) — the card
+     is a score slab plus one row per pillar since the Nov 2026 redesign. */
   dom({ page: D, name: 'Health: emergency fund set aside', formula: 'resolveEarmarks(home accounts).total',
-    re: /^healthBody\/.*health-fig\[1\]\//, globalValue: G.health.earmarks.total, globalSource: 'healthSnapshot().earmarks.total' });
+    re: /^healthBody\/.*button\.health-row\[0\]\//, globalValue: G.health.earmarks.total, globalSource: 'healthSnapshot().earmarks.total' });
   dom({ page: D, name: 'Health: months of essentials covered', formula: 'earmarks.total / monthlyEssential', kind: 'number',
-    re: /^healthBody\/.*health-fig\[1\]\//, globalValue: G.health.metrics.months, globalSource: 'healthSnapshot().metrics.months', note: 'printed to one decimal' });
+    re: /^healthBody\/.*button\.health-row\[0\]\//, globalValue: G.health.metrics.months, globalSource: 'healthSnapshot().metrics.months', note: 'printed to one decimal' });
   dom({ page: D, name: 'Health: income saved on average', formula: 'monthlySavings / monthlyIncome over the trailing six periods', kind: 'percent',
-    re: /^healthBody\/.*health-fig\[2\]\//, globalValue: isNum(G.health.metrics.savingsRate) ? G.health.metrics.savingsRate * 100 : null, globalSource: 'metrics.savingsRate' });
+    re: /^healthBody\/.*button\.health-row\[1\]\//, globalValue: isNum(G.health.metrics.savingsRate) ? G.health.metrics.savingsRate * 100 : null, globalSource: 'metrics.savingsRate' });
   dom({ page: D, name: 'Health: saved per month', formula: 'monthlySavings',
-    re: /^healthBody\/.*health-fig\[2\]\//, globalValue: G.health.metrics.monthlySavings, globalSource: 'metrics.monthlySavings' });
+    re: /^healthBody\/.*button\.health-row\[1\]\//, globalValue: G.health.metrics.monthlySavings, globalSource: 'metrics.monthlySavings' });
   /* The what's-left card is a projection over commitments (committed.js), not
      a lens over rows; its own arithmetic is checked, and its cash figure is
      shown beside the implied bank balances it is a subset of. */

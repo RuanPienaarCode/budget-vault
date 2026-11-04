@@ -117,27 +117,34 @@ atAuditDate(async () => {
     `and a share small enough that a whole percent would erase it (got ${snap.metrics.interestShare})`);
 
   const body = nodes.get('healthBody').textContent;
-  const debtLabel = i18n.t('dash.health.debt');
+  /* Since the Nov 2026 pillar-bars redesign each figure is a pillar row's fact
+     line, "{share} of budget income to interest · {rand figure}", not a tile
+     with its own label. The claims are unchanged. */
+  const rows = require('./helpers/dom-stub.cjs').descend(nodes.get('healthBody'))
+    .filter(e => e._cls && e._cls.has('health-row'));
+  const fact = key => rows.find(r => r.attrs['data-pillar'] === key)
+    .children.find(c => c._cls.has('hr-name')).children.find(c => c._cls.has('hr-fact')).textContent;
+  const debtFact = fact('debt');
   const perMonth = i18n.t('dash.health.perMonth', { amount: ctx.money(monthly, 0) });
-  /* The debt tile alone, sliced out by its own label and meta line, NOT the
-     whole card. The savings tile on this same fixture legitimately reads "0%"
-     over "R 0 / month" — the household really did save nothing in August — and
-     a card-wide "no 0% anywhere" assertion would have called that a defect and
-     pushed the fix into erasing the one zero that IS true. */
-  ok(body.includes(`0,4%${debtLabel}`),
-    `the debt tile shows the share it actually measured, not a rounded-away 0% — got: ${body}`);
-  ok(!body.includes(`0%${debtLabel}`),
-    `and never "0%" for a household paying real interest — got: ${body}`);
-  /* The figure and the sentence under it are ONE claim. Asserted through
+  /* The debt row alone, NOT the whole card. The saving row on this same
+     fixture legitimately reads "0%" over "R 0 a month" — the household really
+     did save nothing in August — and a card-wide "no 0% anywhere" assertion
+     would have called that a defect and pushed the fix into erasing the one
+     zero that IS true. */
+  ok(debtFact.startsWith(i18n.t('dash.health.fact.debt', { pct: '0,4%' })),
+    `the debt row shows the share it actually measured, not a rounded-away 0% — got: ${debtFact}`);
+  ok(!debtFact.startsWith('0%'),
+    `and never "0%" for a household paying real interest — got: ${debtFact}`);
+  /* The figure and the sentence beside it are ONE claim. Asserted through
      i18n.t rather than an English literal: the keys are translated in a
      separate lane, and a hard-coded sentence would go red on the translation
      rather than on the defect. */
-  ok(body.includes(`${debtLabel}${perMonth}`),
-    `and the meta line under it still names the rand figure that share is of — got: ${body}`);
+  ok(debtFact.endsWith(` · ${perMonth}`),
+    `and the same line still names the rand figure that share is of — got: ${debtFact}`);
   /* The true zero the card-wide assertion would have destroyed, pinned so a
      future "never print 0%" edit goes red here instead of shipping. */
-  ok(body.includes(`0%${i18n.t('dash.health.savings')}`),
-    `a genuinely zero savings rate still prints 0% — none is a claim, and a real one — got: ${body}`);
+  ok(fact('saving').startsWith(i18n.t('dash.health.fact.saving', { pct: '0%', amount: 'R 0' })),
+    `a genuinely zero savings rate still prints 0% — none is a claim, and a real one — got: ${fact('saving')} (card: ${body})`);
 
   /* ------------- 3. the report, through the real serialiser -------------- */
   /* The smallest report src/report.js will serialise, carrying THIS

@@ -394,8 +394,59 @@ function scoreBreakdown(m, targetMonths) {
   };
 }
 
+/* The Dashboard card's rows: one per pillar in PILLARS' declaration order, NOT
+   the shortfall order scoreBreakdown sorts into. Layout data over a finished
+   breakdown — every number a row carries is one it already allocated.
+   A pillar the vault cannot measure is absent from the breakdown, so its row is
+   made here: `measured: false`, no points, no tone, its track still sized by
+   its declared weight on the live pillars' renormalised scale (100 / live
+   weights). `track` is 0..1 of the widest; `tone` reads `at` as the rest of
+   the app reads a meter: at least 80% good, at least 50% fair, else poor. */
+const PILLAR_TONES = { good: 0.8, fair: 0.5 };
+const pillarTone = at => (at >= PILLAR_TONES.good ? 'good' : at >= PILLAR_TONES.fair ? 'fair' : 'poor');
+
+function pillarRows(breakdown) {
+  const live = new Map();
+  for (const p of (breakdown && breakdown.pillars) || []) { live.set(p.key, p); }
+  const liveWeight = PILLARS.reduce((t, def) => t + (live.has(def.key) ? def.weight : 0), 0);
+  const scale = liveWeight > 0 ? 100 / liveWeight : 1;
+  const rows = PILLARS.map(def => {
+    const p = live.get(def.key);
+    if (!p) {
+      return {
+        key: def.key, measured: false, weight: def.weight, span: def.weight * scale,
+        shownMax: null, shownPoints: null, at: null, tone: null, gap: null, track: 0,
+      };
+    }
+    return {
+      key: def.key, measured: true, weight: def.weight, span: p.shownMax,
+      shownMax: p.shownMax, shownPoints: p.shownPoints, at: p.at, tone: pillarTone(p.at), gap: p.gap, track: 0,
+    };
+  });
+  const widest = rows.reduce((m, r) => Math.max(m, r.span), 0);
+  rows.forEach(r => { r.track = widest > 0 ? r.span / widest : 0; });
+  return rows;
+}
+
+/* The score's three bands as a scale: zones in ascending order, each as wide as
+   the stretch of 0..100 it covers, read off SCORE_BANDS so the scale and
+   scoreBand() cannot disagree about where steady starts. `on` marks the zone
+   the score sits in; `at` is the marker's position as a percentage. */
+function scoreScale(value) {
+  const bands = [
+    { key: 'attention', from: 0, to: SCORE_BANDS.steady },
+    { key: 'steady', from: SCORE_BANDS.steady, to: SCORE_BANDS.strong },
+    { key: 'strong', from: SCORE_BANDS.strong, to: 100 },
+  ];
+  const now = scoreBand(value);
+  return {
+    zones: bands.map(b => ({ key: b.key, span: b.to - b.from, on: b.key === now })),
+    at: Math.max(0, Math.min(100, Number(value) || 0)),
+  };
+}
+
 module.exports = {
   essentialTotal, resolveEarmarks, debtInterestMonthly, debtInterestCoverage, monthlyAverages,
-  financialScore, scoreFractions, healthMetrics, scoreBand, scoreBreakdown,
+  financialScore, scoreFractions, healthMetrics, scoreBand, scoreBreakdown, pillarRows, pillarTone, scoreScale,
   NON_ESSENTIAL_TYPES, DAYS_PER_MONTH, SCORE_BANDS, PILLARS, FULL_MARKS,
 };
