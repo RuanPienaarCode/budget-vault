@@ -1211,7 +1211,7 @@ module.exports = {
   'dash.health.fact.saving': '{pct} des revenus · {amount} / mois',
   'dash.health.fact.debt': '{pct} des revenus vers les intérêts',
   'dash.health.fact.wealth': '{amount} de patrimoine net · {times} années de revenus',
-  'dash.health.drag': 'Le plus de points perdus : {name} ({lost} sur {max}).',
+  'dash.health.drag': 'Le plus de points perdus : {name}, {lost} sur ses {max}.',
   'dash.health.dragNone': 'Chaque volet obtient tous ses points. Bravo.',
   'dash.health.pillarUnmeasured': '{name} : pas encore mesuré',
   'dash.health.why.bands': '{strong}+ est solide · {steady}–{strongLess} est stable · sous {steady} demande de l’attention',

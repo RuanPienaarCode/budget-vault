@@ -1165,7 +1165,7 @@ module.exports = {
   'dash.health.fact.saving': '{pct} dari pemasukan · {amount} / bulan',
   'dash.health.fact.debt': '{pct} pemasukan untuk bunga',
   'dash.health.fact.wealth': 'kekayaan bersih {amount} · {times} tahun pemasukan',
-  'dash.health.drag': 'Poin hilang terbanyak: {name} ({lost} dari {max}).',
+  'dash.health.drag': 'Poin hilang terbanyak: {name}, {lost} dari {max} poinnya.',
   'dash.health.dragNone': 'Semua bagian meraih poin penuh. Bagus sekali.',
   'dash.health.pillarUnmeasured': '{name}: belum terukur',
   'dash.health.why.bands': '{strong}+ kuat · {steady}–{strongLess} stabil · di bawah {steady} perlu perhatian',

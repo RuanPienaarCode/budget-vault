@@ -1197,7 +1197,7 @@ module.exports = {
   'dash.health.fact.saving': '{pct} van inkomste · {amount} / maand',
   'dash.health.fact.debt': '{pct} van inkomste aan rente',
   'dash.health.fact.wealth': '{amount} netowaarde · {times} jaar se inkomste',
-  'dash.health.drag': 'Meeste punte verloor: {name} ({lost} van {max}).',
+  'dash.health.drag': 'Meeste punte verloor: {name}, {lost} van sy {max}.',
   'dash.health.dragNone': 'Elke deel verdien volpunte. Mooi so.',
   'dash.health.pillarUnmeasured': '{name}: nog nie gemeet nie',
   'dash.health.why.bands': '{strong}+ is sterk · {steady}–{strongLess} is bestendig · onder {steady} benodig aandag',

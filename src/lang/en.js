@@ -1342,7 +1342,7 @@ module.exports = {
   'dash.health.fact.saving': '{pct} of budget income · {amount} a month',
   'dash.health.fact.debt': '{pct} of budget income to interest',
   'dash.health.fact.wealth': '{amount} net worth · {times} years of budget income',
-  'dash.health.drag': 'Most points lost: {name} ({lost} of {max}).',
+  'dash.health.drag': 'Most points lost: {name}, {lost} of its {max}.',
   'dash.health.dragNone': 'Every part is earning full marks. Well done.',
   'dash.health.pillarUnmeasured': '{name}: not measured yet',
   /* The explanation popup. It answers three questions in order — what the score

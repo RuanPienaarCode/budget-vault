@@ -234,7 +234,7 @@ atAuditDate(async () => {
     ok(snap.breakdown.pillars.every(p => p.lost <= drag.lost + 1e-9), 'and the breakdown\'s drag really is the largest loss');
     const foot = find(body, 'health-drag')[0];
     ok(foot && !hasCls(foot, 'is-clear'), 'a footer line is drawn');
-    ok(clean(textOf(foot)).startsWith(`Most points lost: ${NAMES[drag.key]} (${drag.shownLost} of ${drag.shownMax}).`),
+    ok(clean(textOf(foot)).startsWith(`Most points lost: ${NAMES[drag.key]}, ${drag.shownLost} of its ${drag.shownMax}.`),
       `the footer names ${drag.key} and its loss (${clean(textOf(foot))})`);
     ok(clean(textOf(foot)).replace(/Most points lost:[^.]*\.\s*/, '').length > 10, 'followed by one plain sentence of what to do');
 
@@ -314,7 +314,7 @@ atAuditDate(async () => {
       return { ...snap, breakdown: { ...bd, drag: { ...wealth, shownLost: 9, shownMax: 15, gap: { kind: 'build', amount: 123456 } } } };
     });
     const t = clean(textOf(find(M.body, 'health-drag')[0]));
-    ok(t.startsWith('Most points lost: What you own (9 of 15).'), `names the pillar it was handed (${t})`);
+    ok(t.startsWith('Most points lost: What you own, 9 of its 15.'), `names the pillar it was handed (${t})`);
     ok(/Grow your savings, investments or property by R 123456/.test(t) && /3 years of budget income/.test(t), `and uses the Score page's net-worth sentence (${t})`);
   }
   {
@@ -324,7 +324,7 @@ atAuditDate(async () => {
       return { ...snap, breakdown: { ...bd, drag: { ...sp, shownLost: 8, shownMax: 20, gap: null } } };
     });
     const t = clean(textOf(find(M.body, 'health-drag')[0]));
-    eq(t.trim(), 'Most points lost: Spending (8 of 20).', 'a drag with no measurable gap names the loss and stops, never inventing a sentence');
+    eq(t.trim(), 'Most points lost: Spending, 8 of its 20.', 'a drag with no measurable gap names the loss and stops, never inventing a sentence');
   }
 
   /* ---------- the stylesheet: the promises that live in CSS ---------- */
