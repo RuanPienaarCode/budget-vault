@@ -3,6 +3,72 @@
 All notable changes to Budget Vault. Versions match the plugin version in
 `manifest.json` and the release tag exactly (no `v` prefix).
 
+## 1.57.0 — 2026-11-04
+
+Accounts lead with the live balance, the Food page shows spend over time,
+the welcome screen and the Dashboard move, and a math audit fixes fifteen
+figures that came out wrong on ordinary data.
+
+### Added
+
+- **Food over time.** One line per food category across 3M / 6M / 1Y, each
+  product's shelf price at every purchase, and a Last month column beside
+  this month's spend and price.
+- **An animated welcome** on the setup wizard's first screen: the vault door
+  opens, then setup, import, budget and plan play through. A pause button,
+  and nothing moves under reduced motion.
+- **Dashboard arrival motion.** Figures count up to their value and a band of
+  light sweeps across them once; the score tile's motes keep floating while
+  it is on screen. Plays only when a figure changed. Off under reduced motion.
+- **Transactions search matches the Note** as well as the Description.
+
+### Changed
+
+- **Accounts lead with the live balance** — the balance on file plus every
+  transaction since — with the typed figure and its date on the line under
+  it. A difference is an amber "Confirm" prompt, not a red error, and the
+  drawer names rows dated on the confirmation day (already counted).
+- **ZA prime rate default is 10.75%** (from the 25 Sep 2026 repo-rate move).
+
+### Fixed
+
+- **The next payday or charge was predicted from the day the last one
+  happened to land.** A salary paid early because the 25th fell on a Sunday
+  was expected on the 23rd next month, so a day later the Dashboard dropped
+  the incoming pay and the card's settlement cycle from "actually free"; a
+  debit order on the 31st taken on 28 February was expected on 28 March.
+  Both now step to the usual day.
+- **A salary that stopped could hide the one still being paid.** A larger
+  old salary beat the current one and was then found stale, so no salary
+  was found at all.
+- **An unlisted debit order collected a day early across a month end**
+  (31 July for 1 August) dropped out of "still committed" for three months.
+- **Exactly on budget read "R 0,00 over" in red**, a category refunded in
+  full showed as R 0,00 of unbudgeted spend, a credit card paid off to the
+  cent still read as owed and overdrawn, and a fund emptied of exactly what
+  was put in printed a sixteen-digit return. Money figures are now summed in
+  cents.
+- **A transfer into savings whose two legs fall either side of a period
+  boundary** was counted in neither period's "moved to funds" or saving
+  rate. It now counts once, in the period it arrived.
+- **The Score popup's pillar points could add up to one more than the
+  score**, and the Score's spending bands, when spending ran past income,
+  could add up to a rand less than the income.
+- **Two budget rows for one category**: the table showed only the last one
+  while the totals counted both. The table now budgets their sum.
+- **Owed Money: a negative Repaid** raised what is still owed above what was
+  lent and made Recovered negative. It now counts as nothing repaid.
+- **Import: South African bank wording counted as the payee** in the
+  near-duplicate check — "FNB App Payment To Alice" and "…To Bob", or two
+  different debit orders, were unticked as copies of each other.
+- **Import: amounts with a trailing currency code** ("1.500.000 IDR") read as
+  nothing, and a trailing "DB" read as a credit. **Dates with Afrikaans,
+  German, Indonesian, Spanish, French or Portuguese month names** ("22 Okt
+  2026", "22 Mär 2026") were skipped.
+- **Bring amounts after moving payday** read the two-day shift as a two-day
+  cycle and offered seven times the rent.
+- **Phone:** the period pill fits on one row on a 414px iPhone.
+
 ## 1.56.0 — 2026-10-22
 
 A Food page that splits grocery spend into what was actually bought, a

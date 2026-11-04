@@ -23,6 +23,9 @@
         skipped the sum.
      8. Stale-note drift (magnitude vs signed) and the spending ring's ordinal.
      9. The donut legend's Change = Spent − baseline.
+    10. A table with ONE row: the harvester indexes a row only when it has
+        siblings (`tr`, not `tr[0]`), so every `tr\[\d+\]` pattern read a
+        one-row table as empty (2026-11-03, a real period with one row).
 
      node tests/reconcile-checker-fixes.test.cjs */
 
@@ -313,5 +316,25 @@ const clone = x => JSON.parse(JSON.stringify(x));
     ok(/page prints/.test(bad.pageSource), 'and names the row');
   }
 
-  console.log(`PASS — the reconciliation's checkers are checked: 9 fixes pinned on the synthetic household, each with a negative control where it could pass by not looking (${n} assertions).`);
+  /* ---- 10. A one-row table ------------------------------------------------- */
+  {
+    /* A period holding exactly one transaction — the start of a period before
+       the first statement import. The table draws one row, addressed `tr`
+       with no index, and every check must still see it. */
+    const f = `${B}/Transactions/Cheque/2026-10.md`;
+    const one10 = { ...SEED, [f]: '---\nkind: transactions\n---\n\n| Date | Description | Category | Amount | Excluded | Note | Split |\n|---|---|---|---:|---|---|---|\n| 2026-10-02 | Checkers | Groceries | -35.00 |  |  |  |\n' };
+    const r = await reconcile({ files: one10, budgetFolder: B, today: '2026-10-03', period: '2026-10' });
+    const rendered = one(r.checks, 'transactions', /Rows rendered = rows in the window/);
+    eq([rendered.status, rendered.pageValue, rendered.globalValue], ['pass', 1, 1], 'a one-row table is one row, not none');
+    eq(one(r.checks, 'transactions', /Σ rendered amounts = Σ raw rows/).status, 'pass', 'and its one amount is summed');
+    eq(failed(r.checks), [], 'nothing fails on a period with one row');
+
+    /* NEGATIVE CONTROL: that one amount drawn wrong. */
+    const pages = clone(r.pages);
+    const cell = pages.find(p => p.view === 'transactions').figures.find(x => /span\.tx-amt$/.test(x.address) && x.kind === 'money');
+    cell.raw = cell.raw + 1;
+    eq(one(runChecks(r.G, pages), 'transactions', /Σ rendered amounts = Σ raw rows/).status, 'fail', 'a wrong amount on the only row fails the sum');
+  }
+
+  console.log(`PASS — the reconciliation's checkers are checked: 10 fixes pinned on the synthetic household, each with a negative control where it could pass by not looking (${n} assertions).`);
 })().catch(e => { console.error(e); process.exit(1); });

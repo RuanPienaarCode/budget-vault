@@ -1138,7 +1138,7 @@ module.exports = {
   'shell.legend.over': 'Over budget',
   'shell.legend.income': 'Income',
   'shell.legend.budget': 'Spending budget',
-  'shell.tx.search': 'Search description…',
+  'shell.tx.search': 'Search description or note…',
   'shell.tx.wholeHistory': 'whole history',
   'shell.tx.export': 'Export',
   'shell.tx.report': 'Report',

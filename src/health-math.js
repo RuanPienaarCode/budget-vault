@@ -9,7 +9,7 @@
 const { monthlyInterest } = require('./debt-math');
 const { activeDebts } = require('./worth');
 const { isForeign } = require('./currency');
-const { largestRemainder } = require('./share-percents');
+const { largestRemainder, allocateWhole } = require('./share-percents');
 
 const DAYS_PER_MONTH = 30.44;
 
@@ -365,9 +365,13 @@ function scoreBreakdown(m, targetMonths) {
 
   /* ADR-0007 · The popup's integers are allocated so they add up: shownMax
      first, shownPoints over at * shownMax, shownLost derived — otherwise
-     "saving 27 of 26, lost -1". */
+     "saving 27 of 26, lost -1". allocateWhole, not largestRemainder, for the
+     points: at * shownMax can sum to MORE than the headline (two full pillars
+     of 26.667 each show 27, so 54 against round(53.33) = 53), which is
+     largestRemainder's precondition broken, and it returned the bare 54.
+     Capped at shownMax, so a full pillar never prints "27 of 26, lost -1". */
   const shownMax = largestRemainder(pillars.map(p => p.max), 100);
-  const shownPoints = largestRemainder(pillars.map((p, i) => p.at * shownMax[i]), score.value);
+  const shownPoints = allocateWhole(pillars.map((p, i) => p.at * shownMax[i]), score.value, shownMax);
   pillars.forEach((p, i) => {
     p.shownPoints = shownPoints[i];
     p.shownMax = shownMax[i];

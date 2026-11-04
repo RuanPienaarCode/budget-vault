@@ -374,7 +374,9 @@ module.exports = function registerTransactions(ctx) {
         else if (cat === MISSING) { if (!t.cat || known.has(t.cat)) return false; }
         else if (t.cat !== cat) return false;
       }
-      if (q && !t.desc.toLowerCase().includes(q)) return false;
+      /* The Note too: it is where a reader writes what the bank's description
+         does not say. */
+      if (q && ![t.desc, t.note].some(v => String(v || '').toLowerCase().includes(q))) return false;
       /* Counted only among the rows every OTHER filter kept, so the note says
          how many rows this one alone took away. */
       if (outside && outside.has(t.label)) { hiddenOutside++; return false; }

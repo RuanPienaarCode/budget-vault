@@ -990,7 +990,7 @@ module.exports = {
   'shell.legend.over': '超出预算',
   'shell.legend.income': '收入',
   'shell.legend.budget': '支出预算',
-  'shell.tx.search': '搜索摘要…',
+  'shell.tx.search': '搜索摘要或备注…',
   'shell.tx.wholeHistory': '全部历史',
   'shell.tx.export': '导出',
   'shell.tx.deleteFiltered': '删除这些行',

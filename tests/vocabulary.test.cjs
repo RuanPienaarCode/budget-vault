@@ -424,7 +424,7 @@ function provenFalse(desc, exactShape, mangled) {
     'Assume-spent (Dashboard): reads the SAME function rather than re-deriving it — its own copy used to discard real spend, so a category over its budget read "on budget" here and over there');
   /* Phase 3 of ADR-0006: budgetVsActualRows moved from the Dashboard view
      into src/figures.js, the one owner of the period's rows. */
-  ok(live.figures.includes('actual: assumed ? assumedActual(b.amount, 0) : 0'),
+  ok(live.figures.includes('actual: assumed ? assumedActual(amount, 0) : 0'),
     'Assume-spent (Dashboard): an assume-spent row is SEEDED through the rule, with nothing yet spent against it');
   ok(live.figures.includes('existing.actual = assumedActual(existing.budget, -amt);'),
     'Assume-spent (Dashboard): and a transaction landing in that category re-reads the rule with the real figure — REPLACES, never PLUS');

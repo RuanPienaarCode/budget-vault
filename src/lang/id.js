@@ -1009,7 +1009,7 @@ module.exports = {
   'shell.legend.over': 'Melebihi anggaran',
   'shell.legend.income': 'Pemasukan',
   'shell.legend.budget': 'Anggaran pengeluaran',
-  'shell.tx.search': 'Cari di keterangan…',
+  'shell.tx.search': 'Cari di keterangan atau catatan…',
   'shell.tx.wholeHistory': 'seluruh riwayat',
   'shell.tx.export': 'Ekspor',
   'shell.tx.report': 'Laporan',

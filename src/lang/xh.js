@@ -1053,7 +1053,7 @@ module.exports = {
   'shell.legend.over': 'Ngaphaya kwebhajethi',
   'shell.legend.income': 'Ingeniso',
   'shell.legend.budget': 'Ibhajethi yokuchitha',
-  'shell.tx.search': 'Khangela inkcazo…',
+  'shell.tx.search': 'Khangela inkcazo okanye inqaku…',
   'shell.tx.wholeHistory': 'yonke imbali',
   'shell.tx.export': 'Khupha',
   'shell.tx.deleteFiltered': 'Cima le migca',
