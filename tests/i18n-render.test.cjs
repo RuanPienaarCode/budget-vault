@@ -121,6 +121,35 @@ const { makeDom } = require('./helpers/dom-stub.cjs');
 const i18n = require('../src/i18n');
 const { TYPE_ORDER } = require('../src/constants');
 
+/* ---- ISSUE 79 (item 1): REACHED keys ------------------------------------
+   Assertions 1 and 2 only see the strings a render reaches. Measured on
+   2026-11-04, this gate reached 227 of 1 338 keys and NONE of the strings for
+   earmarked funds, set-aside rows, rows dated ahead, a debt with no rate, or
+   the schedule that lands later in the period: its fixture had no such data,
+   so those strings could leak a raw key or a {placeholder} with the gate
+   green. Every key below must now be reached by at least one view in at least
+   one language. Add a key when a feature lands; never delete one to get green
+   - extend the fixture instead. */
+const REQUIRED_KEYS = [
+  'bud.total.setAsidePlanned',
+  'tx.future.hidden',
+  'dash.stat.setAside',
+  'dash.stat.ofWhichSetAside',
+  'dash.scheduledAhead',
+  'dash.split.setAsideNote',
+  'dash.health.debtNoRate',
+  'score.win.debtNoRate',
+  'score.flow.chip.setAsideToMove',
+  'dash.left.earmarked',
+  'dash.left.earmarkedFrom',
+  'dash.left.barAriaSetAside',
+];
+const reachedKeys = new Set();
+{
+  const realT = i18n.t;
+  i18n.t = function (key, ...rest) { reachedKeys.add(key); return realT.call(this, key, ...rest); };
+}
+
 let checks = 0;
 const ok = (c, m) => { assert.ok(c, m); checks++; };
 const eq = (a, b, m) => { assert.deepStrictEqual(a, b, m); checks++; };
@@ -165,12 +194,16 @@ const TRANSLATED_VIEWS = new Set(['dashboard', 'score', 'transactions', 'budgets
    view returns 0 for exactly these ten and only these ten). Reported as a
    finding, not silently folded in without comment — see the dispatch
    summary. */
-const EXPECTED_ENGLISH_ONLY = ['notes', 'food', 'savings', 'debts', 'owed', 'services', 'tax', 'loans', 'import'];
+/* 'debts' left this list on 2026-11-04 (ISSUE 79): it was only "English-only"
+   because the old fixture had no debt without a rate. Its no-rate note is
+   translated (debt.interest.noRates), so German and English differ; the rest
+   of the page is still English. */
+const EXPECTED_ENGLISH_ONLY = ['notes', 'food', 'savings', 'owed', 'services', 'tax', 'loans', 'import'];
 /* Grew once, from 8 to 9, on purpose: the Food page (22 Oct 2026) shipped
    English-only, like Notes before it — its vocabulary is the till slip's own
    (XTRASAVE, Vitality HealthyFood), which is South African and English on the
    paper. Every other change to this count is a translation shrinking it. */
-eq(EXPECTED_ENGLISH_ONLY.length, 9, 'the declared English-only backlog is exactly 9 views (plan and assets were translated in the 3 Sep 2026 mobile redesign; food arrived English-only on 22 Oct 2026) — translating one shrinks this list');
+eq(EXPECTED_ENGLISH_ONLY.length, 8, 'the declared English-only backlog is exactly 8 views (plan and assets were translated in the 3 Sep 2026 mobile redesign; food arrived English-only on 22 Oct 2026; debts left on 4 Nov 2026 once the fixture reached its translated no-rate note) — translating one shrinks this list');
 for (const v of EXPECTED_ENGLISH_ONLY) {
   ok(!TRANSLATED_VIEWS.has(v), `'${v}' cannot be in both TRANSLATED_VIEWS and EXPECTED_ENGLISH_ONLY`);
 }
@@ -288,31 +321,88 @@ const FILES = {
   // assume_spent: true — the one thing that makes budgets.js render its
   // "Pull" button, which carries the literal "(s)" bud.pull.title key.
   [`${B}/Categories/Rent.md`]: '---\ntype: housing\ncolor: "#aa6633"\nassume_spent: true\n---\n',
+  // ISSUE 79: a set-aside envelope (investment-typed), only partly moved.
+  [`${B}/Categories/Investing.md`]: '---\ntype: investment\ncolor: "#66aa33"\n---\n',
+  [`${B}/Categories/Gym.md`]: '---\ntype: expense\ncolor: "#3366aa"\n---\n',
 
   [`${B}/Accounts/Cheque.md`]: '---\ntype: checking\ninstitution: "Bank A"\naccount_number: "12345678901"\ntx_label: "Cheque"\nbalance: 12000.00\nbalance_updated: 2026-07-01\n---\n',
   [`${B}/Accounts/Card.md`]: '---\ntype: credit_card\ncredit_limit: 30000\nbalance: -4000.00\nsettle_monthly: true\nbalance_updated: 2026-07-01\n---\n',
   [`${B}/Accounts/Savings Pot.md`]: '---\ntype: savings\nbalance: 55000.00\ngoal_amount: 100000\nmonthly_contribution: 2000\nbalance_updated: 2026-07-01\n---\n',
-  [`${B}/Accounts/Fund.md`]: '---\ntype: investment\nbalance: 90000.00\ntotal_invested: 75000\nbalance_updated: 2026-07-01\n---\n',
+  // ISSUE 79: an earmarked fund that paid for something this period.
+  [`${B}/Accounts/Emergency fund.md`]: '---\ntype: savings\ntx_label: "Emergency fund"\nemergency_fund: true\nbalance: 15000.00\nbalance_updated: 2026-07-01\n---\n',
+  [`${B}/Accounts/Fund.md`]: '---\ntype: investment\nbalance: 90000.00\ntotal_invested: 75000\nbalance_updated: 2026-03-01\n---\n',
 
-  [`${B}/Budgets/2026-07.md`]: '---\nkind: budget\n---\n\n| Category | Type | Amount | Notes |\n|---|---|---:|---|\n| Groceries | expense | 5000.00 | |\n| Salary | income | 40000.00 | |\n| Rent | housing | 9000.00 | |\n',
+  /* ISSUE 79: June is the last FINISHED period under the pinned clock, which
+     is what the Score page and the health card measure. Without it the score
+     reads "not enough yet" and none of its pillar strings render. */
+  [`${B}/Budgets/2026-06.md`]: '---\nkind: budget\n---\n\n| Category | Type | Amount | Notes |\n|---|---|---:|---|\n| Groceries | expense | 5000.00 | |\n| Salary | income | 40000.00 | |\n| Rent | housing | 9000.00 | |\n| Investing | investment | 2000.00 | |\n',
+  [`${B}/Transactions/Cheque/2026-06.md`]: `---\n${TX_FM}\n---\n\n| Date | Description | Category | Amount | Excluded | Note | Split |\n|---|---|---|---:|---|---|---|\n`
+    + '| 2026-06-01 | Salary | Salary | 40000.00 |  |  |  |\n'
+    + '| 2026-06-02 | Landlord | Rent | -9000.00 |  |  |  |\n'
+    + '| 2026-06-05 | Grocer | Groceries | -4200.00 |  |  |  |\n'
+    + '| 2026-06-06 | To unit trust | Investing | -2000.00 |  |  |  |\n',
+  [`${B}/Budgets/2026-07.md`]: '---\nkind: budget\n---\n\n| Category | Type | Amount | Notes |\n|---|---|---:|---|\n| Groceries | expense | 5000.00 | |\n| Salary | income | 40000.00 | |\n| Rent | housing | 9000.00 | |\n| Investing | investment | 2000.00 | |\n| Gym | expense | 1000.00 | |\n',
 
   [`${B}/Transactions/Cheque/2026-07.md`]: `---\n${TX_FM}\n---\n\n| Date | Description | Category | Amount | Excluded | Note | Split |\n|---|---|---|---:|---|---|---|\n`
     + '| 2026-07-01 | Salary | Salary | 40000.00 |  |  |  |\n'
     + '| 2026-07-03 | Grocer | Groceries | -1200.00 |  |  |  |\n'
-    + '| 2026-07-09 | Uncategorised thing |  | -300.00 |  |  |  |\n',
+    + '| 2026-07-09 | Uncategorised thing |  | -300.00 |  |  |  |\n'
+    // ISSUE 79: part of the set-aside moved, a split parent with its parts,
+    // and a row dated after the pinned today (2026-07-20).
+    + '| 2026-07-10 | To unit trust | Investing | -500.00 |  |  |  |\n'
+    + '| 2026-07-11 | Takealot | Groceries | -600.00 | yes |  | parent |\n'
+    + '| 2026-07-11 | Takealot | Groceries | -400.00 |  |  | part |\n'
+    + '| 2026-07-11 | Takealot | Investing | -200.00 |  |  | part |\n'
+    + '| 2026-07-28 | Grocer | Groceries | -450.00 |  |  |  |\n',
+  [`${B}/Transactions/Emergency fund/2026-07.md`]: `---\n${TX_FM}\n---\n\n| Date | Description | Category | Amount | Excluded | Note | Split |\n|---|---|---|---:|---|---|---|\n`
+    + '| 2026-07-12 | Pram | Groceries | -1500.00 |  |  |  |\n',
 
   [`${B}/Debts.md`]: '---\nkind: debts\n---\n\n| Name | Lender | Type | Balance | Original | Rate | Payment | Extra | Start date | Category | Status | Notes |\n|---|---|---|---:|---:|---:|---:|---:|---|---|---|---|\n'
-    + '| Card debt | Bank A | credit card | 8000.00 | 12000.00 | 22.50 | 400.00 | 150.00 | 2024-03-01 | | active | |\n',
+    + '| Card debt | Bank A | credit card | 8000.00 | 12000.00 | 22.50 | 400.00 | 150.00 | 2024-03-01 | | active | |\n'
+    // ISSUE 79: a debt whose rate nobody has written down yet.
+    + '| Family loan | Uncle | personal loan | 3000.00 | 5000.00 |  | 500.00 | 0.00 | 2025-01-01 | | active | |\n',
 
   [`${B}/Assets.md`]: '---\nkind: assets\n---\n\n| Item | Kind | Value | Valued | Notes |\n|---|---|---:|---|---|\n| House | property | 1500000.00 | 2026-03-01 | |\n',
 
   [`${B}/Owed Money.md`]: '---\nkind: owed\n---\n\n| Person | Amount | Description | Due date | Status | Repaid |\n|---|---:|---|---|---|---:|\n| Sam | 250.00 | lunch | 2026-08-01 | outstanding | |\n',
 
-  [`${B}/Services.md`]: '---\nkind: services\n---\n\n| Name | Provider | Amount | Cycle | Next billing | Category | Active | Notes |\n|---|---|---:|---|---|---|---|---|\n| Streaming | Provider A | 199.00 | monthly | 2026-08-05 | Groceries | yes | |\n',
+  [`${B}/Services.md`]: '---\nkind: services\n---\n\n| Name | Provider | Amount | Cycle | Next billing | Category | Active | Notes |\n|---|---|---:|---|---|---|---|---|\n| Streaming | Provider A | 199.00 | monthly | 2026-08-05 | Groceries | yes | |\n'
+    // ISSUE 79: a weekly service, and one still to land later this period.
+    + '| Gym | Gym A | 250.00 | weekly | 2026-07-22 | Gym | yes | |\n'
+    + '| Insurance | Insurer A | 600.00 | monthly | 2026-07-25 | Groceries | yes | |\n',
 
   [`${B}/Tax/2026.md`]: '---\nkind: tax\ntax_year: 2026\ntaxpayer_type: provisional\nassessment: pending\n---\n\n# Tax Year 2026\n\n## Progress\n\n| Step | Status | Due | Notes |\n|---|---|---|---|\n| Gather documents | busy | 2026-09-01 | |\n\n## Documents\n\n| Document | Source | Status | File | Notes |\n|---|---|---|---|---|\n| IRP5 | Employer | needed | | |\n\n## Figures\n\n| Source code | Description | Source | Amount |\n|---|---|---|---|\n| 4201 | Local interest | Bank A | 15000.00 |\n',
 };
 const PERIOD = '2026-07';
+
+/* ISSUE 79: a household whose ONLY debt has no rate. debtInterestMonthly()
+   answers null only when no active debt states one, so the "rate unknown"
+   strings cannot show in FILES, which also has a rated card debt. */
+const FILES_NO_RATES = {
+  ...FILES,
+  [`${B}/Debts.md`]: '---\nkind: debts\n---\n\n| Name | Lender | Type | Balance | Original | Rate | Payment | Extra | Start date | Category | Status | Notes |\n|---|---|---|---:|---:|---:|---:|---:|---|---|---|---|\n'
+    + '| Family loan | Uncle | personal loan | 3000.00 | 5000.00 |  | 500.00 | 0.00 | 2025-01-01 | | active | |\n',
+};
+
+/* ISSUE 79: renders the view list cannot reach on its own. Each goes through
+   assertions 1 and 2 in every language, like a dispatched view. */
+const SCENES = [
+  { name: 'transactions (opened from a Dashboard category)', files: FILES, render: ctx => {
+    /* The DOM stub's <select> has no `options`; syncOptions() reads them to
+       keep the chosen value, so without this the category resets to ''. Same
+       shim as tests/lane-y-drill-future-rows.test.cjs. */
+    const sel = ctx.$('#txCategory');
+    Object.defineProperty(sel, 'options', { configurable: true,
+      get() { return sel.children.filter(c => c.tagName === 'OPTION').map(o => ({ value: o.attrs.value, textContent: o.textContent })); } });
+    ctx.renderTransactions();
+    sel.value = 'Groceries';
+    ctx.$('#txWholeHistory').checked = false;
+    ctx.setTxInBudgetOnly('Groceries');
+    ctx.renderTransactions();
+  } },
+  { name: 'dashboard (no debt has a rate)', files: FILES_NO_RATES, render: ctx => ctx.renderDashboard() },
+  { name: 'score (no debt has a rate)', files: FILES_NO_RATES, render: ctx => ctx.renderScore() },
+];
 
 /* Mount every view module against one fresh ctx — same registration set and
    order as tests/views-render.test.cjs's mountAll, copied rather than
@@ -320,8 +410,8 @@ const PERIOD = '2026-07';
    in it). A FRESH mount per call, not a shared one, is what keeps each
    view's `nodes` map free of ids any OTHER view happens to have queried —
    the isolation assertion 3's per-view before/after diff depends on. */
-async function mountView() {
-  const ctx = makeCtx(FILES);
+async function mountView(files = FILES) {
+  const ctx = makeCtx(files);
   const S = await loadInto(ctx);          // io, period, trend-math, health-data, load, notes
   S.period = PERIOD;
   const { $, nodes } = makeDom();
@@ -353,6 +443,12 @@ async function mountView() {
   }
   return { ctx, nodes };
 }
+
+/* ISSUE 79: rows dated ahead and "still to land this period" are measured
+   against today, so the clock is pinned inside PERIOD - the wall clock would
+   make this file's verdict depend on the day it runs (ISSUE 90). */
+const { pinClock } = require('./helpers/figures.cjs');
+const unpinClock = pinClock('2026-07-20');
 
 (async () => {
   const rawKeyHits = [];
@@ -429,6 +525,26 @@ async function mountView() {
   }
   i18n.setLanguage('en');
 
+  for (const scene of SCENES) {
+    for (const lang of LANGS) {
+      const { ctx, nodes } = await mountView(scene.files);
+      i18n.setLanguage(lang);
+      assert.doesNotThrow(() => scene.render(ctx), `scene "${scene.name}" must render under language '${lang}'`);
+      checks++;
+      for (const r of runsForNodes(nodes)) {
+        const v = r.text.trim();
+        if (isRawKey(v)) rawKeyHits.push({ view: scene.name, lang, src: r.src, tag: r.tag, val: v });
+        const ph = findPlaceholder(r.text);
+        if (ph) placeholderHits.push({ view: scene.name, lang, src: r.src, tag: r.tag, ph, val: r.text });
+      }
+    }
+  }
+  i18n.setLanguage('en');
+
+  /* ---- ISSUE 79 report: the feature strings were actually rendered ---- */
+  eq(REQUIRED_KEYS.filter(k => !reachedKeys.has(k)), [],
+    'every REQUIRED_KEYS string is reached by the render gate (extend FILES, do not shrink the list)');
+
   /* ---- assertion 1 report ---- */
   eq(rawKeyHits.map(h => `${h.view}/${h.lang} ${h.src} <${h.tag}> "${h.val}"`), [],
     'no raw i18n key reached rendered text or an aria-label/title/alt/placeholder attribute');
@@ -458,5 +574,7 @@ async function mountView() {
   console.log(
     `PASS — i18n render gate: ${DISPATCH.length} views x ${LANGS.length} languages, ` +
     `${EXPECTED_ENGLISH_ONLY.length} declared English-only, ${KNOWN_LITERAL_S_KEYS.length} known literal-"(s)" ` +
-    `key(s), ${KNOWN_ENUM_LEAK_VIEWS.length} known enum-leak view(s) (${checks} checks).`);
+    `key(s), ${KNOWN_ENUM_LEAK_VIEWS.length} known enum-leak view(s), ${REQUIRED_KEYS.length} required feature ` +
+    `key(s) reached (${checks} checks).`);
+  unpinClock();
 })().catch(e => { console.error(e); process.exit(1); });
