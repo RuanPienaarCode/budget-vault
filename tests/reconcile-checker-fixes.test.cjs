@@ -336,5 +336,41 @@ const clone = x => JSON.parse(JSON.stringify(x));
     eq(one(runChecks(r.G, pages), 'transactions', /Σ rendered amounts = Σ raw rows/).status, 'fail', 'a wrong amount on the only row fails the sum');
   }
 
-  console.log(`PASS — the reconciliation's checkers are checked: 10 fixes pinned on the synthetic household, each with a negative control where it could pass by not looking (${n} assertions).`);
+  /* ---- 11. A one-owner household with no emergency fund ------------------- */
+  {
+    /* No account flagged as the emergency fund, so health-math's `months` is
+       null, the reserves pillar is unmeasured and the ring draws four rows,
+       not five; and no owners (every account under Unassigned), so the
+       Accounts page draws no owner card. The
+       checker read the ring by fixed row numbers and expected owner rows on
+       every vault: four FAILs on a real one-owner vault, every one its own
+       (2026-11-04). */
+    const files = {};
+    for (const [k, v] of Object.entries(SEED)) {
+      files[k] = typeof v === 'string'
+        ? v.replace(/^emergency_fund: true\n/gm, '').replace(/^owners?: .*\n/gm, '')
+        : v;
+    }
+    ok(!Object.values(files).some(v => typeof v === 'string' && /emergency_fund: true|^owners?:/m.test(v)), 'the variant has no emergency fund and no owners');
+    const r = await reconcile({ ...H, files, today: '2026-10-05' });
+    eq(r.G.health.metrics.months, null, 'months of cover is unmeasured');
+    ok(!r.G.health.breakdown.pillars.some(p => p.key === 'reserves'), 'so the score leaves the reserves pillar out');
+    eq(failed(r.checks), [], 'nothing fails on a one-owner vault with no emergency fund');
+    eq(one(r.checks, 'score', /Ring: reserves pillar left out/).status, 'pass', 'the absent pillar is checked as absent');
+    eq(one(r.checks, 'score', /Ring: row 0 is the saving pillar/).status, 'pass', 'row 0 is saving now, not reserves');
+    eq(one(r.checks, 'accounts', /Owner rows: card drawn only from two owners up/).status, 'pass', 'no owner card is the page being right');
+
+    /* NEGATIVE CONTROL: a row drawn under the wrong pillar's points. */
+    const pages = clone(r.pages);
+    const pts = pages.find(p => p.view === 'score').figures.filter(x => /button\.score-ring-row\[1\]\/span\.score-ring-row-pts/.test(x.address) && x.kind === 'number');
+    pts[1].raw = (pts[1].raw == null ? Number(pts[1].text) : pts[1].raw) + 3; pts[1].text = String(Number(pts[1].text) + 3);
+    eq(one(runChecks(r.G, pages), 'score', /Ring: row 1 is the debt pillar/).status, 'fail', 'a row whose points are not its pillar\'s fails');
+    /* NEGATIVE CONTROL: an owner card drawn for one owner. */
+    const own = clone(r.pages);
+    const hero = own.find(p => p.view === 'accounts').figures.find(x => x.kind === 'money');
+    own.find(p => p.view === 'accounts').figures.push({ ...hero, address: 'acctSummary/@acct-owner-net' });
+    eq(one(runChecks(r.G, own), 'accounts', /Owner rows: card drawn only from two owners up/).status, 'fail', 'an owner card on a one-owner vault fails');
+  }
+
+  console.log(`PASS — the reconciliation's checkers are checked: 11 fixes pinned on the synthetic household, each with a negative control where it could pass by not looking (${n} assertions).`);
 })().catch(e => { console.error(e); process.exit(1); });

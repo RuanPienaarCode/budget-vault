@@ -20,6 +20,7 @@
    method shorthand so `this` is the profile they were read off. */
 const { fact, limitsFor: zaLimitsForFact } = require('./facts');
 const { formatAmount } = require('./currency');
+const { roundCents } = require('./amount');
 
 /* `currency` is a symbol the CALLER believes these figures are in. Delegates
    the actual formatting to currency.js's formatAmount so this is not a second
@@ -50,10 +51,14 @@ const { formatAmount } = require('./currency');
    directly with no currency in scope. */
 const fmtAmt = (p, v, currency) => formatAmount(currency || p.currency, v, 2, p);
 
-/* Sum the figure rows carrying any of the given codes. */
-const sumCodes = (figures, ...codes) => (figures || [])
+/* Sum the figure rows carrying any of the given codes, in cents: every check
+   below compares the sum against a limit with `>`, and twelve debit orders
+   that hit the TFSA limit exactly add to 46000.000000000015 in floats — a red
+   "40% penalty on the R 0,00 excess" card for a household at the limit
+   (2026-11-04, tests/tax-limit-exact-cents.test.cjs). */
+const sumCodes = (figures, ...codes) => roundCents((figures || [])
   .filter(f => codes.includes((f.code || '').trim()))
-  .reduce((a, f) => a + (f.amount || 0), 0);
+  .reduce((a, f) => a + (f.amount || 0), 0));
 
 /* SARS remuneration + fringe-benefit codes — what an IRP5 contributes to
    taxable income. Deliberately excludes investment codes (4201/4218/4250/…),
