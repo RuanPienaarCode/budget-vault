@@ -32,6 +32,7 @@ const path = require('path');
 const { stubObsidian } = require('../tests/helpers/harness.cjs');
 stubObsidian();
 const { dispatchedViews, pinClock, mountFor, harvestView, readVault, readable } = require('../tests/helpers/figures.cjs');
+const { PILLARS } = require('../src/health-math');
 
 const argv = process.argv.slice(2);
 const flag = n => { const i = argv.indexOf(`--${n}`); return i < 0 ? null : (argv[i + 1] || true); };
@@ -1215,12 +1216,46 @@ function runChecks(G, pages) {
     re: /\/@score-used$/, globalValue: CU.used == null ? null : CU.used * 100, globalSource: `budgetUsed(currentPeriod ${CU.period}).used`, renderedFrom: 0 });
   /* The ring legend, one row per pillar, every figure off healthSnapshot(). */
   const H = G.health.metrics;
-  const ring = i => new RegExp(`score-ring-legend\\[\\d+\\]/button\\.score-ring-row\\[${i}\\]/`);
-  dom({ page: SC, name: 'Ring: emergency fund set aside', formula: 'resolveEarmarks(home accounts).total', re: ring(0), globalValue: G.health.earmarks.total, globalSource: 'earmarks.total', index: 0 });
-  dom({ page: SC, name: 'Ring: essentials per month', formula: 'monthlyEssential (HOUSEHOLD lens essential spend, six-period average)', re: ring(0), globalValue: H.monthlyEssential, globalSource: 'metrics.monthlyEssential', index: 1 });
-  dom({ page: SC, name: 'Ring: % of income saved', formula: 'savingsRate', kind: 'percent', re: ring(1), globalValue: isNum(H.savingsRate) ? H.savingsRate * 100 : null, globalSource: 'metrics.savingsRate' });
-  dom({ page: SC, name: 'Ring: saved per month', formula: 'monthlySavings', re: ring(1), globalValue: H.monthlySavings, globalSource: 'metrics.monthlySavings' });
-  dom({ page: SC, name: 'Ring: % of income to interest', formula: 'interestShare', kind: 'percent', re: ring(2), globalValue: isNum(H.interestShare) ? H.interestShare * 100 : null, globalSource: 'metrics.interestShare' });
+  /* The legend draws one row per pillar the score LIVES on (money-flow.js
+     railSegments: PILLARS' declaration order, a pillar missing from
+     breakdown.pillars skipped), so a row's index is its rank among the live
+     pillars, not a constant. These were 0..4, and on a vault with no
+     emergency fund flagged (health-math `months` null, so `reserves` is
+     unmeasured and left out) every row moved up one: the saving checks read
+     the debt row, the spending checks found nothing, net worth found nothing
+     — four FAILs made by the checker (Susan Vault, 2026-11-04). */
+  const livePillars = new Set(((G.health.breakdown && G.health.breakdown.pillars) || []).map(p => p.key));
+  const ringKeys = PILLARS.map(p => p.key).filter(k => livePillars.has(k));
+  const ringAt = k => ringKeys.indexOf(k);
+  const ring = k => new RegExp(`score-ring-legend\\[\\d+\\]/button\\.score-ring-row\\[${ringAt(k)}\\]/`);
+  /* A pillar the ring leaves out is only right when health-math could measure
+     none of it. Its figure checks are then moot; one check stands for them. */
+  const PILLAR_MEASURES = { reserves: ['months'], saving: ['savingsRate'], debt: ['interestShare', 'instalmentShare'],
+    spending: ['fixedShare', 'consumptionShare', 'budgetUsed'], wealth: ['netWorthMultiple'] };
+  for (const { key } of PILLARS) {
+    if (livePillars.has(key)) {
+      /* And the row really is that pillar: its "out of" points are the ones the
+         breakdown allots it (score-ring-row-pts: earned, then max). */
+      const p = G.health.breakdown.pillars.find(x => x.key === key);
+      const pts = C.figs(SC, new RegExp(`score-ring-legend\\[\\d+\\]/button\\.score-ring-row\\[${ringAt(key)}\\]/span\\.score-ring-row-pts`), 'number');
+      C.add({ page: SC, name: `Ring: row ${ringAt(key)} is the ${key} pillar (points out of)`, formula: 'breakdown pillar shownMax at its railSegments rank', kind: 'count',
+        pageValue: pts[1] ? figValue(pts[1]) : null, pageSource: pts[1] ? pts[1].address : 'no points figure', globalValue: p.shownMax, globalSource: `breakdown.${key}.shownMax`, tol: 0 });
+      continue;
+    }
+    const known = (PILLAR_MEASURES[key] || []).filter(m => isNum(H[m]));
+    C.checks.push({ page: SC, name: `Ring: ${key} pillar left out`, formula: `a pillar is drawn when health-math measures any of ${(PILLAR_MEASURES[key] || []).join(', ')}`, kind: 'count',
+      pageValue: null, pageSource: 'no row drawn', globalValue: known.length, globalSource: known.length ? `measured: ${known.join(', ')}` : 'none of its measures is known',
+      status: known.length ? 'fail' : 'pass', delta: null, why: [], note: '' });
+  }
+  const ringDom = (key, opts) => { if (livePillars.has(key)) dom({ ...opts, re: ring(key) }); };
+  ringDom('reserves', { page: SC, name: 'Ring: emergency fund set aside', formula: 'resolveEarmarks(home accounts).total', globalValue: G.health.earmarks.total, globalSource: 'earmarks.total', index: 0 });
+  ringDom('reserves', { page: SC, name: 'Ring: essentials per month', formula: 'monthlyEssential (HOUSEHOLD lens essential spend, six-period average)', globalValue: H.monthlyEssential, globalSource: 'metrics.monthlyEssential', index: 1 });
+  ringDom('saving', { page: SC, name: 'Ring: % of income saved', formula: 'savingsRate', kind: 'percent', globalValue: isNum(H.savingsRate) ? H.savingsRate * 100 : null, globalSource: 'metrics.savingsRate' });
+  ringDom('saving', { page: SC, name: 'Ring: saved per month', formula: 'monthlySavings', globalValue: H.monthlySavings, globalSource: 'metrics.monthlySavings' });
+  /* score.js whereYouAre('debt') prints nothing when interestShare is null (a
+     debt-free household still scores the pillar), so a null seam beside no
+     figure is the page agreeing. */
+  ringDom('debt', { page: SC, name: 'Ring: % of income to interest', formula: 'interestShare', kind: 'percent', globalValue: isNum(H.interestShare) ? H.interestShare * 100 : null, globalSource: 'metrics.interestShare', renderedFrom: 0 });
   /* The spending pillar's row is ONE sentence of up to three percentages, each
      conditional on its own measure being known (score.js scoreNow, key
      'spending': fixed bills, living costs, budget used — in that order, a bit
@@ -1235,7 +1270,7 @@ function runChecks(G, pages) {
   const spendingAt = k => spendingBits.indexOf(k);
   /* The "now" sentence only — the row's "how" prose sits in the same button and
      can carry a percentage of its own. */
-  const spendingNow = /score-ring-legend\[\d+\]\/button\.score-ring-row\[3\]\/span\.score-ring-row-body\[\d+\]\/span\.score-ring-row-now/;
+  const spendingNow = new RegExp(`score-ring-legend\\[\\d+\\]/button\\.score-ring-row\\[${ringAt('spending')}\\]/span\\.score-ring-row-body\\[\\d+\\]/span\\.score-ring-row-now`);
   const spendingDom = (name, formula, k, v, src) => dom({ page: SC, name, formula, kind: 'percent', re: spendingNow,
     /* Absent measure: nothing to find, and nothing to compare. score.js scoreNow
        drops a bit whose metric is null, so a null seam beside no figure is the
@@ -1253,7 +1288,7 @@ function runChecks(G, pages) {
     C.add({ page: SC, name: 'Ring: spending row prints one percentage per known measure', formula: 'fixedShare, consumptionShare, budgetUsed — each only when non-null', kind: 'count',
       pageValue: printed, pageSource: `${printed} percentages in the spending row`, globalValue: spendingBits.length, globalSource: `known measures: ${spendingBits.join(', ') || 'none'}`, tol: 0 });
   }
-  dom({ page: SC, name: 'Ring: net worth', formula: 'healthSnapshot → worth(impliedAccounts…).net', re: ring(4), globalValue: W.implied.net, globalSource: 'worth().net' });
+  ringDom('wealth', { page: SC, name: 'Ring: net worth', formula: 'healthSnapshot → worth(impliedAccounts…).net', globalValue: W.implied.net, globalSource: 'worth().net' });
   {
     /* Two "budget used" readings on one screen, by two documented rules. */
     const chip = C.fig(SC, /\/@score-used$/, 'percent');
@@ -1385,8 +1420,18 @@ function runChecks(G, pages) {
     /* @acct-owner-net exactly: the foreign "plus $ 1 000" tag is a CHILD of
        this span, and an unanchored match summed it in as another owner. */
     const owners = C.figs(A, /^acctSummary\/@acct-owner-net$/, 'money').map(figValue);
+    /* accounts.js draws the owner card from two owners up (`rows.length < 2`
+       → no card): a one-owner vault has no rows to sum, and that is the page
+       being right, not a figure gone missing (Susan Vault, 2026-11-04). */
+    const ownerKeys = Object.keys(W.byOwnerLive);
+    if (ownerKeys.length < 2) {
+      C.checks.push({ page: A, name: 'Owner rows: card drawn only from two owners up', formula: 'accounts.js netByOwner(...).length < 2 → no owner card', kind: 'count',
+        pageValue: owners.length, pageSource: `${owners.length} owner rows`, globalValue: 0, globalSource: `${ownerKeys.length} owner on the live accounts`,
+        status: owners.length === 0 ? 'pass' : 'fail', delta: null, why: [], note: '' });
+    } else {
     C.add({ page: A, name: 'Owner rows sum to the hero', formula: 'Σ per-owner net = accounts total', pageValue: owners.reduce((a, b) => a + b, 0), pageSource: `Σ ${owners.length} owner rows`, globalValue: liveNet, globalSource: 'Σ live home balances' });
     column({ page: A, name: 'Owner rows = Σ by owner', formula: 'a.owner; a blank owner buckets under Unassigned, never "joint"', re: /^acctSummary\/@acct-owner-net$/, seam: Object.values(W.byOwnerLive), globalSource: 'Σ live by owner (this script)' });
+    }
   }
   dom({ page: A, name: 'Donut: total', formula: 'Σ live home balances', re: /^acctSummary\/div\.card\[2\]\/.*svg\.donut\/text/, globalValue: liveNet, globalSource: 'Σ live home balances' });
   {
