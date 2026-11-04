@@ -13,14 +13,32 @@ money	R 1 000	1000	heroCard/div.hero-grid/div.stat-col[1]/div.stat[1]/div[1]/div
 money	R 2 000	2000	heroCard/div.hero-grid/div.stat-col[1]/div.stat[1]/div[1]/div.st[1]/span.fact[2]
 money	R 12 100	12100	heroCard/div.hero-grid/div.stat-col[1]/div.stat[2]/div[1]/div.sv[0]
 percent	78%	-	heroCard/div.hero-grid/div.stat-col[1]/div.stat[2]/div[1]/div.st[1]/span.tag
-number	45	-	healthBody/div.health-grid/div.health-fig[0]/button.health-fig-btn/div.lv[0]
-number	1,0	-	healthBody/div.health-grid/div.health-fig[1]/button.health-fig-btn/div.lv[0]
-number	6	-	healthBody/div.health-grid/div.health-fig[1]/button.health-fig-btn/div.lm[2]
-money	R 14 500	14500	healthBody/div.health-grid/div.health-fig[1]/button.health-fig-btn/div.lm[2]
-percent	0%	-	healthBody/div.health-grid/div.health-fig[2]/button.health-fig-btn/div.lv[0]
-money	R 0	0	healthBody/div.health-grid/div.health-fig[2]/button.health-fig-btn/div.lm[2]
-percent	0,4%	-	healthBody/div.health-grid/div.health-fig[3]/button.health-fig-btn/div.lv[0]
-money	R 133	133.33333333333334	healthBody/div.health-grid/div.health-fig[3]/button.health-fig-btn/div.lm[2]
+number	45	-	healthBody/div.health-split/div.health-fig[0]/button.health-fig-btn/div.lv[0]
+number	45	-	healthBody/div.health-split/div.health-panel[1]/div.health-panel-head/span[0]
+number	1,0	-	healthBody/div.health-split/div.health-panel[1]/button.health-row[0]/div.hr-name[0]/span.hr-fact
+number	6	-	healthBody/div.health-split/div.health-panel[1]/button.health-row[0]/div.hr-name[0]/span.hr-fact
+money	R 14 500	14500	healthBody/div.health-split/div.health-panel[1]/button.health-row[0]/div.hr-name[0]/span.hr-fact
+number	25	-	healthBody/div.health-split/div.health-panel[1]/button.health-row[0]/div.hr-pts[2]
+number	4	-	healthBody/div.health-split/div.health-panel[1]/button.health-row[0]/div.hr-pts[2]/b
+percent	0%	-	healthBody/div.health-split/div.health-panel[1]/button.health-row[1]/div.hr-name[0]/span.hr-fact
+money	R 0	0	healthBody/div.health-split/div.health-panel[1]/button.health-row[1]/div.hr-name[0]/span.hr-fact
+number	20	-	healthBody/div.health-split/div.health-panel[1]/button.health-row[1]/div.hr-pts[2]
+number	0	-	healthBody/div.health-split/div.health-panel[1]/button.health-row[1]/div.hr-pts[2]/b
+percent	0,4%	-	healthBody/div.health-split/div.health-panel[1]/button.health-row[2]/div.hr-name[0]/span.hr-fact
+money	R 133	133.33333333333334	healthBody/div.health-split/div.health-panel[1]/button.health-row[2]/div.hr-name[0]/span.hr-fact
+number	20	-	healthBody/div.health-split/div.health-panel[1]/button.health-row[2]/div.hr-pts[2]
+number	19	-	healthBody/div.health-split/div.health-panel[1]/button.health-row[2]/div.hr-pts[2]/b
+percent	47%	-	healthBody/div.health-split/div.health-panel[1]/button.health-row[3]/div.hr-name[0]/span.hr-fact
+number	20	-	healthBody/div.health-split/div.health-panel[1]/button.health-row[3]/div.hr-pts[2]
+number	20	-	healthBody/div.health-split/div.health-panel[1]/button.health-row[3]/div.hr-pts[2]/b
+money	R 102 400	102400	healthBody/div.health-split/div.health-panel[1]/button.health-row[4]/div.hr-name[0]/span.hr-fact
+number	0,3	-	healthBody/div.health-split/div.health-panel[1]/button.health-row[4]/div.hr-name[0]/span.hr-fact
+number	15	-	healthBody/div.health-split/div.health-panel[1]/button.health-row[4]/div.hr-pts[2]
+number	2	-	healthBody/div.health-split/div.health-panel[1]/button.health-row[4]/div.hr-pts[2]/b
+money	R 69 500	69500	healthBody/div.health-split/div.health-panel[1]/p.health-drag
+number	6	-	healthBody/div.health-split/div.health-panel[1]/p.health-drag
+number	21	-	healthBody/div.health-split/div.health-panel[1]/p.health-drag/b
+number	25	-	healthBody/div.health-split/div.health-panel[1]/p.health-drag/b
 money	R 28 900	28900	leftBody/@left-cash
 number	2	-	leftBody/div.left-grid[0]/div.left-fig[0]/div.lm[2]/span.fact[0]
 number	2	-	leftBody/div.left-grid[0]/div.left-fig[0]/div.lm[2]/span.fact[2]

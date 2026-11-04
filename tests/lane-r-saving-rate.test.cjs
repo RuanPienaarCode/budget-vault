@@ -74,11 +74,13 @@ const FILES_HEALTH = { ...FILES,
 
   /* ---- the Dashboard health card prints it ------------------------------------ */
   const card = M.nodes.get('#healthBody');
-  const tile = find(card, n => hasClass(n, 'health-fig') && /income saved on average/.test(textOf(n)))[0];
-  ok(tile, 'the health card has its saving tile');
-  const lv = find(tile, n => hasClass(n, 'lv'))[0];
-  eq(textOf(lv).replace(/[^\d,.%]/g, ''), '3%', 'the tile prints 3% (1 000 of 30 000), not the inflated rate the windfalls made it');
-  ok(/R\s?1\s?000/.test(textOf(tile).replace(/ /g, ' ')), 'and R 1 000 a month beside it');
+  /* Since the Nov 2026 pillar-bars redesign the saving figure is the Saving row's
+     fact line ("3% of budget income · R 1 000 a month"), not a tile of its own. */
+  const tile = find(card, n => hasClass(n, 'health-row') && /of budget income/.test(textOf(n)) && /Saving/.test(textOf(n)))[0];
+  ok(tile, 'the health card has its saving row');
+  const fact = find(tile, n => hasClass(n, 'hr-fact'))[0];
+  ok(/^3% of budget income/.test(textOf(fact).replace(/\u00a0/g, ' ')), 'the row prints 3% (1 000 of 30 000), not the inflated rate the windfalls made it');
+  ok(/R\s?1\s?000/.test(textOf(fact).replace(/\u00a0/g, ' ')), 'and R 1 000 a month beside it');
 
   /* ---- the Score page reads the same snapshot -------------------------------- */
   {

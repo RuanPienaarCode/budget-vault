@@ -107,15 +107,17 @@
 
 /* ------------------------------------------------------------
    2. FINANCIAL HEALTH
-   Score first and a little wider; the three inputs beside it at figure size.
-   Tones are today's: green good, amber fair, rose poor.
+   The green score slab on the left, and "what the score is made of" beside it:
+   five rows, each a bar as long as the part is worth and filled to what it
+   earned. Tones are today's: green good, amber fair, rose poor — the shared
+   .cat-bar fills, so no new colour and no glow.
    ------------------------------------------------------------ */
-.budget-app-root #healthBody .health-grid {
-  grid-template-columns: minmax(0, 1.12fr) repeat(3, minmax(0, 1fr));
-  gap: 12px;
+.budget-app-root #healthBody .health-split {
+  grid-template-columns: minmax(240px, .85fr) minmax(0, 2.4fr);
+  gap: 14px;
 }
 .budget-app-root #healthBody .health-fig {
-  padding: 22px 22px 20px;
+  padding: 24px;
   border-radius: 22px;
   display: flex;
   flex-direction: column;
@@ -125,34 +127,12 @@
   flex: 1;
   flex-direction: column;
   align-items: stretch;
-  justify-content: flex-start;
+  justify-content: center;
   height: 100%;
   text-align: left;
 }
-.budget-app-root #healthBody .health-fig .ll {
-  font-size: var(--st-label);
-  font-weight: var(--st-weight-label);
-  margin-top: 12px;
-}
-.budget-app-root #healthBody .health-fig .lm {
-  font-size: var(--st-small);
-  line-height: 1.45;
-  margin-top: 4px;
-}
-.budget-app-root #healthBody .health-fig:not(.is-score) .lm { color: var(--text-light); }
-.budget-app-root #healthBody .health-fig .lv small {
-  font-size: 16px;
-  font-weight: var(--st-weight-label);
-  letter-spacing: 0;
-  color: var(--text-muted);
-}
-.budget-app-root #healthBody .health-meter { margin-top: 14px; }
-.budget-app-root #healthBody .health-fig:not(.is-score) .lm.text-danger { color: var(--color-danger-ink); }
-
-/* The score is the card's conclusion: score size, its label and band word pinned
-   to the foot of the slab. */
-.budget-app-root #healthBody .health-fig.is-score { padding: 24px; }
-.budget-app-root #healthBody .health-fig.is-score .health-fig-btn { justify-content: space-between; }
+/* The score is the card's conclusion: score size, its label and band word, then
+   the scale. */
 .budget-app-root #healthBody .health-fig.is-score .lv {
   font-size: var(--st-score);
   line-height: .9;
@@ -160,32 +140,125 @@
 }
 .budget-app-root #healthBody .health-fig.is-score .ll {
   font-size: var(--st-body);
+  font-weight: var(--st-weight-label);
   margin-top: 14px;
 }
 .budget-app-root #healthBody .health-fig.is-score .lm {
   font-size: 14px;
   font-weight: var(--st-weight-label);
 }
-@media (max-width: 1100px) {
-  .budget-app-root #healthBody .health-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-  .budget-app-root #healthBody .health-fig.is-score { grid-column: 1 / -1; }
-  .budget-app-root #healthBody .health-fig.is-score .health-fig-btn {
-    flex-direction: row;
-    align-items: flex-end;
-    justify-content: flex-start;
-    gap: 20px;
-  }
-  .budget-app-root #healthBody .health-fig.is-score .ll { margin-top: 0; }
+
+.budget-app-root #healthBody .health-panel {
+  min-width: 0;
+  padding: 18px 22px 20px;
+  border-radius: 22px;
+  background: var(--surface-glass);
+  border: 1px solid var(--line-soft);
 }
+.budget-app-root #healthBody .health-panel-head {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  padding-bottom: 8px;
+  border-bottom: 1px solid var(--line-soft);
+  font-size: var(--st-micro);
+  color: var(--ink-faint);
+}
+/* A row is one real button routing to the page that argues its figure. Name and
+   fact on the left, the bar in the middle, the points on the right. The hover
+   tint is a flat wash, bled out to the panel's padding so it reads as a row. */
+.budget-app-root #healthBody .health-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1.3fr) minmax(0, 2fr) minmax(56px, auto);
+  align-items: center;
+  gap: 16px;
+  min-height: 44px;
+  margin: 0 -10px;
+  padding: 12px 10px;
+  width: calc(100% + 20px);
+  border: 0;
+  border-bottom: 1px solid var(--line-soft);
+  border-radius: 0;
+  background: none;
+  font: inherit;
+  color: var(--text-primary);
+  text-align: left;
+  cursor: pointer;
+}
+@media (hover: hover) {
+  .budget-app-root #healthBody .health-row:hover { background: var(--line-soft); }
+}
+.budget-app-root #healthBody .health-row:focus-visible { outline: 2px solid var(--color-primary); outline-offset: -2px; }
+.budget-app-root #healthBody .hr-name { min-width: 0; }
+.budget-app-root #healthBody .hr-name b {
+  display: block;
+  font-size: var(--st-body);
+  font-weight: 600;
+}
+/* No colour on .hr-over's own rule: the muted tone is set here on every fact and
+   the over-claim warning is a .text-danger, whose doubled rule must out-rank it
+   (tests/css-tone-wins.test.cjs). */
+.budget-app-root #healthBody .hr-fact {
+  display: block;
+  margin-top: 2px;
+  font-size: var(--st-small);
+  line-height: 1.4;
+  color: var(--text-light);
+}
+.budget-app-root #healthBody .hr-bar { min-width: 0; }
+/* The track is as long as the part is worth (an inline width, a share of the
+   widest part), so .cat-bar's own floor must not prop the short ones up. */
+.budget-app-root #healthBody .health-row .health-track {
+  box-sizing: border-box;
+  min-width: 0;
+  max-width: 100%;
+  height: 12px;
+  border-radius: 12px;
+}
+.budget-app-root #healthBody .health-row .health-track .cat-bar-fill { border-radius: 12px; }
+/* A part the vault cannot measure: an empty, dashed track rather than a fill
+   of nothing, so "no data" does not read as "scored zero". */
+.budget-app-root #healthBody .health-row .health-track.is-empty {
+  background: transparent;
+  border: 1px dashed var(--border-color);
+}
+.budget-app-root #healthBody .hr-pts {
+  text-align: right;
+  white-space: nowrap;
+  font-size: var(--st-small);
+  color: var(--text-muted);
+}
+.budget-app-root #healthBody .hr-pts b {
+  font-size: 20px;
+  font-weight: 700;
+  color: var(--text-primary);
+}
+.budget-app-root #healthBody .health-row.is-unmeasured .hr-pts b { color: var(--text-muted); }
+.budget-app-root #healthBody .health-drag {
+  margin: 14px 0 0;
+  font-size: var(--st-small);
+  line-height: 1.5;
+  color: var(--text-muted);
+}
+.budget-app-root #healthBody .health-drag b { color: var(--text-primary); font-weight: 600; }
+
+@media (max-width: 900px) {
+  .budget-app-root #healthBody .health-split { grid-template-columns: minmax(0, 1fr); }
+}
+/* Phone: the slab sits on top at full width, and each row folds to two lines —
+   name and points on the first, the bar underneath. */
 @media (max-width: 640px) {
-  .budget-app-root #healthBody .health-grid { grid-template-columns: minmax(0, 1fr); }
-  .budget-app-root #healthBody .health-fig.is-score .health-fig-btn {
-    flex-direction: column;
-    align-items: flex-start;
-    justify-content: space-between;
-    gap: 0;
+  .budget-app-root #healthBody .health-fig { padding: 20px; }
+  .budget-app-root #healthBody .health-panel { padding: 16px 16px 18px; }
+  .budget-app-root #healthBody .health-panel-head span:last-child { display: none; }
+  .budget-app-root #healthBody .health-row {
+    grid-template-columns: minmax(0, 1fr) auto;
+    gap: 8px 12px;
+    align-items: start;
   }
-  .budget-app-root #healthBody .health-fig.is-score .ll { margin-top: 14px; }
+  .budget-app-root #healthBody .hr-name { grid-column: 1; grid-row: 1; }
+  .budget-app-root #healthBody .hr-pts { grid-column: 2; grid-row: 1; }
+  .budget-app-root #healthBody .hr-bar { grid-column: 1 / -1; grid-row: 2; }
 }
 
 /* ------------------------------------------------------------
@@ -396,4 +469,11 @@
   line-height: 1.45;
   margin-top: 12px;
   color: var(--text-light);
+}
+
+/* :focus-visible is Safari 15.4+ and an unknown pseudo-class drops the whole
+   rule, so on iOS 15.0-15.3 the row's ring above would vanish; plain :focus is
+   the fallback there (the same trade styles.css makes in its own block). */
+@supports not selector(:focus-visible) {
+  .budget-app-root #healthBody .health-row:focus { outline: 2px solid var(--color-primary); outline-offset: -2px; }
 }

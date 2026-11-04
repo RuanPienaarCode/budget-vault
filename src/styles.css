@@ -1065,17 +1065,18 @@ body.is-tablet .budget-app-root button:where(.dock-btn) { padding: 6px 10px; }
   .budget-app-root .left-op { display: none; }
 }
 
-/* Financial health — four figures on the same visual grammar as What's left
-   (big value, muted label, faint meta), but with no operators between them:
-   these are four independent facts, not one subtraction. Tones reuse the
-   tokens the left-figs already established — primary for good, warning-ink
-   for fair, danger-ink for poor — so "this colour means this" stays one rule
-   across the two adjacent cards. */
-.budget-app-root .health-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; }
+/* Financial health — the score slab on the left, and beside it the five parts
+   the score is made of (variant B, Nov 2026): a row per part with a bar as long
+   as the part is worth. The slab keeps the grammar of What's left (big value,
+   muted label, faint meta). Tones reuse the tokens the left-figs already
+   established — primary for good, warning for fair, danger for poor — so "this
+   colour means this" stays one rule across the adjacent cards. The panel's own
+   rules live in src/statement/dashboard.css, which owns #healthBody. */
+.budget-app-root .health-split { display: grid; grid-template-columns: minmax(240px, .85fr) minmax(0, 2.4fr); gap: 14px; }
 .budget-app-root .health-fig { padding: 12px 14px; min-width: 0; background: var(--surface-glass); border-radius: 12px; }
-/* A tile that routes somewhere is a real button filling its own tile, so the
-   whole card is the target rather than the text inside it. Reset to inherit
-   the tile's own look — this is a link wearing a figure, not a control. */
+/* The slab is a real button filling its own tile, so the whole slab is the
+   target rather than the text inside it. Reset to inherit the tile's own look
+   — this is a link wearing a figure, not a control. */
 .budget-app-root .health-fig-btn {
   display: block; width: 100%; padding: 0; margin: 0;
   background: none; border: 0; font: inherit; color: inherit; text-align: inherit;
@@ -1088,17 +1089,13 @@ body.is-tablet .budget-app-root button:where(.dock-btn) { padding: 6px 10px; }
 }
 .budget-app-root .health-fig .lv { font-size: 26px; font-weight: 700; letter-spacing: -.02em; line-height: 1.15; }
 .budget-app-root .health-fig .ll { font-size: 12px; color: var(--text-muted); margin-top: 3px; }
-/* The unit beside the cover figure — smaller and lighter so the number still
-   leads, matching how .hero-num sets its currency symbol. */
-.budget-app-root .health-fig .lv small { font-size: 0.5em; font-weight: 600; color: var(--text-muted); }
 .budget-app-root .health-fig .lm { font-size: 11.5px; color: var(--ink-faint); margin-top: 3px; }
 .budget-app-root .health-fig.is-good .lv { color: var(--color-primary); }
 .budget-app-root .health-fig.is-fair .lv { color: var(--color-warning-ink); }
 .budget-app-root .health-fig.is-poor .lv { color: var(--color-danger-ink); }
-.budget-app-root .health-meter { margin-top: 8px; min-width: 0; }
 
-/* The score tile is the card's CONCLUSION — the other three are the inputs it
-   is drawn from — so it is inverted to say so at a glance.
+/* The score slab is the card's CONCLUSION — the five rows beside it are the
+   parts it is drawn from — so it is inverted to say so at a glance.
 
    Composed from the sealed palette rather than a new colour, and stated once
    per theme because --color-primary-dark is a deep green in the light theme and
@@ -1114,8 +1111,9 @@ body.is-tablet .budget-app-root button:where(.dock-btn) { padding: 6px 10px; }
 .budget-app-root .health-fig.is-score .lv .num { color: #ffffff; }
 .budget-app-root .health-fig.is-score .ll { color: rgba(255, 255, 255, .86); }
 .budget-app-root .health-fig.is-score .lm { color: rgba(255, 255, 255, .72); }
-/* The band tones colour the FIGURE on the other tiles; on this one the slab
-   already carries the meaning, and a red number on deep green is unreadable. */
+/* The band tone would colour the FIGURE in the plain tile grammar; on the slab
+   the colour already carries the meaning, and a red number on deep green is
+   unreadable. */
 .budget-app-root .health-fig.is-score.is-good .lv,
 .budget-app-root .health-fig.is-score.is-fair .lv,
 .budget-app-root .health-fig.is-score.is-poor .lv { color: #ffffff; }
@@ -1131,7 +1129,24 @@ body.is-tablet .budget-app-root button:where(.dock-btn) { padding: 6px 10px; }
 .budget-app-root.bud-dark .health-fig.is-score .ll { color: var(--text-muted); }
 .budget-app-root.bud-dark .health-fig.is-score .lm { color: var(--ink-faint); }
 .budget-app-root.bud-dark .health-fig.is-score .health-fig-btn:focus-visible { outline-color: var(--color-primary); }
-@media (max-width: 900px) { .budget-app-root .health-grid { grid-template-columns: repeat(2, 1fr); } }
+
+/* The band scale under "steady": three zones as wide as the stretch of 0-100
+   each covers, the zone the score is in lit, a marker at the score. White on the
+   light theme's deep-green slab; on the dark theme's glass slab the same roles
+   are played by the border, primary and text tokens — stated once per theme for
+   the contrast reason above. Flat fills only: no glow, no coloured shadow. */
+.budget-app-root .health-band { margin-top: 18px; }
+.budget-app-root .health-band .band-bar { position: relative; display: flex; gap: 3px; }
+.budget-app-root .health-band .band-bar span { display: block; min-width: 0; height: 8px; border-radius: 4px; background: rgba(255, 255, 255, .22); }
+.budget-app-root .health-band .band-bar span.on { background: rgba(255, 255, 255, .5); }
+.budget-app-root .health-band .band-bar b { position: absolute; top: -3px; width: 4px; height: 14px; margin-left: -2px; border-radius: 2px; background: #ffffff; }
+.budget-app-root .health-band .band-l { display: flex; gap: 3px; margin-top: 6px; font-size: 12px; line-height: 1.2; color: rgba(255, 255, 255, .86); }
+.budget-app-root .health-band .band-l span { min-width: 0; white-space: nowrap; }
+.budget-app-root.bud-dark .health-band .band-bar span { background: var(--border-color); }
+.budget-app-root.bud-dark .health-band .band-bar span.on { background: var(--color-primary); }
+.budget-app-root.bud-dark .health-band .band-bar b { background: var(--text-primary); }
+.budget-app-root.bud-dark .health-band .band-l { color: var(--ink-faint); }
+@media (max-width: 900px) { .budget-app-root .health-split { grid-template-columns: minmax(0, 1fr); } }
 
 /* The tile is a positioning context for nothing in particular now — the
    popup it anchored is gone (see views/dashboard.js). Kept because it costs
@@ -6388,13 +6403,10 @@ body.is-tablet .budget-app-root button:where(.dock-btn) { padding: 6px 10px; }
 .budget-app-root .left-bar.bud-bar-in .b-free { animation-delay: calc(.35s - var(--bud-skip, 0ms)); }
 /* The meters' own first-paint grow (bud-bar-grow) restarts with every new
    node; mid-entrance it carries on instead, like the rest. */
-.budget-app-root .hero-meter.bud-bar-in i,
-.budget-app-root .health-meter.bud-bar-in .cat-bar-fill { animation-delay: calc(var(--bud-skip, 0ms) * -1); }
+.budget-app-root .hero-meter.bud-bar-in i { animation-delay: calc(var(--bud-skip, 0ms) * -1); }
 @keyframes bud-seg-in { from { transform: scaleX(0); } }
-.budget-app-root .health-meter.bud-bar-in { position: relative; overflow: hidden; }
 .budget-app-root .left-bar.bud-bar-in::after,
-.budget-app-root .hero-meter.bud-bar-in::after,
-.budget-app-root .health-meter.bud-bar-in::after {
+.budget-app-root .hero-meter.bud-bar-in::after {
   content: ''; position: absolute; inset: 0; pointer-events: none;
   background: linear-gradient(90deg, transparent, rgba(255, 255, 255, .6), transparent);
   transform: translateX(-100%); animation: bud-shimmer .9s ease-out .75s both;
@@ -6410,7 +6422,6 @@ body.is-tablet .budget-app-root button:where(.dock-btn) { padding: 6px 10px; }
   .budget-app-root .left-bar.bud-bar-in i { animation: none; }
   .budget-app-root .left-bar.bud-bar-in::after,
   .budget-app-root .hero-meter.bud-bar-in::after,
-  .budget-app-root .health-meter.bud-bar-in::after,
   .budget-app-root .bud-float,
   .budget-app-root .bud-sparks { display: none; }
 }

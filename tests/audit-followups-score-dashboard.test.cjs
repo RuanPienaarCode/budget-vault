@@ -129,34 +129,39 @@ atAuditDate(async () => {
   ctx.renderDashboard();
   const healthBody = nodes.get('#healthBody');
   const figBtns = find(healthBody, 'health-fig-btn');
+  const rowBtns = find(healthBody, 'health-row');
 
-  /* ---- finding #4: emergency and saving tiles are now real buttons ------
-     OLD fig() calls for these two omitted the fifth `to` argument, so
-     buildScoreRing/dashboard's fig() built a plain <div> for them — no
-     button, no `is-link`, no route — while debt and score both routed.
-     `find(..., 'health-fig-btn')` returns only what fig() built as a real
-     <button>, so this is a direct count, not an inference from styling. */
-  const btnLabels = figBtns.map(b => textOf(b));
-  ok(btnLabels.some(t => /of essential spending covered/.test(t)),
-    'the emergency-cover tile is now a real button — audit finding #4');
-  /* "of budget income" since the 2026-10-20 audit: the base the Score names. */
-  ok(btnLabels.some(t => /of budget income saved/.test(t)),
-    'the saving-rate tile is now a real button too — audit finding #4');
+  /* ---- finding #4: every part of the health card is a real button ------
+     The original finding: with debt and score routing and emergency/saving
+     not, a grid of four tiles read as two buttons and two dead ends. Since the
+     Nov 2026 pillar-bars redesign the card is the score slab (-> Score) plus
+     one row per pillar; `find(..., 'health-row')` returns only what the card
+     built as a real <button>, so this is a direct count, not an inference
+     from styling. */
+  const rowLabels = rowBtns.map(b => textOf(b));
+  eq(rowBtns.length, 5, 'five pillar rows, each a button — audit finding #4');
+  ok(rowBtns.every(b => b.tagName === 'BUTTON'), 'and every one is a real <button>');
+  ok(rowLabels.some(t => /Emergency cover/.test(t)), 'the emergency-cover row exists — audit finding #4');
+  ok(rowLabels.some(t => /Saving/.test(t) && /of budget income/.test(t)), 'the saving row exists — audit finding #4');
 
-  const emergencyBtn = figBtns.find(b => /of essential spending covered/.test(textOf(b)));
-  const savingBtn = figBtns.find(b => /of budget income saved/.test(textOf(b)));
-  emergencyBtn.click();
-  ok(switchViewCalls.includes('accounts'),
-    'and clicking it routes to Accounts, where emergency_fund: is set — audit finding #4');
-  savingBtn.click();
-  ok(switchViewCalls.includes('savings'),
-    'clicking the saving tile routes to Savings, where the contributions it measures live — audit finding #4');
+  const rowFor = key => rowBtns.find(b => b.attrs['data-pillar'] === key);
+  const ROUTES = { reserves: 'accounts', saving: 'savings', debt: 'debts', spending: 'budgets', wealth: 'savings' };
+  for (const [key, view] of Object.entries(ROUTES)) {
+    const btn = rowFor(key);
+    ok(btn, `the ${key} row can be found`);
+    switchViewCalls.length = 0;
+    btn.click();
+    eq(switchViewCalls, [view],
+      `clicking the ${key} row routes to ${view} — audit finding #4 (reserves -> Accounts, where emergency_fund: is set; saving -> Savings, where the contributions it measures live)`);
+  }
 
-  /* Debt and score were already links — pinned so this file would catch a
-     regression on THEM too, not only on the two that were fixed. */
-  const debtBtn = figBtns.find(b => /of budget income to debt interest/.test(textOf(b)));
+  /* The score slab was already a link — pinned so this file would catch a
+     regression on it too, not only on the rows. */
   const scoreBtn = figBtns.find(b => /financial score/.test(textOf(b)));
-  ok(debtBtn && scoreBtn, 'debt and score remain real buttons (unchanged by this fix)');
+  ok(scoreBtn, 'the score slab remains a real button (unchanged by this fix)');
+  switchViewCalls.length = 0;
+  scoreBtn.click();
+  eq(switchViewCalls, ['score'], 'and still routes to the Score page');
 
   /* ---- finding #5: the "Missing categories" tile is now interactive -----
      OLD markup built this tile as a plain `el('div', { class: 'stat' }, …)`
@@ -176,6 +181,6 @@ atAuditDate(async () => {
     'clicking it now actually navigates to Transactions — audit finding #5');
 
   console.log(`PASS — audit follow-ups: reserves defines "essential" and states its divisor, `
-    + `the fixed-flag empty state discloses its score effect, all four health tiles route, `
+    + `the fixed-flag empty state discloses its score effect, the score slab and all five health rows route, `
     + `and the missing-categories tile is a real button (${checks} assertions).`);
 }, '2026-08-15').catch(e => { console.error('FAIL —', e.message); process.exit(1); });
