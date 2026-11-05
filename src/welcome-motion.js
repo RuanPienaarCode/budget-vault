@@ -275,4 +275,6 @@ function planScene(stage, t, money) {
   return s;
 }
 
-module.exports = { buildWelcomeMotion, SCENE_MS };
+/* `door` is shared with the wizard's finish screen, which shuts the same door
+   the welcome scene opens (onboarding.js shutDoor()). */
+module.exports = { buildWelcomeMotion, door, SCENE_MS };

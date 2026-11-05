@@ -164,6 +164,10 @@ const SHELL_HTML = `
         <div class="financial-period-banner">
           <h1 class="financial-period-banner-title" data-i18n="nav.dashboard">Dashboard</h1>
         </div>
+        <!-- First steps: the setup wizard's homework as five ticks. Above the
+             hero because it is the one thing on a new vault's dashboard that
+             says what to do next; hidden unless data.json switched it on. -->
+        <div class="card mb-4 hidden first-steps" id="firstStepsCard"></div>
         <div class="card hero mb-4" id="heroCard"></div>
         <!-- Financial health. Between the hero and What's left because it sits
              between their time-scales: the hero is this period's budget, What's

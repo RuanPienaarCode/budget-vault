@@ -274,7 +274,7 @@ function walkPath(w, expected, label) {
        scenes inside a dialog that no longer shows them. */
     const motion = byClass(w.contentEl, 'budget-onb-motion');
     eq(motion.length, 1, 'the welcome screen opens on the animation');
-    eq(w.contentEl.children[0], motion[0], 'above the welcome title, not under it');
+    eq(byClass(w.contentEl, 'budget-onb-pane')[0].children[0], motion[0], 'above the welcome title, not under it');
     ok(textOf(w.contentEl, 'bvm-tile-v').includes('R 28 500'),
       'its figures are in the wizard\'s currency, grouped the chosen country\'s way');
     const shown = w.motion;
@@ -455,7 +455,7 @@ function walkPath(w, expected, label) {
        right already, and the old wizard opened setup with it. */
     const groups = byClass(w.contentEl, 'budget-onb-group');
     eq(groups.length, 1, 'the locale controls sit under one heading');
-    const kids = w.contentEl.children;
+    const kids = byClass(w.contentEl, 'budget-onb-pane')[0].children;   // the step body lives in the sliding pane
     ok(kids.indexOf(groups[0]) > kids.indexOf(byClass(w.contentEl, 'setting-item')[0]),
       'and that heading comes after the name field, not before it');
 
@@ -677,6 +677,8 @@ function walkPath(w, expected, label) {
   await runCsvApply();
   await runManualApply();
   await runBudgetAlreadyThere();
+  await runConversation();
+  console.log(`PASS — setup wizard screens: three paths render, validate inline and apply, and talk back (${checks} assertions).`);
 })().catch(e => { console.error(e); process.exit(1); });
 
 /* ---- 9: the CSV create path applies ---- */
@@ -706,7 +708,30 @@ async function runCsvApply() {
   ok(w.finished, 'the create path completes');
   eq(p.settings.onboarded, true, 'and marks the plugin onboarded');
   ok(!NOTICES.some(n => /Setup failed/.test(n)), `apply() threw: ${NOTICES.join(' | ')}`);
-  ok(w.closed, 'the CSV path closes the modal onto the app, as it always did');
+  /* The CSV path used to close straight onto the app with a toast. It now
+     ends where the manual path does — on the vault door shutting on a vault
+     that really was written — and the reader's own tap opens the app. */
+  ok(!w.closed, 'the CSV path stays open on the finish screen');
+  eq(byClass(w.contentEl, 'budget-onb-celebrate').length, 1, 'which is the same ending the manual path has');
+  eq(byClass(w.contentEl, 'budget-onb-shut').length, 1, 'with the vault door on it');
+  ok(/first steps/i.test(textOf(w.contentEl, 'budget-onb-celebrate-body')),
+    'and it hands over to the checklist instead of a paragraph of homework');
+  ok(!/is saved/i.test(textOf(w.contentEl, 'budget-onb-celebrate-body')),
+    'and does not claim a saved budget the CSV path never filled in');
+  eq(p.settings.firstSteps, 'on', 'a wizard-made vault turns the first-steps card on');
+  ok(/^\d{4}-\d{2}-\d{2}$/.test(p.settings.firstStepsSince), 'and records the day it started counting from');
+  /* The wizard snapshots the balance stamp it just wrote, rather than leaving
+     it to the card's first drawing: the CSV path lands on Budgets, so the
+     Dashboard may not draw until after the reader has already edited the
+     balance — and a late snapshot would swallow that edit. */
+  eq(p.settings.firstStepsStamps, { 'Cheque account': `1234.5|${p.settings.firstStepsSince}` },
+    'and snapshots the balance stamp it wrote on the account');
+  {
+    const cta = buttons(w.contentEl);
+    eq(cta.length, 1, 'one CTA');
+    await cta[0]._onClick();
+  }
+  ok(w.closed, 'the button closes the modal onto the app');
   eq(p._activated, 1, 'and opens the view itself');
 
   const files = Object.keys(app._files);
@@ -831,26 +856,18 @@ async function runManualApply() {
       'closing from the celebration must never toast "setup skipped" — setup is done');
   }
 
-  /* ---- confetti: deterministic, decorative, and declinable ---- */
+  /* ---- the vault door shuts: decorative, and still under reduced motion ----
+     It replaced a confetti burst. The door is the mark the welcome screen
+     opened on, so setup ends where it began, and it carries no colour the
+     welcome scene did not already use. */
   {
     w.renderCelebrate();
-    const bits = byClass(w.contentEl, 'budget-onb-confetti-bit');
-    eq(bits.length, 28, 'the burst is a fixed number of pieces');
-    eq(byClass(w.contentEl, 'budget-onb-confetti')[0].getAttribute('aria-hidden'), 'true',
-      'and is hidden from assistive technology — it says nothing a reader needs');
-    const first = bits.map(b => b.getAttribute('style'));
-    w.renderCelebrate();
-    eq(byClass(w.contentEl, 'budget-onb-confetti-bit').map(b => b.getAttribute('style')), first,
-      'pieces are derived from the index, not drawn at random — a shower that reshuffles reads as a glitch');
-
-    const realWindow = global.window;
-    global.window = { matchMedia: () => ({ matches: true }), setTimeout: realWindow.setTimeout };
-    w.renderCelebrate();
-    eq(byClass(w.contentEl, 'budget-onb-confetti').length, 0,
-      'reduced motion means no burst at all — asked live, so turning it on takes effect now');
-    ok(byClass(w.contentEl, 'budget-onb-celebrate-title').length === 1,
-      'and the screen itself still renders — the celebration is the words, not the confetti');
-    global.window = realWindow;
+    const shut = byClass(w.contentEl, 'budget-onb-shut');
+    eq(shut.length, 1, 'the finish screen shows the door');
+    eq(shut[0].getAttribute('aria-hidden'), 'true', 'and hides it from assistive technology — it says nothing a reader needs');
+    ok(shut[0].hasClass('budget-onb-motion'), 'drawn in the welcome scene\'s own palette, not a new one');
+    eq(byClass(w.contentEl, 'budget-onb-confetti').length, 0, 'no confetti');
+    eq(p.settings.firstSteps, 'on', 'the manual path turns the first-steps card on too');
   }
 
   console.log('  ok   manual create path writes a real budget and celebrates it');
@@ -898,5 +915,89 @@ async function runBudgetAlreadyThere() {
   ok(/Budgets page/i.test(body), 'and points at where the reader can go and look');
   ok(!/is saved/i.test(body), 'and does NOT claim a save that did not happen');
 
-  console.log(`PASS — setup wizard screens: three paths render, validate inline and apply (${checks} assertions).`);
+}
+
+/* ---- 12: the wizard talks back, says less, and moves ----
+   Each question screen opens on one line that repeats the LAST answer back in
+   its consequence — "paid on the 25th, so your month runs 25th to 24th" — so
+   the screen is friendlier and a wrong answer is visible the moment after it
+   was given. The long explanations moved behind "Why are we asking?" so the
+   screen itself is a question, a sentence and a control. And the step body
+   slides in from the side it came from, but only when the step changed — a
+   dropdown re-rendering its own screen must not make it jump. */
+async function runConversation() {
+  const p = makePlugin();
+  const w = open(makeApp(), p);
+  const go = step => { w.stepIdx = w.steps().indexOf(step); w.renderStep(); };
+  const echo = () => textOf(w.contentEl, 'budget-onb-echo');
+
+  go('name');
+  eq(echo(), '', 'nothing to echo on the first question');
+  w.data.name = 'Ruan';
+  go('period');
+  eq(echo(), i18n.t('wiz.echo.name', { name: 'Ruan' }), 'the period screen greets the name just given');
+  w.data.name = '   ';
+  go('period');
+  eq(echo(), '', 'a blank name is not greeted as "Nice to meet you, ."');
+
+  w.data.periodDays = 0; w.data.payday = 25;
+  go('how');
+  ok(echo().includes(i18n.day(25)) && echo().includes(i18n.day(24)),
+    `the how screen says the month the payday makes, got "${echo()}"`);
+  w.data.payday = 1;
+  go('how');
+  eq(echo(), i18n.t('wiz.echo.calendar'), 'day 1 is the calendar month, said plainly');
+
+  w.data.inputMode = 'manual';
+  go('rates');
+  eq(echo(), i18n.t('wiz.echo.manual'), 'the rates screen echoes the manual answer');
+  w.data.inputMode = 'csv';
+  go('rates');
+  eq(echo(), i18n.t('wiz.echo.csv'), 'and the CSV one');
+
+  go('categories');
+  eq(echo(), i18n.t('wiz.echo.ratesOff'), 'the first setup screen echoes the rates answer');
+
+  /* Why are we asking? — present, closed, and not a control. */
+  go('period');
+  const why = byClass(w.contentEl, 'budget-onb-why');
+  eq(why.length, 1, 'the period screen carries one "why"');
+  eq(why[0].tagName, 'DETAILS', 'a native disclosure — no script, works on iOS 15');
+  ok(why[0].textContent.includes(i18n.t('wiz.why')), 'labelled "Why are we asking?"');
+  ok(why[0].textContent.includes(i18n.t('wiz.period.howOftenDesc')), 'and holding the explanation that used to sit on the screen');
+  ok(!textOf(w.contentEl, 'setting-item-description').includes(i18n.t('wiz.period.howOftenDesc')),
+    'which is no longer ALSO printed under the dropdown');
+  go('rates');
+  const whyRates = byClass(w.contentEl, 'budget-onb-why');
+  eq(whyRates.length, 1, 'the rates screen carries one "why"');
+  ok(whyRates[0].textContent.includes(i18n.t('wiz.rates.on.desc')), 'the long "yes" explanation is in it');
+  ok(!textOf(w.contentEl, 'budget-onb-choice-desc').includes(i18n.t('wiz.rates.on.desc')),
+    'and the card itself is down to its title');
+  ok(w.contentEl.textContent.includes(i18n.t('wiz.rates.desc', { symbol: w.currencySymbol() })),
+    'the sentence that says this is the only part using the internet stays on the screen');
+
+  /* The slide. */
+  const pane = () => byClass(w.contentEl, 'budget-onb-pane')[0];
+  go('name');
+  await w.next();
+  ok(pane().hasClass('is-fwd'), 'Next slides the new step in forwards');
+  w.renderStep();
+  ok(!pane().hasClass('is-fwd') && !pane().hasClass('is-back'), 'a re-render of the same step does not slide');
+  const back = buttons(w.contentEl).find(b => b.textContent === i18n.t('wiz.back'));
+  back._onClick();
+  ok(pane().hasClass('is-back'), 'Back slides it in from the other side');
+  ok(!all(pane(), e => e.hasClass('budget-onb-nav')).length, 'the buttons sit outside the pane and do not slide');
+
+  /* Connecting adopts an existing vault: not a new household, no card. */
+  {
+    const cp = makePlugin();
+    const cw = open(EXISTING(), cp);
+    cw.data.folder = 'Existing/Budget';
+    await cw.adoptFolder('Existing/Budget');
+    cw.stepIdx = cw.steps().indexOf('finish'); cw.renderStep();
+    await cw.next();
+    eq(cp.settings.firstSteps, undefined, 'connecting to an existing budget does not turn the checklist on');
+  }
+
+  console.log('  ok   the wizard echoes, discloses and slides');
 }

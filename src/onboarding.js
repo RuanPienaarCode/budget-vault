@@ -29,7 +29,8 @@
 const { Modal, Setting, Notice, normalizePath, TFile, TFolder } = require('obsidian');
 const { PROFILES, COUNTRY_ORDER, localeFor } = require('./locale');
 const { formatAmount, formatSigned } = require('./currency');
-const { buildWelcomeMotion } = require('./welcome-motion');
+const { buildWelcomeMotion, door } = require('./welcome-motion');
+const { balanceStamps } = require('./first-steps');
 const { SET_ASIDE_TYPES } = require('./vocabulary');
 /* Namespace import for the same reason settings-tab.js uses one: this file
    binds `t` as a parameter in several `.addText(t => …)` callbacks, so a bare
@@ -376,13 +377,27 @@ class OnboardingWizard extends Modal {
     if (this.stepIdx >= steps.length) this.stepIdx = steps.length - 1;
     if (this.stepIdx < 0) this.stepIdx = 0;
     const step = steps[this.stepIdx];
+    /* The step body slides in from the side the reader came from — but only
+       when the STEP changed. Most re-renders are the same screen redrawing
+       itself (a dropdown, a radio, an inline error), and a screen that jumps
+       sideways every time a control is touched reads as broken. The buttons
+       sit outside the pane so they stay put under the reader's thumb. The
+       slide is a keyframe on a fresh node, so it plays on insertion and is
+       dropped under reduced motion in styles.css. */
+    const moved = this._shownStep !== undefined && this._shownStep !== step;
+    const dir = moved ? (this.stepIdx > this._shownIdx ? ' is-fwd' : ' is-back') : '';
+    this._shownStep = step;
+    this._shownIdx = this.stepIdx;
+    const pane = c.createDiv({ cls: 'budget-onb-pane' + dir });
     // The welcome screen isn't a "step" in the user's mind — no counter there.
     if (step !== 'welcome') {
-      c.createDiv({ cls: 'budget-onb-step', text: i18n.t('wiz.stepOf', { n: this.stepIdx, total: steps.length - 1 }) });
-      c.createEl('h3', { cls: 'budget-onb-title', text: stepTitle(step) });
+      pane.createDiv({ cls: 'budget-onb-step', text: i18n.t('wiz.stepOf', { n: this.stepIdx, total: steps.length - 1 }) });
+      const said = this.echo(steps[this.stepIdx - 1]);
+      if (said) pane.createDiv({ cls: 'budget-onb-echo', text: said });
+      pane.createEl('h3', { cls: 'budget-onb-title', text: stepTitle(step) });
     }
-    this['render_' + step](c);
-    if (err) c.createDiv({ cls: 'budget-onb-error', text: err });
+    this['render_' + step](pane);
+    if (err) pane.createDiv({ cls: 'budget-onb-error', text: err });
 
     const nav = new Setting(c);
     nav.settingEl.addClass('budget-onb-nav');
@@ -402,6 +417,46 @@ class OnboardingWizard extends Modal {
      easy to miss on a phone, can land behind the modal, and never says which
      field it means. */
   fail(msg) { this.error = msg; this.renderStep(); }
+
+  /* The line that opens a screen by saying the LAST answer back.
+
+     Not a greeting for its own sake: it repeats the answer in its CONSEQUENCE
+     ("paid on the 25th, so your month runs 25th to 24th"), which is the one
+     moment a wrong answer is cheap to spot — the reader is a tap from Back.
+     Keyed on the step just left rather than on the step being drawn, so
+     reordering the list can never make a screen echo a question that was not
+     the one before it. '' means say nothing: a blank name is not greeted. */
+  echo(prev) {
+    if (prev === 'name') {
+      const name = String(this.data.name || '').trim();
+      return name ? i18n.t('wiz.echo.name', { name }) : '';
+    }
+    if (prev === 'period') {
+      const days = periodDaysOrZero(this.data.periodDays);
+      if (days) {
+        return isRealIsoDate(this.data.periodAnchor)
+          ? i18n.t('wiz.echo.cycle', { days, date: this.data.periodAnchor }) : '';
+      }
+      const d = parseInt(this.data.payday, 10);
+      if (!(d >= 1 && d <= 28)) return '';
+      return d === 1 ? i18n.t('wiz.echo.calendar')
+        : i18n.t('wiz.echo.payday', { start: i18n.day(d), end: i18n.day(d - 1) });
+    }
+    if (prev === 'how') return i18n.t(this.isManual() ? 'wiz.echo.manual' : 'wiz.echo.csv');
+    if (prev === 'rates') return i18n.t(this.fxOn() ? 'wiz.echo.ratesOn' : 'wiz.echo.ratesOff');
+    return '';
+  }
+
+  /* "Why are we asking?" — the explanation a screen used to print in full,
+     one tap away instead. A native <details>: no script, no state to keep,
+     and it opens the same way on iOS 15 as on the desktop. Not a control, so
+     the one-question-per-screen count is untouched. */
+  why(c, ...texts) {
+    const d = c.createEl('details', { cls: 'budget-onb-why' });
+    d.createEl('summary', { text: i18n.t('wiz.why') });
+    for (const text of texts) d.createEl('p', { text });
+    return d;
+  }
 
   /* Every re-render and the close go through here first: emptying the
      content does not stop the animation's timer, and a timer left running
@@ -637,7 +692,6 @@ class OnboardingWizard extends Modal {
     const days = periodDaysOrZero(this.data.periodDays);
     new Setting(c)
       .setName(i18n.t('wiz.period.howOften'))
-      .setDesc(i18n.t('wiz.period.howOftenDesc'))
       .addDropdown(d => {
         // periodLengthOptions, not PERIOD_PRESETS: re-running the wizard over a
         // vault whose Settings.md was hand-set to, say, 10 days must SHOW that
@@ -710,6 +764,10 @@ class OnboardingWizard extends Modal {
       c.appendChild(hint);
       paint();
     }
+    /* Under the controls, not above: the worked example in the hint already
+       answers "what does this mean for me"; the why is for the reader who
+       wants the rule behind it. */
+    this.why(c, i18n.t('wiz.period.howOftenDesc'));
   }
 
   /* Two big radio cards rather than a dropdown. This is the decision the whole
@@ -787,8 +845,13 @@ class OnboardingWizard extends Modal {
       });
       const body = label.createDiv({ cls: 'budget-onb-choice-body' });
       body.createDiv({ cls: 'budget-onb-choice-title', text: i18n.t('wiz.rates.' + mode + '.title') });
-      body.createDiv({ cls: 'budget-onb-choice-desc', text: i18n.t('wiz.rates.' + mode + '.desc') });
     }
+    /* The two long paragraphs that used to fill these cards — what "no" keeps
+       on the device, and exactly what "yes" sends where — are one tap away
+       rather than gone. The sentence above the cards still says, on the
+       screen, that this is the only part of the plugin that uses the
+       internet; the why carries the detail behind it. */
+    this.why(c, i18n.t('wiz.rates.off.desc'), i18n.t('wiz.rates.on.desc'));
     /* The provider's attribution, under the cards and not inside one: the 'on'
        card is a <label>, and a click on a link inside a label also selects the
        card — reading who supplies the rates must not switch the fetch on. */
@@ -1298,47 +1361,81 @@ class OnboardingWizard extends Modal {
     await this.io().ensureVaultFolder(path);
   }
 
-  /* Only the manual CREATE path celebrates. Connecting to an existing budget
-     is not a first budget, and the CSV path ends on an import the household
-     still has to do — a confetti burst over "now go and find a CSV" would be
-     congratulating them on work not yet done. */
+  /* Every CREATE path ends on the finish screen now; connecting to an
+     existing budget is not a new vault and still closes with a toast.
+
+     What the screen SAYS still differs, for the reason this used to be
+     manual-only: the manual path has written a real first budget and the
+     sentence can say so, while the CSV path has written categories with no
+     amounts and an import still to do. Its sentence hands the reader to the
+     first-steps card instead of congratulating them on work not yet done. */
   celebrates() {
-    return this.mode === 'create' && this.isManual();
+    return this.mode === 'create';
   }
 
-  /* The last screen: the budget is already on disk when this renders.
+  /* The last screen: the vault is already on disk when this renders.
 
      No step counter — this is not a step, it is the end. One CTA, and closing
      the modal any other way is equally fine (finished is already true). The
      button, not apply(), calls activateView(): opening the pane is the reader's
-     move, and doing it underneath a celebration they have not read yet just
-     yanks the modal's backdrop out from under them. */
+     move, and doing it underneath a screen they have not read yet just yanks
+     the modal's backdrop out from under them. */
   renderCelebrate() {
     const c = this.contentEl;
     c.empty();
     const hero = c.createDiv({ cls: 'budget-onb-celebrate' });
-    hero.createEl('h2', { cls: 'budget-onb-celebrate-title', text: i18n.t('wiz.celebrate.title') });
-    /* Two sentences, and which one is the truth depends on what happened on
-       disk. writeIfAbsent declines when a budget for that period is already
-       there — the reader pointed the wizard at a folder that had one — and
-       saying "your budget is saved" over a file the wizard deliberately did
-       not touch would be the app's first statement to this household, and
-       false. The app argues; it never quietly claims. */
+    this.shutDoor(hero);
+    const manual = this.isManual();
+    hero.createEl('h2', {
+      cls: 'budget-onb-celebrate-title',
+      text: i18n.t(manual ? 'wiz.celebrate.title' : 'wiz.ready.title'),
+    });
+    /* Which sentence is the truth depends on what happened on disk.
+       writeIfAbsent declines when a budget for that period is already there —
+       the reader pointed the wizard at a folder that had one — and saying
+       "your budget is saved" over a file the wizard deliberately did not touch
+       would be the app's first statement to this household, and false. The
+       app argues; it never quietly claims. */
     hero.createEl('p', {
       cls: 'budget-onb-celebrate-body',
-      text: i18n.t(this.budgetWritten === false ? 'wiz.celebrate.bodyKept' : 'wiz.celebrate.body',
-        { period: this.periodLabel() }),
+      text: !manual ? i18n.t('wiz.ready.body')
+        : i18n.t(this.budgetWritten === false ? 'wiz.celebrate.bodyKept' : 'wiz.celebrate.body',
+          { period: this.periodLabel() }),
     });
-    this.confetti(hero);
     const nav = new Setting(c);
     nav.settingEl.addClass('budget-onb-nav');
     nav.addButton(b => b
-      .setButtonText(i18n.t('wiz.celebrate.cta'))
+      .setButtonText(i18n.t(manual ? 'wiz.celebrate.cta' : 'wiz.ready.cta'))
       .setCta()
       .onClick(async () => {
+        const p = this.plugin;
         this.close();
-        await this.plugin.activateView();
+        /* Land a freshly-created CSV vault on Budgets, not the Dashboard: the
+           first step on the card IS "give your budget its amounts", and
+           Budgets is already seeded with every category the reader picked.
+           Guarded — where the reader lands is a courtesy, and a courtesy must
+           never be able to fail a completed setup. */
+        if (!manual && typeof p.forEachView === 'function') {
+          try { p.forEachView(ctl => ctl.parkView && ctl.parkView('budgets')); } catch (_) { /* land wherever */ }
+        }
+        await p.activateView();
       }));
+  }
+
+  /* The vault door from the welcome screen, shutting on the vault that was
+     just written. Setup opened on that door swinging open; it ends on the same
+     door closing and its wheel turning to lock. It replaced a confetti burst:
+     the door is the plugin's own mark in the welcome scene's own palette, so
+     the ending adds no colour and no glow the start did not already have.
+
+     Wrapped in .budget-onb-motion so it inherits that scene's palette
+     variables rather than declaring a second copy of them. The resting style
+     is the SHUT door, so under reduced motion — where the keyframes are
+     dropped — the reader sees the end state, not a door left ajar. */
+  shutDoor(parent) {
+    const box = parent.createDiv({ cls: 'budget-onb-motion budget-onb-shut', attr: { 'aria-hidden': 'true' } });
+    door(box);
+    return box;
   }
 
   /* "Aug 2026" for a month-shaped period, the start date itself for a cycle —
@@ -1347,39 +1444,6 @@ class OnboardingWizard extends Modal {
   periodLabel() {
     const period = this.firstPeriod();
     return this.cycleDays() ? period : monthLabel(period);
-  }
-
-  /* A confetti burst, deliberately the same shape as celebrate() in
-     views/score.js — read its header for why this is CSS keyframes and not
-     requestAnimationFrame (rAF is starved to nothing while the pane is hidden,
-     which would freeze a half-drawn shower on screen).
-
-     Pieces are derived from the index rather than drawn at random so the same
-     screen celebrates the same way twice; a shower that reshuffles on a
-     re-render reads as a glitch. Asked live rather than cached, because a
-     reader who turns reduced motion on means it now. The window guards are not
-     ceremony: this class is constructed in bare node by the wizard's own guard
-     test, where neither window nor a real document exists. */
-  confetti(hero) {
-    if (typeof window !== 'undefined' && typeof window.matchMedia === 'function'
-        && window.matchMedia('(prefers-reduced-motion: reduce)').matches) { return; }
-    if (typeof document === 'undefined' || typeof document.createElement !== 'function') { return; }
-
-    const burst = hero.createDiv({ cls: 'budget-onb-confetti', attr: { 'aria-hidden': 'true' } });
-    for (let i = 0; i < 28; i++) {
-      const left = ((i * 37) % 100);
-      const delay = ((i % 6) * 90);
-      const drift = ((i % 5) - 2) * 24;
-      const spin = 180 + ((i % 4) * 120);
-      burst.createEl('i', { cls: `budget-onb-confetti-bit tone-${i % 4}` })
-        .setAttribute('style', `left:${left}%;animation-delay:${delay}ms;--bud-drift:${drift}px;--bud-spin:${spin}deg`);
-    }
-    /* Taken down rather than left in the DOM, same as the score page's: the
-       modal can sit open for as long as the reader likes, and a hundred spent
-       nodes under it is this screen's own small leak. */
-    if (typeof window !== 'undefined' && typeof window.setTimeout === 'function') {
-      window.setTimeout(() => { if (burst.remove) { burst.remove(); } }, 2600);
-    }
   }
 
   async apply() {
@@ -1472,6 +1536,11 @@ class OnboardingWizard extends Modal {
             // a bare colon-space in a bank's name would fork the key mid-value.
             (this.accountInstitution() ? `institution: ${yamlStr(this.accountInstitution())}\n` : '') +
             `balance: ${bal.toFixed(2)}\nbalance_updated: ${ymd}\ntags: [finance, finance/budget, finance/budget/accounts]\n---\n\n# ${acct}\n\nTransactions are stored under \`Transactions/${safe}/\` as monthly files.\n`);
+          /* The stamp just written, for the first-steps card's balance step:
+             what setup left on the account, so only a later change by the
+             reader ticks it. Keyed by file basename — the loader's account
+             name — and read back the way the loader reads the figure. */
+          this.setupStamps = balanceStamps([{ name: safe, balance: Number(bal.toFixed(2)), balance_updated: ymd }]);
           await this.ensureFolder(normalizePath(`${folder}/Transactions/${safe}`));
         }
         const period = this.firstPeriod();
@@ -1510,39 +1579,36 @@ class OnboardingWizard extends Modal {
         await this.writeIfAbsent(normalizePath(`${folder}/Data/Categorisation Rules.csv`), 'pattern,category\n');
       }
       p.settings.onboarded = true;
+      /* A vault this wizard just made gets the first-steps card; one it merely
+         connected to does not — that household is not starting out, and a
+         checklist appearing over a budget they have kept for a year would be
+         the app telling them how to do what they already do. `since` is the
+         line between what setup wrote and what the reader did afterwards:
+         the balance this wizard stamps today must not tick "check an account
+         against your bank" (src/first-steps.js). */
+      if (this.mode === 'create') {
+        p.settings.firstSteps = 'on';
+        p.settings.firstStepsSince = todayIso();
+        p.settings.firstStepsStamps = this.setupStamps || {};
+      }
       await p.saveSettings();
       /* Before any early return below: onClose() reads this to decide whether
          a dismissal was a "not now". Dismissing the celebration screen is not
          skipping setup — setup is done — and toasting that it had been skipped
          would be the wizard's last word to a household that just finished it. */
       this.finished = true;
-      /* The manual create path stays open on a celebration screen instead of
-         closing onto a dashboard the reader has to work out for themselves.
+      /* A created vault stays open on the finish screen instead of closing
+         onto a dashboard the reader has to work out for themselves.
          reloadViews() still runs here so the new files are read; activateView()
-         moves to the button, which is the reader's own "I'm ready". Nothing
-         about the CSV path changes. */
+         moves to the button, which is the reader's own "I'm ready". */
       if (this.celebrates()) {
         p.reloadViews();
         this.renderCelebrate();
         return;
       }
       this.close();
-      new Notice(i18n.t(this.mode === 'connect' ? 'wiz.done.connected' : 'wiz.done.created'));
+      new Notice(i18n.t('wiz.done.connected'));
       p.reloadViews();
-      /* Land a freshly-created CSV vault on Budgets, not the Dashboard. The
-         manual path already ends somewhere with something on it — it wrote
-         real budget rows and gets a celebration screen — but the CSV path is
-         the DEFAULT, and it finished on a hero reading R0,00, three zero tiles
-         and three empty states, thirty seconds after being told to "give your
-         categories an amount on the Budgets page". Budgets is already seeded
-         with every category the reader just picked, so it is the one screen
-         where the setup they just did is visible. */
-      /* Guarded, and deliberately not awaited into the failure path: where the
-         reader LANDS is a courtesy, and a courtesy must never be able to
-         report a completed setup as "Setup failed". */
-      if (this.mode === 'create' && !this.isManual() && typeof p.forEachView === 'function') {
-        try { p.forEachView(ctl => ctl.parkView && ctl.parkView('budgets')); } catch (_) { /* land wherever */ }
-      }
       await p.activateView();
     } catch (e) {
       new Notice(i18n.t('wiz.failed', { error: e.message || e }), 8000);

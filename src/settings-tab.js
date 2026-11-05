@@ -19,7 +19,8 @@ const { parseOwners } = require('./owners');
 const { parseGroups, parseNonEssential, typeOrder } = require('./groups');
 const { NON_ESSENTIAL_TYPES } = require('./health-math');
 const { normalizeCode, normalizeCadence } = require('./fx');
-const { ISO_DATE, isoDayNumber, isRealIsoDate } = require('./dates');
+const { ISO_DATE, isoDayNumber, isRealIsoDate, todayIso } = require('./dates');
+const { firstStepsOn } = require('./first-steps');
 
 /* Date-SHAPED, used only to recognise budget filenames. An anchor the user
    types or a file stores must be a real calendar date, so those go through
@@ -224,6 +225,10 @@ class BudgetSettingTab extends PluginSettingTab {
           }
           this.plugin.forEachView(ctl => ctl.applyPrivacyLock());
         }));
+
+    this.firstStepsToggle(new Setting(containerEl)
+      .setName(i18n.t('settings.firstSteps.name'))
+      .setDesc(i18n.t('settings.firstSteps.desc')));
 
     new Setting(containerEl)
       .setName(i18n.t('settings.feedback.name'))
@@ -768,6 +773,33 @@ class BudgetSettingTab extends PluginSettingTab {
     if (key === 'language') return i18n.resolveLanguage(md.language ?? i18n.defaultLanguage());
     return undefined;
   }
+  /* The first-steps card's switch. A custom render on both settings paths
+     rather than a declarative toggle, because the stored value is not a
+     boolean: 'on', 'off', or 'done' once all five were ticked — and a reader
+     who finished the list and wants the card back should get it back.
+
+     Switching it on keeps an existing `since` (the day the wizard set the
+     vault up) and only stamps today when there is none. That date is what
+     stops the balance the wizard wrote from ticking "check an account"
+     (src/first-steps.js), so moving it to today on every toggle would make a
+     step the reader already earned un-tick itself. */
+  firstStepsToggle(setting) {
+    const ps = this.plugin.settings;
+    setting.addToggle(t => t
+      .setValue(firstStepsOn(ps))
+      .onChange(async v => {
+        ps.firstSteps = v ? 'on' : 'off';
+        if (v && !isRealIsoDate(ps.firstStepsSince)) ps.firstStepsSince = todayIso();
+        try {
+          await this.plugin.saveSettings();
+        } catch (e) {
+          new Notice(i18n.t('settings.err.save', { error: e.message || e }), 6000);
+        }
+        this.plugin.reloadViews();
+      }));
+    return setting;
+  }
+
   async setControlValue(key, value) {
     if (!MD_KEYS.has(key)) {
       // validate() rejects a bad value but never rewrites a good one, so the
@@ -908,6 +940,11 @@ class BudgetSettingTab extends PluginSettingTab {
         name: i18n.t('settings.privacy.name'),
         desc: i18n.t('settings.privacy.desc'),
         control: { type: 'toggle', key: 'privacyLock', defaultValue: DEFAULT_SETTINGS.privacyLock },
+      },
+      {
+        name: i18n.t('settings.firstSteps.name'),
+        desc: i18n.t('settings.firstSteps.desc'),
+        render: setting => this.firstStepsToggle(setting),
       },
       {
         name: i18n.t('settings.feedback.name'),

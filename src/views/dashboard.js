@@ -40,6 +40,8 @@ const { sharePercents, largestRemainder, sharePercentLabel } = require('../share
    off ctx, so neither view depends on the other's registration order. */
 const { assumedActual } = require('../money-flow');
 const { createDashMotion } = require('../dash-motion');
+/* The first-steps card above the hero — see the header of first-steps-card.js. */
+const { createFirstStepsCard } = require('./first-steps-card');
 /* The income row's words ("more than planned" / "still to come" / "received as
    planned") are the Budget page's own, so one row reads the same on both.
    Since the 2026-10-20 audit (D2-05, D1-07) so are every other row's — the
@@ -133,7 +135,11 @@ module.exports = function registerDashboard(ctx) {
   const guardedTrend = () => guard('#trendChart', 'spending trend', renderTrend);
   const guardedSplit = () => guard('#dashSplit', 'spending split', renderSplit);
 
+  const firstStepsCard = createFirstStepsCard(ctx);
   function renderDashboard() {
+    /* First, and behind its own guard like every card: a throw in the
+       checklist must never cost the reader the hero under it. */
+    guard('#firstStepsCard', 'first steps', firstStepsCard.render);
     guard('#heroCard', 'summary', renderHero);
     guard('#healthBody', 'financial health', renderHealth);
     guard('#leftBody', "what's left", renderLeft);

@@ -407,6 +407,8 @@ ok(/let current = defaultLanguage\(\)/.test(i18nSrc),
 {
   const TRANSLATED_VIEWS = new Set(['accounts.js', 'dashboard.js', 'budgets.js', 'transactions.js', 'score.js', 'report.js']);
   TRANSLATED_VIEWS.add('budget-export.js');
+  // The dashboard's first-steps card: small by nature (five steps), fully keyed.
+  TRANSLATED_VIEWS.add('first-steps-card.js');
   /* PARTLY KEYED is not the same as translated (2026-10-14 audit, L8-09).
      views/plan.js sat in TRANSLATED_VIEWS with about 140 English literals in
      it — its headings, buttons, envelope and source dialogs — beside the ~40
@@ -424,7 +426,7 @@ ok(/let current = defaultLanguage\(\)/.test(i18nSrc),
      labels are looked up in a loop — so every string it shows is translated
      and it still carries under twenty call sites. Its own floor, rather than
      lowering everyone's. */
-  const SMALL_VIEW_FLOOR = { 'budget-export.js': 12 };
+  const SMALL_VIEW_FLOOR = { 'budget-export.js': 12, 'first-steps-card.js': 12 };
   const VIEWS = path.join(SRC, 'views');
   const usage = f => {
     const text = fs.readFileSync(path.join(VIEWS, f), 'utf8');
