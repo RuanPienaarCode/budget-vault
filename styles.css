@@ -377,6 +377,7 @@ body.is-tablet .budget-app-root button:where(.dock-btn) { padding: 6px 10px; }
 @media (max-width: 600px) {
   body.is-tablet .budget-app-root button:where(.dock-btn) { padding: 6px 2px; }
 }
+body.is-tablet .budget-app-root button:where(.fs-hide) { padding: 4px; }   /* first-steps card's hide (x) */
 /* The split dialog is a Modal, outside .budget-app-root, so it cannot use the
    block above; its delete button is (0,1,0) against the host's (0,2,1) and
    loses on an iPad. (0,2,1) here is enough: the plugin's sheet loads after
@@ -3035,24 +3036,40 @@ body.is-tablet .budget-app-root button:where(.dock-btn) { padding: 6px 10px; }
 .budget-onb-celebrate { position: relative; overflow: hidden; text-align: center; padding: 18px 6px 22px; }
 .budget-onb-celebrate-title { font-size: 22px; font-weight: 700; margin: 0 0 8px; }
 .budget-onb-celebrate-body { font-size: 13.5px; line-height: 1.55; opacity: .8; margin: 0 auto; max-width: 44ch; }
-.budget-onb-confetti { position: absolute; inset: 0; overflow: hidden; pointer-events: none; }
-.budget-onb-confetti-bit {
-  position: absolute; top: -14px; width: 8px; height: 12px; border-radius: 2px;
-  opacity: 0; pointer-events: none;
-  animation: bud-confetti 1.9s cubic-bezier(.24, .78, .4, 1) forwards;
-}
-.budget-onb-confetti-bit.tone-0 { background: var(--interactive-accent, #7c6cf5); }
-.budget-onb-confetti-bit.tone-1 { background: var(--text-success, #2e9b64); }
-.budget-onb-confetti-bit.tone-2 { background: var(--text-warning, #e0a800); }
-.budget-onb-confetti-bit.tone-3 { background: var(--text-accent, #7c6cf5); }
-/* The mirror of the .score-confetti rule in the reduced-motion block above:
-   confetti() already declines to build the burst when the preference is set,
-   but that is asked once at render — this covers a reader who turns it on
-   while the screen is open, and it is the rule that would still be right if
-   the JS guard were ever dropped. */
+/* ---- The wizard talks back (src/onboarding.js echo() / why()) ----------
+   The echo is the previous answer said back in its consequence, so it reads
+   as the app's half of a conversation: smaller and quieter than the question
+   under it, never competing with it. The "why" is a plain disclosure — the
+   explanation a screen used to print in full, one tap away. */
+.budget-onb-echo { font-size: 13.5px; line-height: 1.45; opacity: .72; margin: 0 0 4px; }
+.budget-onb-why { margin: 10px 0 2px; font-size: 12.5px; line-height: 1.5; }
+.budget-onb-why > summary { cursor: pointer; opacity: .7; width: max-content; max-width: 100%; }
+.budget-onb-why > summary:hover { opacity: 1; }
+.budget-onb-why > p { margin: 6px 0 0; opacity: .75; }
+
+/* The step body slides in from the side the reader came from. A fresh node
+   per step, so the keyframe plays on insertion; only when the STEP changed
+   (onboarding.js renderStep), so a control redrawing its own screen does not
+   make it jump. Short and small — a nudge, not a carousel. */
+.budget-onb-pane.is-fwd { animation: budget-onb-in-fwd .22s cubic-bezier(.22, .61, .36, 1) both; }
+.budget-onb-pane.is-back { animation: budget-onb-in-back .22s cubic-bezier(.22, .61, .36, 1) both; }
+@keyframes budget-onb-in-fwd { from { opacity: 0; transform: translateX(14px); } to { opacity: 1; transform: none; } }
+@keyframes budget-onb-in-back { from { opacity: 0; transform: translateX(-14px); } to { opacity: 1; transform: none; } }
+
+/* The vault door shutting on the finish screen (onboarding.js shutDoor()).
+   It borrows .budget-onb-motion for the welcome scene's palette, so it adds
+   no colour of its own. The RESTING state is the shut, locked door — the
+   welcome scene rests open — so with the keyframes dropped (reduced motion)
+   the reader sees the end of the story, not a door left ajar. */
+.budget-onb-shut { display: flex; justify-content: center; margin: 0 0 12px; }
+.budget-onb-shut .bvm-door { width: 64px; height: 64px; }
+.budget-onb-shut .bvm-door-leaf { transform: scaleX(1); animation: budget-onb-shut .9s cubic-bezier(.22, .61, .36, 1) .15s both; }
+.budget-onb-shut .bvm-door-spin { animation: budget-onb-lock .8s cubic-bezier(.65, 0, .35, 1) 1.05s both; }
+@keyframes budget-onb-shut { from { transform: scaleX(.38); } to { transform: scaleX(1); } }
+@keyframes budget-onb-lock { from { transform: rotate(0deg); } to { transform: rotate(120deg); } }
 @media (prefers-reduced-motion: reduce) {
-  .budget-onb-confetti-bit { animation: none; }
-  .budget-onb-confetti { display: none; }
+  .budget-onb-pane.is-fwd, .budget-onb-pane.is-back,
+  .budget-onb-shut .bvm-door-leaf, .budget-onb-shut .bvm-door-spin { animation: none; }
 }
 
 /* ---- The welcome animation (src/welcome-motion.js) ----------------------
@@ -6446,6 +6463,59 @@ body.is-tablet .budget-app-root button:where(.dock-btn) { padding: 6px 10px; }
   .budget-app-root .hero-meter.bud-bar-in::after,
   .budget-app-root .bud-float,
   .budget-app-root .bud-sparks { display: none; }
+}
+
+/* ------------------------- first steps (dashboard) -------------------------
+   src/views/first-steps-card.js. A small card above the hero: a five-segment
+   bar, the next step in full, the rest behind a disclosure. Every colour is
+   the sealed palette's own — the primary for done, the border colour for not yet —
+   and the only motion is on a step that ticked since the last drawing: its
+   segment fills, its mark pops, its tick draws left to right, and the
+   dashboard's existing .bud-shine sweeps the title. No glow anywhere. */
+.budget-app-root .first-steps { padding: 14px 16px; }
+.budget-app-root .fs-head { display: flex; align-items: center; gap: 10px; }
+.budget-app-root .fs-title { margin: 0; font-size: 15px; font-weight: 650; color: var(--text-primary); }
+.budget-app-root .fs-count { margin-left: auto; font-size: 12.5px; color: var(--text-muted); white-space: nowrap; }
+/* 36px square — the × is the card's only way out, and at 23px (the first
+   cut) it was under WCAG 2.5.8's 24px floor on a phone. */
+.budget-app-root .fs-hide {
+  padding: 4px; min-width: 36px; min-height: 36px; margin: -6px -8px -6px 0;
+  display: inline-flex; align-items: center; justify-content: center; color: var(--text-muted);
+}
+.budget-app-root .fs-bar { display: grid; grid-template-columns: repeat(5, 1fr); gap: 4px; margin: 10px 0 12px; }
+/* --border-color, not --line-soft: soft is 4% white on the dark theme and
+   left the empty track and rings all but invisible on the card. */
+.budget-app-root .fs-seg { height: 6px; border-radius: 3px; background: var(--border-color); transform-origin: left center; }
+.budget-app-root .fs-seg.is-done { background: var(--color-primary); }
+.budget-app-root .fs-seg.is-new { animation: fs-fill .6s cubic-bezier(.22, .61, .36, 1) both; }
+.budget-app-root .fs-next { display: flex; gap: 10px; align-items: flex-start; }
+.budget-app-root .fs-next-body { min-width: 0; flex: 1; }
+.budget-app-root .fs-next-title { font-size: 14px; font-weight: 600; color: var(--text-primary); }
+.budget-app-root .fs-desc { margin: 2px 0 0; font-size: 13px; line-height: 1.45; color: var(--text-muted); }
+.budget-app-root .fs-go { margin-top: 10px; }
+.budget-app-root .fs-mark {
+  flex: none; display: inline-flex; align-items: center; justify-content: center;
+  width: 20px; height: 20px; border-radius: 50%; border: 2px solid var(--border-color); box-sizing: border-box;
+}
+.budget-app-root .fs-mark.is-done { background: var(--color-primary); border-color: var(--color-primary); color: #ffffff; }
+.budget-app-root .fs-mark .fs-tick { display: inline-flex; width: 12px; height: 12px; overflow: hidden; }
+.budget-app-root .fs-mark .fs-tick svg { flex: none; width: 12px; height: 12px; stroke-width: 3; }
+.budget-app-root .fs-mark.is-new { animation: fs-pop .45s cubic-bezier(.34, 1.25, .64, 1) both; }
+.budget-app-root .fs-mark.is-new .fs-tick { width: 0; animation: fs-draw .4s ease-out .3s forwards; }
+.budget-app-root .fs-all { margin-top: 12px; }
+.budget-app-root .fs-all > summary { cursor: pointer; font-size: 12.5px; color: var(--text-muted); width: max-content; max-width: 100%; padding: 8px 0; }
+.budget-app-root .fs-list { list-style: none; margin: 8px 0 0; padding: 0; }
+.budget-app-root .fs-item { display: flex; align-items: center; gap: 8px; padding: 4px 0; font-size: 13px; color: var(--text-primary); }
+.budget-app-root .fs-item.is-done .fs-item-title { color: var(--text-muted); }
+.budget-app-root .fs-item.is-next .fs-item-title { font-weight: 600; }
+@keyframes fs-fill { from { transform: scaleX(0); } to { transform: scaleX(1); } }
+@keyframes fs-pop { from { transform: scale(.5); opacity: 0; } to { transform: none; opacity: 1; } }
+/* The tick is revealed left to right by growing the width of its
+   overflow-hidden box — the stroke appears to draw itself. */
+@keyframes fs-draw { from { width: 0; } to { width: 12px; } }
+@media (prefers-reduced-motion: reduce) {
+  .budget-app-root .fs-seg.is-new, .budget-app-root .fs-mark.is-new { animation: none; }
+  .budget-app-root .fs-mark.is-new .fs-tick { animation: none; width: 12px; }
 }
 /* ============================================================
    STATEMENT TYPE — the foundation (October 2026, "Option 3").
