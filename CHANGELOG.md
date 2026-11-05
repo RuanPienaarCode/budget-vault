@@ -3,6 +3,43 @@
 All notable changes to Budget Vault. Versions match the plugin version in
 `manifest.json` and the release tag exactly (no `v` prefix).
 
+## 1.58.0 — 2026-11-05
+
+Setup talks back and ends with a door shutting on your new vault, the
+Dashboard gets a first-steps checklist, the Financial health card shows what
+the score is made of, and Services and the Dashboard stay quick as a
+household's history grows.
+
+### Added
+
+- **First steps on the Dashboard.** A small card with five milestones —
+  give your budget its amounts, get your spending in, sort every
+  transaction, check an account against your bank, finish your first month.
+  Nothing is stored: each tick is read off your files, so typing things in
+  by hand counts too. A step that just ticked draws its tick; all five says
+  "All set" once and the card goes. Only new vaults made by the setup
+  wizard turn it on — Settings → First steps checklist has the switch.
+- **The setup wizard talks back.** Each question opens with a line saying
+  your last answer back ("Paid on the 25th, so your month runs from the
+  25th to the 24th"), so a wrong answer is easy to spot. The longer
+  explanations sit behind "Why are we asking?", and each screen slides in
+  from the side you came from.
+- **Setup ends on the vault door shutting** on the vault it just made, for
+  bank-statement and by-hand households alike. It replaces the confetti.
+- **What the score is made of.** The Financial health card shows its five
+  pillars, each with a fact line, a bar of points earned against the
+  pillar's weight, and a link to its page.
+
+### Fixed
+
+- **Tax:** a total exactly at a SARS limit (TFSA, interest exemption, CGT
+  exclusion) is within it, not a red card about a R 0,00 excess.
+
+### Performance
+
+- **Services about 3.5× and the Dashboard about 2× faster** on a large
+  history, with every figure unchanged.
+
 ## 1.57.0 — 2026-11-04
 
 Accounts lead with the live balance, the Food page shows spend over time,
