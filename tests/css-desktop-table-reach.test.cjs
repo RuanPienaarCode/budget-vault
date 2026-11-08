@@ -48,7 +48,9 @@
    The rules pinned here let each table give up room before it gives up a
    column, in this order: wrap what can wrap, narrow what can narrow, and only
    then drop the columns the Accounts drawer already repeats (the phone has
-   always dropped them; this reaches the widths between a phone and a laptop).
+   always dropped them; this reached the widths between a phone and a laptop).
+   For Accounts the last step no longer exists: the drawer, the columns it
+   repeated and the actions that wrapped are gone (see section 1 below).
    The layout itself was measured in a browser, before and after; what a bare
    node guard can honestly hold is that the rules which did the work are still
    there and still say what they said, so each assertion names the number the
@@ -81,51 +83,33 @@ const want = (sel, prop, ctx, test, why) => {
   return d;
 };
 
-/* ---- 1. ACCOUNTS: the state cell wraps at every width, the actions take their own line ---- */
-want(`${R} .acct-col-state`, 'white-space', [], v => v === 'normal',
-  'let the state cell wrap at desktop widths too (it was nowrap above 760px: 453px for a pill, a reason and three buttons)');
-want(`${R} .acct-row-acts`, 'display', [], v => v === 'flex', 'be a flex row of its own, not an inline-flex run beside the pill');
-want(`${R} .acct-row-acts`, 'flex-wrap', [], v => v === 'wrap', 'wrap its buttons');
-want(`${R} .acct-row-why`, 'flex', [], v => /^1 1 100%$/.test(v),
-  'take the whole first line of the actions row, so the reason wraps in the cell instead of stretching it');
+/* ---- 1. ACCOUNTS: a quiet list that gives before it scrolls ----
+   The per-row actions, the drawer-repeated columns and the two width steps that
+   dropped them are RETIRED with the table they belonged to: the Accounts list is
+   name / balance (+ the period's movement under it) / status / notes, with the
+   decisions in the inspector beside it. What the browser measurement of this
+   audit turned on — that no cell holds a line the table cannot narrow — is still
+   the property, and it is held by the numbers the new rules carry. */
 {
-  const m = decl(`${R} .acct-row-acts`, 'margin', []);
-  const p = m && String(m.value).trim().split(/\s+/);
-  ok(m && px(p[0]) > 0 && (p[3] === undefined ? px(p[1] === undefined ? p[0] : p[1]) : px(p[3])) === 0,
-    `the actions keep a gap ABOVE them and no inline offset (found "${m && m.value}")`);
+  const d = want(`${R} #acctTable td.acct-col-state`, 'max-width', [], v => px(v) > 0 && px(v) <= 120,
+    'cap the status column: "nothing imported" wraps to two short lines, which is what leaves the name a readable width on a 760px pane');
+  const f = decl(`${R} #acctTable th:first-child`, 'min-width', []);
+  ok(f && px(f.value) <= 160, `the name column's floor is at most 160px, so it cannot be the column that forces a scroll (found "${f && f.value}")`);
+  void d;
 }
+want(`${R} .acct-flow`, 'white-space', [], v => v === 'normal',
+  'let the period\'s movement wrap under the balance: the cell is nowrap (td.num), and "+R 7 296 in November 2026" on one line widened the column by ~160px');
+want(`${R} .acct-flow`, 'max-width', [], v => /^[\d.]+em$/.test(v) && parseFloat(v) <= 10,
+  'bound the movement line, so it wraps into two short right-aligned lines');
 want(`${R} .acct-goal`, 'flex-wrap', [], v => v === 'wrap',
-  'let the goal label drop under its bar: the bar and a nowrap label were 195px, the Progress column could not narrow');
-
-/* The columns the drawer repeats drop in two steps between a phone and a
-   laptop. Each step is the width below which the table, with everything before
-   it already wrapped and narrowed, no longer fits the card: the card is the
-   window less ~122px (the drawer's rail and the page gutters), the table needs
-   about 1061px with all eight columns, 826 without the sparkline and the
-   confirmed date, 587 with only the name, balance, state and notes. */
-const STEP1 = '@media (max-width: 1180px)', STEP2 = '@media (max-width: 960px)';
-const hides = (ctx, sel) => { const d = decl(sel, 'display', [ctx]); return d && d.value === 'none'; };
-for (const n of [4, 6]) {
-  ok(hides(STEP1, `${R} #acctTable:not(.is-sized) .acct-col-drop:nth-child(${n})`),
-    `${STEP1}: the ${n === 4 ? 'sparkline' : 'confirmed-date'} column (nth-child(${n})) drops, so the table fits a ~1024px window`);
-}
-ok(hides(STEP2, `${R} #acctTable:not(.is-sized) .acct-col-drop`),
-  `${STEP2}: every .acct-col-drop column drops (the phone's set), so the table fits down to the 760px rule that already does it`);
-/* A reader who dragged a column edge chose their widths (fixed layout); hiding
-   columns under that would make the stored widths mean something else. */
+  'let the goal label drop under its bar: the bar and a nowrap label were 195px (still true in the inspector\'s narrow pane)');
+/* There is no width step any more: nothing drops a column between a phone and a
+   laptop, because there are no columns left to drop. And no rule may bring one
+   back by hiding a cell of a table the list is laid out in. */
 for (const r of rules) {
-  if (!r.context.some(c => c === STEP1 || c === STEP2)) continue;
   for (const s of r.selectors.filter(x => x.includes('#acctTable'))) {
-    ok(/#acctTable:not\(\.is-sized\)/.test(s), `${locate(r.line)}: "${s}" drops a column of a table the reader has sized by hand`);
+    ok(!/\.acct-col-drop/.test(s), `${locate(r.line)}: "${s}" names .acct-col-drop, a column that no longer exists`);
   }
-}
-/* The VoiceOver gate (css-phone-layout) only concerns display values that take
-   the table out of table layout; display:none is neither, so nothing here may
-   re-lay the table out. */
-for (const r of rules) {
-  if (!r.context.some(c => c === STEP1 || c === STEP2)) continue;
-  for (const d of r.decls) ok(!(d.prop === 'display' && /^(grid|block|flex|inline-flex|contents)$/.test(d.value)),
-    `${locate(r.line)}: a width step may drop a column, never re-lay the table out (${d.prop}: ${d.value})`);
 }
 
 /* ---- 2. BUDGET: the inline-width Notes input, the nowrap caption and badge ---- */
@@ -223,4 +207,4 @@ want(`${O} td.num .fine-note`, 'white-space', WIDE, v => v === 'normal',
   'let "counts as 0 in the totals" wrap (td.num is nowrap, so the note would fix the Amount column at its own length)');
 
 if (failures.length) { console.error(`FAIL — css-desktop-table-reach: ${failures.length} of ${checks} checks\n  ` + failures.join('\n  ')); process.exit(1); }
-console.log(`PASS — css-desktop-table-reach: Accounts state cell wraps at every width and drops its repeated columns in two steps, Budget, Debts, Transactions and Owed Money give up room before columns (${checks} checks).`);
+console.log(`PASS — css-desktop-table-reach: Accounts list gives before it scrolls (status capped, movement wrapped, no dropped columns), Budget, Debts, Transactions and Owed Money give up room before columns (${checks} checks).`);

@@ -735,6 +735,16 @@ function mountApp(view) {
        this view hides it; connectVault's own hide/show pair above stays in
        charge of the not-yet-loaded case. */
     $('#periodPill').classList.toggle('hidden', v === 'report');
+    /* The Accounts inspector is `position: sticky`, which binds to the nearest
+       ancestor that is a scroll container — and .main-content, with its
+       `overflow-x: hidden`, IS one (an overflow on one axis computes the other
+       to `auto`) that never scrolls, being as tall as its content. The
+       inspector would sit still while the list scrolled past it. This class
+       lets src/statement/accounts.css swap that to `overflow-x: clip` for this
+       one page: the same clipping, no scroll container, so the sticky binds to
+       .bud-scroll. Scoped rather than global because `clip` also stops
+       containing floats, and no other page needs it. */
+    $('.main-content').classList.toggle('is-accounts', v === 'accounts');
     for (const b of $$('.dock-btn[data-dock-view]')) {
       if (b.dataset.dockView === v) b.setAttribute('aria-current', 'page');
       else b.removeAttribute('aria-current');

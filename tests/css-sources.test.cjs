@@ -7,14 +7,14 @@
    anything:
 
      1. THE ORDER IS THE CASCADE, AS DECLARED: fonts, the legacy sheet, the
-        statement foundation, the three page lanes, the generated palettes LAST.
+        statement foundation, the page lanes, the generated palettes LAST.
         Presets last is not cosmetic: they are the only block that must beat the
         base tokens, and a lane that ended up after them could re-point a token
         a palette had just set.
      2. NOTHING SHIPPED IS LEFT OUT. Every .css file under src/ is in the list. A
         lane file added but not listed would be written, reviewed, and silently
         never loaded.
-     3. THE LANES ARE SEPARATE FILES. Three lanes can only work in parallel without
+     3. THE LANES ARE SEPARATE FILES. The lanes can only work in parallel without
         ever editing the same file if each owns exactly one, named for it, so
         the list pins the names the page lanes were briefed with.
      4. EVERY FILE ENDS WITH A NEWLINE, because the assembly inserts no separator:
@@ -48,10 +48,11 @@ eq(CSS_SOURCES, [
   'src/statement/dashboard.css',
   'src/statement/budget.css',
   'src/statement/transactions.css',
+  'src/statement/accounts.css',
   'src/statement/phone.css',
   'src/statement/phone-tables.css',
   'src/styles-presets.css',
-], 'fonts -> legacy -> foundation -> three lanes -> two phone lanes -> presets, in that order');
+], 'fonts -> legacy -> foundation -> four lanes -> two phone lanes -> presets, in that order');
 eq(CSS_SOURCES[CSS_SOURCES.length - 1], 'src/styles-presets.css', 'the generated palette blocks are last');
 
 /* ---- 2. nothing under src/ is left out ---- */

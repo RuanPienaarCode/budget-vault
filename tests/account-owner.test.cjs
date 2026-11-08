@@ -20,7 +20,7 @@
         file is allowed to say
      6. the per-owner split sums to the same net figure the hero states
      7. a one-person vault renders exactly the page it had before this existed —
-        no card, no chips, no owner row in the drawer
+        no card, no chips, no owner row in the inspector
 
    Runs in bare node against the in-memory vault. Every figure is synthetic.
      node tests/account-owner.test.cjs        # non-zero exit on failure */
@@ -210,7 +210,7 @@ const textOf = root => descend(root).map(n => n.textContent || '').join(' | ');
     eq(chipEls.length, 6, 'one chip per bucket, plus the "Everyone" chip that clears the filter');
 
     // The owner reaches the ledger row, so a reader can see whose an account is
-    // without opening its drawer.
+    // without selecting it.
     ok(textOf(ctx.$('#acctTable')).includes('Ouma'),
       'the row subtitle carries the owner alongside the kind and the bank');
 
@@ -253,13 +253,16 @@ const textOf = root => descend(root).map(n => n.textContent || '').join(' | ');
     eq(solo.$('#acctOwners').className, '',
       'and the band is left classless, so a bare div reserves no space on the page');
 
-    // Opening a drawer must not offer an Owner row on a page with no owners.
+    // Selecting an account must not offer an Owner row on a page with no owners.
+    // (The drawer this used to open is the inspector now; selection is the same
+    // S.acctView.open the drawer was keyed on.)
     solo.renderAccounts();
     soloS.acctView.open = 'Cheque';
     solo.renderAccounts();
-    const drawer = descend(solo.$('#acctTable')).find(n => n._cls && n._cls.has('acct-drawer'));
-    ok(drawer, 'the drawer opens');
-    ok(!textOf(drawer).match(/\bOwner\b/), 'and says nothing about an owner');
+    const inspector = solo.$('#acctInspector');
+    ok(descend(inspector).some(n => n._cls && n._cls.has('acct-insp-name') && n.textContent.trim() === 'Cheque'),
+      'the inspector shows the selected account');
+    ok(!textOf(inspector).match(/\bOwner\b/), 'and says nothing about an owner');
   }
 
   /* ---------- 9. a starting amount of ZERO is a real baseline ------------

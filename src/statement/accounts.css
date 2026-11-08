@@ -1,0 +1,227 @@
+/* Statement lane: accounts — the quiet list and its inspector (views/accounts.js renderTable, renderInspector). */
+/* THE ACCOUNTS LIST AND ITS INSPECTOR.
+
+   Before this lane the Accounts page was one table of eight columns whose State
+   cell held a pill, a why-sentence and up to three buttons, with a drawer that
+   opened under the row. On a real ~760px Obsidian pane a flagged row measured
+   ~270px tall and its buttons were clipped, "November 2026" wrapped in its own
+   header, and the balance sub-line ("R 9 150,62 as at Sep 1 · +R 1 080,36
+   since") ran off its column.
+
+   The list now says who, how much and whether it agrees, and carries no
+   buttons. Selecting a row fills the inspector beside it (below it on a phone)
+   with that account's reconciliation worked out line by line, its actions and
+   its facts. The component rules the old table used (pill, bar, chip, recon,
+   the drawer-act pills) stay in src/styles.css where Savings shares them; this
+   file is the layout and the new parts.
+
+   Rules of this file
+     - Tokens only, no hex: the palette is sealed (scripts/presets.cjs).
+     - iOS 15 / WebKit floor: NO container queries (iOS 16+), no :has(), no
+       color-mix(). The mockup this was drawn from answers to the PANE's width
+       with @container; the plugin cannot, so the stacked layout answers to the
+       window — the same 760px the table used to drop its columns at, and the
+       same 600px phone breakpoint src/styles.css puts its cards at. A split
+       pane in a wide window therefore keeps the side-by-side layout and gets a
+       narrower list; the list is built to give (the name wraps, the status
+       word wraps) rather than to hide anything.
+     - position: sticky only, never fixed: the inspector is a card in the page's
+       flow, so nothing floats over the list on a phone.
+     - Loads before phone.css, which raises every text size under 12px on a
+       phone; nothing here is under 12px. */
+
+/* ---- the split -------------------------------------------------------------
+   One column until renderInspector marks the container `.has-insp` (it has a
+   selection to show) — an empty vault, or a search that finds nothing, gets the
+   list at full width instead of a 272px hole. */
+.budget-app-root .acct-split { display: block; }
+.budget-app-root .acct-split.has-insp {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 272px;
+  align-items: start;
+}
+.budget-app-root .acct-list { min-width: 0; }
+
+/* ---- the list --------------------------------------------------------------
+   The name column takes whatever the balance, the status and the notes chip
+   leave. A floor keeps it from collapsing to one word per line when they are
+   wide (it did: "FNB Business Account (Ruan)" rendered a word a line), and it
+   is lifted on a phone, where the card layout below gives the name its own
+   track. */
+.budget-app-root #acctTable th:first-child,
+.budget-app-root #acctTable td:first-child { min-width: 150px; }
+
+/* The status takes its own width and wraps inside it: "nothing imported" is two
+   short lines, which is what lets the name keep a readable width on a 760px
+   pane. Top-aligned dot, so the dot sits beside the first line of the word. */
+.budget-app-root #acctTable td.acct-col-state { width: 1%; min-width: 96px; max-width: 120px; }
+.budget-app-root .acct-st {
+  display: inline-flex; align-items: flex-start; gap: 6px;
+  font-size: 12.5px; line-height: 1.35; color: var(--text-muted);
+}
+.budget-app-root .acct-st i {
+  flex: none; box-sizing: border-box; width: 7px; height: 7px; margin-top: .42em;
+  border-radius: 50%; background: var(--color-primary);
+}
+.budget-app-root .acct-st.is-warn { color: var(--color-warning-ink); font-weight: 500; }
+.budget-app-root .acct-st.is-warn i { background: var(--color-warning); }
+/* A muted account keeps its words and gives up the alarm colour. Dashed, as the
+   muted pill's border is, so it is tellable from an agreeing one without colour. */
+.budget-app-root .acct-st.is-muted i { background: transparent; border: 1.5px dashed var(--ink-faint); }
+
+/* The period's movement, a line under the balance. `max-width` and the right
+   margin let "+R 7 296 in November 2026" wrap into two short right-aligned
+   lines instead of widening the balance column (the td is nowrap, and the
+   line must not inherit that). Its colour is the tone class on the span. */
+.budget-app-root .acct-flow {
+  margin: 2px 0 0 auto; max-width: 9.5em; white-space: normal;
+  font-size: 12px; line-height: 1.35; text-align: right; font-variant-numeric: tabular-nums;
+}
+
+/* The balance header holds two sort buttons: the balance, and under it the
+   period's name (the line each row carries beneath its balance). */
+/* Not spelled with #acctTable: this is a button's own box inside a header cell,
+   not a re-layout of the table, and tests/css-phone-layout.test.cjs reserves
+   `#acctTable` + a block/flex display for the role-gated phone card. */
+.budget-app-root .table thead th button.acct-sort-sub {
+  display: flex; margin-left: auto; margin-top: 2px; font-size: 12px; font-weight: 600;
+}
+
+/* ---- the inspector ---------------------------------------------------------
+   Sticky within the page's scroller, so a long list scrolls past while the
+   account being read stays in view. Capped and scrollable on its own: a drift
+   account with every fact on it is taller than a short window, and a sticky
+   box taller than the viewport would put its last buttons out of reach.
+
+   STICKY NEEDS A SCROLLER THAT SCROLLS. .main-content carries
+   `overflow-x: hidden` (src/styles.css), which makes it a scroll container that
+   never scrolls, and a sticky box binds to the nearest one — so without the rule
+   below it would not stick at all. controller.js marks .main-content
+   `.is-accounts` on this page only; `overflow-x: clip` clips the same way
+   without being a scroll container, so the sticky binds to .bud-scroll. Behind
+   @supports because iOS 15 has no `clip`: there it keeps `hidden` and the
+   inspector scrolls with the page, which is a lesser page and not a broken one
+   (sticky is an enhancement of the side-by-side layout, not a way to reach it). */
+@supports (overflow: clip) {
+  .budget-app-root .main-content.is-accounts { overflow-x: clip; }
+}
+.budget-app-root .acct-insp {
+  position: sticky; top: 12px; align-self: start; min-width: 0; box-sizing: border-box;
+  max-height: calc(100vh - 120px); overflow-y: auto; overscroll-behavior: contain;
+  padding: 20px 20px 24px; border-left: 1px solid var(--border-color);
+  scroll-margin-top: 12px;
+}
+.budget-app-root .acct-insp.is-empty { display: none; }
+.budget-app-root .acct-insp-grip { display: none; }
+.budget-app-root .acct-insp-k { font-size: 12.5px; color: var(--ink-faint); overflow-wrap: break-word; }
+.budget-app-root .acct-insp-name {
+  display: flex; align-items: center; gap: 8px; margin: 2px 0 0;
+  font-size: 17px; font-weight: 600; letter-spacing: -.01em; overflow-wrap: break-word;
+}
+/* Size, weight and the muted symbol come from the statement foundation's
+   figure-small treatment (.acct-drawer-v); only the room around it is set here. */
+.budget-app-root .acct-insp .acct-drawer-v { margin: 14px 0 2px; }
+.budget-app-root .acct-insp-flow { display: flex; align-items: center; flex-wrap: wrap; gap: 10px; margin-top: 8px; }
+.budget-app-root .acct-insp .acct-badges { margin-top: 12px; }
+
+/* The reconciliation card. Amber while there is an argument to settle, green
+   when the figure agrees, plain for the states that are a sentence. The same
+   frame tokens the "Needs a look" banner uses, so amber means one thing. */
+.budget-app-root .acct-insp-recon {
+  margin: 14px 0; padding: 12px 14px; border-radius: 14px;
+  border: 1px solid var(--border-color); font-size: 13px; line-height: 1.45; color: var(--text-muted);
+}
+.budget-app-root .acct-insp-recon.is-drift { border-color: var(--color-warning); background: var(--color-warning-light); }
+.budget-app-root .acct-insp-recon.is-ok { border-color: var(--color-primary); background: var(--color-primary-light); }
+.budget-app-root .acct-insp-recon .acct-recon { margin: 0; padding: 0; border: 0; }
+.budget-app-root .acct-insp-recon .acct-recon-txt { font-size: 13px; line-height: 1.45; }
+.budget-app-root .acct-insp-recon-t { margin-bottom: 10px; }
+.budget-app-root .acct-insp-recon-t b { color: var(--text-primary); }
+.budget-app-root .acct-insp-line {
+  display: flex; justify-content: space-between; align-items: baseline; gap: 12px; padding: 3px 0;
+  color: var(--text-primary); font-variant-numeric: tabular-nums;
+}
+.budget-app-root .acct-insp-line > span:first-child { color: var(--text-muted); }
+.budget-app-root .acct-insp-line .num { white-space: nowrap; }
+/* The sum's last line, set off by a rule and in bold: it is the figure the
+   primary button below offers, and the one the other two add up to. */
+.budget-app-root .acct-insp-line.is-total {
+  margin-top: 4px; padding-top: 8px; border-top: 1px solid var(--border-color); font-weight: 700;
+}
+.budget-app-root .acct-insp-line.is-total > span:first-child { color: var(--text-primary); }
+.budget-app-root .acct-insp-recon-note { margin-top: 8px; font-size: 12.5px; }
+/* The same-day line (sameDayLine) keeps its own rule above it. */
+.budget-app-root .acct-insp .acct-sameday { margin: 0 0 14px; }
+
+/* Actions, stacked and full width: the primary answer, then the two beside it.
+   Written at (0,3,0) so they out-rank Obsidian's `.is-tablet button:not(...)`
+   padding (0,2,1) on an iPad without needing a padding twin in styles.css. */
+.budget-app-root .acct-insp-acts { display: flex; flex-direction: column; gap: 6px; margin-top: 12px; }
+.budget-app-root .acct-insp-acts-2 { display: flex; gap: 6px; }
+.budget-app-root .acct-insp-acts-2 .acct-insp-btn { flex: 1 1 0; min-width: 0; }
+.budget-app-root .acct-insp .acct-insp-btn {
+  display: inline-flex; align-items: center; justify-content: center; gap: 6px;
+  width: 100%; min-height: 36px; box-sizing: border-box; padding: 6px 14px;
+  font: inherit; font-size: 13px; font-weight: 600; line-height: 1.25; text-align: center;
+  cursor: pointer; border-radius: 999px;
+  border: 1px solid var(--border-color); background: var(--surface); color: var(--text-primary);
+}
+.budget-app-root .acct-insp .acct-insp-btn:hover { border-color: var(--text-muted); }
+.budget-app-root .acct-insp .acct-insp-btn.is-primary {
+  border-color: var(--color-primary); background: var(--color-primary-light); color: var(--color-primary);
+}
+.budget-app-root .acct-insp .acct-insp-btn.is-quiet { color: var(--text-muted); border-color: transparent; background: transparent; }
+.budget-app-root .acct-insp .acct-insp-btn.is-quiet:hover { color: var(--text-primary); border-color: var(--border-color); }
+.budget-app-root .acct-insp .acct-insp-btn .ico svg { width: 0.9rem; height: 0.9rem; }
+.budget-app-root .acct-insp .acct-insp-btn:focus-visible { outline: 2px solid var(--color-primary); outline-offset: 2px; }
+.budget-app-root .acct-insp .acct-drawer-acts { margin-top: 12px; }
+
+/* The facts. Two columns: Confirmed beside State, Progress and anything wide on
+   a line of its own. The state pill may be long ("nothing imported · ignored"),
+   so it wraps here rather than forcing the column wider. */
+.budget-app-root .acct-insp-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 14px 12px; margin-top: 18px; }
+.budget-app-root .acct-insp-grid > * { min-width: 0; }
+.budget-app-root .acct-insp-grid .acct-drawer-f.is-wide { grid-column: 1 / -1; }
+.budget-app-root .acct-insp-grid .acct-drawer-val { font-variant-numeric: tabular-nums; overflow-wrap: break-word; }
+.budget-app-root .acct-insp-grid .acct-pill { white-space: normal; }
+.budget-app-root .acct-insp-grid .acct-goal { display: flex; }
+
+@media (pointer: coarse) {
+  .budget-app-root .acct-insp .acct-insp-btn { min-height: 44px; }
+}
+
+/* ---- stacked: the inspector below the list ---------------------------------
+   At the table's own 760px breakpoint the two stop sharing a row. The inspector
+   becomes a card styled as a bottom sheet — rounded top, a grip — but IN FLOW,
+   under the list: selecting a row scrolls it into view (selectRow in the view),
+   and nothing is overlaid on the list, so a phone never has a fixed panel
+   hiding the row it was opened from. */
+@media (max-width: 760px) {
+  .budget-app-root .acct-split.has-insp { display: block; }
+  .budget-app-root .acct-insp {
+    position: static; max-height: none; overflow: visible;
+    margin: 8px 8px 10px; padding: 16px 18px 22px;
+    border: 1px solid var(--border-color); border-radius: 22px 22px 26px 26px;
+    background: var(--surface); box-shadow: var(--shadow-md);
+  }
+  .budget-app-root .acct-insp-grip {
+    display: block; width: 40px; height: 4px; margin: 0 auto 14px;
+    border-radius: 4px; background: var(--border-color);
+  }
+}
+
+/* A phone card for each row has its own tracks (src/styles.css, "Accounts at a
+   phone width"), so the floors the desktop columns carry are lifted. */
+@media (max-width: 600px) {
+  .budget-app-root #acctTable th:first-child,
+  .budget-app-root #acctTable td:first-child { min-width: 0; }
+  .budget-app-root #acctTable td.acct-col-state { width: auto; min-width: 0; max-width: none; }
+  .budget-app-root #acctTable[role='table'] td.acct-col-state { padding-top: 0; }
+  .budget-app-root .acct-insp { margin-left: 4px; margin-right: 4px; }
+}
+
+/* Mirrors of the focus rings above for iOS 15.0-15.3, which do not know
+   :focus-visible and would drop the whole rule — see tests/focus-visible-fallback. */
+@supports not selector(:focus-visible) {
+  .budget-app-root .acct-insp .acct-insp-btn:focus { outline: 2px solid var(--color-primary); outline-offset: 2px; }
+}

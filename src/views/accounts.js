@@ -32,7 +32,7 @@ const { normalizeCode, codeForSymbol, currencyConflict } = require('../fx');
    it was wrong on all four. poolCatType alongside it: ITEM 2, the same
    growth/contribution split savings.js now makes — this file's own
    totalReturn() call below must feed it the SAME pool-aware type lookup or
-   the goal cell and drawer answer a different growth figure for the same
+   the goal cell and inspector answer a different growth figure for the same
    account than the Savings page does (exactly the two-call-sites-drift bug
    the comment above already names one instance of). */
 /* goalPercentLabel and returnPercentText beside them: the goal cell and the
@@ -57,6 +57,10 @@ const { isCreditCard } = require('../committed');
 /* The state machine behind the decision queue — which accounts land in it, in
    what order, and why. Pure, and tested without a DOM. */
 const { statusOf, wantsALook, staleRank, queueOrder, WARNINGS, mutedWarnings, URGENCY } = require('../acct-status');
+/* Which account the inspector shows, the reconciliation's three figures, which
+   buttons that account gets — decided in a pure module so a guard test can
+   reach them without a page. This file words them and draws them. */
+const { pickSelection, reconSteps, inspectorActions, leadTrim } = require('../acct-inspector');
 /* isSplitPart, alongside supersededBySplit: the delete dialog counts what the
    BANK actually printed, and a split's parts are rows this app created, not
    statement lines — see tx-role.js's own header. */
@@ -92,7 +96,7 @@ const { worth, cardOverlap } = require('../worth');
 const { sharePercents, sharePercentLabel } = require('../share-percents');
 
 module.exports = function registerAccounts(ctx) {
-  const { S, $, app, root, plugin, money, toast, writeFile, ensureFolder, relPath, fileAt, ledger, tally, LENSES,
+  const { S, $, app, root, money, toast, writeFile, ensureFolder, relPath, fileAt, ledger, tally, LENSES,
     txInPeriod, accountForLabel, accountIndex, accountsWithFolder, periodMonthName,
     periodRange, currentPeriod } = ctx;
 
@@ -130,7 +134,7 @@ module.exports = function registerAccounts(ctx) {
   const acctMoney = (a, v, decimals = 2) =>
     ctx.moneyIn(symbolOf(a, S.settings.currency), v, decimals);
   /* Is the symbol acctMoney() prints for this account exactly one code point?
-     The statement stylesheet shrinks the first letter of the drawer balance to
+     The statement stylesheet shrinks the first letter of the inspector's balance to
      draw a small muted currency symbol, which is only right when that letter is
      the whole symbol: this account may print its own ("USD", "Rp"), not the
      household's. A conflicted account prints its CODE (symbolOf), so it never
@@ -521,7 +525,7 @@ module.exports = function registerAccounts(ctx) {
        This is the one screen where a real bank balance enters the vault, and
        until now it took the number, stamped today, and compared nothing — then
        reconcile(), finding its whole window behind the fresh stamp, reported
-       "clean" and the drawer printed "This figure matches your transactions".
+       "clean" and the page printed "This figure matches your transactions".
        That sentence was false by construction on every entry that disagreed:
        a statement imported into the wrong account, a missing row, a duplicate,
        all silently absorbed, because the confirmed baseline moved with the
@@ -840,8 +844,12 @@ module.exports = function registerAccounts(ctx) {
           that figure is made of;
        2. the QUEUE — the accounts whose stated balance cannot currently be
           trusted, each with the single action that settles it;
-       3. the LEDGER — every account as one table row, sortable, with the
-          detail folded into a drawer that opens under the row.
+       3. the LEDGER — every account as one quiet row (who, how much, whether it
+          agrees), sortable, beside an INSPECTOR that shows the selected
+          account in full: its reconciliation worked out line by line, the
+          actions, the facts. The decisions used to sit on the row itself, and
+          on a real ~760px pane a flagged row was ~270px tall with its buttons
+          clipped.
 
      It replaced a grid of tiles. Tiles cost ~180px of height each and said the
      same eight things about an account whether or not any of them mattered, so
@@ -853,9 +861,15 @@ module.exports = function registerAccounts(ctx) {
 
   /* Page state lives on S, NOT in a module-local. The file watcher re-renders
      the whole app whenever anything under the budget folder changes, and a
-     sort, a filter or an open drawer held in this closure would reset itself
+     sort, a filter or a selection held in this closure would reset itself
      every time a transaction file was saved — including by an import running
      in another window while the reader is halfway down this page.
+
+     `open` is the SELECTED account — the one the inspector shows. The name is
+     from the drawer this page used to open under a row; the field kept it so
+     a selection survives a watcher re-render exactly as an open drawer did.
+     null means "the reader has not chosen", and the inspector then shows the
+     first account that wants a look (acct-inspector.js pickSelection).
 
      Filled in field by field and IN PLACE rather than replaced wholesale: the
      click handlers below capture the object this returns, so handing out a
@@ -920,7 +934,7 @@ module.exports = function registerAccounts(ctx) {
       const st = statusOf(a, rows, null, folders.has(a));
       const act = periodActivity(labels);
       /* Computed once here rather than separately in the goal cell and the
-         drawer, same reasoning as reconcile() above it — two call sites
+         inspector, same reasoning as reconcile() above it — two call sites
          deriving "what this account earned" independently is exactly how the
          retired `balance - total_invested` formula and views/savings.js's
          totalReturn() came to disagree by R60 000 on the same account. */
@@ -1498,10 +1512,10 @@ module.exports = function registerAccounts(ctx) {
     return i18n.t(`acct.deck.why.${r.state}`);
   }
 
-  /* The ONE action a reader would take without looking. Everything else is
-     "Review", which opens this account's drawer in the table below — so there
-     is one place to act in a hurry and one place to act in depth, rather than
-     two competing copies of the same controls. */
+  /* The ONE action a reader would take without looking — the inspector's
+     primary button. Everything else it offers (see the rows, ignore, edit) is
+     the depth behind it, so there is one answer in a hurry and one place to act
+     in depth, rather than two competing copies of the same controls. */
   function deckAction(r) {
     if (r.state === 'drift') {
       return { label: i18n.t('acct.deck.do.drift', { amount: acctMoney(r.a, r.rec.implied) }),
@@ -1536,12 +1550,12 @@ module.exports = function registerAccounts(ctx) {
   /* Redesign variant B (see budget-redesign.html, screen 8, variant B): the
      four-card deck collapsed to one line. The per-account "why" sentence and
      the one-tap action (deckWhy / deckAction above) are NOT retired — they
-     move onto the row itself (see accountRow's `acct-row-acts`, and
-     reasonGroups() below for the once-per-reason header that replaces the
-     old once-per-account repetition of the same sentence). This function's
-     only job now is to say how many accounts want a look and offer the one
-     door into them; the table (already filterable to "Needs a look") is
-     where the reader actually acts. */
+     moved onto the row first and then into the inspector (see
+     renderInspector), with reasonGroups() below supplying the once-per-reason
+     header that replaces the old once-per-account repetition of the same
+     sentence. This function's only job now is to say how many accounts want
+     a look and offer the one door into them; the list (already filterable to
+     "Needs a look") and its inspector are where the reader actually acts. */
   /* `rows` is what the owner filter leaves on view — the deck's "Show them"
      opens the table under that same filter, so it counts what it will show. */
   function renderDeck(rows) {
@@ -1668,7 +1682,7 @@ module.exports = function registerAccounts(ctx) {
   function setOwnerFilter(key) {
     const v = view();
     v.owner = key;
-    v.open = null;                        // a drawer left open under a filtered-out row
+    v.open = null;                        // a selection left on a filtered-out row
     renderAccounts();
   }
 
@@ -1736,7 +1750,7 @@ module.exports = function registerAccounts(ctx) {
         f.label, el('span', { class: 'acct-seg-n' }, String(n)));
       b.addEventListener('click', () => {
         v.filter = f.key;
-        v.open = null;                     // a drawer left open under a filtered-out row
+        v.open = null;                     // a selection left on a filtered-out row
         renderAccounts();
       });
       wrap.append(b);
@@ -1750,7 +1764,7 @@ module.exports = function registerAccounts(ctx) {
      inventing one would put a number under the reader's eye that no file says.
      An account nothing moved through gets no line at all, because a flat
      stroke would claim a month that was measured and found still. */
-  function sparkline(r) {
+  function sparkline(r, width = 96) {
     const rowsInPeriod = txInPeriod(S.period)
       .filter(t => r.labels.has(t.label) && !supersededBySplit(t))
       .sort((x, y) => (x.date < y.date ? -1 : x.date > y.date ? 1 : 0));
@@ -1760,7 +1774,7 @@ module.exports = function registerAccounts(ctx) {
     const series = [0];
     for (const t of rowsInPeriod) { run += t.amount; series.push(run); }
 
-    const W = 96, H = 24, pad = 2;
+    const W = width, H = 24, pad = 2;
     const lo = Math.min(...series), hi = Math.max(...series), span = (hi - lo) || 1;
     /* The one inversion (SVG's y grows downward) happens here and nowhere else,
        so the series above stays plain ascending-is-up. */
@@ -1828,7 +1842,7 @@ module.exports = function registerAccounts(ctx) {
          own header for why that formula was retired: measured against real
          accounts it was wrong on all four, most starkly wherever a debit
          order kept moving the balance without total_invested keeping pace.
-         `r.tr` is computed once in model() and shared with the drawer below,
+         `r.tr` is computed once in model() and shared with the inspector below,
          so the two cannot disagree with each other the way the goal cell and
          views/savings.js's own tile used to. */
       const tr = r.tr;
@@ -1838,7 +1852,7 @@ module.exports = function registerAccounts(ctx) {
          This cell used to recompute its own `pct` with a `capitalIn > 0 ? … : 0`
          fallback, which silently printed "+0%" in exactly the case the maths
          module refuses to answer at all — the same account showing a real growth
-         bar in the drawer beside a dash-free 0% in the table. */
+         bar in the inspector beside a dash-free 0% in the list. */
       if (tr.returnPct === null) return el('span', { class: 'acct-dash' }, '—');
       const pct = tr.returnPct;
       /* One decimal in the household's mark, through the formatter the Savings
@@ -1853,6 +1867,18 @@ module.exports = function registerAccounts(ctx) {
     return el('span', { class: 'acct-dash' }, '—');
   }
 
+  /* The state, in words. One function so the list's status dot and the
+     inspector's pill can never say two different things about one account.
+     `stale` is the only state whose label states a number, so it is the only
+     one that needs a param; every other state — `unreadable` now included — is
+     a bare label the state name itself selects. The template-literal form is
+     invisible to tests/i18n.test.cjs's source scan, which is why the rendered
+     proof in tests/reconcile-unreadable-dates.test.cjs asserts the pill
+     through this same i18n.t call rather than against a literal. */
+  const stateLabel = r => (r.state === 'stale'
+    ? i18n.t('acct.state.stale', { count: r.days })
+    : i18n.t(`acct.state.${r.state}`));
+
   function statePill(r) {
     /* `drift` is a warning, not an error, since the row leads with the live
        figure (liveBalance): the number on the row is already the one the
@@ -1860,21 +1886,13 @@ module.exports = function registerAccounts(ctx) {
        against a statement — the same kind of question `stale` asks. */
     const cls = { ok: 'ok', drift: 'warn', stale: 'warn', unreadable: 'warn',
       nodate: 'warn', notx: 'warn', nofolder: 'warn' }[r.state];
-    /* `stale` is the only state whose pill states a number, so it is the only
-       one that needs a param; every other state — `unreadable` now included —
-       is a bare label the state name itself selects. The template-literal form
-       is invisible to tests/i18n.test.cjs's source scan, which is why the
-       rendered proof in tests/reconcile-unreadable-dates.test.cjs asserts the
-       pill through this same i18n.t call rather than against a literal. */
-    const label = r.state === 'stale'
-      ? i18n.t('acct.state.stale', { count: r.days })
-      : i18n.t(`acct.state.${r.state}`);
+    const label = stateLabel(r);
     /* A muted account still says what it IS — the pill is the fact, and the
        reader asked for the nagging to stop, not for the page to start
        claiming the figure agrees with transactions it has never seen. Muting
        only drops the alarm colour and adds the reason it is quiet. The WHY
        ("Ignored on this account, so it is not listed under 'Needs a look'.")
-       used to live only in a `title`, invisible on the phones this table's
+       used to live only in a `title`, invisible on the phones this page's
        reconciliation state is read on just as much as a desktop — caveatChip
        (dom.js) makes it reachable by tap. */
     if (r.muted) {
@@ -1884,35 +1902,30 @@ module.exports = function registerAccounts(ctx) {
     return el('span', { class: `acct-pill ${cls}` }, label);
   }
 
-  /* Variant B's per-row actions (see budget-redesign.html screen 8, variant
-     B): the deck's own Review / one-tap-fix pair, now printed on the row that
-     wants it instead of duplicated on a card above the table. `null` for a
-     clean account — nothing here is a decision, so nothing here has buttons. */
-  function rowActions(r) {
-    if (!wantsALook(r)) return null;
-    const act = deckAction(r);
-    const reviewBtn = el('button', { type: 'button', class: 'acct-deck-btn ghost sm',
-      'aria-label': i18n.t('acct.deck.ariaReview', { name: r.a.name }) }, i18n.t('acct.deck.review'));
-    reviewBtn.addEventListener('click', e => { e.stopPropagation(); openRow(r.a.name, true); });
-    const doBtn = el('button', { type: 'button', class: 'acct-deck-btn sm' }, icoEl(['check']), act.label);
-    doBtn.addEventListener('click', e => { e.stopPropagation(); act.run(); });
-    /* The reason travels with the row: a flagged account must say WHY on the
-       same surface it is flagged, whichever filter is active (the reason
-       group header only exists under the "Needs a look" filter). */
-    /* Ignore: the third answer to a decision, beside "look" and "fix". Only
-       for a state that is a judgement (WARNINGS); `unreadable` is a typo with
-       one correct answer and is never offered, the same rule mutedWarnings
-       applies to a hand-written key. Appends to whatever is already muted on
-       the account and saves that one key, so nothing else in the file moves. */
-    const kids = [el('span', { class: 'acct-row-why' }, deckWhy(r)), reviewBtn, doBtn];
-    if (WARNINGS.includes(r.state)) {
-      const ignBtn = el('button', { type: 'button', class: 'acct-deck-btn ghost sm',
-        'aria-label': i18n.t('acct.deck.ariaIgnore', { name: r.a.name }) }, i18n.t('acct.deck.ignore'));
-      ignBtn.addEventListener('click', e => { e.stopPropagation(); ignoreWarning(r); });
-      kids.push(ignBtn);
-    }
-    return el('span', { class: 'acct-row-acts' }, ...kids);
+  /* The list's status: a dot and one word, nothing to press. The pill above is
+     for the inspector, where it has room; in a list of fifteen accounts a row
+     of bordered pills is the visual noise this redesign removed. The word is
+     NOT optional and the dot never stands alone — colour only is a reading a
+     colour-blind reader and a phone in sunlight both lose.
+
+     A muted account says "ignored" here (the reader's own decision, which is
+     the more useful word at a glance) and keeps the FACT it is ignoring — "nothing
+     imported" — in the title and, in full, in the inspector's pill. The dot is
+     dashed, as the muted pill's border is, so it is tellable from a plain one
+     without colour.
+
+     The title on a flagged row is its reason with the account's own numbers in
+     it (deckWhy): the sentence the row used to print, kept where a pointer can
+     reach it without the row growing back to ~270px. The inspector says the
+     same thing in full, so nothing is reachable ONLY through a tooltip. */
+  function stateDot(r) {
+    const tone = r.muted ? 'muted' : r.state === 'ok' ? 'ok' : 'warn';
+    const title = r.muted ? stateLabel(r) : r.state === 'ok' ? null : deckWhy(r);
+    return el('span', { class: `acct-st is-${tone}`, title },
+      el('i', { 'aria-hidden': 'true' }),
+      r.muted ? i18n.t('acct.state.muted') : stateLabel(r));
   }
+
 
   async function ignoreWarning(r) {
     const a = r.a;
@@ -1923,21 +1936,43 @@ module.exports = function registerAccounts(ctx) {
     toast(i18n.t('acct.toast.ignored', { name: a.name }));
   }
 
-  function accountRow(r) {
-    const a = r.a, v = view();
-    const open = v.open === a.name;
+  /* The line under a balance — and under the inspector's — saying how much
+     moved through the account this period. The sign is a separate glyph and
+     the magnitude alone goes through acctMoney(), so a harvest reads +500
+     where the ledger holds -500. */
+  const flowText = r => i18n.t('acct.row.flow', {
+    amount: `${r.flow >= 0 ? '+' : '−'}${acctMoney(r.a, Math.abs(r.flow), 0)}`,
+    period: periodMonthName(S.period),
+  });
+
+  /* "type · bank · owner", the one line an account has under its name. Owner
+     joins the kind and the bank only when there IS one — an empty owner would
+     leave a trailing separator on every row in a single-person vault. */
+  const subLine = a => [a.type.replace('_', ' '), a.institution,
+    a.owner ? ownerLabel(a.owner, declaredOwners()) : ''].filter(Boolean).join(' · ');
+
+  /* One row of the list: who, how much, whether it agrees. NO BUTTONS beyond the
+     two that were always on a row (the name drills into transactions, the
+     balance opens its dialog) and the notes chip. Every decision — confirm,
+     review, ignore — moved into the inspector, because a row that has to hold
+     a sentence and three buttons is what measured ~270px tall on a 760px pane
+     with the buttons clipped (tests/accounts-inspector.test.cjs holds the
+     line). Clicking the row selects it. */
+  function accountRow(r, selected) {
+    const a = r.a;
     const tr = el('tr', {
       /* A currency conflict flags the ROW as well as carrying a badge in the
-         drawer: it is a contradiction in the file, not a figure that has merely
-         aged, and a reader should not have to open an account to discover that
-         the app is reading it as a different currency from the one they wrote.
-         Deliberately NOT a new `state`: acct-status.js's own note says a sixth
-         one has to be understood by every consumer of the pill, the queue and
-         the mute aliases before it can ship, and this needs none of that — the
-         existing "look at me" styling says enough, and the badge says which. */
-      class: `acct-row${r.state === 'drift' ? ' is-drift' : (wantsALook(r) || r.a.currency_conflict) ? ' is-flag' : ''}${open ? ' is-open' : ''}`,
+         inspector: it is a contradiction in the file, not a figure that has
+         merely aged, and a reader should not have to select an account to
+         discover that the app is reading it as a different currency from the
+         one they wrote. Deliberately NOT a new `state`: acct-status.js's own
+         note says a sixth one has to be understood by every consumer of the
+         pill, the queue and the mute aliases before it can ship, and this
+         needs none of that — the existing "look at me" styling says enough,
+         and the badge says which. */
+      class: `acct-row${r.state === 'drift' ? ' is-drift' : (wantsALook(r) || r.a.currency_conflict) ? ' is-flag' : ''}${selected ? ' is-selected' : ''}`,
       tabindex: '0',
-      'aria-expanded': String(open),
+      'aria-selected': String(selected),
       'aria-label': i18n.t('acct.aria.row', { name: a.name }),
     });
 
@@ -1967,93 +2002,246 @@ module.exports = function registerAccounts(ctx) {
       'aria-label': i18n.t('acct.aria.balance', { name: a.name, amount: balLabel }) },
       balLabel);
     balBtn.addEventListener('click', e => { e.stopPropagation(); editBalance(a); });
-    /* The typed figure, kept on the row whenever the live one has moved off
-       it — with its date and the movement since, so the reader can see both
-       halves of the disagreement without opening the drawer. The date is the
-       one thing that decides which transactions count, and the Confirmed
-       column that also carries it is dropped on a phone. */
-    const balSub = !unreadable && r.live !== a.balance
-      ? el('div', { class: 'acct-bal-sub' }, i18n.t('acct.row.typedAsAt', {
-        stated: acctMoney(a, a.balance),
-        date: ctx.dateText(a.balance_updated),
-        delta: `${r.live >= a.balance ? '+' : '−'}${acctMoney(a, Math.abs(r.live - a.balance))}`,
-      }))
+
+    /* The period's movement stays on the ROW, a short quiet line under the
+       balance, rather than moving into the inspector with the sparkline. The
+       reconciliation gate (tests/reconcile-gate.test.cjs) reads this figure off
+       every account that has one and checks it against the ledger's
+       ACCOUNT-lens activity; shown only for the selected account it would be
+       one reading of fifteen. The direction goes in the NAME rather than the
+       number: a reconciliation can then assert that an `acct-flow-out` figure
+       matches a negative activity and an `acct-flow-in` a positive one, which
+       comparing magnitudes cannot. */
+    const flow = r.act.count
+      ? el('div', { class: 'acct-flow' },
+        el('span', { class: r.flow >= 0 ? 'text-success' : 'text-danger',
+          'data-fig': r.flow >= 0 ? 'acct-flow-in' : 'acct-flow-out' }, flowText(r)))
       : null;
-
-    /* The sign is a separate glyph and the magnitude alone goes through
-       money(), so a harvest reads +500 where the ledger holds -500. The
-       direction goes in the NAME rather than the number: a reconciliation can
-       then assert that an `acct-flow-out` chip matches a negative activity and
-       an `acct-flow-in` a positive one, which comparing magnitudes cannot. */
-    const flowCell = r.act.count
-      ? el('span', { class: `acct-chip ${r.flow >= 0 ? 'up' : 'down'}`,
-        'data-fig': r.flow >= 0 ? 'acct-flow-in' : 'acct-flow-out' },
-        `${r.flow >= 0 ? '+' : '−'}${acctMoney(a, Math.abs(r.flow), 0)}`)
-      : el('span', { class: 'acct-dash' }, '—');
-
-    const spark = sparkline(r);
 
     tr.append(
       el('td', {}, el('div', { class: 'acct-cell-name' },
         el('span', { class: 'acct-dot', style: `background:${colourOf(a)}` }),
-        el('span', {}, nameEl,
-          el('span', { class: 'acct-cell-sub' },
-            /* Owner joins the kind and the bank on the one line the row
-               already has. Only when there IS one — an empty owner would leave
-               a trailing separator on every row in a single-person vault. */
-            [a.type.replace('_', ' '), a.institution,
-              a.owner ? ownerLabel(a.owner, declaredOwners()) : ''].filter(Boolean).join(' · '))))),
-      el('td', { class: 'num' }, balBtn, ...(balSub ? [balSub] : [])),
-      el('td', { class: 'num acct-col-drop' }, flowCell),
-      el('td', { class: 'acct-col-drop' }, spark || el('span', { class: 'acct-dash' }, '—')),
-      el('td', { class: 'acct-col-drop' }, goalCell(r)),
-      el('td', { class: 'acct-col-drop' },
-        el('span', { class: 'acct-when' }, a.balance_updated || i18n.t('acct.noDate'))),
-      el('td', { class: 'acct-col-state' }, statePill(r), rowActions(r)),
+        el('span', {}, nameEl, el('span', { class: 'acct-cell-sub' }, subLine(a))))),
+      el('td', { class: 'num' }, balBtn, ...(flow ? [flow] : [])),
+      el('td', { class: 'acct-col-state' }, stateDot(r)),
       /* Notes get a column of their own, at the end.
          It rode with the account NAME first, which read fine on one-line names
          and badly on the real ones: "Discovery Bank Transaction Account
          (Alex)" wraps to three lines, and an inline chip after the last word
          lands alone under the name looking like a stray control belonging to
          nothing. A column keeps it on the row's own baseline whatever the name
-         does, and puts every account's chip in one scannable strip.
-         NOT acct-col-drop: the columns that drop on a phone are the figures a
-         narrow screen can do without, and notes are the opposite — the phone
-         is where you write "the bank said X" while still on the call. */
+         does, and puts every account's chip in one scannable strip. The phone
+         keeps it too: it is where you write "the bank said X" while still on
+         the call. */
       el('td', { class: 'acct-col-notes' }, ctx.noteButton('account', a.name)));
 
-    tr.addEventListener('click', () => openRow(a.name, false));
+    tr.addEventListener('click', () => selectRow(a.name));
     tr.addEventListener('keydown', e => {
       if (e.target !== tr) return;
       if (e.key !== 'Enter' && e.key !== ' ') return;
       e.preventDefault();
-      openRow(a.name, false);
+      selectRow(a.name);
     });
     return tr;
   }
 
-  /* Everything the tile used to carry below its balance, moved wholesale into
-     a drawer that opens under the row. Nothing here is new information — it is
-     the same badges, the same activity line and the same reconciliation offer,
-     shown when the reader asks for one account rather than for all of them. */
-  function drawerRow(r) {
-    const a = r.a;
-    const box = el('div', { class: 'acct-drawer' });
+  /* ------------------------------ the inspector -----------------------------
+     Everything the drawer carried, for the ONE account the reader is looking
+     at, in a pane beside the list (below it on a phone). Nothing here is new
+     information — it is the same badges, figures, reconciliation and actions,
+     now with the room to show the reconciliation's working. */
 
+  /* The badges the tile carried. Kept because they say things the state pill
+     cannot: "not in budget" is not a problem with the figure, it is a fact
+     about what the figure counts toward. */
+  function badgesFor(r) {
+    const a = r.a;
+    const badges = el('div', { class: 'acct-badges' });
+    if (!a.in_budget) badges.append(badge(i18n.t('acct.badge.notInBudget'), 'muted'));
+    if (!r.rows.length) badges.append(badge(i18n.t('acct.badge.noTx'), 'warn'));
+    if (a.balance_updated && r.days === null) {
+      // dateText: prose for a real date (D2-11); a cell it cannot read comes
+      // back exactly as typed, which is what this badge exists to show.
+      badges.append(badge(i18n.t('acct.badge.asOf', { date: ctx.dateText(a.balance_updated) }), 'muted'));
+    }
+    /* The account's own two currency fields contradicting each other, said on
+       the row rather than left to be inferred from a total. `currency: R` with
+       `currency_code: USD` in a rand vault used to be HOME to currency.js and
+       FOREIGN to fx.js — R1 000 in the split headline against R17 985,61 on
+       the converted line. The app now takes the safe reading (foreign, named
+       by its code, never added at par), and this badge is the other half of
+       that: the reader is told which of the two words won, so they can correct
+       the file rather than wonder why their rand account is listed under USD.
+       Warning-toned, because it is a fact about the FILE and not about the
+       money — nothing here is stale or unconfirmed, it is contradictory. */
+    if (a.currency_conflict) {
+      badges.append(badge(i18n.t('acct.badge.currencyClash', {
+        code: a.currency_conflict.code, symbol: a.currency_conflict.symbol,
+      }), 'warn'));
+    }
+    return badges.children.length ? badges : null;
+  }
+
+  /* The reconciliation, argued out in lines. For a drift: what was typed, what
+     has moved since, and what that implies — three figures the reader can add
+     up for themselves — under a sentence that says the thing the app will not:
+     which of the two is wrong is theirs to decide. The primary button below
+     offers the implied figure; nothing in this block changes either number.
+
+     Every other state is a sentence (reconLine), not a sum: "nothing imports
+     into this account" has no arithmetic to show. */
+  function reconBlock(r) {
+    const a = r.a, rec = r.rec;
+    const steps = reconSteps(r, unreadableBalance(a));
+    if (!steps) {
+      return el('div', { class: `acct-insp-recon${r.state === 'ok' ? ' is-ok' : ''}` }, reconLine(r, false));
+    }
+    const line = (label, value, fig, cls) => el('div', { class: `acct-insp-line${cls ? ' ' + cls : ''}` },
+      el('span', {}, label),
+      el('span', { class: 'num', 'data-fig': fig }, value));
+    const box = el('div', { class: 'acct-insp-recon is-drift' },
+      el('div', { class: 'acct-insp-recon-t' }, i18n.t('acct.insp.drift') + ' ',
+        el('b', {}, i18n.t('acct.insp.which'))),
+      line(i18n.t('acct.insp.stated', { date: ctx.dateText(a.balance_updated) }),
+        acctMoney(a, steps.stated), 'acct-insp-stated'),
+      line(i18n.t('acct.insp.since', { count: steps.count }),
+        `${steps.delta >= 0 ? '+' : '−'}${acctMoney(a, Math.abs(steps.delta))}`, 'acct-insp-delta'),
+      line(i18n.t('acct.insp.implied'), acctMoney(a, steps.implied), 'acct-insp-implied', 'is-total'));
+    /* Stated on EVERY branch, not only on its own state — see reconLine. A
+       drifting account can ALSO have rows dated ahead and rows nothing can
+       date; both used to ride on the end of the drift sentence and now have a
+       line each, so they are not lost on exactly the accounts with more than
+       one thing wrong. */
+    const n = (rec && rec.unreadable) || 0;
+    for (const note of [rec.ahead ? i18n.t('acct.recon.pending', { count: rec.ahead }) : '',
+      n ? i18n.t('acct.recon.undatable', { count: n }) : ''].map(leadTrim).filter(Boolean)) {
+      box.append(el('div', { class: 'acct-insp-recon-note' }, note));
+    }
+    return box;
+  }
+
+  /* The inspector for one account, or empty when the list has nothing to show.
+     The aside is in the shell, once, so a screen reader's live region is the
+     same node across selections; only its contents are rebuilt. */
+  function renderInspector(r) {
+    const wrap = $('#acctInspector');
+    if (!wrap) return;
+    wrap.empty();
+    wrap.setAttribute('aria-label', i18n.t('acct.insp.aria'));
+    const split = $('#acctSplit');
+    if (split) split.classList.toggle('has-insp', !!r);
+    wrap.classList.toggle('is-empty', !r);
+    if (!r) return;
+
+    const a = r.a;
     /* Same unreadable-cell treatment as the row's own balance button — see
        unreadableBalance() above and the row's own comment. */
     const unreadable = unreadableBalance(a);
-    const drawerBal = unreadable
+    const bal = unreadable
       ? i18n.t('acct.balance.unreadable', { raw: a.balanceRaw })
       : acctMoney(a, r.live);
-    box.append(el('div', { class: 'acct-drawer-h' },
-      el('h3', {}, a.name),
-      el('div', { class: `acct-drawer-v num${unreadable ? ' text-warning' : r.live < 0 ? ' text-danger' : ''}${acctSymbolIsOneChar(a) ? ' st-cur1' : ''}` }, drawerBal)));
 
-    const grid = el('div', { class: 'acct-drawer-grid' });
-    const f = (label, value) => grid.append(el('div', { class: 'acct-drawer-f' },
+    wrap.append(
+      /* The grip is the phone's: below the list the inspector is a sheet-styled
+         card, and the grip says so. Decorative — hidden from the desktop in CSS
+         and from a screen reader here. */
+      el('div', { class: 'acct-insp-grip', 'aria-hidden': 'true' }),
+      el('div', { class: 'acct-insp-k' }, subLine(a)),
+      el('h3', { class: 'acct-insp-name' },
+        el('span', { class: 'acct-dot', style: `background:${colourOf(a)}` }), a.name),
+      /* The class pair statement-currency.test.cjs holds: this figure may print
+         the ACCOUNT's own symbol, so the muted-symbol rule needs .st-cur1, which
+         is added exactly when that symbol is one code point. */
+      el('div', { class: `acct-drawer-v num${unreadable ? ' text-warning' : r.live < 0 ? ' text-danger' : ''}${acctSymbolIsOneChar(a) ? ' st-cur1' : ''}`,
+        'data-fig': 'acct-insp-bal' }, bal));
+
+    const spark = sparkline(r, 110);
+    if (r.act.count || spark) {
+      wrap.append(el('div', { class: 'acct-insp-flow' },
+        ...(r.act.count ? [el('span', { class: `acct-chip ${r.flow >= 0 ? 'up' : 'down'}` }, flowText(r))] : []),
+        ...(spark ? [spark] : [])));
+    }
+    const badges = badgesFor(r);
+    if (badges) wrap.append(badges);
+
+    wrap.append(reconBlock(r));
+    const sameDay = sameDayLine(r);
+    if (sameDay) wrap.append(sameDay);
+
+    /* ---- actions ---- */
+    const primary = [...r.labels][0];
+    const plan = inspectorActions(r, { hasTransactions: !!primary });
+    const btn = (label, cls, run, aria, icon) => {
+      const b = el('button', { type: 'button', class: `acct-insp-btn${cls ? ' ' + cls : ''}`,
+        ...(aria ? { 'aria-label': aria } : {}) }, ...(icon ? [icoEl([icon])] : []), label);
+      b.addEventListener('click', run);
+      return b;
+    };
+    const acts = el('div', { class: 'acct-insp-acts' });
+    if (plan.primary === 'answer') {
+      const act = deckAction(r);
+      acts.append(btn(act.label, 'is-primary', act.run, null, 'check'));
+    }
+    const second = el('div', { class: 'acct-insp-acts-2' });
+    for (const name of plan.secondary) {
+      if (name === 'transactions') {
+        second.append(btn(i18n.t('acct.btn.seeTx'), '', () => openTransactions(primary),
+          i18n.t('acct.aria.showTx', { name: a.name })));
+      } else if (name === 'editBalance') {
+        second.append(btn(i18n.t('acct.btn.editBalance'), '', () => editBalance(a),
+          i18n.t('acct.aria.balance', { name: a.name, amount: bal })));
+      } else if (name === 'ignore') {
+        /* Ignore: the third answer to a decision, beside "look" and "fix". Only
+           for a state that is a judgement (WARNINGS); `unreadable` is a typo
+           with one correct answer and is never offered, the same rule
+           mutedWarnings applies to a hand-written key. Appends to whatever is
+           already muted on the account and saves that one key, so nothing else
+           in the file moves. */
+        second.append(btn(i18n.t('acct.deck.ignore'), 'is-quiet', () => ignoreWarning(r),
+          i18n.t('acct.deck.ariaIgnore', { name: a.name })));
+      }
+    }
+    if (second.children.length) acts.append(second);
+    wrap.append(acts);
+
+    /* The smaller controls the drawer carried. Edit balance appears here only
+       while a decision is on screen (see inspectorActions). */
+    const tools = el('div', { class: 'acct-drawer-acts' });
+    const tool = (label, aria, run, cls) => {
+      const b = el('button', { type: 'button', class: `acct-drawer-act${cls ? ' ' + cls : ''}`, 'aria-label': aria }, label);
+      b.addEventListener('click', run);
+      tools.append(b);
+    };
+    for (const name of plan.tools) {
+      if (name === 'editBalance') {
+        tool(i18n.t('acct.btn.editBalance'), i18n.t('acct.aria.balance', { name: a.name, amount: bal }), () => editBalance(a));
+      } else if (name === 'edit') {
+        tool(i18n.t('acct.btn.edit'), i18n.t('acct.aria.edit', { name: a.name }), () => editAccount(a));
+      } else if (name === 'budget') {
+        tool(i18n.t(a.in_budget ? 'acct.btn.exclude' : 'acct.btn.include'),
+          i18n.t(a.in_budget ? 'acct.aria.exclude' : 'acct.aria.include', { name: a.name }),
+          () => toggleBudget(a));
+      } else if (name === 'note') {
+        tool(i18n.t('acct.btn.openNote'), i18n.t('acct.aria.openNote', { name: a.name }), () => openAccountFile(a));
+      } else if (name === 'delete') {
+        // Last, and on its own class: it is the only action here that removes
+        // something, and it should not sit a thumb's width from "Edit".
+        tool(i18n.t('acct.btn.delete'), i18n.t('acct.aria.delete', { name: a.name }),
+          () => deleteAccount(a), 'acct-drawer-del');
+      }
+    }
+    wrap.append(tools);
+
+    /* ---- the facts ---- */
+    const grid = el('div', { class: 'acct-insp-grid' });
+    const f = (label, value, wide) => grid.append(el('div', { class: wide ? 'acct-drawer-f is-wide' : 'acct-drawer-f' },
       el('div', { class: 'acct-drawer-l' }, label),
-      el('div', { class: 'acct-drawer-val num' }, value)));
+      el('div', { class: 'acct-drawer-val' }, value)));
+
+    f(i18n.t('acct.col.confirmed'), a.balance_updated || i18n.t('acct.noDate'));
+    f(i18n.t('acct.col.state'), statePill(r));
+    const progress = goalCell(r);
+    if (!progress.classList.contains('acct-dash')) f(i18n.t('acct.col.goal'), progress, true);
 
     const u = utilisationOf(liveAcct(r));
     if (u) {
@@ -2070,7 +2258,7 @@ module.exports = function registerAccounts(ctx) {
        on basis 'stated' at an explicit total_invested of 0 (a real baseline
        since A1).
 
-       ONE BASIS, and the drawer says which. "Total invested" (the file's own
+       ONE BASIS, and the inspector says which. "Total invested" (the file's own
        figure) used to sit directly above a Growth measured against the capital
        the TRANSACTIONS add up to — on the vault the audit ran against (7 Oct
        2026) the pair overshot the balance beside it by thousands with nothing
@@ -2097,18 +2285,18 @@ module.exports = function registerAccounts(ctx) {
       f(i18n.t('acct.drawer.rows', { count: r.act.count }), periodMonthName(S.period));
     }
     /* ISSUE 42. What the pill stops short of. The pill is now as-of today, so
-       the rest of the period has to be somewhere a reader can find it — this
-       drawer is where this page says what it knows about an account, and
+       the rest of the period has to be somewhere a reader can find it — the
+       inspector is where this page says what it knows about an account, and
        "nothing here" would read as "nothing coming". */
     if (r.act.ahead && r.act.ahead.count) {
       f(i18n.t('acct.drawer.ahead'),
         `+${acctMoney(a, r.act.ahead.inAmt, 0)} · −${acctMoney(a, r.act.ahead.outAmt, 0)}`);
       f(i18n.t('acct.drawer.aheadRows', { count: r.act.ahead.count }), periodMonthName(S.period));
     }
-    /* Stated even when unset, unlike the row subtitle above: the drawer is
-       where a reader goes to find out what this app knows about an account, and
-       a question with a blank answer is itself the answer. Suppressed only in a
-       vault that has no owner question at all. */
+    /* Stated even when unset, unlike the list's sub-line: this is where a reader
+       goes to find out what this app knows about an account, and a question
+       with a blank answer is itself the answer. Suppressed only in a vault that
+       has no owner question at all. */
     if (ownerInPlay()) f(i18n.t('acct.field.owner'), ownerLabel(a.owner, declaredOwners()));
     if (a.currency_conflict) {
       f(i18n.t('acct.drawer.currencyClash'), i18n.t('acct.badge.currencyClash', {
@@ -2117,74 +2305,20 @@ module.exports = function registerAccounts(ctx) {
     }
     f(i18n.t('acct.drawer.folder'), a.tx_label || a.name);
     f(i18n.t('acct.drawer.inBudget'), i18n.t(a.in_budget ? 'acct.drawer.yes' : 'acct.drawer.no'));
-    box.append(grid);
-
-    /* The badges the tile carried. Kept because they say things the state pill
-       cannot: "not in budget" is not a problem with the figure, it is a fact
-       about what the figure counts toward. */
-    const badges = el('div', { class: 'acct-badges' });
-    if (!a.in_budget) badges.append(badge(i18n.t('acct.badge.notInBudget'), 'muted'));
-    if (!r.rows.length) badges.append(badge(i18n.t('acct.badge.noTx'), 'warn'));
-    if (a.balance_updated && r.days === null) {
-      // dateText: prose for a real date (D2-11); a cell it cannot read comes
-      // back exactly as typed, which is what this badge exists to show.
-      badges.append(badge(i18n.t('acct.badge.asOf', { date: ctx.dateText(a.balance_updated) }), 'muted'));
-    }
-    /* The account's own two currency fields contradicting each other, said on
-       the row rather than left to be inferred from a total. `currency: R` with
-       `currency_code: USD` in a rand vault used to be HOME to currency.js and
-       FOREIGN to fx.js — R1 000 in the split headline against R17 985,61 on
-       the converted line. The app now takes the safe reading (foreign, named
-       by its code, never added at par), and this badge is the other half of
-       that: the reader is told which of the two words won, so they can correct
-       the file rather than wonder why their rand account is listed under USD.
-       Warning-toned, because it is a fact about the FILE and not about the
-       money — nothing here is stale or unconfirmed, it is contradictory. */
-    if (a.currency_conflict) {
-      badges.append(badge(i18n.t('acct.badge.currencyClash', {
-        code: a.currency_conflict.code, symbol: a.currency_conflict.symbol,
-      }), 'warn'));
-    }
-    if (badges.childElementCount) box.append(badges);
-
-    box.append(reconLine(r));
-    const sameDay = sameDayLine(r);
-    if (sameDay) box.append(sameDay);
-
-    const acts = el('div', { class: 'acct-drawer-acts' });
-    const act = (label, aria, run) => {
-      const b = el('button', { type: 'button', class: 'acct-drawer-act', 'aria-label': aria }, label);
-      b.addEventListener('click', run);
-      acts.append(b);
-    };
-    act(i18n.t('acct.btn.editBalance'),
-      i18n.t('acct.aria.balance', { name: a.name, amount: drawerBal }), () => editBalance(a));
-    const primary = [...r.labels][0];
-    if (primary) {
-      act(i18n.t('acct.btn.seeTx'), i18n.t('acct.aria.showTx', { name: a.name }),
-        () => openTransactions(primary));
-    }
-    act(i18n.t('acct.btn.edit'), i18n.t('acct.aria.edit', { name: a.name }), () => editAccount(a));
-    act(i18n.t(a.in_budget ? 'acct.btn.exclude' : 'acct.btn.include'),
-      i18n.t(a.in_budget ? 'acct.aria.exclude' : 'acct.aria.include', { name: a.name }),
-      () => toggleBudget(a));
-    act(i18n.t('acct.btn.openNote'), i18n.t('acct.aria.openNote', { name: a.name }),
-      () => openAccountFile(a));
-    // Last, and on its own class: it is the only action here that removes
-    // something, and it should not sit a thumb's width from "Edit".
-    const del = el('button', { type: 'button', class: 'acct-drawer-act acct-drawer-del',
-      'aria-label': i18n.t('acct.aria.delete', { name: a.name }) }, i18n.t('acct.btn.delete'));
-    del.addEventListener('click', () => deleteAccount(a));
-    acts.append(del);
-    box.append(acts);
-
-    const td = el('td', { colspan: '8', class: 'acct-drawer-cell' }, box);
-    return el('tr', { class: 'acct-drawer-row' }, td);
+    wrap.append(grid);
   }
 
-  /* The reconciliation, stated the same way it always was — the arithmetic and
-     an offer, never a silent correction. */
-  function reconLine(r) {
+  /* The reconciliation as a sentence — the arithmetic and, when `offer` is on,
+     an offer, never a silent correction.
+
+     The inspector turns `offer` OFF: it prints the one-tap answer as its own
+     primary button (deckAction), so the offer printed here too would be two
+     buttons for one decision a few lines apart. A drift with a readable
+     balance never reaches this function from the inspector at all — it gets the
+     three-line working in reconBlock; what arrives here is every state that has
+     no sum to show, and a drift whose stated balance the loader could not read
+     (where a "Stated: R 0,00" line would print a figure nobody typed). */
+  function reconLine(r, offer = true) {
     const a = r.a, rec = r.rec;
     const line = el('div', { class: 'acct-recon' });
     /* Stated on EVERY branch below, not only on its own state. An account that
@@ -2205,7 +2339,7 @@ module.exports = function registerAccounts(ctx) {
     if (rec.state === 'drift') {
       const diff = rec.implied - a.balance;
       /* The difference in CENTS, like the implied figure in the same sentence
-         and the stated one in the drawer's heading it is the difference
+         and the stated one in the inspector's heading it is the difference
          between ("R 1 150,40 — R 150 higher" was two precisions in one
          clause); the date as prose (2026-10-20 audit, D2-03 / D2-11). */
       line.append(el('div', { class: 'acct-recon-txt' },
@@ -2216,11 +2350,13 @@ module.exports = function registerAccounts(ctx) {
           diff: acctMoney(a, Math.abs(diff)),
           dir: i18n.t(diff < 0 ? 'acct.drawer.lower' : 'acct.drawer.higher'),
         }) + (rec.ahead ? i18n.t('acct.recon.pending', { count: rec.ahead }) : '') + undatable));
-      const btn = el('button', { type: 'button', class: 'acct-recon-btn',
-        'aria-label': i18n.t('acct.aria.useThis', { name: a.name, amount: acctMoney(a, rec.implied) }) },
-        icoEl(['check']), i18n.t('acct.recon.useThis'));
-      btn.addEventListener('click', () => acceptImplied(a, rec.implied, rec));
-      line.append(btn);
+      if (offer) {
+        const btn = el('button', { type: 'button', class: 'acct-recon-btn',
+          'aria-label': i18n.t('acct.aria.useThis', { name: a.name, amount: acctMoney(a, rec.implied) }) },
+          icoEl(['check']), i18n.t('acct.recon.useThis'));
+        btn.addEventListener('click', () => acceptImplied(a, rec.implied, rec));
+        line.append(btn);
+      }
       return line;
     }
     const txt = r.state === 'notx' ? i18n.t('acct.drawer.recon.notx')
@@ -2232,7 +2368,7 @@ module.exports = function registerAccounts(ctx) {
                 : i18n.t('acct.drawer.recon.ok');
     line.append(el('div', { class: `acct-recon-txt${r.state === 'ok' ? ' text-success' : ' text-muted'}` },
       txt + undatable));
-    if (r.state === 'stale' || r.state === 'nodate') {
+    if (offer && (r.state === 'stale' || r.state === 'nodate')) {
       const btn = el('button', { type: 'button', class: 'acct-recon-btn' },
         i18n.t(r.state === 'stale' ? 'acct.deck.do.stale' : 'acct.deck.do.nodate'));
       btn.addEventListener('click', () => editBalance(a));
@@ -2246,7 +2382,7 @@ module.exports = function registerAccounts(ctx) {
      is right for a bank balance read after the day's postings and wrong for a
      balance typed first and spent against after — type today's figure, log
      today's coffee, and the coffee never counts, under a green "agrees". The
-     file cannot say which it was, so the drawer says it and the reader
+     file cannot say which it was, so the inspector says it and the reader
      decides (discussion #124).
 
      The button opens the balance dialog rather than moving the date itself.
@@ -2274,106 +2410,96 @@ module.exports = function registerAccounts(ctx) {
     return line;
   }
 
-  /* ------------------------- resizable columns ---------------------------
-     The reader drags a column edge; the width is remembered in plugin data
-     (settings.acctColWidths) and re-applied on every later render.
+  /* ------------------------------ the list ---------------------------------
+     There is no column resizing any more. It existed because eight columns
+     fought over ~760px and a reader could take width from one to give another.
+     The list has three — who, how much, whether it agrees — and the name
+     column takes whatever the other two leave, so there is no width worth
+     dragging. `settings.acctColWidths` is still in the plugin's defaults so a
+     data.json written by an older build loads unchanged; nothing reads it. */
 
-     WIDTHS ARE ONLY HONOURED UNDER `table-layout: fixed`. Under the automatic
-     layout this table ships with, a `width` on a `th` is a suggestion the
-     engine is free to ignore the moment the content disagrees — which is
-     exactly what a reader narrowing a column is asking it to do. So the table
-     switches to a fixed layout the first time ANY column is sized, and stays
-     automatic for a household that never drags one. That keeps the default
-     behaviour (and the name-column min-width floor that fixed the one-word-
-     per-line wrap) untouched for everyone who never asks for this.
-
-     Not applied on a phone: the three `acct-col-drop` columns are display:none
-     under 760px, so a width dragged on a desktop would be shared out among a
-     different set of columns and read as a broken table. The stored figure is
-     kept, not cleared — going back to the desktop restores it. */
-  const COL_MIN = 64;
-  const RESIZE_AT = 761;   // one past the 760px drop breakpoint in styles.css
-
-  function widths() { return plugin.settings.acctColWidths || {}; }
-  function resizingOn() {
-    return typeof window === 'undefined' || typeof window.matchMedia !== 'function'
-      ? true : window.matchMedia(`(min-width: ${RESIZE_AT}px)`).matches;
-  }
-
-  /* Persisted on RELEASE, not on every pointermove: a drag is one decision,
-     and writing data.json per frame would put hundreds of writes into a vault
-     that syncs. Guarded like every other settings write in this app. */
-  async function saveWidth(key, px) {
-    const w = { ...widths() };
-    if (px === null) { delete w[key]; } else { w[key] = Math.round(px); }
-    plugin.settings.acctColWidths = w;
-    try { await plugin.saveSettings(); }
-    catch (e) { toast(i18n.t('settings.err.save', { error: e.message || e }), true); }
-  }
-
-  /* One grip per header. pointerdown/move/up with setPointerCapture rather
-     than document-level listeners: capture keeps the drag alive when the
-     pointer leaves the 6px grip, which it does immediately, and releases it
-     automatically if the pointer is cancelled. touch-action:none is what stops
-     the table scrolling under a finger instead of resizing. */
-  function addGrip(th, key) {
-    const grip = el('span', { class: 'acct-grip', 'aria-hidden': 'true' });
-    let startX = 0, startW = 0, live = null;
-    grip.addEventListener('pointerdown', e => {
-      if (!resizingOn()) { return; }
-      e.preventDefault(); e.stopPropagation();       // never sorts the column it grips
-      startX = e.clientX; startW = th.getBoundingClientRect().width; live = startW;
-      grip.setPointerCapture(e.pointerId);
-      grip.classList.add('is-dragging');
-      $('#acctTable').classList.add('is-sized');
-    });
-    grip.addEventListener('pointermove', e => {
-      if (!grip.hasPointerCapture || !grip.classList.contains('is-dragging')) { return; }
-      live = Math.max(COL_MIN, startW + (e.clientX - startX));
-      th.style.width = `${live}px`;
-    });
-    const end = e => {
-      if (!grip.classList.contains('is-dragging')) { return; }
-      grip.classList.remove('is-dragging');
-      try { grip.releasePointerCapture(e.pointerId); } catch (err) { /* already gone */ }
-      if (live !== null) { saveWidth(key, live); }
-    };
-    grip.addEventListener('pointerup', end);
-    grip.addEventListener('pointercancel', end);
-    /* Double-click resets this one column — the standard escape hatch, and the
-       only way back to automatic sizing for a column dragged somewhere silly. */
-    grip.addEventListener('dblclick', e => {
-      e.preventDefault(); e.stopPropagation();
-      th.style.width = '';
-      saveWidth(key, null);
-      renderAccounts();
-    });
-    th.append(grip);
-  }
-
-  /* Stamped on the th at build time so both the restore and the drag read one
-     name for a column. */
-  function colHeader(th, key) {
-    th.setAttribute('data-col', key);
-    const px = widths()[key];
-    if (px && resizingOn()) { th.style.width = `${px}px`; }
-    addGrip(th, key);
-    return th;
-  }
-
-  function sortHeader(key, label) {
+  /* One header cell. `key` is the sorter (SORTERS above), and the click flips the
+     direction of the column already sorted by, as it always has. `extra` is a
+     second sort button in the SAME header cell — see the balance column. */
+  function sortButton(key, label, cls) {
     const v = view();
     const on = v.sort === key;
-    const th = el('th', { class: on ? 'is-sorted' : '', scope: 'col' });
-    const b = el('button', { type: 'button', 'aria-label': i18n.t('acct.aria.sortBy', { column: label }) },
-      label, el('span', { class: 'acct-caret' }, on ? (v.dir === -1 ? '↓' : '↑') : '↕'));
+    const b = el('button', { type: 'button', ...(cls ? { class: cls } : {}),
+      'aria-label': i18n.t('acct.aria.sortBy', { column: label }) },
+    label, el('span', { class: 'acct-caret' }, on ? (v.dir === -1 ? '↓' : '↑') : '↕'));
     b.addEventListener('click', () => {
       if (v.sort === key) v.dir = -v.dir;
       else { v.sort = key; v.dir = key === 'name' ? 1 : -1; }
       renderAccounts();
     });
-    th.append(b);
-    return colHeader(th, key);
+    return b;
+  }
+  function sortHeader(key, label, ...more) {
+    const th = el('th', { class: [key, ...more.map(m => m.key)].includes(view().sort) ? 'is-sorted' : '', scope: 'col' });
+    th.append(sortButton(key, label));
+    for (const m of more) th.append(sortButton(m.key, m.label, 'acct-sort-sub'));
+    return th;
+  }
+
+  /* How the list is cut into sections, as plain data: what `renderTable` draws
+     and what pickSelection reads, so "the first row" means the same thing to
+     both. Filtered to "Needs a look" the list groups by REASON whatever the
+     kind toggle says: "group by kind" and "why does this account need a look"
+     are two different questions, and the reason grouping is the one that filter
+     exists to answer. */
+  function sectionsOf(shown) {
+    const v = view();
+    if (!shown.length) return [];
+    if (v.filter === 'flag') {
+      return reasonGroups(shown).map(g => ({ kind: 'reason', state: g.state, rows: g.rows }));
+    }
+    if (v.grouped) {
+      return ACCT_GROUPS.map(([key]) => ({ kind: 'group', key, rows: shown.filter(r => r.group === key) }))
+        .filter(s => s.rows.length);
+    }
+    return [{ kind: 'flat', rows: shown }];
+  }
+
+  /* What the last render drew — the rows in display order and the row elements —
+     so a selection can repaint IN PLACE. Derived from the render, never state
+     of its own: renderAccounts() replaces it wholesale, and S.acctView.open
+     (which survives a watcher re-render) remains the only thing that is
+     remembered. Repainting in place rather than re-rendering is what keeps the
+     focus on the row a keyboard reader just chose, and the scroll where it
+     was; a rebuild of the table drops both. */
+  let drawn = { order: [], rowEls: new Map() };
+
+  function paintSelection() {
+    const sel = pickSelection(drawn.order, view().open);
+    for (const [name, tr] of drawn.rowEls) {
+      const on = !!sel && sel.a.name === name;
+      tr.classList.toggle('is-selected', on);
+      tr.setAttribute('aria-selected', String(on));
+    }
+    renderInspector(sel);
+    return sel;
+  }
+
+  /* The stacked layout is the phone's: the inspector sits BELOW the list (the
+     same 760px the table used to drop its columns at), where a selection made
+     at the top of the list would otherwise change something the reader cannot
+     see. */
+  const inspectorBelow = () => typeof window !== 'undefined' && typeof window.matchMedia === 'function'
+    && window.matchMedia('(max-width: 760px)').matches;
+
+  /* Select a row: the inspector shows it, the list marks it, and — when the
+     inspector is below the list — it is scrolled into view. Selecting is never
+     a toggle: the inspector is never empty while the list has rows, so there
+     is nothing for a second click to close. */
+  function selectRow(name) {
+    view().open = name;
+    paintSelection();
+    if (!inspectorBelow()) return;
+    const insp = $('#acctInspector');
+    if (!insp || typeof insp.scrollIntoView !== 'function') return;
+    const still = typeof window.matchMedia === 'function'
+      && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    insp.scrollIntoView({ block: 'start', behavior: still ? 'auto' : 'smooth' });
   }
 
   function renderTable(rows) {
@@ -2381,56 +2507,28 @@ module.exports = function registerAccounts(ctx) {
     if (!table) return;
     const v = view();
     const shown = visibleRows(rows);
+    const sections = sectionsOf(shown);
+    const order = sections.flatMap(s => s.rows);
+    const sel = pickSelection(order, v.open);
+    drawn = { order, rowEls: new Map() };
 
-    /* keepScroll: this is the widest table in the plugin, and every wide
-       table in it (Assets, Debts) already rebuilds inside this wrapper — see
-       dom.js's own note on why. Without it, every render (a filter click, a
-       drawer opening, even the file watcher firing from an import running in
-       another window) snapped a reader mid-scroll on a phone back to the
-       leftmost column. */
+    /* keepScroll: every wide table in the plugin rebuilds inside this wrapper —
+       see dom.js's own note on why. Without it, every render (a filter click, a
+       sort, even the file watcher firing from an import running in another
+       window) snapped a reader mid-scroll on a phone back to the leftmost
+       column. */
     keepScroll(table, () => {
       table.empty();
       const head = el('tr', {},
         sortHeader('name', i18n.t('acct.col.account')),
-        sortHeader('balance', i18n.t('acct.col.balance')),
-        sortHeader('flow', periodMonthName(S.period)),
-        /* TODO(i18n): reword acct.col.month from "Month" to "Period" — this
-           header sits over the SPARKLINE column, which is drawn from
-           txInPeriod(S.period) (see sparkline() below), the same window as
-           every other figure on this page. "Month" is wrong whenever the
-           household's period is not a calendar month (a fortnightly household
-           gets a column headed "Month" showing 14 days of shape). The column
-           it sits beside (idx2, just above) already gets this right — its
-           header is periodMonthName(S.period), which is interval-aware — so
-           this is the one surface still hard-coding the word. Matches the
-           vocabulary acct.sort.flow ("this period") and acct.drawer.flow
-           ("This period") already use for the same figure elsewhere on this
-           page — three names for one concept is the bug the audit named;
-           "Period" is the fourth surface converging on the two that already
-           got it right, not a fifth new word. */
-        colHeader(el('th', { class: 'acct-col-drop', scope: 'col' }, i18n.t('acct.col.month')), 'month'),
-        /* TODO(i18n): reword acct.col.goal from "Goal / limit" to "Progress"
-           — goalCell() (below) puts THREE different figures under this one
-           header depending on account type: a credit card's utilisation
-           against its limit, a savings pot's balance against its goal, and —
-           since totalReturn() replaced the retired balance-minus-invested
-           formula — an INVESTMENT'S GROWTH, which is neither a goal nor a
-           limit. "Goal / limit" was accurate for two of three and silently
-           wrong for the third. Renaming beats splitting the figure into its
-           own column: every neighbouring column here is `acct-col-drop`
-           (hidden under 760px) and this table already switches to a fixed
-           layout the moment any column is resized (see COL_MIN's own note
-           above) — adding a column means updating every hard-coded colspan='8'
-           in this file (the empty-table row, the type-row group total, the
-           drawer row) and the phone breakpoint CSS, for a number the Savings
-           page already owns and states in full. "Progress" reads honestly for
-           all three: a limit bar, a goal bar and a growth bar are each "how
-           this account is doing against a benchmark", and a one-word header
-           survives a dragged-narrow column the way "Goal / limit / growth"
-           would not. */
-        colHeader(el('th', { class: 'acct-col-drop', scope: 'col' }, i18n.t('acct.col.goal')), 'goal'),
-        sortHeader('stale', i18n.t('acct.col.confirmed')),
-        colHeader(el('th', { scope: 'col' }, i18n.t('acct.col.state')), 'state'),
+        /* Balance and this period's movement are one cell in the body — the
+           movement is the line under the balance — so they share one header
+           cell and each keeps its own sort. The period's name is the label the
+           body line carries, and `acct.sort.flow` ("this period") is what the
+           "sorted by" line says. */
+        sortHeader('balance', i18n.t('acct.col.balance'),
+          { key: 'flow', label: periodMonthName(S.period) }),
+        sortHeader('stale', i18n.t('acct.col.state')),
         /* The label is for a screen reader, not for the eye. Spelling "Notes"
            out visibly made the column 76px wide to hold a 26px chip, which
            pushed the whole table 24px past its card at 1280 — and the column it
@@ -2439,51 +2537,41 @@ module.exports = function registerAccounts(ctx) {
            without the one word that says what the column is. */
         el('th', { class: 'acct-col-notes', scope: 'col' },
           el('span', { class: 'sr-only' }, i18n.t('acct.col.notes'))));
-      head.children[2].classList.add('acct-col-drop', 'num');
-      head.children[5].classList.add('acct-col-drop');
-      /* See the note on COL_MIN above: fixed layout is what makes a stored width
-         real, and it is switched on only for a table that has one. */
-      table.classList.toggle('is-sized', resizingOn() && Object.keys(widths()).length > 0);
+      head.children[1].classList.add('num');
       table.append(el('thead', {}, head));
+      const span = String(head.children.length);
 
       const body = el('tbody', {});
       const emit = r => {
-        body.append(accountRow(r));
-        if (v.open === r.a.name) body.append(drawerRow(r));
+        const tr = accountRow(r, !!sel && sel.a.name === r.a.name);
+        drawn.rowEls.set(r.a.name, tr);
+        body.append(tr);
       };
 
       if (!shown.length) {
         body.append(el('tr', { class: 'acct-empty' },
-          el('td', { colspan: '8' },
+          el('td', { colspan: span },
             S.accounts.length ? i18n.t('acct.emptySearch') : i18n.t('acct.empty'))));
-      } else if (v.filter === 'flag') {
-        /* Variant B (screen 8): filtered to "Needs a look", the table groups
-           by REASON rather than by kind — the sentence that used to repeat
-           on every one of the old deck's cards now heads the group instead,
-           and each row underneath states only what is specific to IT
-           (deckWhy, via rowActions' own doBtn label). Overrides the kind
-           toggle deliberately: "group by kind" and "why does this account
-           need a look" are two different questions, and the reason grouping
-           is the one this filter exists to answer. */
-        for (const g of reasonGroups(shown)) {
+      }
+      for (const s of sections) {
+        if (s.kind === 'reason') {
+          /* The sentence that used to repeat on every one of the old deck's
+             cards heads the group instead; each row underneath states only what
+             is specific to IT, and the inspector says the rest. */
           body.append(el('tr', { class: 'type-row' },
-            el('td', { colspan: '8' },
-              reasonHeader(g.state),
-              el('span', { class: 'acct-group-total num' }, String(g.rows.length)))));
-          for (const r of g.rows) emit(r);
-        }
-      } else if (v.grouped) {
-        for (const [key] of ACCT_GROUPS) {
-          const inGroup = shown.filter(r => r.group === key);
-          if (!inGroup.length) continue;
+            el('td', { colspan: span },
+              reasonHeader(s.state),
+              el('span', { class: 'acct-group-total num' }, String(s.rows.length)))));
+        } else if (s.kind === 'group') {
+          const { key } = s;
           /* ITEM 5, same rule as the hero above it: this row's own total sums
              only the group's primary-currency accounts, and any other
              currency in the group gets its own small side figure rather than
              being folded in and marked with an asterisk. */
-          const { primary, others } = splitByCurrency(inGroup.map(liveAcct));
+          const { primary, others } = splitByCurrency(s.rows.map(liveAcct));
           const total = primaryTotal(primary, S.settings.currency);
           body.append(el('tr', { class: 'type-row' },
-            el('td', { colspan: '8' },
+            el('td', { colspan: span },
               i18n.t(key),
               /* Both named. The foreign tag is a CHILD of the total, so an
                  unanchored match on the total swept the tag in as a second
@@ -2492,10 +2580,8 @@ module.exports = function registerAccounts(ctx) {
               el('span', { class: 'acct-group-total num', 'data-fig': 'acct-group-total' }, money(total),
                 ...(others.length ? [el('span', { class: 'acct-group-other', 'data-fig': 'acct-group-other' },
                   otherCurrenciesTag(others))] : [])))));
-          for (const r of inGroup) emit(r);
         }
-      } else {
-        for (const r of shown) emit(r);
+        for (const r of s.rows) emit(r);
       }
       table.append(body);
       /* The phone card layout (<600px, src/styles.css) lays each row out as a
@@ -2504,14 +2590,16 @@ module.exports = function registerAccounts(ctx) {
          page as a table. Stamped explicitly, as Transactions and Budget do; the
          stylesheet gates the cards on #acctTable[role='table'], so the layout
          can never arrive without the semantics. No data-labels: the card keeps
-         its own header row and its own State label (7 Oct 2026 audit, L6-03). */
+         its own header row (7 Oct 2026 audit, L6-03). */
       tableCells(table, []);
     });
+
+    renderInspector(sel);
 
     const sub = $('#acctTblSub');
     if (sub) {
       /* What the table above actually does. Filtered to "Needs a look" it is
-         grouped by REASON whatever the kind toggle says (the branch above), and
+         grouped by REASON whatever the kind toggle says (see sectionsOf), and
          the line used to report the toggle instead: "grouped by kind" over the
          groups "The balance disagrees with the transactions" and "Nothing
          imports into these". Its own key, because the old one's eleven
@@ -2531,20 +2619,18 @@ module.exports = function registerAccounts(ctx) {
     if (search && search.value !== v.q) search.value = v.q;
   }
 
-  /* Open (or close) one account's drawer. `scroll` is for the queue's Review
-     button, which may be pointing at a row a filter is currently hiding — so
-     it clears a group filter first rather than scrolling to nothing. */
+  /* Select one account from outside the list. `scroll` is for a caller that may
+     be pointing at a row a filter is currently hiding — it clears a group
+     filter first rather than selecting something nobody can see — and then
+     brings the row into view and focuses it. */
   function openRow(name, scroll) {
     const v = view();
     if (scroll && v.filter !== 'all' && v.filter !== 'flag') v.filter = 'all';
-    v.open = v.open === name && !scroll ? null : name;
+    v.open = name;
     renderAccounts();
-    if (!scroll || !v.open) return;
-    const table = $('#acctTable');
-    if (!table) return;
-    for (const tr of table.querySelectorAll('tr.acct-row')) {
-      if (tr.classList.contains('is-open')) { tr.scrollIntoView({ block: 'center' }); tr.focus(); break; }
-    }
+    if (!scroll) return;
+    const tr = drawn.rowEls.get(name);
+    if (tr) { tr.scrollIntoView({ block: 'center' }); tr.focus(); }
   }
 
   function renderAccounts() {
@@ -2946,9 +3032,10 @@ module.exports = function registerAccounts(ctx) {
       }
       S.txFolders = (S.txFolders || []).filter(n => !labels.includes(n));
     }
-    /* Close the drawer if it was this account's — v.open holds a NAME, and a
-       name pointing at nothing renders no drawer but leaves the row that would
-       have opened it looking selected. */
+    /* Forget the selection if it was this account's — v.open holds a NAME, and
+       a name pointing at nothing would be ignored by pickSelection anyway, but
+       leaving it there would re-select the account the moment one with the same
+       name is added again. */
     const v = view();
     if (v.open === a.name) v.open = null;
     ctx.render();   // not renderAccounts — Savings has this button too

@@ -20,6 +20,13 @@
       were stamped explicitly. That gate is checked here, so the card layout
       can never quietly cost a screen-reader user the table.
 
+      THE FIX ABOVE WAS REPLACED, NOT LOST. The per-row actions it wrapped are
+      gone (the Accounts list is quiet and the decisions are in the inspector),
+      so the assertions that pinned them — the state cell wrapping, the action
+      row on its own line — are retired and say so beside their replacement. What
+      is pinned instead is the same promise: a phone's card has the name's floor
+      lifted, and the inspector is stacked under the list in the page's flow.
+
    2. TAP TARGETS. Plan's item ticks were 17x17, item and bucket names 16-18px
       tall, status pills 20px on Owed/Debts/Tax, one-line caveat chips 21px —
       all under the 24px WCAG 2.2 AA floor (2.5.8). The sizes are computed from
@@ -84,20 +91,28 @@ const later = (sel, prop, ctx) => {
     `${sel} { ${prop} }: the ${ctx.join(' ')} override (${over && locate(over.line)}) must come AFTER the base rule ` +
     `(${base && locate(base.line)}) — they tie on specificity, so an earlier override loses on every phone`);
 };
-want('.budget-app-root .acct-col-state', 'white-space', PHONE, v => v === 'normal', 'let the state cell wrap');
-later('.budget-app-root .acct-col-state', 'white-space', PHONE);
-want('.budget-app-root .acct-row-acts', 'display', PHONE, v => v === 'flex', 'be a block-level flex row (its own line)');
-later('.budget-app-root .acct-row-acts', 'display', PHONE);
-want('.budget-app-root .acct-row-acts', 'flex-wrap', PHONE, v => v === 'wrap', 'wrap its buttons');
-const actsMargin = want('.budget-app-root .acct-row-acts', 'margin', PHONE, v => inlineStartOf(v) === 0, 'drop the inline offset it has beside the pill');
-later('.budget-app-root .acct-row-acts', 'margin', PHONE);
-want('.budget-app-root .acct-pill + .acct-row-acts', 'margin-left', PHONE, v => px(v) === 0, 'drop the 8px it has beside the pill');
-later('.budget-app-root .acct-pill + .acct-row-acts', 'margin-left', PHONE);
-ok(!actsMargin || blockOf(actsMargin.value) > 0, 'the actions keep a gap above them, under the pill and its reason');
-want('.budget-app-root .acct-col-state .acct-pill', 'white-space', SMALL, v => v === 'normal', 'let a long pill wrap on a phone');
+/* The list/inspector redesign retired the per-row actions this block used to pin
+   (.acct-col-state wrapping, .acct-row-acts, .acct-row-why): the row holds no
+   pill, sentence or buttons now, so there is nothing for the state cell to wrap
+   around and no action row to put on its own line. What a phone still needs from
+   the stylesheet is below — the name floor lifted, the status let go of its
+   desktop width, and the inspector stacked UNDER the list in the page's flow. */
 want('.budget-app-root #acctTable td:first-child', 'min-width', SMALL, v => px(v) === 0,
-  'lift the 210px name floor on a phone, where the state cell is no longer the column that cannot give');
+  'lift the name floor on a phone, where the card layout gives the name its own track');
 later('.budget-app-root #acctTable td:first-child', 'min-width', SMALL);
+want('.budget-app-root #acctTable td.acct-col-state', 'max-width', SMALL, v => v === 'none',
+  'let the status take the card\'s second line rather than the desktop column\'s 120px cap');
+later('.budget-app-root #acctTable td.acct-col-state', 'max-width', SMALL);
+want('.budget-app-root .acct-split.has-insp', 'display', PHONE, v => v === 'block', 'stack the inspector under the list');
+later('.budget-app-root .acct-split.has-insp', 'display', PHONE);
+want('.budget-app-root .acct-insp', 'position', PHONE, v => v === 'static',
+  'sit in the page\'s flow below the list: a sticky side pane would cover half a phone screen');
+later('.budget-app-root .acct-insp', 'position', PHONE);
+/* Never fixed, on any width: a fixed sheet over the list would hide the very row
+   a selection was made from, and a selection made at the top of a long list
+   would change something the reader cannot see. */
+ok(!rules.some(r => r.selectors.some(s => /\.acct-insp\b/.test(s)) && r.decls.some(d => d.prop === 'position' && d.value === 'fixed')),
+  'no rule makes the Accounts inspector position: fixed — it is a sheet-styled card in flow, not an overlay');
 
 /* The VoiceOver gate. Any rule that changes how an #acctTable element is
    DISPLAYED must name [role='table'] in that selector. */

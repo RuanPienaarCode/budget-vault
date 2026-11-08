@@ -43,7 +43,7 @@
      2. The two modules now agree about home-vs-foreign.
      3. The disclosure names it by its CODE, not by the household symbol it
         falsely claims.
-     4. The household is TOLD, on the row and in the drawer — the app argues,
+     4. The household is TOLD, on the row and in the inspector — the app argues,
         it does not silently pick a winner.
 
      node tests/currency-fields-agree.test.cjs   # non-zero exit on failure */
@@ -146,17 +146,17 @@ const VAULT = {
       if (isBroker) brokerRow = n;
     });
     ok(brokerRow, 'the Broker row is on the page');
-    ok(brokerRow._cls.has('is-flag'), 'and is flagged for a look without being opened');
+    ok(brokerRow._cls.has('is-flag'), 'and is flagged for a look without being selected');
 
-    /* And the drawer says WHICH of the two words won, so the file can be
+    /* And the inspector says WHICH of the two words won, so the file can be
        corrected rather than the reader left wondering why a rand account is
        listed under USD. */
     brokerRow.click();
     let txt = '';
-    walk($('#acctTable'), n => { if (n._text) txt += n._text + ' | '; });
+    walk($('#acctInspector'), n => { if (n._text) txt += n._text + ' | '; });
     const want = i18n.t('acct.badge.currencyClash', { code: 'USD', symbol: 'R' });
     ok(txt.includes(want),
-      `the drawer names the conflict — wanted "${want}", got: ${txt.slice(-400)}`);
+      `the inspector names the conflict — wanted "${want}", got: ${txt.slice(-400)}`);
   }
 
   console.log(`PASS currency-fields-agree (${checks} checks)`);

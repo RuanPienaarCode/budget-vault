@@ -259,8 +259,13 @@ class PinnedDate extends RealDate {
   ok(!table.includes(i18n.t('acct.state.ok')),
     `the row does not claim the figure agrees with its transactions — got: ${JSON.stringify(table)}`);
   ok(table.includes(i18n.t('acct.state.unreadable')), 'it says what is actually wrong with it');
-  const pills = $('#acctTable').querySelectorAll('.acct-pill');
-  ok(pills.length >= 1, 'the row carries a state pill at all');
+  /* The row says it as a status word with a dot (the list has no pills); the
+     pill proper is in the inspector, where the one account is the default
+     selection. Neither may be the green one. */
+  const dots = $('#acctTable').querySelectorAll('.acct-st');
+  ok(dots.length >= 1 && !dots.some(d => d._cls.has('is-ok')), 'the row carries a status that is not the green one');
+  const pills = $('#acctInspector').querySelectorAll('.acct-pill');
+  ok(pills.length >= 1, 'the inspector carries a state pill at all');
   ok(!pills.some(p => p._cls.has('ok')), 'and none of them is the green one');
 
   /* The queue. This is the surface the account vanished from: an attention
@@ -269,13 +274,21 @@ class PinnedDate extends RealDate {
      what makes this the SINGULAR form, the one the old inline concatenation
      rendered as "1 transaction … against them". */
   /* Since the 3 Sep 2026 redesign (variant B) the deck is a one-line banner
-     carrying the count, and the per-account "why" sentence sits on the
-     account's own row in the table. The invariant is unchanged, so both
-     surfaces are read together. */
-  const deck = $('#acctDeck').textContent + ' ' + $('#acctTable').textContent;
+     carrying the count, and the per-account "why" sentence sat on the account's
+     own row. The list is quiet now: the row's status word carries that sentence
+     as its title (a pointer's reach, not a ~270px row), and the inspector says
+     the same count in its own line (acct.recon.undatable, separator trimmed —
+     it is written to be glued on, and stands alone here). The invariant is
+     unchanged — the account is named and the reason is stated with its number —
+     so every surface that states it is read. */
+  const lead = t => String(t).replace(/^[\s·]+/, '');
+  const whyOnRow = String($('#acctTable').querySelectorAll('.acct-st')[0].attrs.title);
+  const deck = $('#acctDeck').textContent + ' ' + $('#acctInspector').textContent;
   ok(!/is-clear/.test($('#acctDeck').attrs.class || ''), 'the deck is not in its all-clear state');
-  ok(deck.includes(i18n.t('acct.deck.why.unreadable', { count: 1 })),
-    `the queue names the account and says why — got: ${JSON.stringify(deck)}`);
+  ok(whyOnRow.includes(i18n.t('acct.deck.why.unreadable', { count: 1 })),
+    `the row's status says why, with the count — got: ${JSON.stringify(whyOnRow)}`);
+  ok(deck.includes(lead(i18n.t('acct.recon.undatable', { count: 1 }))),
+    `and the inspector states the same count of undatable rows — got: ${JSON.stringify(deck)}`);
 
   /* ---- 9. and it says it in the reader's own language ----
      The states above were reported in inline English for one wave, because
@@ -295,13 +308,16 @@ class PinnedDate extends RealDate {
     i18n.setLanguage('af');
     ctx.renderAccounts();
     const afTable = $('#acctTable').textContent;
-    const afDeck = $('#acctDeck').textContent + ' ' + afTable;
+    const afWhy = String($('#acctTable').querySelectorAll('.acct-st')[0].attrs.title);
+    const afDeck = $('#acctDeck').textContent + ' ' + afTable + ' ' + afWhy + ' ' + $('#acctInspector').textContent;
     ok(afTable.includes(i18n.t('acct.state.unreadable')),
-      `the Afrikaans pill states the Afrikaans label — got: ${JSON.stringify(afTable)}`);
-    ok(!/date unreadable/.test(afTable),
+      `the Afrikaans status states the Afrikaans label — got: ${JSON.stringify(afTable)}`);
+    ok(!/date unreadable/.test(afDeck),
       'and not the English one left standing beside it');
-    ok(afDeck.includes(i18n.t('acct.deck.why.unreadable', { count: 1 })),
-      `the Afrikaans queue explains it in Afrikaans — got: ${JSON.stringify(afDeck)}`);
+    ok(afWhy.includes(i18n.t('acct.deck.why.unreadable', { count: 1 })),
+      `the Afrikaans reason on the row is in Afrikaans — got: ${JSON.stringify(afWhy)}`);
+    ok(afDeck.includes(lead(i18n.t('acct.recon.undatable', { count: 1 }))),
+      `and the inspector's count of undatable rows is too — got: ${JSON.stringify(afDeck)}`);
     ok(!/cannot read/.test(afDeck),
       'with no English sentence surviving into the same line');
     /* The raw key is the OTHER way this fails: a key called before every table

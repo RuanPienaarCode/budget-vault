@@ -1,11 +1,15 @@
 'use strict';
 /* The Accounts table's colspan ↔ column-count contract.
 
-   Three rows in that table span the WHOLE width rather than sitting in the
-   columns: the empty state, each group's subtotal bar, and the drawer that
-   opens under an account. All three carry a hardcoded `colspan` string in
-   views/accounts.js, and nothing has ever checked it against the number of
-   columns the header actually emits.
+   Two rows in that table span the WHOLE width rather than sitting in the
+   columns: the empty state and each group's subtotal bar. (A third, the drawer
+   that opened under an account, went when the drawer became the inspector beside
+   the list: the table has no row to span any more, so its assertion is retired
+   rather than moved. The count of columns went with it, from eight to four.)
+   They carry a `colspan` that views/accounts.js now READS from the header it
+   builds rather than hardcoding — and this still checks it against the number of
+   columns the header actually emits, because that is the property, not the
+   mechanism.
 
    That is a silent failure. A table whose colspan is one short does not throw,
    does not warn and still renders — it just pulls the last column in on those
@@ -13,13 +17,13 @@
    the drawer leaves a narrow empty cell at the end. You find it by looking,
    which means you find it after it ships.
 
-   It has already moved once: 1.16.0 added a notes column and all three sites
-   went 7 -> 8 by hand. There is no reason to believe the next column will
-   remember to.
+   It has already moved twice: 1.16.0 added a notes column and all three sites
+   went 7 -> 8 by hand, and the list/inspector redesign took it to 4. There is no
+   reason to believe the next column will remember to.
 
    So this asserts the RELATIONSHIP rather than the number — the expected value
-   is read from the rendered header, so adding a ninth column fails this file
-   until the three sites follow. Nothing here needs updating when the table
+   is read from the rendered header, so adding a column fails this file until
+   every full-width row follows. Nothing here needs updating when the table
    grows; that is the point.
 
    Runs in bare node against the real view. Wired into ./build.sh.
@@ -85,7 +89,7 @@ const spanningCells = table =>
   ctx.renderAccounts();
   const table = ctx.$('#acctTable');
   const cols = headerCount(table);
-  ok(cols >= 7, `the accounts table still has a recognisable header (found ${cols} columns)`);
+  ok(cols >= 4, `the accounts table still has a recognisable header (found ${cols} columns)`);
 
   /* ---- 2. the group subtotal bar ---- */
   eq(S.acctView.grouped, true, 'the table groups by default — the subtotal bar is on screen');
@@ -96,13 +100,15 @@ const spanningCells = table =>
     eq(span, String(cols), `a subtotal bar spans every column (${cls})`);
   }
 
-  /* ---- 3. the drawer that opens under an account ---- */
+  /* ---- 3. selecting an account adds no full-width row ----
+     It used to open a drawer row under the account, spanning every column. The
+     detail is the inspector beside the list now, so selecting must emit nothing
+     into the table that spans — and must not leave a drawer row behind. */
   S.acctView.open = 'Cheque';
   ctx.renderAccounts();
   spans = spanningCells(ctx.$('#acctTable'));
-  const drawer = spans.filter(([cls]) => cls.includes('acct-drawer-row'));
-  eq(drawer.length, 1, 'opening an account emits exactly one drawer row');
-  eq(drawer[0][1], String(cols), 'the drawer spans every column');
+  eq(spans.filter(([cls]) => cls.includes('acct-drawer-row')).length, 0,
+    'selecting an account emits no drawer row — the inspector is outside the table');
 
   /* ---- 4. the empty state ---- */
   S.acctView.open = null;
@@ -120,7 +126,7 @@ const spanningCells = table =>
   S.acctView.open = 'Cheque';
   ctx.renderAccounts();
   const all = spanningCells(ctx.$('#acctTable'));
-  ok(all.length >= 3, `the three known full-width rows are all present (found ${all.length})`);
+  ok(all.length >= 2, `the group bars are all present (found ${all.length})`);
   const wrong = all.filter(([, span]) => span !== String(cols));
   eq(wrong, [], `every full-width cell spans exactly ${cols} columns`);
 

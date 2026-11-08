@@ -1,9 +1,12 @@
 'use strict';
-/* The Ignore action on a flagged account row (3 Sep 2026 redesign, variant B).
+/* The Ignore action on a flagged account (3 Sep 2026 redesign, variant B; now
+   in the inspector).
 
    An account with no linked folder lands in the decision queue as `nofolder`.
    Before this action the only way to quieten it was the Edit sheet's toggles.
-   The row now carries "Ignore", which appends the row's own state to
+   The account's inspector now carries "Ignore" (it was on the row itself until
+   the list went quiet — the list has no buttons now, and every assertion below
+   moved with the button, none weakened), which appends the row's own state to
    ignore_warnings (never wider than that state), saves only that key, and the
    account leaves the queue while its pill keeps stating what it is.
 
@@ -73,9 +76,13 @@ const BASE = {
     const { ctx, S, $, writes } = await mount({ ...BASE,
       [`${B}/Accounts/Education Fund.md`]: '---\ntype: savings\nbalance: 5000.00\nbalance_updated: 2026-08-20\n---\n' });
     ctx.renderAccounts();
-    const btn = $('#acctTable').querySelectorAll('button')
+    /* The only account, and flagged, so it is the default selection — the
+       inspector is filled with no click. */
+    const btn = $('#acctInspector').querySelectorAll('button')
       .find(b => b.textContent === i18n.t('acct.deck.ignore'));
-    ok(btn, 'a flagged (nofolder) row offers Ignore');
+    ok(btn, 'a flagged (nofolder) account offers Ignore');
+    ok(!$('#acctTable').querySelectorAll('button').some(b => b.textContent === i18n.t('acct.deck.ignore')),
+      'and the list row does not: decisions are the inspector\'s');
     eq(i18n.t('acct.deck.ignore') === 'acct.deck.ignore', false, 'the label is a real string, not its key');
     btn.click();
     await new Promise(r => setTimeout(r, 0));
@@ -99,9 +106,11 @@ const BASE = {
       [`${B}/Accounts/Cheque.md`]: '---\ntype: checking\ntx_label: "Cheque"\nbalance: 10000.00\nbalance_updated: 2026-08-20\n---\n',
       [`${B}/Transactions/Cheque/2026-08.md`]: `---\n${TX_FM}\n---\n\n${HEAD}| 2026-13-05 | Grocer | Groceries | -2000.00 |  |  |  |\n` });
     ctx.renderAccounts();
-    const btn = $('#acctTable').querySelectorAll('button')
+    const insp = $('#acctInspector');
+    ok(insp.children.length, 'fixture: the unreadable-date account is selected, so its inspector is drawn');
+    const btn = insp.querySelectorAll('button')
       .find(b => b.textContent === i18n.t('acct.deck.ignore'));
-    ok(!btn, 'an unreadable-date row offers no Ignore: a typo is not a judgement');
+    ok(!btn, 'an unreadable-date account offers no Ignore: a typo is not a judgement');
   }
   console.log(`accounts-ignore-action.test.cjs — ${checks} checks OK`);
   } finally { global.Date = RealDate; }

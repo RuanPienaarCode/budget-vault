@@ -84,7 +84,9 @@ function pills(ctx) {
     let name = null, chip = null;
     walk(tr, n => {
       if (!name && n._cls && n._cls.has('acct-name-btn')) name = n.textContent.trim();
-      if (!chip && n._cls && n._cls.has('acct-chip')) chip = n.textContent.trim();
+      /* The movement is a data-fig span under the balance now ("+R 28300 in
+         August 2026"), not the bordered chip it was when it had a column. */
+      if (!chip && n.attrs && /^acct-flow-/.test(n.attrs['data-fig'] || '')) chip = n.textContent.trim();
     });
     if (name) out.set(name, chip);
   }
@@ -97,7 +99,9 @@ function pills(ctx) {
 const amountOf = chip => {
   if (!chip) return null;
   const neg = chip.trim().startsWith('\u2212');
-  const n = Number(chip.replace(/[^0-9.]/g, ''));
+  /* The first number only: the line goes on to name the period ("... in August
+     2026"), whose year is not part of the amount. */
+  const n = Number((/[0-9]+(?:\.[0-9]+)?/.exec(chip) || ['0'])[0]);
   return neg ? -n : n;
 };
 
@@ -117,13 +121,14 @@ atAuditDate(async () => {
       `the pram already happened, so it is in the pill exactly as before — got ${p.get('Baby fund')}`);
   }
 
-  /* ---- 2. and the drawer names what the pill stopped short of ----------- */
+  /* ---- 2. and the inspector names what the pill stopped short of -------- */
   {
     const { ctx } = await mount(PERIOD);
     ctx.renderAccounts();
-    /* The drawer opens the way a reader opens it — by clicking the row —
+    /* The inspector fills the way a reader fills it — by clicking the row —
        rather than through a function this test would have to reach past the
-       view's own door to call. */
+       view's own door to call. (It was the drawer under the row; the facts
+       it carried are the inspector's now.) */
     const walk = (n, fn) => { fn(n); for (const c of (n.children || [])) walk(c, fn); };
     let chequeRow = null;
     walk(ctx.$('#acctTable'), n => {
@@ -135,9 +140,9 @@ atAuditDate(async () => {
     ok(chequeRow, 'the cheque row is on the page to click');
     chequeRow.click();
     let txt = '';
-    walk(ctx.$('#acctTable'), n => { if (n._text) txt += n._text + ' | '; });
+    walk(ctx.$('#acctInspector'), n => { if (n._text) txt += n._text + ' | '; });
     ok(txt.includes(i18n.t('acct.drawer.ahead')),
-      `the drawer names the rows still to come — got: ${txt}`);
+      `the inspector names the rows still to come — got: ${txt}`);
     ok(txt.includes(i18n.t('acct.drawer.aheadRows', { count: 5 })),
       `and how many there are — five, on the cheque account — got: ${txt}`);
     ok(txt.includes('R 1890'),

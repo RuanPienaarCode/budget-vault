@@ -2,7 +2,7 @@
 /* Five fixes from the 13-agent Accounts-lane audit, pinned against the real
    view rather than trusted by inspection.
 
-     1. GROWTH — the goal cell and the drawer read totalReturn(), not the
+     1. GROWTH — the goal cell and the inspector read totalReturn(), not the
         retired `balance - total_invested`, and the two now agree with
         views/savings.js's own figure for the same account.
      2. MIXED CURRENCY — the ring discloses a group (and the household) that
@@ -115,18 +115,20 @@ async function mount(files, settingsFm = 'owners: "Alex, Sam"\n') {
       'the retired formula (balance - total_invested = 20 000) and the real one now disagree, '
       + 'which is exactly the bug this fix closes');
 
-    const goalCell = textOf(ctx.$('#acctTable'));
+    /* The goal bar is in the inspector now, not on the row. Fund is the only
+       account, so it is the default selection with no click needed. */
+    const goalCell = textOf(ctx.$('#acctInspector'));
     ok(goalCell.includes('+9%') || goalCell.includes('R 55000') || goalCell.includes('R 55 000') || goalCell.includes('55000'),
-      `the goal cell reads off the real capital-in figure, not total_invested (table text: ${goalCell})`);
+      `the goal cell reads off the real capital-in figure, not total_invested (inspector text: ${goalCell})`);
     ok(!goalCell.includes('+50%'),
       'and NOT the retired formula\'s answer ((60000-40000)/40000 = +50%)');
 
-    // Open the drawer and check the Growth field directly.
+    // Select it explicitly and check the Growth field directly.
     S.acctView.open = 'Fund';
     ctx.renderAccounts();
-    const drawerTxt = textOf(ctx.$('#acctTable'));
+    const drawerTxt = textOf(ctx.$('#acctInspector'));
     ok(drawerTxt.includes('R 5000.00') || drawerTxt.includes('R5000.00') || drawerTxt.includes('5000.00'),
-      `the drawer's Growth field is 5 000, not 20 000 (drawer text: ${drawerTxt})`);
+      `the inspector's Growth field is 5 000, not 20 000 (inspector text: ${drawerTxt})`);
   }
 
   /* ---- 1b. totalReturn basis 'none' — no fabricated number ---- */
