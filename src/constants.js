@@ -36,15 +36,15 @@ const DEFAULT_SETTINGS = {
      upgrade changes nothing until it is asked to. */
   palette: DEFAULT_PALETTE,
   openOnStartup: false,
-  /* Accounts-table column widths the reader dragged, keyed by column and
-     measured in px. Plugin data for the same reason the chart ranges below
-     are: display state, and Settings.md is the user's own hand-editable file.
+  /* RETIRED — nothing reads or writes this. It held the Accounts-table column
+     widths a reader dragged, keyed by column and measured in px. The Accounts
+     list is four columns now (name, balance, status, notes) with the detail in
+     an inspector beside it, so there is no width worth dragging and the grips
+     are gone (tests/accounts-col-widths.test.cjs pins that).
 
-     An empty object is the default and MEANS something — the table keeps its
-     automatic layout until a column is actually dragged, at which point it
-     switches to a fixed one so the widths are honoured exactly. So "never
-     touched" and "dragged back to roughly the default" stay distinguishable,
-     and a household that never wants this never pays for it. */
+     The KEY stays, empty, rather than being removed: dropping a setting is a
+     data.json migration, and an older build reading this one's data.json
+     expects it. A width stored by an older build is left exactly as it was. */
   acctColWidths: {},
   onboarded: false,       // first-run wizard shown (or an existing budget was detected)
   privacyLock: true,      // splash gate: nothing loads or paints until "Enter budget" is tapped

@@ -115,7 +115,7 @@ ok(!used.has('env-') && !used.has('tone-') && !used.has('status-'),
    The list is checked BOTH WAYS below, so it cannot rot: an entry that gains a
    rule, or stops being emitted, fails this suite and must be deleted. */
 const KNOWN_UNSTYLED = [
-  'acct-drawer-f', 'acct-fact', 'acct-owners', 'acct-ring',
+  'acct-fact', 'acct-owners', 'acct-ring',
   'assets-hero-largest', 'budget-reslice-list',
   'num-sm', 'sav-banner-warn',
   'score-empty', 'score-gap-go',

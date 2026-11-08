@@ -20,6 +20,13 @@
    Same rule as the Savings card for the same account, so the two pages cannot
    disagree about what an account earned on what.
 
+   THE DRAWER IS THE INSPECTOR NOW. The drawer under a row was folded into the
+   inspector beside the list (views/accounts.js renderInspector); its fields kept
+   their classes and their labels, so every assertion below reads the same field
+   from #acctInspector instead of #acctTable. The file keeps its name so the
+   history of the rule it pins stays findable. Nothing was loosened: the same
+   three bases, the same sums, the same captions.
+
      node tests/accounts-drawer-growth-basis.test.cjs */
 
 const assert = require('assert');
@@ -73,10 +80,10 @@ async function mount() {
   return { ctx, S, $ };
 }
 
-/* label → value of every field in the open drawer. */
+/* label → value of every field in the inspector. */
 function drawerFields($) {
   const out = {};
-  for (const f of descend($('#acctTable')).filter(n => n._cls.has('acct-drawer-f'))) {
+  for (const f of descend($('#acctInspector')).filter(n => n._cls.has('acct-drawer-f'))) {
     out[String(f.children[0].textContent)] = String(f.children[1].textContent);
   }
   return out;
@@ -100,12 +107,12 @@ const num = t => Number(String(t).replace(/[^\d.-]/g, ''));
       const d = drawerFields($);
       eq(d[L.putIn], 'R 36500.00', 'Put in is the capital growth is measured against');
       eq(d[L.growth], 'R 5000.00', 'Growth is measured on today\'s implied balance');
-      eq(d[L.measuredOn], 'R 41500.00', 'and the drawer names that balance, since it is not the one typed');
+      eq(d[L.measuredOn], 'R 41500.00', 'and the inspector names that balance, since it is not the one typed');
       eq(num(d[L.putIn]) + num(d[L.growth]), num(d[L.measuredOn]), 'Put in + Growth = the balance it was measured on');
       eq(d[L.investedFile], 'R 33000.00', 'the file\'s own total_invested stays visible, captioned as the file\'s');
       ok(!(L.invested in d), 'and no bare "Total invested" stands in for the capital it is not');
 
-      const row = descend($('#acctTable')).find(n => n._cls.has('acct-goal'));
+      const row = descend($('#acctInspector')).find(n => n._cls.has('acct-goal'));
       /* One decimal in the household's mark, the Savings card's formatter
          (2026-10-20 audit, D2-10): +13,7%, where this cell used to round to +14. */
       ok(row && String(row.textContent).includes(i18n.t('acct.growthOn', { pct: '+13,7', amount: 'R 36500' })),
@@ -118,7 +125,7 @@ const num = t => Number(String(t).replace(/[^\d.-]/g, ''));
       S.acctView = { open: 'Steady' };
       ctx.renderAccounts();
       const d = drawerFields($);
-      eq(num(d[L.putIn]) + num(d[L.growth]), 12000, 'Put in + Growth = the balance in the drawer heading');
+      eq(num(d[L.putIn]) + num(d[L.growth]), 12000, 'Put in + Growth = the balance in the inspector heading');
       ok(!(L.measuredOn in d), 'nothing rolled forward, so no extra line');
       ok(!(L.investedFile in d), 'and no file figure to caption on an account that carries none');
     }
@@ -136,7 +143,7 @@ const num = t => Number(String(t).replace(/[^\d.-]/g, ''));
 
     /* ---- 4. the words, once en.js carries them ---- */
     eq([L.putIn, L.measuredOn, L.investedFile], ['Put in', 'Growth is measured on', 'Total invested (account file)'],
-      'the drawer labels read as English, not as their key names');
+      'the inspector labels read as English, not as their key names');
   } finally { unpin(); }
-  console.log(`PASS — the Accounts drawer's growth adds up on one basis, and says which (${checks} checks).`);
+  console.log(`PASS — the Accounts inspector's growth adds up on one basis, and says which (${checks} checks).`);
 })().catch(e => { console.error(e); process.exit(1); });

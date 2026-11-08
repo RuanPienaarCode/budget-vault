@@ -37,8 +37,10 @@ if (root.length) {
   ok(val(root[0], '-webkit-user-select') === 'text', `.budget-app-root { -webkit-user-select: text } at ${locate(root[0].line)} (Safari before 17 reads only the prefixed property)`);
 }
 
-/* The things a finger drives keep `none`. */
-const NONE = ['button', 'summary', '.app-drawer', '.topbar', '.acct-grip', 'svg'];
+/* The things a finger drives keep `none`. (`.acct-grip` was listed here: the
+   Accounts column-resize grip is gone with the columns it resized, so there is
+   no longer a grip to keep unselectable.) */
+const NONE = ['button', 'summary', '.app-drawer', '.topbar', 'svg'];
 const none = rules.filter(r => r.context.length === 0 && val(r, 'user-select') === 'none');
 for (const sel of NONE) {
   const full = `${R} ${sel}`;
@@ -65,4 +67,4 @@ if (failures.length) {
   console.log(`FAIL — css-text-selection: ${failures.length} of ${checks} checks\n  - ${failures.join('\n  - ')}`);
   process.exit(1);
 }
-console.log(`PASS — css-text-selection: ${checks} checks (content selectable, prefixed twins, none kept on buttons/summary/drawer/top bar/grip/charts).`);
+console.log(`PASS — css-text-selection: ${checks} checks (content selectable, prefixed twins, none kept on buttons/summary/drawer/top bar/charts).`);

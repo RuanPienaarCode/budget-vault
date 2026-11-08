@@ -19,11 +19,20 @@
    D2-10  Growth reads one decimal in the household's mark ("-13,7%"), as on
           Savings and the Report.
    D2-17  Negative growth is rose (bg-danger), as Savings paints it, not amber.
-   D2-11  Prose dates read "Aug 1", not "2026-08-01"; the table's Confirmed
-          column keeps its ISO date.
+   D2-11  Prose dates read "Aug 1", not "2026-08-01"; the inspector's Confirmed
+          field keeps its ISO date.
    D1-15  "Share of what these accounts hold. Plus € 640 held …", not glued.
    Sparkline  An Accounts sparkline is decorative (aria-hidden) and carries no
           aria-label="undefined" (chart.js set the attribute with no label).
+
+   THE ACCOUNTS INSPECTOR (this file's pins moved, none weakened). The eight-column
+   table and its drawer are gone: the goal cell, the drawer's fields and the
+   reconciliation now live in #acctInspector for the SELECTED account, and the
+   sentence "N transactions since D imply X — Y higher" is three lines (Stated,
+   N transactions since, Implied today). Each assertion below reads the same
+   figure from its new home: the goal bar and drawer fields from the inspector
+   of the account being asserted on, the drift's prose date and cents from the
+   reconciliation lines, the stale reason from the status word's own title.
 
      node tests/accounts-audit-2026-10-20.test.cjs */
 
@@ -91,10 +100,18 @@ async function render(open) {
 }
 const rowOf = (ctx, name) => descend(ctx.$('#acctTable'))
   .find(n => n.tagName === 'TR' && hasCls(n, 'acct-row') && descend(n).some(c => hasCls(c, 'acct-name-btn') && String(c.textContent) === name));
-const goalOf = (ctx, name) => flat(byCls(rowOf(ctx, name), 'acct-goal')[0]);
+/* Select an account and re-render under the same pinned clock render() used: a
+   re-render outside it reads the wall clock, and "stale" would mean something
+   else by the time this suite runs. */
+const select = (ctx, name) => {
+  const unpin = pinClock(TODAY);
+  try { ctx.S.acctView.open = name; ctx.renderAccounts(); } finally { unpin(); }
+  return ctx.$('#acctInspector');
+};
+const goalOf = (ctx, name) => flat(byCls(select(ctx, name), 'acct-goal')[0]);
 const drawerFields = ctx => {
   const out = {};
-  for (const f of byCls(ctx.$('#acctTable'), 'acct-drawer-f')) out[flat(f.children[0])] = flat(f.children[1]);
+  for (const f of byCls(ctx.$('#acctInspector'), 'acct-drawer-f')) out[flat(f.children[0])] = flat(f.children[1]);
   return out;
 };
 
@@ -119,7 +136,7 @@ const drawerFields = ctx => {
   /* ---- D2-10 + D2-17 ---- */
   ok(goalOf(ctx, 'Fund').startsWith(i18n.t('acct.growthOn', { pct: '-13,7', amount: 'R 10 000' })),
     `growth reads one decimal in the household's mark (got "${goalOf(ctx, 'Fund')}")`);
-  const fundFill = descend(byCls(rowOf(ctx, 'Fund'), 'acct-mbar')[0]).find(n => n.tagName === 'I');
+  const fundFill = descend(byCls(select(ctx, 'Fund'), 'acct-mbar')[0]).find(n => n.tagName === 'I');
   ok(hasCls(fundFill, 'bg-danger') && !hasCls(fundFill, 'bg-warning'), 'a loss is rose, as Savings paints it, not amber');
 
   /* ---- D2-01 / D2-03 / MT-07: the ring ---- */
@@ -142,7 +159,7 @@ const drawerFields = ctx => {
   ok(!/hold Plus/.test(ringSub), 'not glued');
 
   /* ---- Sparkline aria ---- */
-  const sparks = descend(ctx.$('#acctTable')).filter(n => n.tagName === 'SVG' && hasCls(n, 'acct-spark'));
+  const sparks = descend(select(ctx, 'Cheque')).filter(n => n.tagName === 'SVG' && hasCls(n, 'acct-spark'));
   ok(sparks.length >= 1, 'the drifting account draws a sparkline');
   for (const s of sparks) {
     ok(s.getAttribute('aria-label') !== 'undefined', 'no aria-label="undefined"');
@@ -150,9 +167,13 @@ const drawerFields = ctx => {
   }
 
   /* ---- D2-11: the deck's stale line ---- */
-  const why = flat(rowOf(ctx, 'Old'));
+  /* The reason is the status word's title now: the row no longer prints a
+     sentence (that is what made a flagged row ~270px tall). */
+  const status = descend(rowOf(ctx, 'Old')).find(n => hasCls(n, 'acct-st'));
+  const why = String(status.attrs.title);
   ok(why.includes(i18n.t('acct.deck.why.stale', { count: 80, date: 'Aug 1' })), `the stale reason names a prose date (got "${why}")`);
-  ok(why.includes('2026-08-01'), 'while the Confirmed column keeps its ISO date');
+  ok(flat(status) === i18n.t('acct.state.stale', { count: 80 }), 'and the row itself says only the short state');
+  ok(drawerFields(select(ctx, 'Old') && ctx)[i18n.t('acct.col.confirmed')] === '2026-08-01', 'while the Confirmed field keeps its ISO date');
 
   /* ---- drawers ---- */
   {
@@ -166,13 +187,17 @@ const drawerFields = ctx => {
   }
   {
     const c = await render('Cheque');
-    const recon = flat(byCls(c.$('#acctTable'), 'acct-recon-txt')[0]);
-    ok(recon.includes(i18n.t('acct.drawer.drift', { count: 2, date: 'Oct 1', implied: 'R 1 150,40', diff: 'R 150,00', dir: i18n.t('acct.drawer.higher') })),
-      `the drawer's drift: prose date, and the difference in cents beside the cents implied figure (got "${recon}")`);
+    const lines = byCls(c.$('#acctInspector'), 'acct-insp-line').map(flat);
+    eq(lines, [
+      // label then figure: two spans in a flex line, so no space between them in the text
+      `${i18n.t('acct.insp.stated', { date: 'Oct 1' })}R 1 000,40`,
+      `${i18n.t('acct.insp.since', { count: 2 })}+R 150,00`,
+      `${i18n.t('acct.insp.implied')}R 1 150,40`,
+    ], 'the drift worked out: a prose date, the movement and the implied figure each in cents, and the three add up');
   }
   {
     const c = await render('Old');
-    const recon = flat(byCls(c.$('#acctTable'), 'acct-recon-txt')[0]);
+    const recon = flat(byCls(c.$('#acctInspector'), 'acct-recon-txt')[0]);
     ok(recon.includes(i18n.t('acct.drawer.recon.stale', { date: 'Aug 1' })), `the stale drawer line names a prose date (got "${recon}")`);
   }
 

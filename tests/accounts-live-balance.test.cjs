@@ -16,8 +16,9 @@
    bank figure read after the day's postings and wrong for a figure typed
    first, and the file cannot say which. So the app says it, at the two places
    a reader can act on it: the toast when the row is added, and the account's
-   drawer. Neither moves the date for them — the drawer's button opens the
-   balance dialog, whose as-at field is the answer.
+   inspector (it was a drawer under the row until the list/inspector redesign).
+   Neither moves the date for them — the inspector's button opens the balance
+   dialog, whose as-at field is the answer.
 
    No row-level "Count them" button: acceptImplied() stamps the date of the
    last row it absorbed, so EVERY reconciled account carries same-day rows that
@@ -30,13 +31,17 @@
      1. The row's figure is the implied balance: Cheque R20 000 typed, then
         −R1 200 on the 2nd → R18 800. Accounts with nothing since keep their
         typed figure.
-     2. The typed figure is still on the row, with its date and the movement
-        since — the disagreement is shown, not erased.
+     2. The typed figure is still shown, with its date and the movement since —
+        the disagreement is shown, not erased. It used to be a sub-line under the
+        balance ("R 20 000,00 as at Sep 1 · −R 1 200,00 since") that ran off its
+        column on a 760px pane; it is three lines in the inspector now (Stated,
+        N transactions since, Implied today) and this file pins that they are
+        the same two figures and that the last is the row's own balance.
      3. The hero, the group subtotal and the balance sort read the same
         figure as the rows, so the page adds up to itself.
      4. A drift is a prompt to confirm, not an alarm: warning tone, and the
         button says Confirm.
-     5. The drawer names the same-day rows and offers the balance dialog.
+     5. The inspector names the same-day rows and offers the balance dialog.
      6. Adding a row dated on or before its account's balance date says so.
 
      node tests/accounts-live-balance.test.cjs   # non-zero exit on failure */
@@ -94,7 +99,17 @@ const textOf = n => { let s = ''; walk(n, m => { if (m._text) s += m._text; }); 
 /* "R 18800.00" → 18800. The harness's moneyIn prints a plain fixed figure. */
 const num = s => Number(String(s).replace(/[^0-9.\-]/g, ''));
 
-/* Each account row, keyed by name, with the parts this file asserts on. */
+/* The reconciliation line (label + figure) that holds a given data-fig. */
+function descendLine(ctx, fig) {
+  let out = null;
+  walk(ctx.$('#acctInspector'), n => {
+    if (!out && has(n, 'acct-insp-line')) walk(n, m => { if (!out && m.attrs && m.attrs['data-fig'] === fig) out = n; });
+  });
+  return out;
+}
+
+/* Each account row, keyed by name, with the parts this file asserts on. The
+   state is the status word's dot now, not a pill: the pill is in the inspector. */
 function rowsOf(ctx) {
   const out = new Map();
   walk(ctx.$('#acctTable'), tr => {
@@ -103,8 +118,7 @@ function rowsOf(ctx) {
     walk(tr, n => {
       if (!r.name && has(n, 'acct-name-btn')) r.name = textOf(n).trim();
       if (!r.bal && has(n, 'acct-bal')) r.bal = n;
-      if (!r.sub && has(n, 'acct-bal-sub')) r.sub = n;
-      if (!r.pill && has(n, 'acct-pill')) r.pill = n;
+      if (!r.st && has(n, 'acct-st')) r.st = n;
     });
     if (r.name) out.set(r.name, r);
   });
@@ -124,13 +138,29 @@ atAuditDate(async () => {
       'an account with nothing dated since its confirmation keeps its typed figure');
     eq(num(textOf(rows.get('Baby fund').bal)), 8000, 'and so does the baby fund');
 
-    const sub = rows.get('Cheque').sub;
-    ok(sub, 'the drifting row still shows what was typed');
-    const subTxt = readable(textOf(sub));
-    eq(subTxt, readable(i18n.t('acct.row.typedAsAt', {
-      stated: 'R 20000.00', date: ctx.dateText('2026-09-01'), delta: '−R 1200.00' })),
-    `the sub-line names the typed figure, its date and the movement since — got "${subTxt}"`);
-    ok(!rows.get('Emergency fund').sub, 'no sub-line where the two figures are the same');
+    /* The disagreement, worked out in the inspector the row selects. The three
+       lines are read back as numbers: what was typed, what moved, and what that
+       implies — and the last must be the figure the ROW leads with, so the
+       list and the inspector can never print two balances for one account. */
+    rows.get('Cheque').tr.click();
+    const fig = name => { let f = null; walk(ctx.$('#acctInspector'), n => { if (!f && n.attrs && n.attrs['data-fig'] === name) f = n; }); return f; };
+    ok(fig('acct-insp-stated'), 'the drifting account shows what was typed');
+    eq(num(textOf(fig('acct-insp-stated'))), 20000, 'R20 000, as typed');
+    /* The view prints U+2212 for a minus, which num() would strip as a non-digit. */
+    const delta = num(textOf(fig('acct-insp-delta')).replace('\u2212', '-'));
+    eq(delta, -1200, 'less the R1 200 Checkers shop since');
+    eq(num(textOf(fig('acct-insp-implied'))), 18800, 'implies R18 800');
+    eq(num(textOf(fig('acct-insp-stated'))) + delta, num(textOf(fig('acct-insp-implied'))),
+      'and the three add up');
+    eq(num(textOf(fig('acct-insp-implied'))), num(textOf(rows.get('Cheque').bal)),
+      'the implied line IS the figure the row leads with');
+    eq(num(textOf(fig('acct-insp-bal'))), 18800, 'as is the inspector\'s own big balance');
+    const stated = readable(textOf(descendLine(ctx, 'acct-insp-stated')));
+    ok(stated.includes(ctx.dateText('2026-09-01')), `the typed figure carries its date — got "${stated}"`);
+
+    /* Where the two figures are the same there is no argument to show. */
+    rows.get('Emergency fund').tr.click();
+    ok(!fig('acct-insp-stated'), 'no reconciliation lines where the stated and implied figures agree');
   }
 
   /* ------------- 3. the page adds up to its own rows --------------------- */
@@ -155,10 +185,14 @@ atAuditDate(async () => {
   {
     const { ctx } = await mount();
     ctx.renderAccounts();
-    const pill = rowsOf(ctx).get('Cheque').pill;
-    ok(has(pill, 'warn') && !has(pill, 'danger'), 'the drift pill is a warning, not an error');
+    const st = rowsOf(ctx).get('Cheque').st;
+    ok(has(st, 'is-warn'), 'the drift status is a warning, not an error');
+    rowsOf(ctx).get('Cheque').tr.click();
+    let pill = null;
+    walk(ctx.$('#acctInspector'), n => { if (!pill && has(n, 'acct-pill')) pill = n; });
+    ok(has(pill, 'warn') && !has(pill, 'danger'), 'and so is the inspector\'s pill');
     let btnTxt = '';
-    walk(rowsOf(ctx).get('Cheque').tr, n => { if (has(n, 'acct-deck-btn') && !has(n, 'ghost')) btnTxt += textOf(n); });
+    walk(ctx.$('#acctInspector'), n => { if (has(n, 'acct-insp-btn') && has(n, 'is-primary')) btnTxt += textOf(n); });
     eq(readable(btnTxt).trim(), readable(i18n.t('acct.deck.do.drift', { amount: 'R 18800.00' })),
       'the one-tap answer confirms the figure the row already shows');
     ok(/confirm/i.test(i18n.t('acct.deck.do.drift', { amount: 'x' })), 'and says Confirm in English');
@@ -169,12 +203,11 @@ atAuditDate(async () => {
     const { ctx } = await mount();
     ctx.renderAccounts();
     rowsOf(ctx).get('Emergency fund').tr.click();
-    let drawer = null;
-    walk(ctx.$('#acctTable'), n => { if (!drawer && has(n, 'acct-drawer')) drawer = n; });
-    ok(drawer, 'the emergency fund drawer opens');
+    const drawer = ctx.$('#acctInspector');
+    ok(drawer.children.length, 'the emergency fund inspector fills');
     const want = i18n.t('acct.drawer.sameDay', { count: 1, date: ctx.dateText('2026-09-01'), amount: '+R 2000.00' });
     ok(readable(textOf(drawer)).includes(readable(want)),
-      `the drawer says the R2 000 transfer dated the 1st is taken as already in — got "${textOf(drawer)}"`);
+      `the inspector says the R2 000 transfer dated the 1st is taken as already in — got "${textOf(drawer)}"`);
 
     let btn = null;
     walk(drawer, n => { if (!btn && has(n, 'acct-sameday-btn')) btn = n; });
@@ -190,8 +223,7 @@ atAuditDate(async () => {
     const { ctx: c2 } = await mount();
     c2.renderAccounts();
     rowsOf(c2).get('Baby fund').tr.click();
-    let d2 = null;
-    walk(c2.$('#acctTable'), n => { if (!d2 && has(n, 'acct-drawer')) d2 = n; });
+    const d2 = c2.$('#acctInspector');
     ok(readable(textOf(d2)).includes(readable(i18n.t('acct.drawer.sameDay', {
       count: 1, date: c2.dateText('2026-09-01'), amount: '−R 5000.00' }))),
     `money out is signed as money out — got "${textOf(d2)}"`);

@@ -3,12 +3,18 @@
 
    caveatChip (src/dom.js) exists so a caveat is reachable by tap on a phone,
    where a `title=` tooltip never shows. On the Accounts page the "ignored" chip
-   sits INSIDE a table row whose own click opens the row's drawer — and the
+   once sat INSIDE a table row whose own click opened the row's drawer — and the
    chip's click bubbled up to it: the drawer opened, the re-render threw the
    just-expanded chip away, and the explanation never showed (audit of
    7 Oct 2026, confirmed in a browser on a household with three ignored
    warnings). views/accounts.js's own statePill comment says the chip is there
    precisely for that tap.
+
+   After the list/inspector redesign the chip lives in the inspector's State
+   field, which is not itself a click target; the list row carries only a status
+   word. §B now pins the two things that still matter there: tapping the chip
+   neither rebuilds the inspector out from under the expanded reason nor changes
+   the selection, and a tap on the row still selects it.
 
    The dom-stub does not bubble (deliberately — see its _fire), so this file
    carries a ten-line dispatcher that does, honouring stopPropagation the way a
@@ -95,18 +101,22 @@ function dispatch(target, type, init = {}) {
       ctx.renderAccounts();
 
       const row = descend($('#acctTable')).find(n => n._cls.has('acct-row'));
-      const btn = descend(row).find(n => n._cls.has('caveat-chip-btn'));
-      ok(btn, 'fixture: the muted row carries the "ignored" chip');
+      /* The one account is the default selection, so its inspector is filled
+         without a click and S.acctView.open is still null. */
+      const btn = descend($('#acctInspector')).find(n => n._cls.has('caveat-chip-btn'));
+      ok(btn, 'fixture: the muted account\'s inspector carries the "ignored" chip');
+      eq(descend(row).some(n => n._cls.has('caveat-chip-btn')), false,
+        'and the list row does not: it says "ignored" and keeps the chip for the inspector');
       dispatch(btn, 'click');
-      eq(S.acctView.open, null, 'tapping the chip does not open the row\'s drawer');
-      ok($('#acctTable').contains(btn), 'so the table is not rebuilt out from under it');
+      eq(S.acctView.open, null, 'tapping the chip does not change the selection');
+      ok($('#acctInspector').contains(btn), 'so the inspector is not rebuilt out from under it');
       const detail = descend(btn._parent).find(n => n._cls.has('caveat-chip-detail'));
       ok(detail && !detail._cls.has('hidden'), 'and the reason the warning is quiet is on screen');
 
       dispatch(row, 'click');
-      eq(S.acctView.open, 'Petty Box', 'a tap anywhere else on the row still opens it');
+      eq(S.acctView.open, 'Petty Box', 'a tap on the row selects it');
     } finally { unpin(); }
   }
 
-  console.log(`PASS — a caveat chip keeps its own tap, inside a clickable row (${checks} checks).`);
+  console.log(`PASS — a caveat chip keeps its own tap, in the inspector beside a clickable row (${checks} checks).`);
 })().catch(e => { console.error(e); process.exit(1); });

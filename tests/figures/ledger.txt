@@ -500,31 +500,33 @@ number	3	-	acctFilters/button.acct-seg[0]/span.acct-seg-n
 number	1	-	acctFilters/button.acct-seg[1]/span.acct-seg-n
 number	2	-	acctFilters/button.acct-seg[2]/span.acct-seg-n
 number	3	-	acctFilters/button.acct-seg[3]/span.acct-seg-n
-number	2026	-	acctTable/thead/tr/th.acct-col-drop[2]/button
+number	2026	-	acctTable/thead/tr/th.is-sorted[1]/button.acct-sort-sub[1]
 money	R 14 400,00	14400	acctTable/@acct-group-total
 money	R 14 400,00	14400	acctTable/@acct-bal
-money	R 20 000,00	20000	acctTable/tbody/tr.acct-row[1]/td.num[1]/div.acct-bal-sub
-number	1	-	acctTable/tbody/tr.acct-row[1]/td.num[1]/div.acct-bal-sub
-money	R 5 600,00	5600	acctTable/tbody/tr.acct-row[1]/td.num[1]/div.acct-bal-sub
 money	R 15 400	15400	acctTable/@acct-flow-in
-number	5	-	acctTable/tbody/tr.acct-row[1]/td.acct-col-state[6]/span.acct-row-acts[1]/span.acct-row-why
-money	R 14 400,00	14400	acctTable/tbody/tr.acct-row[1]/td.acct-col-state[6]/span.acct-row-acts[1]/span.acct-row-why
-money	R 20 000,00	20000	acctTable/tbody/tr.acct-row[1]/td.acct-col-state[6]/span.acct-row-acts[1]/span.acct-row-why
-money	R 14 400,00	14400	acctTable/tbody/tr.acct-row[1]/td.acct-col-state[6]/span.acct-row-acts[1]/button.acct-deck-btn[1]
+number	2026	-	acctTable/@acct-flow-in
 money	R 14 500,00	14500	acctTable/@acct-group-total
 money	$ 1 000	1000	acctTable/@acct-group-other
 money	R 14 500,00	14500	acctTable/@acct-bal
-money	R 15 000,00	15000	acctTable/tbody/tr.acct-row[3]/td.num[1]/div.acct-bal-sub
-number	1	-	acctTable/tbody/tr.acct-row[3]/td.num[1]/div.acct-bal-sub
-money	R 500,00	500	acctTable/tbody/tr.acct-row[3]/td.num[1]/div.acct-bal-sub
 money	R 500	500	acctTable/@acct-flow-out
-percent	52,6%	-	acctTable/tbody/tr.acct-row[3]/td.acct-col-drop[4]/span.acct-goal/span.acct-mbar-l[1]
-money	R 9 500	9500	acctTable/tbody/tr.acct-row[3]/td.acct-col-drop[4]/span.acct-goal/span.acct-mbar-l[1]
-number	2	-	acctTable/tbody/tr.acct-row[3]/td.acct-col-state[6]/span.acct-row-acts[1]/span.acct-row-why
-money	R 14 500,00	14500	acctTable/tbody/tr.acct-row[3]/td.acct-col-state[6]/span.acct-row-acts[1]/span.acct-row-why
-money	R 15 000,00	15000	acctTable/tbody/tr.acct-row[3]/td.acct-col-state[6]/span.acct-row-acts[1]/span.acct-row-why
-money	R 14 500,00	14500	acctTable/tbody/tr.acct-row[3]/td.acct-col-state[6]/span.acct-row-acts[1]/button.acct-deck-btn[1]
+number	2026	-	acctTable/@acct-flow-out
 money	$ 1 000,00	1000	acctTable/@acct-bal
+money	R 14 400,00	14400	acctInspector/@acct-insp-bal
+money	R 15 400	15400	acctInspector/div.acct-insp-flow[3]/span.acct-chip
+number	2026	-	acctInspector/div.acct-insp-flow[3]/span.acct-chip
+number	1	-	acctInspector/div.acct-insp-recon[4]/div.acct-insp-line[1]/span[0]
+money	R 20 000,00	20000	acctInspector/@acct-insp-stated
+number	5	-	acctInspector/div.acct-insp-recon[4]/div.acct-insp-line[2]/span[0]
+money	R 5 600,00	5600	acctInspector/@acct-insp-delta
+money	R 14 400,00	14400	acctInspector/@acct-insp-implied
+number	2	-	acctInspector/div.acct-recon[5]/div.acct-recon-txt
+number	1	-	acctInspector/div.acct-recon[5]/div.acct-recon-txt
+money	R 21 000,00	21000	acctInspector/div.acct-recon[5]/div.acct-recon-txt
+money	R 14 400,00	14400	acctInspector/div.acct-insp-acts[6]/button.acct-insp-btn
+money	R 30 000	30000	acctInspector/div.acct-insp-grid[8]/div.acct-drawer-f[2]/div.acct-drawer-val[1]
+money	R 14 600	14600	acctInspector/div.acct-insp-grid[8]/div.acct-drawer-f[2]/div.acct-drawer-val[1]
+number	7	-	acctInspector/div.acct-insp-grid[8]/div.acct-drawer-f[3]/div.acct-drawer-l[0]
+number	2026	-	acctInspector/div.acct-insp-grid[8]/div.acct-drawer-f[3]/div.acct-drawer-val[1]
 number	3	-	acctTblSub/
 
 ## assets

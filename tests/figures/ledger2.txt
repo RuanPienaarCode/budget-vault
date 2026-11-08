@@ -418,21 +418,26 @@ number	2	-	acctFilters/button.acct-seg[0]/span.acct-seg-n
 number	1	-	acctFilters/button.acct-seg[1]/span.acct-seg-n
 number	1	-	acctFilters/button.acct-seg[2]/span.acct-seg-n
 number	2	-	acctFilters/button.acct-seg[3]/span.acct-seg-n
-number	2026	-	acctTable/thead/tr/th.acct-col-drop[2]/button
+number	2026	-	acctTable/thead/tr/th.is-sorted[1]/button.acct-sort-sub[1]
 money	R 48 500,00	48500	acctTable/@acct-group-total
 money	R 48 500,00	48500	acctTable/@acct-bal
-money	R 20 000,00	20000	acctTable/tbody/tr.acct-row[1]/td.num[1]/div.acct-bal-sub
-number	23	-	acctTable/tbody/tr.acct-row[1]/td.num[1]/div.acct-bal-sub
-money	R 28 500,00	28500	acctTable/tbody/tr.acct-row[1]/td.num[1]/div.acct-bal-sub
 money	R 28 500	28500	acctTable/@acct-flow-in
-number	2	-	acctTable/tbody/tr.acct-row[1]/td.acct-col-state[6]/span.acct-row-acts[1]/span.acct-row-why
-money	R 48 500,00	48500	acctTable/tbody/tr.acct-row[1]/td.acct-col-state[6]/span.acct-row-acts[1]/span.acct-row-why
-money	R 20 000,00	20000	acctTable/tbody/tr.acct-row[1]/td.acct-col-state[6]/span.acct-row-acts[1]/span.acct-row-why
-money	R 48 500,00	48500	acctTable/tbody/tr.acct-row[1]/td.acct-col-state[6]/span.acct-row-acts[1]/button.acct-deck-btn[1]
+number	2026	-	acctTable/@acct-flow-in
 money	R 15 000,00	15000	acctTable/@acct-group-total
 money	R 15 000,00	15000	acctTable/@acct-bal
-percent	50,0%	-	acctTable/tbody/tr.acct-row[3]/td.acct-col-drop[4]/span.acct-goal/span.acct-mbar-l[1]
-money	R 10 000	10000	acctTable/tbody/tr.acct-row[3]/td.acct-col-drop[4]/span.acct-goal/span.acct-mbar-l[1]
+money	R 48 500,00	48500	acctInspector/@acct-insp-bal
+money	R 28 500	28500	acctInspector/div.acct-insp-flow[3]/span.acct-chip
+number	2026	-	acctInspector/div.acct-insp-flow[3]/span.acct-chip
+number	23	-	acctInspector/div.acct-insp-recon[4]/div.acct-insp-line[1]/span[0]
+money	R 20 000,00	20000	acctInspector/@acct-insp-stated
+number	2	-	acctInspector/div.acct-insp-recon[4]/div.acct-insp-line[2]/span[0]
+money	R 28 500,00	28500	acctInspector/@acct-insp-delta
+money	R 48 500,00	48500	acctInspector/@acct-insp-implied
+money	R 48 500,00	48500	acctInspector/div.acct-insp-acts[5]/button.acct-insp-btn
+money	R 30 000	30000	acctInspector/div.acct-insp-grid[7]/div.acct-drawer-f[2]/div.acct-drawer-val[1]
+money	R 1 500	1500	acctInspector/div.acct-insp-grid[7]/div.acct-drawer-f[2]/div.acct-drawer-val[1]
+number	2	-	acctInspector/div.acct-insp-grid[7]/div.acct-drawer-f[3]/div.acct-drawer-l[0]
+number	2026	-	acctInspector/div.acct-insp-grid[7]/div.acct-drawer-f[3]/div.acct-drawer-val[1]
 number	2	-	acctTblSub/
 
 ## assets

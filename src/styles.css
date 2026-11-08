@@ -184,15 +184,14 @@
   -webkit-user-select: text;
   user-select: text;
 }
-/* Controls, the drawer and top bar, a <summary> toggle, the column-resize grip
-   and charts (a drag on a chart scrubs its readout) stay unselectable: a tap or
-   drag on them must never leave a blue selection behind. Form fields are not
-   listed on purpose; WebKit refuses typed text in a field under `none`. */
+/* Controls, the drawer and top bar, a <summary> toggle and charts (a drag on a
+   chart scrubs its readout) stay unselectable: a tap or drag on them must never
+   leave a blue selection behind. Form fields are not listed on purpose; WebKit
+   refuses typed text in a field under `none`. */
 .budget-app-root button,
 .budget-app-root summary,
 .budget-app-root .app-drawer,
 .budget-app-root .topbar,
-.budget-app-root .acct-grip,
 .budget-app-root svg {
   -webkit-user-select: none;
   user-select: none;
@@ -294,7 +293,7 @@
        its `padding: 0` back from this one rule.
      - Each class that carries a padding of its own is stated again as
        `button:where(.cls)`. :where() keeps the twin at (0,2,2), so it beats the
-       host and still LOSES to every (0,3,0)+ component rule (`.acct-deck-btn.sm`,
+       host and still LOSES to every (0,3,0)+ component rule (`.acct-insp .acct-insp-btn`,
        `.bud-table .bud-act`, the id-scoped Transactions rules), which already
        beat the host and are the intended values. The twins tie each other, so
        they are listed in their base rules' source order, media variants in
@@ -1833,79 +1832,20 @@ body.is-tablet .budget-app-root button:where(.fs-hide) { padding: 4px; }   /* fi
 .budget-app-root .acct-search input:focus { outline: 2px solid var(--color-primary); outline-offset: 1px; }
 
 /* Band 3 — the ledger rows. */
+/* A row of the list. The selected row carries the primary tint and a rail on
+   its leading edge; a row that wants a look carries the warning rail instead.
+   Both are a box-shadow inset on the first cell rather than a border, so a rail
+   cannot shift the cell's width and knock the column grid out of alignment. A
+   selected row that is also flagged keeps the warning rail — the amber is the
+   information, the tint is only where the reader's attention is. */
 .budget-app-root .table tbody tr.acct-row { cursor: pointer; }
 .budget-app-root .table tbody tr.acct-row:hover { background: rgba(127, 127, 127, .07); }
-.budget-app-root .table tbody tr.acct-row.is-open { background: var(--color-primary-light); }
+.budget-app-root .table tbody tr.acct-row.is-selected { background: var(--color-primary-light); }
 .budget-app-root .table tbody tr.acct-row:focus-visible { outline: 2px solid var(--color-primary); outline-offset: -2px; }
-/* The state rail. A box-shadow inset rather than a border so it cannot shift
-   the cell's width and knock the column grid out of alignment. */
+.budget-app-root .table tbody tr.acct-row.is-selected td:first-child { box-shadow: inset 3px 0 0 var(--color-primary); }
 .budget-app-root .table tbody tr.acct-row.is-flag td:first-child { box-shadow: inset 3px 0 0 var(--color-warning); }
 .budget-app-root .table tbody tr.acct-row.is-drift td:first-child { box-shadow: inset 3px 0 0 var(--color-warning); }
 .budget-app-root .acct-cell-name { display: flex; align-items: center; gap: 11px; min-width: 0; }
-/* The account name is the row's identity, so it must never be the column that
-   gives way. Every other column in this table is nowrap — figures, dates, the
-   state pills ("nothing imported · ignored") — so when their combined width
-   passes the pane, auto table layout has only this column left to squeeze and
-   collapses it to min-content: "FNB Business Account (Ruan)" rendered one word
-   per line. A floor here pushes the table past its container instead, which
-   .table-responsive already scrolls. Names longer than the floor still wrap,
-   just at a readable width rather than at every space. */
-/* ---- resizable columns (views/accounts.js) ----
-   The grip is a 9px strip on the trailing edge of each header, invisible until
-   the header is hovered so six of them do not turn the head row into a comb.
-   touch-action:none is load-bearing on iOS: without it the first finger move
-   scrolls the table instead of dragging the column. */
-.budget-app-root #acctTable th { position: relative; }
-.budget-app-root .acct-grip {
-  position: absolute; top: 0; right: 0; bottom: 0; width: 9px;
-  cursor: col-resize; touch-action: none; z-index: 2;
-  opacity: 0; transition: opacity .14s ease;
-}
-.budget-app-root .acct-grip::after {
-  content: ''; position: absolute; top: 6px; bottom: 6px; right: 3px;
-  width: 2px; border-radius: 2px; background: var(--color-primary);
-}
-.budget-app-root #acctTable th:hover .acct-grip,
-.budget-app-root .acct-grip.is-dragging { opacity: .55; }
-.budget-app-root .acct-grip.is-dragging { opacity: 1; }
-/* Only a table that has actually been sized takes a fixed layout — see the
-   COL_MIN note in views/accounts.js for why a stored width is meaningless
-   without it, and why the automatic layout stays the default. */
-.budget-app-root #acctTable.is-sized { table-layout: fixed; }
-.budget-app-root #acctTable.is-sized td { overflow: hidden; text-overflow: ellipsis; }
-/* The floor below is for the AUTOMATIC layout, where the engine gets to
-   shrink this column to min-content. A reader who has explicitly dragged it
-   has overruled that, so the floor must not fight their own width back. */
-.budget-app-root #acctTable.is-sized th:first-child,
-.budget-app-root #acctTable.is-sized td:first-child { min-width: 0; }
-/* A phone drops three columns entirely; a desktop width applied there would be
-   shared among a different set. Grips go with them. */
-@media (max-width: 760px) {
-  .budget-app-root .acct-grip { display: none; }
-  .budget-app-root #acctTable.is-sized { table-layout: auto; }
-}
-.budget-app-root #acctTable th:first-child,
-.budget-app-root #acctTable td:first-child { min-width: 210px; }
-/* The columns the drawer repeats drop in two steps between a phone and a
-   laptop (audit L6-01). With the state cell wrapping and the goal label under
-   its bar, the table needs about 1061px for all eight columns; the card is the
-   window less ~122px (the rail and the page gutters), capped at 1078px. So all
-   eight fit from a ~1190px window; below it the sparkline (Period) and the
-   confirmed date go, which is 826px and fits from ~950px; below that the
-   phone's set goes (Change, Progress as well), 587px, which fits down to the
-   760px rule that already drops them. Each step is the window width where the
-   table, already as narrow as it can wrap, no longer fits the card.
-   :not(.is-sized) because a reader who dragged a column edge chose a fixed
-   layout and their stored widths; hiding columns under it would make those
-   widths mean something else. display:none and nothing that re-lays the table
-   out, so the VoiceOver gate on the [role='table'] card layout is untouched. */
-@media (max-width: 1180px) {
-  .budget-app-root #acctTable:not(.is-sized) .acct-col-drop:nth-child(4),
-  .budget-app-root #acctTable:not(.is-sized) .acct-col-drop:nth-child(6) { display: none; }
-}
-@media (max-width: 960px) {
-  .budget-app-root #acctTable:not(.is-sized) .acct-col-drop { display: none; }
-}
 .budget-app-root .acct-dot { width: 9px; height: 9px; border-radius: 3px; flex: none; }
 .budget-app-root .acct-cell-sub { display: block; font-size: 11.5px; color: var(--ink-faint); margin-top: 1px; }
 /* justify-content, not only text-align: this is a <button>, which Obsidian
@@ -1920,13 +1860,6 @@ body.is-tablet .budget-app-root button:where(.fs-hide) { padding: 4px; }   /* fi
 }
 .budget-app-root .acct-bal:hover { text-decoration: underline; }
 .budget-app-root .acct-bal:focus-visible { outline: 2px solid var(--color-primary); outline-offset: 3px; border-radius: 6px; }
-/* The typed figure under a live one that has moved off it (discussion #124):
-   "R 20 000,00 as at 1 Sep · −R 1 200,00 since". Muted and small, because the
-   figure above it is the answer and this is where it came from. */
-.budget-app-root .acct-bal-sub {
-  margin-top: 2px; font-size: 12px; line-height: 1.35; color: var(--text-muted);
-  font-variant-numeric: tabular-nums; text-align: right;
-}
 .budget-app-root .acct-chip {
   display: inline-flex; align-items: center; gap: 5px;
   font-size: 11.5px; font-weight: 600; padding: 2px 9px; border-radius: 999px;
@@ -2045,16 +1978,12 @@ body.is-tablet .budget-app-root button:where(.fs-hide) { padding: 4px; }   /* fi
    (dom.js) — the pill itself no longer wraps a `.acct-pill-mute` text node,
    so that rule (and its "· " prefix) is retired with it. */
 
-/* The drawer — everything the tile used to carry, shown for ONE account. */
-.budget-app-root .table tbody tr.acct-drawer-row td.acct-drawer-cell { padding: 0 .25rem .5rem; border-bottom: none; background: none; }
-.budget-app-root .acct-drawer {
-  border-radius: 20px; border: 1px solid var(--color-primary);
-  background: var(--color-primary-light); padding: 20px 22px;
-}
-.budget-app-root .acct-drawer-h { display: flex; align-items: baseline; justify-content: space-between; gap: 14px; flex-wrap: wrap; margin-bottom: 14px; }
-.budget-app-root .acct-drawer-h h3 { margin: 0; font-size: 15px; font-weight: 600; letter-spacing: -.01em; }
+/* The inspector's facts and its small controls. The names are the drawer's: the
+   drawer is gone, but Savings' row sheet (views/savings.js) draws its own
+   actions on .acct-drawer-act / -acts / -del, and the statement foundation keys
+   the figure-small treatment on .acct-drawer-v, so the classes stayed and the
+   layout around them moved to src/statement/accounts.css. */
 .budget-app-root .acct-drawer-v { font-size: 22px; font-weight: 700; letter-spacing: -.02em; }
-.budget-app-root .acct-drawer-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(145px, 1fr)); gap: 14px; margin-bottom: 4px; }
 .budget-app-root .acct-drawer-l { font-size: 11.5px; color: var(--ink-faint); font-weight: 600; }
 .budget-app-root .acct-drawer-val { font-size: 14px; font-weight: 600; margin-top: 3px; }
 .budget-app-root .acct-drawer-acts { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 14px; }
@@ -2109,12 +2038,8 @@ body.is-tablet .budget-app-root button:where(.fs-hide) { padding: 4px; }   /* fi
 .budget-app-root .tx-undo-x:focus-visible { outline: 2px solid var(--color-primary); outline-offset: 2px; }
 
 @media (max-width: 900px) { .budget-app-root .top-grid { grid-template-columns: 1fr; } }
-/* A phone gets the name, the balance and the state. Everything the three
-   dropped columns carried is in the drawer, one tap away. */
 @media (max-width: 760px) {
   .budget-app-root .acct-hero { padding: 26px 22px; }
-  .budget-app-root .table th.acct-col-drop,
-  .budget-app-root .table td.acct-col-drop { display: none; }
 }
 
 /* ============================================================
@@ -6054,95 +5979,18 @@ body.is-tablet .budget-app-root button:where(.fs-hide) { padding: 4px; }   /* fi
   white-space: nowrap;
 }
 
-/* ---- per-row inline actions -------------------------------------------- */
-/* The state column now carries the pill AND, for a flagged row, the same
-   Review / one-tap-fix pair the old deck card offered — same buttons, same
-   handlers (rowActions() in accounts.js), just printed once per row instead
-   of once per card. */
-/* The state cell wraps at every width, and the actions take a line of their own
-   under the pill and its reason. It was nowrap above 760px, so the pill, the
-   reason and up to three buttons were ONE 453px line: at 1024 and at 1280px
-   alike the table measured 1443px in a 902-1078px card, the reason and
-   Review / "Use R ..." / Ignore ran past the card edge and the Notes chip sat
-   outside it (audit L6-01, Obsidian 1.14.4's real app.css). With the cell
-   wrapping it is 195px and the table 1149px; the Progress cell and the two
-   steps further down take it the rest of the way. A flex row, not an
-   inline-flex run beside the pill: an inline-flex container's children cannot
-   wrap their own text, so the reason alone (display:block inside it) held the
-   cell at its full one-line width. */
-.budget-app-root .acct-col-state {
-  white-space: normal;
-}
-.budget-app-root .acct-row-acts {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 6px;
-  margin: 6px 0 0;
-}
-.budget-app-root .acct-deck-btn.sm {
-  padding: 3px 10px;
-  font-size: 11.5px;
-}
-.budget-app-root .acct-deck-btn.sm .ico svg {
-  width: 0.7rem;
-  height: 0.7rem;
-}
-
-/* A row's inline actions are decoration on top of a row that is already a
-   click target (accountRow opens the drawer on click) — stop the click from
-   also toggling the drawer. Handled in JS via stopPropagation on each
-   button; this rule only keeps the buttons from visually merging into the
-   pill above them. */
-.budget-app-root .acct-pill + .acct-row-acts {
-  margin-left: 0;
-}
-/* The reason is the first item of the actions row and takes its whole line, so
-   the buttons start on the next one and the sentence wraps inside the cell. */
-.budget-app-root .acct-row-why { flex: 1 1 100%; margin: 0; font-size: 12px; color: var(--text-muted); white-space: normal; }
-
 /* ---- Accounts at a phone width -------------------------------------------
-   The 760px rule near the top of the Accounts section promises "a phone gets
-   the name, the balance and the state". The per-row actions broke that: the
-   state cell kept the pill, the reason and two or three buttons on ONE nowrap
-   line, so at 390px the table measured 827px inside a 380px scroller — the
-   pill cut to "doesn'" at the screen edge, Review / "Use R …" / Ignore at x
-   625-876, and the drawer under the row (colspan=8, so as wide as the table)
-   put Delete at x 739. Everything worked, behind a sideways swipe nobody is
-   told to make.
+   Under 600px a row of the list becomes a card: name and balance on the first
+   line, the notes chip beside them, the status word on the line below. The list
+   has no buttons now, so a card is short (the old state cell held a pill, a
+   sentence and up to three buttons and measured ~270px on a flagged row).
 
-   Under 760px the state cell wraps and the actions take a line of their own
-   under the pill and its reason. That alone fits the table from 760px down
-   to 500px (measured), and with the table the drawer, which is only ever as
-   wide as the table it spans. Declared after the base rules above on purpose:
-   these selectors tie them on specificity, so source order decides. */
-@media (max-width: 760px) {
-  .budget-app-root .acct-col-state { white-space: normal; }
-  .budget-app-root .acct-row-acts { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin: 6px 0 0; }
-  .budget-app-root .acct-pill + .acct-row-acts { margin-left: 0; }
-  .budget-app-root .acct-row-why { flex: 1 1 100%; margin: 0; }
-}
-/* A phone has room for fewer than four table columns. Two of them are money
-   that must not wrap — the balance, and the one-tap "Use R …" fix, whose
-   figure is grouped with ordinary spaces and would split mid-number —
-   so as a TABLE the row cannot get under ~400px however it wraps. The name
-   column's 210px floor (see #acctTable td:first-child above) is lifted here:
-   it exists so the name is not the only column left to squeeze, and with the
-   state cell wrapping it no longer is.
-
-   The layout that actually fits is a card per row — name and balance on the
-   first line, the state and its actions on the line below — which is a grid
-   on the <tr>. A grid row is no longer a row to VoiceOver, so Transactions
-   and Budget stamp explicit ARIA roles on their stacked tables (dom.js
-   tableCells), and this layout waits for the same: it is gated on
-   [role='table'] and applies the moment the Accounts view stamps them. Until
-   then the table keeps its table semantics, and the rules above at least put
-   every control within a short swipe of the screen. */
+   A grid row is no longer a row to VoiceOver, so Transactions and Budget stamp
+   explicit ARIA roles on their stacked tables (dom.js tableCells), and this
+   layout waits for the same: it is gated on [role='table'] and applies the
+   moment the Accounts view stamps them. Until then the table keeps its table
+   semantics. */
 @media (max-width: 600px) {
-  .budget-app-root .acct-col-state .acct-pill { white-space: normal; }
-  .budget-app-root #acctTable th:first-child,
-  .budget-app-root #acctTable td:first-child { min-width: 0; }
-
   .budget-app-root #acctTable[role='table'],
   .budget-app-root #acctTable[role='table'] > thead,
   .budget-app-root #acctTable[role='table'] > tbody { display: block; width: 100%; }
@@ -6156,23 +6004,22 @@ body.is-tablet .budget-app-root button:where(.fs-hide) { padding: 4px; }   /* fi
     align-items: center;
   }
   /* Placed by column position, as the stacked Transactions rows are: name,
-     balance and notes on the first line, the state cell spanning the second.
-     The three dropped columns keep their display:none from the 760px rule. */
+     balance and notes on the first line, the status spanning the second. */
   .budget-app-root #acctTable[role='table'] tr > :nth-child(1),
   .budget-app-root #acctTable[role='table'] tr > :nth-child(2),
-  .budget-app-root #acctTable[role='table'] tr > :nth-child(7),
-  .budget-app-root #acctTable[role='table'] tr > :nth-child(8) { display: block; min-width: 0; }
+  .budget-app-root #acctTable[role='table'] tr > :nth-child(3),
+  .budget-app-root #acctTable[role='table'] tr > :nth-child(4) { display: block; min-width: 0; }
   .budget-app-root #acctTable[role='table'] tr > :nth-child(1) { grid-column: 1; grid-row: 1; }
   .budget-app-root #acctTable[role='table'] tr > :nth-child(2) { grid-column: 2; grid-row: 1; }
-  .budget-app-root #acctTable[role='table'] tr > :nth-child(8) { grid-column: 3; grid-row: 1; width: auto; }
-  .budget-app-root #acctTable[role='table'] tr > :nth-child(7) { grid-column: 1 / -1; grid-row: 2; padding-top: 0; }
+  .budget-app-root #acctTable[role='table'] tr > :nth-child(4) { grid-column: 3; grid-row: 1; width: auto; }
+  .budget-app-root #acctTable[role='table'] tr > :nth-child(3) { grid-column: 1 / -1; grid-row: 2; padding-top: 0; }
   /* The header keeps its sort buttons — on this page they are the only sort
      control there is — and visually drops the State label, whose column is
      now the second line of every card. Clipped rather than display:none so
      the cells under it keep a column name. */
   .budget-app-root #acctTable[role='table'] thead tr { border-bottom: 1px solid var(--border-color); }
   .budget-app-root #acctTable[role='table'] thead th { border-bottom: 0; }
-  .budget-app-root #acctTable[role='table'] thead tr > :nth-child(7) {
+  .budget-app-root #acctTable[role='table'] thead tr > :nth-child(3) {
     position: absolute;
     width: 1px; height: 1px;
     padding: 0; margin: -1px;
@@ -6186,10 +6033,11 @@ body.is-tablet .budget-app-root button:where(.fs-hide) { padding: 4px; }   /* fi
   .budget-app-root #acctTable[role='table'] tr.acct-row { border-bottom: 1px solid var(--border-color); }
   .budget-app-root #acctTable[role='table'] tr.acct-row > td { border-bottom: 0; }
   .budget-app-root #acctTable[role='table'] tr.acct-row td:first-child { box-shadow: none; }
+  .budget-app-root #acctTable[role='table'] tr.acct-row.is-selected { box-shadow: inset 3px 0 0 var(--color-primary); }
   .budget-app-root #acctTable[role='table'] tr.acct-row.is-flag { box-shadow: inset 3px 0 0 var(--color-warning); }
   .budget-app-root #acctTable[role='table'] tr.acct-row.is-drift { box-shadow: inset 3px 0 0 var(--color-warning); }
-  /* Group bars, the empty state and the drawer span the card. Last, so it
-     outranks the nth-child(1) placement above at equal specificity. */
+  /* Group bars and the empty state span the card. Last, so it outranks the
+     nth-child(1) placement above at equal specificity. */
   .budget-app-root #acctTable[role='table'] td[colspan] { display: block; grid-column: 1 / -1; grid-row: auto; }
 }
 

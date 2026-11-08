@@ -723,8 +723,17 @@ const SHELL_HTML = `
           <div class="card-h">
             <div><h2 data-i18n="acct.table.title">All accounts</h2><div class="sub" id="acctTblSub"></div></div>
           </div>
-          <div class="body-pad body-pad-tight">
-            <div class="table-responsive"><table class="table" id="acctTable"></table></div>
+          <!-- The list and its inspector. #acctSplit is a one-column grid until
+               renderInspector adds .has-insp (it has a selection to show), and
+               a two-column one above 760px: the list takes what the 272px
+               inspector leaves. The aside is here, once, so its live region is
+               the same node across selections; renderAccounts fills it and
+               sets its accessible name from the language table. -->
+          <div class="acct-split" id="acctSplit">
+            <div class="body-pad body-pad-tight acct-list">
+              <div class="table-responsive"><table class="table" id="acctTable"></table></div>
+            </div>
+            <aside class="acct-insp is-empty" id="acctInspector" aria-live="polite" data-i18n-aria="acct.insp.aria" aria-label="Account detail"></aside>
           </div>
         </div>
       </section>

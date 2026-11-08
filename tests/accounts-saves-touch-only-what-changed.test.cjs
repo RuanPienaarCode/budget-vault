@@ -119,7 +119,11 @@ const tick = () => new Promise(r => setTimeout(r, 0));
       const { ctx, $, file } = await mount();
       ctx.renderAccounts();
       const before = file('Pocket Wallet');
-      const btn = descend($('#acctTable')).find(n => n.tagName === 'BUTTON'
+      /* Ignore is the inspector's now, so the reader selects the wallet first —
+         by clicking its row, the way a reader does. */
+      descend($('#acctTable')).find(n => n._cls && n._cls.has('acct-row')
+        && descend(n).some(c => c._cls && c._cls.has('acct-name-btn') && c.textContent === 'Pocket Wallet'))._fire('click');
+      const btn = descend($('#acctInspector')).find(n => n.tagName === 'BUTTON'
         && n.getAttribute('aria-label') === 'Ignore this warning on Pocket Wallet');
       ok(btn, 'fixture: a wallet with no folder offers Ignore');
       btn._fire('click'); await tick(); await tick();

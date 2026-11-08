@@ -195,7 +195,9 @@ const hasCls = (el, cls) => el.className.split(/\s+/).includes(cls);
     require('../src/views/accounts')(ctx);
     ctx.renderAccounts();
 
-    const pill = $('#acctTable').querySelectorAll('.acct-pill').find(p => hasCls(p, 'muted'));
+    /* The full pill is the inspector's (the list row carries a status word, not
+       a pill). Cash is the only account, so it is the default selection. */
+    const pill = $('#acctInspector').querySelectorAll('.acct-pill').find(p => hasCls(p, 'muted'));
     ok(pill, 'fixture sanity: the muted pill actually rendered');
     const btn = pill.querySelectorAll('.caveat-chip-btn')[0];
     ok(btn, 'the muted pill carries a real caveatChip button, not a bare title=');
