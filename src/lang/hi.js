@@ -1799,4 +1799,13 @@ module.exports = {
     one: '{count} ख़र्च बकेट · {pot} में से {placed} रखा गया',
     other: '{count} ख़र्च बकेट · {pot} में से {placed} रखा गया',
   },
+  /* Discovery Miles import (src/miles.js): the value-of-a-Mile setting and the review
+     screen's lines about it. Machine-assisted, not native-reviewed. */
+  'settings.milesRate.name': 'Discovery Mile का मूल्य',
+  'settings.milesRate.desc': 'Miles एक्सपोर्ट इम्पोर्ट करते समय एक Discovery Mile की आपकी मुद्रा में क़ीमत। हर Mile इसी एक दर से आँका जाता है — 0.10 का मतलब 10 Miles की क़ीमत 1 है — इसलिए खाते का बैलेंस हमेशा आपके Miles बैलेंस गुणा दर के बराबर रहता है। रिडेम्प्शन अपनी क़ीमत ख़ुद छापता है; वह पंक्ति के नोट में रखी जाती है, इस्तेमाल नहीं होती। 0 से ऊपर, अधिकतम 1।',
+  'settings.milesRate.invalid': 'बजट: "{value}" Miles का मान्य मूल्य नहीं है — एक Mile की क़ीमत लिखें, 0 से ऊपर और अधिकतम {max}। 0.10 का मतलब 10 Miles की क़ीमत 1 है।',
+  'settings.milesRate.validate': '0 से ऊपर और अधिकतम {max} का मान चुनें।',
+  'imp.miles.banner': 'Discovery Miles एक्सपोर्ट के रूप में पढ़ा गया। हर Mile {rate} पर दर्ज होता है (सेटिंग्स में तय), इसलिए {miles} Miles का मूल्य {value} बनता है। Miles की गिनती, छपी हुई रैंड क़ीमत (यदि कोई हो) और बैंक का अपना ब्योरा हर पंक्ति के नोट में रखे जाते हैं।',
+  'imp.miles.budgetWarn': '{account} आपके बजट में गिना जाता है, और Miles इनाम का बैलेंस हैं, बैंक में जमा पैसा नहीं — यहाँ वे आमदनी गिने जाएँगे। इसके बजाय बजट में न गिना जाने वाला खाता चुनें या बनाएँ।',
+  'imp.miles.newAccountName': 'Discovery Miles',
 };

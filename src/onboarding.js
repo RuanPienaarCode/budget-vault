@@ -1515,7 +1515,10 @@ class OnboardingWizard extends Modal {
              exist from this list, so a settable key left out of it is a key
              nobody finds — and this one only does anything once an account is
              earmarked, which is the half that needs saying out loud. */
-          `- **emergency_target_months** — months of essential spending your emergency fund aims to cover (default 6). Mark the account holding it with "Emergency fund" on the Accounts page.\n\n` +
+          `- **emergency_target_months** — months of essential spending your emergency fund aims to cover (default 6). Mark the account holding it with "Emergency fund" on the Accounts page.\n` +
+          /* Documented for the same reason, and just as unwritten: absent means 0.10, ten Miles to the
+             rand. Only a Discovery Miles import ever reads it. */
+          `- **miles_rate** — what one Discovery Mile is worth, in your currency, when a Miles export is imported (default 0.10, so 10 Miles = 1). Every Mile is valued at this one rate; the Miles count is kept in each row's Note.\n\n` +
           `Edit the values above directly, or change them in **Settings → Budget Vault** —\n` +
           `the plugin writes them back to this file, so they sync to every device with the vault.\n`);
         for (const cat of STARTER_CATEGORIES) {

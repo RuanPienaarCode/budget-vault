@@ -1700,4 +1700,13 @@ module.exports = {
   'plan.env.sub': {
     other: '支出バケット {count} 件 · {pot} のうち {placed} を割り当て済み',
   },
+  /* Discovery Miles import (src/miles.js): the value-of-a-Mile setting and the review
+     screen's lines about it. Machine-assisted, not native-reviewed. */
+  'settings.milesRate.name': 'Discovery Miles の価値',
+  'settings.milesRate.desc': 'Miles のエクスポートを取り込むときの、Discovery Mile 1 つあたりの価値（お使いの通貨）です。すべての Mile をこの 1 つのレートで評価します — 0.10 は 10 Miles が 1 に相当するという意味です — そのため、口座残高は常に Miles 残高 × レートに一致します。交換時には額面が印字されますが、それは使われず、行のメモに残されます。0 より大きく、最大 1。',
+  'settings.milesRate.invalid': '予算: 「{value}」は有効な Miles の価値ではありません — 1 Mile の価値を 0 より大きく {max} 以下で入力してください。0.10 は 10 Miles が 1 に相当するという意味です。',
+  'settings.milesRate.validate': '0 より大きく {max} 以下の値を選んでください。',
+  'imp.miles.banner': 'Discovery Miles のエクスポートとして読み込みました。各 Mile は {rate} で記録されます（設定で変更できます）。つまり {miles} Miles は {value} になります。Miles の数、印字されたランド額（あれば）、銀行の詳細は、各行のメモに残ります。',
+  'imp.miles.budgetWarn': '{account} は予算に含まれますが、Miles は銀行のお金ではなく特典の残高です — ここでは収入として数えられてしまいます。代わりに、予算に含まれない口座を選ぶか作成してください。',
+  'imp.miles.newAccountName': 'Discovery Miles',
 };

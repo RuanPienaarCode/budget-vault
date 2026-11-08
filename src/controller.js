@@ -474,7 +474,7 @@ function mountApp(view) {
      should not lose the reader's filter). */
   const S = {
     loaded: false,
-    settings: { month_start_day: 23, currency: 'R', country: 'za', language: 'en', input_mode: 'csv', period_days: 0, period_anchor: '', overspend_lag: 1, emergency_target_months: 6, owners: [], groups: [], nonessential_groups: [] },
+    settings: { month_start_day: 23, currency: 'R', country: 'za', language: 'en', input_mode: 'csv', period_days: 0, period_anchor: '', overspend_lag: 1, emergency_target_months: 6, miles_rate: 0.1, owners: [], groups: [], nonessential_groups: [] },
     categories: [],            // {name, type, color, assumeSpent, rel}
     accounts: [],              // account frontmatter + body
     budgets: {},               // 'YYYY-MM' -> [{category, type, amount, notes}]

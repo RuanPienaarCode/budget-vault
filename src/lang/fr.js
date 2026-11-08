@@ -1798,4 +1798,13 @@ module.exports = {
     one: '{count} enveloppe · {placed} réparti sur {pot}',
     other: '{count} enveloppes · {placed} répartis sur {pot}',
   },
+  /* Discovery Miles import (src/miles.js): the value-of-a-Mile setting and the review
+     screen's lines about it. Machine-assisted, not native-reviewed. */
+  'settings.milesRate.name': 'Valeur d’un Discovery Mile',
+  'settings.milesRate.desc': 'Ce que vaut un Discovery Mile, dans votre devise, lorsque vous importez un export Miles. Chaque Mile est valorisé à ce taux unique — 0.10 signifie que 10 Miles valent 1 — de sorte que le solde du compte égale toujours votre solde de Miles multiplié par le taux. Un échange imprime sa propre valeur ; elle est conservée dans la note de la ligne, pas utilisée. Supérieur à 0, au plus 1.',
+  'settings.milesRate.invalid': 'Budget : « {value} » n’est pas une valeur de Miles valide — saisissez ce que vaut un Mile, supérieure à 0 et au plus {max}. 0.10 signifie que 10 Miles valent 1.',
+  'settings.milesRate.validate': 'Choisissez une valeur supérieure à 0 et au plus {max}.',
+  'imp.miles.banner': 'Lu comme un export Discovery Miles. Chaque Mile est enregistré à {rate} (réglé dans les Paramètres), donc {miles} Miles valent {value}. Le nombre de Miles, la valeur en rands imprimée le cas échéant et le détail de la banque sont conservés dans la note de chaque ligne.',
+  'imp.miles.budgetWarn': '{account} compte dans votre budget, et les Miles sont un solde de récompenses, pas de l’argent en banque — ici ils seraient comptés comme un revenu. Choisissez ou créez plutôt un compte hors budget.',
+  'imp.miles.newAccountName': 'Discovery Miles',
 };

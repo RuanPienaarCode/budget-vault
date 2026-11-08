@@ -1786,4 +1786,13 @@ module.exports = {
     one: '{count} bolsa de gasto · {placed} asignado de {pot}',
     other: '{count} bolsas de gasto · {placed} asignado de {pot}',
   },
+  /* Discovery Miles import (src/miles.js): the value-of-a-Mile setting and the review
+     screen's lines about it. Machine-assisted, not native-reviewed. */
+  'settings.milesRate.name': 'Valor de una Discovery Mile',
+  'settings.milesRate.desc': 'Lo que vale una Discovery Mile, en tu moneda, cuando importas una exportación de Miles. Cada Mile se valora con esta única tasa — 0.10 significa que 10 Miles valen 1 —, así que el saldo de la cuenta siempre es tu saldo de Miles por la tasa. Un canje imprime su propio valor; ese se guarda en la nota de la fila, no se usa. Mayor que 0, como máximo 1.',
+  'settings.milesRate.invalid': 'Presupuesto: «{value}» no es un valor de Miles válido — escribe lo que vale una Mile, mayor que 0 y como máximo {max}. 0.10 significa que 10 Miles valen 1.',
+  'settings.milesRate.validate': 'Elige un valor mayor que 0 y como máximo {max}.',
+  'imp.miles.banner': 'Leído como una exportación de Discovery Miles. Cada Mile se registra a {rate} (se define en Ajustes), así que {miles} Miles suman {value}. El número de Miles, el valor impreso en rands si lo hay y el detalle del propio banco se guardan en la nota de cada fila.',
+  'imp.miles.budgetWarn': '{account} cuenta para tu presupuesto, y las Miles son un saldo de recompensas, no dinero en el banco — aquí se contarían como ingresos. Elige o crea una cuenta que no cuente para el presupuesto.',
+  'imp.miles.newAccountName': 'Discovery Miles',
 };

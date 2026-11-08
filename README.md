@@ -125,6 +125,8 @@ The plugin rewrites the whole table on save, so a file created through **New deb
 
 Any statement with Date / Description / Amount columns works. Discovery Bank, FNB, Capitec and Nedbank exports have been imported end to end, but nothing is hardcoded per bank — columns are matched by header, then by layout shape for headerless files, and you can map them by hand if neither resolves.
 
+A Discovery Bank **Miles** export (`DiscoveryBankMiles_….csv`, which has a Miles column and no amount) is read on its own path: every Mile is valued at one rate you set in Settings (default 0.10, so 10 Miles = R1), the exact Miles count and any value the bank printed for a redemption are kept in each row's Note, and the rows go to an account that is outside the budget, since the card spend that earned them is already in your bank account.
+
 Sign conventions are verified, not guessed: where a statement carries a running balance, the amounts are checked against it, so a bank that lists money out as a positive number can't quietly import every expense as income. If it can't be verified, the review screen says so.
 
 No supported bank? Build your own CSV with `Date`, `Title` and `Amount` columns — negative for money out.
