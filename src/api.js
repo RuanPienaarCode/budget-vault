@@ -128,7 +128,7 @@ const { localeFor } = require('./locale');
    holds the two together so this copy cannot drift from that one. */
 const DEFAULT_STATE_SETTINGS = {
   month_start_day: 23, currency: 'R', country: 'za', language: 'en', input_mode: 'csv',
-  period_days: 0, period_anchor: '', overspend_lag: 1, emergency_target_months: 6,
+  period_days: 0, period_anchor: '', overspend_lag: 1, emergency_target_months: 6, miles_rate: 0.1,
   owners: [], groups: [], nonessential_groups: [],
 };
 

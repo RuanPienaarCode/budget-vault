@@ -2718,9 +2718,18 @@ module.exports = function registerAccounts(ctx) {
      first guess. Validated rather than trusted — the same function is wired
      straight to click handlers elsewhere, and a MouseEvent's own `.type` is
      the string 'click', which would silently land in the select as a type no
-     group on this page renders. */
+     group on this page renders.
+
+     The import review passes four more for a Discovery Miles file — `name`,
+     `institution`, `account_number` and `budget: 'no'` — so the account it
+     offers to create is already a non-budget rewards account carrying the
+     number the file's name routed by. They are only ever starting values in
+     the form below, and each is taken only as a string (a MouseEvent has none
+     of them); `budget` is honoured only as the literal 'no', because the safe
+     default for every other caller is the account that counts. */
   async function addAccount(defaults) {
     const preType = defaults && ACCT_TYPES.includes(defaults.type) ? defaults.type : 'savings';
+    const pre = key => (defaults && typeof defaults[key] === 'string' ? defaults[key] : undefined);
     /* The create form offers only the two optional figures it always has, and
        now only when the kind being created has any use for them — a cash
        wallet is not asked for its savings goal or what was invested in it.
@@ -2729,9 +2738,9 @@ module.exports = function registerAccounts(ctx) {
        trade than a second click. */
     const opt = fieldsForType(preType, null);
     const r = await askFields(app, i18n.t('acct.new.title'), [
-      { key: 'name', label: i18n.t('acct.field.name'), type: 'text', placeholder: i18n.t('acct.new.namePlaceholder') },
+      { key: 'name', label: i18n.t('acct.field.name'), type: 'text', placeholder: i18n.t('acct.new.namePlaceholder'), value: pre('name') },
       { key: 'type', label: i18n.t('acct.field.type'), type: 'select', options: acctTypeOptions(), value: preType },
-      { key: 'institution', label: i18n.t('acct.field.institution'), type: 'text', placeholder: i18n.t('acct.new.institutionPlaceholder') },
+      { key: 'institution', label: i18n.t('acct.field.institution'), type: 'text', placeholder: i18n.t('acct.new.institutionPlaceholder'), value: pre('institution') },
       ...ownerField(defaults && defaults.owner),
       { key: 'balance', label: i18n.t('acct.field.balance'), type: 'number', value: '0' },
       ...currencyFields(null),
@@ -2741,7 +2750,7 @@ module.exports = function registerAccounts(ctx) {
       ...(opt.includes('total_invested')
         ? [{ key: 'total_invested', label: i18n.t('acct.field.investedOpt'), type: 'number',
           desc: i18n.t('acct.field.investedDesc') }] : []),
-      { key: 'budget', label: i18n.t('acct.field.counts'), type: 'select', value: 'yes',
+      { key: 'budget', label: i18n.t('acct.field.counts'), type: 'select', value: pre('budget') === 'no' ? 'no' : 'yes',
         options: [{ value: 'yes', label: i18n.t('acct.counts.yes') },
           { value: 'no', label: i18n.t('acct.counts.no') }],
         desc: i18n.t('acct.field.countsDesc') },
@@ -2793,7 +2802,7 @@ module.exports = function registerAccounts(ctx) {
       // '' when the form never asked — saveAccount's FM_WRITERS then writes no
       // owner line at all, which is what a one-person vault should produce.
       owner: (r.owner || '').trim(),
-      account_number: '', tx_label: '',
+      account_number: (pre('account_number') || '').trim(), tx_label: '',
       currency: (r.currency || '').trim(),
       currency_code: code,
       // Nothing muted on a fresh account: the warnings are how a new account

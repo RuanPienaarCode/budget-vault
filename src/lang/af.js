@@ -1784,4 +1784,13 @@ module.exports = {
     one: '{count} bestedingsbak · {placed} geplaas van {pot}',
     other: '{count} bestedingsbakke · {placed} geplaas van {pot}',
   },
+  /* Discovery Miles import (src/miles.js): the value-of-a-Mile setting and the review
+     screen's lines about it. Machine-assisted, not native-reviewed. */
+  'settings.milesRate.name': 'Waarde van ’n Discovery-Mile',
+  'settings.milesRate.desc': 'Wat een Discovery-Mile werd is, in jou geldeenheid, wanneer jy ’n Miles-uitvoer invoer. Elke Mile word teen hierdie een koers gewaardeer — 0.10 beteken 10 Miles is 1 werd — sodat die rekeningsaldo altyd jou Miles-saldo maal die koers is. ’n Inwisseling druk sy eie waarde, en dit word in die ry se nota bewaar eerder as gebruik. Bo 0, hoogstens 1.',
+  'settings.milesRate.invalid': 'Begroting: “{value}” is nie ’n geldige Miles-waarde nie — tik in wat een Mile werd is, bo 0 en hoogstens {max}. 0.10 beteken 10 Miles is 1 werd.',
+  'settings.milesRate.validate': 'Kies ’n waarde bo 0 en hoogstens {max}.',
+  'imp.miles.banner': 'Gelees as ’n Discovery Miles-uitvoer. Elke Mile word teen {rate} aangeteken (gestel onder Instellings), so {miles} Miles kom op {value} te staan. Die Miles-getal, enige gedrukte randwaarde en die bank se eie besonderhede word in elke ry se nota bewaar.',
+  'imp.miles.budgetWarn': '{account} tel by jou begroting, en Miles is ’n belonings-saldo eerder as geld in die bank — hier sou hulle as inkomste getel word. Kies of skep eerder ’n rekening wat nie by die begroting tel nie.',
+  'imp.miles.newAccountName': 'Discovery Miles',
 };

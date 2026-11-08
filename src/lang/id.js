@@ -1721,4 +1721,13 @@ module.exports = {
   'plan.env.sub': {
     other: '{count} kantong belanja · {placed} dialokasikan dari {pot}',
   },
+  /* Discovery Miles import (src/miles.js): the value-of-a-Mile setting and the review
+     screen's lines about it. Machine-assisted, not native-reviewed. */
+  'settings.milesRate.name': 'Nilai Discovery Mile',
+  'settings.milesRate.desc': 'Berapa nilai satu Discovery Mile, dalam mata uangmu, saat kamu mengimpor ekspor Miles. Setiap Mile dinilai dengan satu tarif ini — 0.10 berarti 10 Miles bernilai 1 — sehingga saldo akun selalu sama dengan saldo Miles kamu dikali tarif. Penukaran mencetak nilainya sendiri; nilai itu disimpan di catatan baris, bukan dipakai. Di atas 0, paling banyak 1.',
+  'settings.milesRate.invalid': 'Anggaran: "{value}" bukan nilai Miles yang valid — isi nilai satu Mile, di atas 0 dan paling banyak {max}. 0.10 berarti 10 Miles bernilai 1.',
+  'settings.milesRate.validate': 'Pilih nilai di atas 0 dan paling banyak {max}.',
+  'imp.miles.banner': 'Dibaca sebagai ekspor Discovery Miles. Setiap Mile dicatat pada {rate} (diatur di Pengaturan), jadi {miles} Miles menjadi {value}. Jumlah Miles, nilai rand yang tercetak (jika ada), dan keterangan dari bank disimpan di catatan setiap baris.',
+  'imp.miles.budgetWarn': '{account} dihitung dalam anggaranmu, dan Miles adalah saldo hadiah, bukan uang di bank — di sini Miles akan dihitung sebagai pemasukan. Pilih atau buat akun yang tidak dihitung dalam anggaran.',
+  'imp.miles.newAccountName': 'Discovery Miles',
 };

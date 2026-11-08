@@ -1988,5 +1988,13 @@ module.exports = {
   'ctl.toast.thatFile': 'that file',
   'settings.exchangeRates.source': 'Exchange-rate source',
   'settings.exchangeRates.sourceDesc': 'When switched on, rates come from open.er-api.com, a free service run by ExchangeRate-API (exchangerate-api.com). The only thing sent is the three-letter currency code in the address of the request; like any request over the internet, it also shows them your IP address.',
-
+  /* Discovery Miles import (src/miles.js): the value-of-a-Mile setting and the review
+     screen's lines about it. English is the source. */
+  'settings.milesRate.name': 'Discovery Miles value',
+  'settings.milesRate.desc': 'What one Discovery Mile is worth, in your currency, when you import a Miles export. Every Mile is valued at this one rate — 0.10 means 10 Miles are worth 1 — so the account balance always equals your Miles balance times the rate. A redemption prints its own value; that is kept in the row’s note, not used. Above 0, at most 1.',
+  'settings.milesRate.invalid': 'Budget: “{value}” is not a valid Miles value — enter what one Mile is worth, above 0 and at most {max}. 0.10 means 10 Miles are worth 1.',
+  'settings.milesRate.validate': 'Pick a value above 0 and at most {max}.',
+  'imp.miles.banner': 'Read as a Discovery Miles export. Each Mile is recorded at {rate} (set in Settings), so {miles} Miles come to {value}. The Miles count, any printed rand value and the bank’s own detail are kept in each row’s note.',
+  'imp.miles.budgetWarn': '{account} counts toward your budget, and Miles are a rewards balance rather than money in the bank — here they would be counted as income. Choose or create a non-budget account instead.',
+  'imp.miles.newAccountName': 'Discovery Miles',
 };

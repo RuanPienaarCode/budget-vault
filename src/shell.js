@@ -922,7 +922,7 @@ const SHELL_HTML = `
             <button type="button" class="upload-area" id="drop" aria-controls="fileInput">
               <span class="ico" data-ico="cloud-upload|upload-cloud"></span>
               <span class="ua-line">Drop a bank statement here, or click to choose a file.</span>
-              <span class="hint" id="importDropHint">Discovery filenames like <code>DiscoveryBank_10123456789_…​.csv</code> auto-select the account.</span>
+              <span class="hint" id="importDropHint">Discovery filenames like <code>DiscoveryBank_10123456789_…​.csv</code> auto-select the account. A Discovery Miles export (<code>DiscoveryBankMiles_….csv</code>) is read in rand at the value set under Settings, and goes to an account that is outside the budget.</span>
             </button>
             <!-- Tab- and semicolon-separated exports are read too (the delimiter
                  is sniffed from the file), and banks hand those out as .txt and

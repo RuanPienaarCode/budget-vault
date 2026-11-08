@@ -1785,4 +1785,13 @@ module.exports = {
     one: '{count} Ausgabentopf · {placed} von {pot} zugewiesen',
     other: '{count} Ausgabentöpfe · {placed} von {pot} zugewiesen',
   },
+  /* Discovery Miles import (src/miles.js): the value-of-a-Mile setting and the review
+     screen's lines about it. Machine-assisted, not native-reviewed. */
+  'settings.milesRate.name': 'Wert einer Discovery Mile',
+  'settings.milesRate.desc': 'Was eine Discovery Mile in deiner Währung wert ist, wenn du einen Miles-Export importierst. Jede Mile wird mit diesem einen Satz bewertet — 0.10 bedeutet, 10 Miles sind 1 wert —, sodass der Kontostand immer deinem Miles-Stand mal dem Satz entspricht. Eine Einlösung druckt ihren eigenen Wert; der wird in der Notiz der Zeile aufbewahrt, nicht verwendet. Über 0, höchstens 1.',
+  'settings.milesRate.invalid': 'Budget: „{value}“ ist kein gültiger Miles-Wert — gib ein, was eine Mile wert ist, über 0 und höchstens {max}. 0.10 bedeutet, 10 Miles sind 1 wert.',
+  'settings.milesRate.validate': 'Wähle einen Wert über 0 und höchstens {max}.',
+  'imp.miles.banner': 'Als Discovery-Miles-Export gelesen. Jede Mile wird mit {rate} erfasst (in den Einstellungen festgelegt), also ergeben {miles} Miles {value}. Der Miles-Stand, ein etwaiger gedruckter Rand-Wert und die eigenen Angaben der Bank stehen in der Notiz jeder Zeile.',
+  'imp.miles.budgetWarn': '{account} zählt zu deinem Budget, und Miles sind ein Prämienguthaben, kein Geld auf der Bank — hier würden sie als Einnahmen gezählt. Wähle stattdessen ein Konto, das nicht zum Budget zählt, oder lege eines an.',
+  'imp.miles.newAccountName': 'Discovery Miles',
 };

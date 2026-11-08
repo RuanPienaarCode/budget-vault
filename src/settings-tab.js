@@ -21,6 +21,7 @@ const { NON_ESSENTIAL_TYPES } = require('./health-math');
 const { normalizeCode, normalizeCadence } = require('./fx');
 const { ISO_DATE, isoDayNumber, isRealIsoDate, todayIso } = require('./dates');
 const { firstStepsOn } = require('./first-steps');
+const { milesRate, MILES_RATE_MAX, MILES_RATE_DEFAULT } = require('./miles');
 
 /* Date-SHAPED, used only to recognise budget filenames. An anchor the user
    types or a file stores must be a real calendar date, so those go through
@@ -49,7 +50,7 @@ const CADENCE_OPTIONS = () => ({
   monthly: i18n.t('settings.rateRefresh.monthly'),
 });
 
-const MD_KEYS = new Set(['household', 'owners', 'month_start_day', 'country', 'language', 'currency', 'currency_code', 'exchange_rates', 'rate_refresh', 'input_mode', 'period_days', 'period_anchor', 'overspend_lag', 'emergency_target_months', 'groups', 'nonessential_groups']);
+const MD_KEYS = new Set(['household', 'owners', 'month_start_day', 'country', 'language', 'currency', 'currency_code', 'exchange_rates', 'rate_refresh', 'input_mode', 'period_days', 'period_anchor', 'overspend_lag', 'emergency_target_months', 'miles_rate', 'groups', 'nonessential_groups']);
 
 /* Shared by display() and getSettingDefinitions(), same as OWNERS_DESC below.
    It has to say what the setting HIDES as well as what it stores: choosing
@@ -430,6 +431,30 @@ class BudgetSettingTab extends PluginSettingTab {
       });
 
     new Setting(containerEl)
+      .setName(i18n.t('settings.milesRate.name'))
+      .setDesc(i18n.t('settings.milesRate.desc'))
+      .addText(t => {
+        t.inputEl.type = 'number';
+        t.inputEl.step = '0.01';
+        t.setValue(String(milesRate(md.miles_rate)));
+        t.onChange(v => {
+          clearTimeout(this._milesTimer);
+          this._milesTimer = setTimeout(async () => {
+            const n = Number(String(v).trim().replace(',', '.'));
+            // Say so, like the three above — and refuse rather than clamp: a
+            // "10" typed to mean "10 Miles to the rand" must not become a rate
+            // of R1 a Mile that nobody typed.
+            if (!Number.isFinite(n) || n <= 0 || n > MILES_RATE_MAX) {
+              new Notice(i18n.t('settings.milesRate.invalid', { value: v, max: MILES_RATE_MAX }), 6000);
+              return;
+            }
+            await this.plugin.updateBudgetSettingsMd('miles_rate', String(n));
+            this.plugin.reloadViews();
+          }, 800);
+        });
+      });
+
+    new Setting(containerEl)
       .setName(i18n.t('settings.periodLength.name'))
       .setDesc(periodLengthDesc(md))
       .addDropdown(d => {
@@ -742,6 +767,9 @@ class BudgetSettingTab extends PluginSettingTab {
     if (key === 'overspend_lag') return overspendLag(md.overspend_lag);
     // Clamped on the way out for the same reason as overspend_lag above.
     if (key === 'emergency_target_months') return emergencyTarget(md.emergency_target_months);
+    // Through milesRate(), like the two above: the control shows the rate the
+    // importer will run, not what a hand-edited file happens to say.
+    if (key === 'miles_rate') return milesRate(md.miles_rate);
     // Dropdown values are strings; the banded number keeps the control honest
     // about what the app is running rather than what the file happens to say.
     if (key === 'period_days') return String(periodDaysOrZero(md.period_days));
@@ -841,6 +869,7 @@ class BudgetSettingTab extends PluginSettingTab {
       : key === 'month_start_day' ? String(parseInt(value, 10))
       : key === 'overspend_lag' ? String(overspendLag(value))
       : key === 'emergency_target_months' ? String(emergencyTarget(value))
+      : key === 'miles_rate' ? String(milesRate(value))
       : key === 'period_days' ? String(periodDaysOrZero(value))
       : key === 'period_anchor' ? String(value).trim()
       : key === 'country' ? String(value)
@@ -1038,6 +1067,17 @@ class BudgetSettingTab extends PluginSettingTab {
           validate: v => {
             const n = parseInt(v, 10);
             return n >= 1 && n <= EMERGENCY_TARGET_MAX ? undefined : `Pick a number of months between 1 and ${EMERGENCY_TARGET_MAX}.`;
+          },
+        },
+      },
+      {
+        name: i18n.t('settings.milesRate.name'),
+        desc: i18n.t('settings.milesRate.desc'),
+        control: {
+          type: 'number', key: 'miles_rate', defaultValue: MILES_RATE_DEFAULT, min: 0.01, max: MILES_RATE_MAX,
+          validate: v => {
+            const n = Number(String(v).trim().replace(',', '.'));
+            return Number.isFinite(n) && n > 0 && n <= MILES_RATE_MAX ? undefined : i18n.t('settings.milesRate.validate', { max: MILES_RATE_MAX });
           },
         },
       },

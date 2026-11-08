@@ -1700,4 +1700,13 @@ module.exports = {
   'plan.env.sub': {
     other: '{count} 个支出信封 · 已分配 {placed}，共 {pot}',
   },
+  /* Discovery Miles import (src/miles.js): the value-of-a-Mile setting and the review
+     screen's lines about it. Machine-assisted, not native-reviewed. */
+  'settings.milesRate.name': 'Discovery 里程的价值',
+  'settings.milesRate.desc': '导入 Miles 导出文件时，一个 Discovery 里程（Mile）按你的货币折算的价值。每一个 Mile 都按这同一个比率估值 — 0.10 表示 10 Miles 值 1 — 因此账户余额始终等于你的 Miles 余额乘以该比率。兑换会印出它自己的价值，这个价值保存在该行的备注里，不参与计算。必须大于 0，最大为 1。',
+  'settings.milesRate.invalid': '预算：“{value}”不是有效的 Miles 价值 — 请输入一个 Mile 的价值，需大于 0 且不超过 {max}。0.10 表示 10 Miles 值 1。',
+  'settings.milesRate.validate': '请选择大于 0 且不超过 {max} 的值。',
+  'imp.miles.banner': '已按 Discovery Miles 导出文件读取。每个 Mile 按 {rate} 记录（可在设置中更改），所以 {miles} Miles 合计 {value}。Miles 数量、印出的兰特金额（如有）以及银行自己的明细，都保存在每一行的备注里。',
+  'imp.miles.budgetWarn': '{account} 计入你的预算，而 Miles 是奖励余额，不是银行里的钱 — 在这里它们会被算作收入。请改选或新建一个不计入预算的账户。',
+  'imp.miles.newAccountName': 'Discovery Miles',
 };

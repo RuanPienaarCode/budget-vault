@@ -1812,4 +1812,13 @@ module.exports = {
     one: 'Ibhakede lokuchitha eli-{count} · {placed} kubekwe kwa-{pot}',
     other: 'Amabhakede okuchitha angu-{count} · {placed} kubekwe kwa-{pot}',
   },
+  /* Discovery Miles import (src/miles.js): the value-of-a-Mile setting and the review
+     screen's lines about it. Machine-assisted, not native-reviewed. */
+  'settings.milesRate.name': 'Inani le-Discovery Mile',
+  'settings.milesRate.desc': 'Ukuthi i-Discovery Mile eyodwa ibiza malini, ngemali yakho, uma ungenisa ifayela le-Miles. I-Mile ngayinye ibalwa ngenani elilodwa — 0.10 kusho ukuthi ama-Miles angu-10 abiza u-1 — ngakho ibhalansi ye-akhawunti ihlala ilingana nebhalansi yakho ye-Miles eyandiswe ngenani. Ukuhlawulwa ngama-Miles kuphrinta inani lakho; leli ligcinwa enothini lomugqa, alisetshenziswa. Ngaphezu kuka-0, ubuningi buka-1.',
+  'settings.milesRate.invalid': 'Isabelomali: "{value}" akulona inani le-Miles elivumelekile — thayipha ukuthi i-Mile eyodwa ibiza malini, ngaphezu kuka-0 futhi kungadluli ku-{max}. 0.10 kusho ukuthi ama-Miles angu-10 abiza u-1.',
+  'settings.milesRate.validate': 'Khetha inani elingaphezu kuka-0 futhi elingadluli ku-{max}.',
+  'imp.miles.banner': 'Ifundwe njengefayela le-Discovery Miles. I-Mile ngayinye iqoshwa ku-{rate} (ngokubekwe Kumasethingi), ngakho ama-Miles angu-{miles} aba ngu-{value}. Inani lama-Miles, inani eliphrintiwe ngama-rand (uma likhona) nemininingwane yebhange kugcinwa enothini lomugqa ngamunye.',
+  'imp.miles.budgetWarn': '{account} ibalwa esabelomalini sakho, futhi ama-Miles ayibhalansi yemiklomelo, hhayi imali ebhange — lapha azobalwa njengemali engenayo. Khetha noma wenze i-akhawunti engabalwa esabelomalini esikhundleni.',
+  'imp.miles.newAccountName': 'Discovery Miles',
 };

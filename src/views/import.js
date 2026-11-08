@@ -26,6 +26,8 @@ const { confirmModal } = require('../modal');
 const { isCreditCard } = require('../committed');
 const { symbolOf, isForeign } = require('../currency');
 const { todayIso, isoDayNumber } = require('../dates');
+const { decimalText } = require('../locale');
+const { detectMilesExport, milesRows, milesRate, milesFilenameNumber } = require('../miles');
 
 /* ISSUE 62 — see the call site. Decides which way round the day and month go
    in a file's dates and returns { dayFirst, assumed }.
@@ -114,14 +116,31 @@ module.exports = function registerImport(ctx) {
     const idx = typeof ctx.accountIndex === 'function' ? ctx.accountIndex() : new Map();
     return acct => (idx.get(acct) || {}).rows || [];
   }
-  function detectAccountLabel(filename, rows) {
+  /* `nonBudgetOnly` is for a Discovery Miles file and nothing else. Its filename
+     (`DiscoveryBankMiles_<n>_…`) matches the very pattern the other Discovery
+     exports route by, and nothing says <n> differs from the cheque account's
+     number — if it is the same, routing by number alone would send a rewards
+     balance into the account the budget counts, and every Mile would arrive as
+     income. So a Miles file is only ever auto-routed to an account that has
+     opted out of the budget (ADR-0007); otherwise it is left unrouted and the
+     review asks, exactly as it does for any file it cannot place.
+
+     The converse holds too, and is why `find` became a preference: once a Miles
+     account carries that same number, an ordinary Discovery bank statement
+     matches TWO accounts, and the old first-match-wins answer depended on which
+     sorted first. A bank statement now prefers the account that counts toward
+     the budget; it falls back to whichever matches only when none does, so a
+     household whose one account with that number is a deliberate non-budget one
+     still routes to it. */
+  function detectAccountLabel(filename, rows, { nonBudgetOnly = false } = {}) {
     // Discovery-style "Label_12345_..." or a bare account number ("12345678901.csv",
     // "12345678901 (3).csv" — FNB names exports after the account alone). The bare
     // form needs 6+ digits so a leading year ("2026-07 export.csv") never matches.
     const m = filename.match(/^[A-Za-z][A-Za-z0-9]*_(\d{4,})(?:_|\.)/) ||
               filename.match(/^(\d{6,})\D/);
     const byNumber = n => {
-      const acc = S.accounts.find(a => a.account_number === n);
+      const hits = S.accounts.filter(a => a.account_number === n);
+      const acc = nonBudgetOnly ? hits.find(a => !a.in_budget) : (hits.find(a => a.in_budget) || hits[0]);
       return acc ? (acc.tx_label || acc.name) : '';
     };
     if (m) { const l = byNumber(m[1]); if (l) return l; }
@@ -169,6 +188,17 @@ module.exports = function registerImport(ctx) {
     const rows = parseStatement(text);
     if (!rows.length) return toast('Empty statement file', true);
     const loc = locale();
+    /* A Discovery Miles export is asked about FIRST. It has no amount column, so
+       its header is not read as a statement header — and the headerless SHAPE
+       detector then takes the Miles column as the Amount and "Additional
+       information" as the description, without opening the mapper: one rand a
+       Mile, under a review screen that looks routine (measured on the real file:
+       R667,502 of earned "income"). See src/miles.js. */
+    const milesMap = detectMilesExport(rows, file.name);
+    if (milesMap) {
+      try { await runMilesImport(rows, milesMap, file); } finally { importProgress('done'); }
+      return;
+    }
     const map = detectStatementColumns(rows, loc.dayFirst);
     // Nothing resolved — but the file is readable, so ask instead of refusing.
     // This is what makes a bank nobody has tested importable at all.
@@ -432,6 +462,45 @@ module.exports = function registerImport(ctx) {
     importShown = IMPORT_PAGE;   // a fresh file starts at the first page
     renderImportReview();
     if (showBar) importProgress('done');
+  }
+
+  /* A Discovery Miles export, put on the same review screen as any statement.
+
+     Everything that makes it different is decided in src/miles.js (what a row is
+     worth, what goes in the Note, which rows are skipped); this only supplies
+     the household's rate and the vault's state, and builds the one object the
+     review, the commit and the undo already understand. Deliberately NOT a
+     parallel path: dedupe, the account select, the identity gate, the commit
+     and Undo are all the ordinary ones, and a Miles row is an ordinary item
+     that happens to carry a `note`.
+
+     Left out on purpose, each for the reason the ordinary path has it:
+       - no sign verdict / reconcile banner: there is no balance column to prove
+         anything against, and the sign is not a convention here — the file says
+         earned or redeemed in the Miles figure itself;
+       - no date-reading verdict: the export is ISO dates, so nothing is ambiguous;
+       - no `acctNumber`: the number in the FILENAME is a routing hint, not the
+         file's own claim about itself, and acctIdentity must not BLOCK an import
+         on a guess read off a name the reader may have changed.
+
+     `miles` on the pending import is what marks it as one, and what the review
+     reads to say so. */
+  async function runMilesImport(rows, map, file) {
+    const rate = milesRate((S.settings || {}).miles_rate);
+    const { items, skipped, zero, tooSmall, miles } = milesRows(rows, map, { rate });
+    let range = null;
+    for (const it of items) {
+      if (!range) range = { min: it.date, max: it.date };
+      else { if (it.date < range.min) range.min = it.date; if (it.date > range.max) range.max = it.date; }
+    }
+    S.pendingImport = { items, label: detectAccountLabel(file.name, rows, { nonBudgetOnly: true }),
+      index: dedupIndex(), range, skipped, noted: zero + tooSmall, filename: file.name,
+      acctNumber: '', reconcile: null, dateReading: null, iBalance: -1, iAmount: -1,
+      miles: { rate, total: miles, zero, tooSmall, number: milesFilenameNumber(file.name) },
+      rows, map, file };
+    $('#importMap').classList.add('hidden');
+    importShown = IMPORT_PAGE;
+    renderImportReview();
   }
 
   /* ------------------------- is this the right account? --------------------
@@ -739,7 +808,14 @@ module.exports = function registerImport(ctx) {
        function re-runs on every account switch and every "show more", and a
        listener added each time would open one dialog per render. */
     $('#impNewAccount').onclick = async () => {
-      const acct = await ctx.addAccount({ type: 'checking' });
+      /* A Miles file's account is offered as what it is: a rewards balance that
+         sits outside the budget, named and numbered from the file, so the
+         reader confirms rather than composes it. The reader still sees the whole
+         create form and can change any of it — these are defaults. */
+      const acct = await ctx.addAccount(p.miles
+        ? { type: 'other', budget: 'no', name: i18n.t('imp.miles.newAccountName'), institution: 'Discovery',
+          account_number: p.miles.number }
+        : { type: 'checking' });
       if (!acct) return;                       // cancelled or rejected — leave the review alone
       // The folder transactions live under, which is what p.label means — not
       // the account's display name. Same resolution the select's options use.
@@ -796,6 +872,12 @@ module.exports = function registerImport(ctx) {
     const rec = p.reconcile;
     /* ISSUE 62. Say which way the dates were read when the file overruled the
        household profile — the parsed ISO date on screen hides the decision. */
+    /* Hidden again when this file has no date verdict. Nothing else ever hid it,
+       so the sentence about the PREVIOUS statement's dates stayed on screen over
+       a file it said nothing about — noticed with a Miles export dropped after a
+       month-first statement, whose dates are ISO and were never in question. */
+    const dateNote = $('#impDateReading');
+    if (!p.dateReading && dateNote) dateNote.classList.add('hidden');
     if (p.dateReading) {
       const noteEl = $('#impDateReading');
       if (noteEl) {
@@ -844,6 +926,32 @@ module.exports = function registerImport(ctx) {
     nbEl.classList.toggle('hidden', !nonBudget);
     if (nonBudget) nbEl.textContent =
       `${target.name} is excluded from the budget — these rows will import and show in Transactions, but won’t count toward income or spending totals.`;
+
+    /* A Discovery Miles file says what it was read as, at what rate, and what it
+       comes to — the review is where the rate is a claim the reader can check
+       before it is written — and ARGUES when the account it is bound for counts
+       toward the budget: Miles are a rewards balance, not money in a bank, and
+       landing in a budget account they would be income (the card spend that
+       earned them is already in that account's own rows). Said, not corrected:
+       the pick is the reader's, and the one-tap alternative is the account
+       button beside it. Reuses the reconcile line, which a Miles file has no use
+       for (no balance column), rather than adding a second banner slot. */
+    if (p.miles) {
+      const loc = locale();
+      const total = p.items.reduce((n, it) => n + it.miles, 0);
+      const value = p.items.reduce((n, it) => n + it.amount, 0);
+      const places = Math.abs(p.miles.rate * 100 - Math.round(p.miles.rate * 100)) < 1e-9 ? 2 : 4;
+      recEl.classList.remove('hidden', 'imp-reconcile-warn');
+      recEl.textContent = i18n.t('imp.miles.banner', {
+        miles: typeof ctx.moneyIn === 'function' ? ctx.moneyIn('', total, 0).trim() : String(total),
+        rate: decimalText(p.miles.rate, places, loc),
+        value: previewMoney(value),
+      });
+      if (target && target.in_budget) {
+        recEl.classList.add('imp-reconcile-warn');
+        recEl.textContent += ' ' + i18n.t('imp.miles.budgetWarn', { account: target.name });
+      }
+    }
 
     /* The account-identity verdict, said on the review screen and enforced
        again at commit. Both, deliberately: the banner is what lets the reader
@@ -898,6 +1006,10 @@ module.exports = function registerImport(ctx) {
         el('td', {}, it.desc, ...(it.near ? [
           el('span', { class: 'category-badge badge-near', title: nearWhy }, 'likely dup'),
           el('div', { class: 'imp-near-why' }, nearWhy),
+        ] : []), ...(p.miles && it.note ? [
+          // The facts the rand figure was derived from, where the reader can see
+          // them before they are written — the same text the Note column gets.
+          el('div', { class: 'text-muted', style: 'font-size:0.8em' }, it.note),
         ] : []), ...(it.pending && !it.near ? [
           el('span', { class: 'category-badge badge-near', title: pendingWhy }, 'pending'),
           el('div', { class: 'imp-near-why' }, pendingWhy),
@@ -1029,7 +1141,12 @@ module.exports = function registerImport(ctx) {
       const key = `${label}/${month}`;
       if (!additions.has(key)) additions.set(key, { month, entries: [] });
       additions.get(key).entries.push({
-        row: { date: it.date, desc: it.desc, cat: it.cat, amount: it.amount, excluded: it.excluded, note: it.excluded ? 'Excluded during import' : '' },
+        /* A Miles row carries its facts in `note` (src/miles.js). The reader's
+           own Excluded tick is appended AFTER them, so the Miles count stays the
+           first thing in the cell for parseMilesNote. */
+        row: { date: it.date, desc: it.desc, cat: it.cat, amount: it.amount, excluded: it.excluded,
+          note: it.note ? (it.excluded ? `${it.note} \u00b7 Excluded during import` : it.note)
+            : it.excluded ? 'Excluded during import' : '' },
         src: it,
       });
     }

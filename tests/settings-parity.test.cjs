@@ -73,7 +73,7 @@ const mdKeys = new Set(
    inventory of what syncs with the vault rather than with the device. */
 eq([...mdKeys].sort(),
   ['country', 'currency', 'currency_code', 'emergency_target_months', 'exchange_rates',
-    'groups', 'household', 'input_mode', 'language', 'month_start_day',
+    'groups', 'household', 'input_mode', 'language', 'miles_rate', 'month_start_day',
     'nonessential_groups', 'overspend_lag', 'owners', 'period_anchor', 'period_days',
     'rate_refresh'],
   'MD_KEYS holds every Settings.md key');

@@ -475,6 +475,23 @@ const FEE_COLS = ['fee', 'fees', 'fee amount', 'bank charge', 'bank charges', 's
 const BALANCE_COLS = ['balance', 'running balance', 'closing balance', 'account balance', 'balance (zar)',
   'saldo', 'kontostand', 'solde', 'sisa saldo', '余额', '残高', 'शेष', 'शेष राशि'];
 
+/* Does this (lowercased) header row name ANY money column — a signed amount, a
+   debit/credit pair, or the amount vocabulary as a substring?
+
+   Exported for src/miles.js, which recognises a Discovery Miles export partly by
+   the ABSENCE of one. It reads the same vocabulary, and by the same exact-then-
+   substring rule, that detectStatementColumns resolves the amount with, so the
+   two cannot disagree about whether a header names a money column. Miles is
+   asked first (views/import.js), so were it to keep its own, shorter word list a
+   file with a real amount column the statement reader would have used could be
+   diverted onto the Miles path and have its printed amounts replaced by a rate.
+   The fee column is deliberately not asked about — it is only ever an extra
+   beside a real amount. */
+function hasAmountColumn(low) {
+  return (low || []).some(c => AMOUNT_COLS.includes(c) || c.includes('amount')
+    || DEBIT_COLS.some(n => c.includes(n)) || CREDIT_COLS.some(n => c.includes(n)));
+}
+
 /* Decide which column is which: by header name where the file has one, by the
    shape of the rows where it doesn't. Returns a column map, or null when the
    file resolves to neither — null means "ask the user", never "give up", and
@@ -687,6 +704,6 @@ function sameAccountNumber(a, b) {
 module.exports = {
   parseStatement, decodeStatement, parseStatementDate,
   counterpartyAccount, applyCounterparties, oppositeLeg, TRANSFER_LEG_DAYS, reconcileAmounts,
-  detectHeaderlessColumns, detectStatementColumns,
+  detectHeaderlessColumns, detectStatementColumns, hasAmountColumn,
   statementAccountNumber, sameAccountNumber,
 };

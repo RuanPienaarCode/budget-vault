@@ -65,6 +65,17 @@ An account whose every transaction sits outside income and spend totals. The
 per-account counterpart to an excluded transaction.
 _Avoid_: off-budget, untracked, external
 
+**Discovery Miles**:
+The Discovery Bank rewards balance, imported from its own Miles export and kept
+in rand at ONE household-chosen rate (`miles_rate`, default R0.10 a Mile) in a
+non-budget account. One rate for every row, not each redemption's printed rand
+value: the same Miles are earned at about ten to the rand and redeemed at about
+seven, so booking the printed values would drive the balance negative while the
+Miles balance is positive. The exact Miles count, any printed value and the
+bank's own detail stay in each row's Note, so the rate is a claim that can be
+set against what was realised, never a figure the file is made to agree with.
+_Avoid_: points, rewards money, loyalty balance
+
 **Set-aside**:
 Money that left a budget account under a savings- or investment-typed category
 in a period. Counted inside gross spend, and named separately so the one

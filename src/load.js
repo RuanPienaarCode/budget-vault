@@ -3,6 +3,7 @@
 
 const { TFile } = require('obsidian');
 const { TYPE_ORDER, overspendLag, emergencyTarget, inputMode } = require('./constants');
+const { milesRate } = require('./miles');
 const { periodDaysOrZero } = require('./dates');
 const { parseNum, normalizeAmount } = require('./amount');
 const { normalizeCode, normalizeCadence, currencyConflict } = require('./fx');
@@ -250,6 +251,11 @@ module.exports = function registerLoad(ctx) {
       /* ADR-0007 · emergency_target_months is assigned unconditionally. The clamp lives in
          constants.js beside the settings tab's. */
       S.settings.emergency_target_months = emergencyTarget(fm.emergency_target_months);
+      /* The value of one Discovery Mile, in the household's currency, for the Miles
+         importer (src/miles.js). Assigned unconditionally like the two above, and
+         through the one definition, so a blank, zero or unreadable hand-edit
+         reads as the default 10 Miles to the rand rather than as nothing. */
+      S.settings.miles_rate = milesRate(fm.miles_rate);
     }
     S.categories = [];
     for (const { file, text } of await read(mdFilesUnder('Categories'))) {

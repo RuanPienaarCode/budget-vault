@@ -1807,4 +1807,13 @@ module.exports = {
     one: 'Ibhakethe yokuchitha e-{count} · {placed} ibekiwe kwi-{pot}',
     other: 'Iibhakethe zokuchitha ezi-{count} · {placed} ibekiwe kwi-{pot}',
   },
+  /* Discovery Miles import (src/miles.js): the value-of-a-Mile setting and the review
+     screen's lines about it. Machine-assisted, not native-reviewed. */
+  'settings.milesRate.name': 'Ixabiso le-Discovery Mile',
+  'settings.milesRate.desc': 'Ukuba i-Discovery Mile enye ixabisa malini, kwimali yakho, xa ungenisa ifayile ye-Miles. I-Mile nganye ixatyiswa ngexabiso elinye elo — 0.10 kuthetha ukuba ii-Miles ezili-10 zixabisa 1 — ngoko ibhalansi yeakhawunti ihlala ilingana nebhalansi yakho ye-Miles iphindaphindwe ngelo xabiso. Into ethunyelwe ngokutshintshiselana ngee-Miles iprinta ixabiso layo; eli ligcinwa kwinqaku lomqolo, alisetyenziswa. Ngaphezulu kwe-0, ubuninzi be-1.',
+  'settings.milesRate.invalid': 'Ibhajethi: "{value}" ayilo xabiso lifanelekileyo le-Miles — chwetheza ixabiso le-Mile enye, ngaphezulu kwe-0 kwaye ubuninzi be-{max}. 0.10 kuthetha ukuba ii-Miles ezili-10 zixabisa 1.',
+  'settings.milesRate.validate': 'Khetha ixabiso elingaphezulu kwe-0 kwaye ubuninzi be-{max}.',
+  'imp.miles.banner': 'Ifundwe njengefayile ye-Discovery Miles. I-Mile nganye ibhalwa ku-{rate} (ibekwe kwiSeto), ngoko ii-Miles ezi-{miles} ziyi-{value}. Inani le-Miles, ixabiso elinyathelisiweyo ngeerandi (ukuba likho) neenkcukacha zebhanki zigcinwa kwinqaku lomqolo ngamnye.',
+  'imp.miles.budgetWarn': '{account} ibalwa kwibhajethi yakho, kwaye ii-Miles yibhalansi yamabhaso, ayiyondawo yemali ebhankini — apha ziya kubalwa njengengeniso. Khetha okanye wenze iakhawunti engabalwa kwibhajethi endaweni yoko.',
+  'imp.miles.newAccountName': 'Discovery Miles',
 };
