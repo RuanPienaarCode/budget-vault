@@ -51,10 +51,18 @@
 .budget-app-root #acctTable th:first-child,
 .budget-app-root #acctTable td:first-child { min-width: 150px; }
 
-/* The status takes its own width and wraps inside it: "nothing imported" is two
-   short lines, which is what lets the name keep a readable width on a 760px
-   pane. Top-aligned dot, so the dot sits beside the first line of the word. */
-.budget-app-root #acctTable td.acct-col-state { width: 1%; min-width: 96px; max-width: 120px; }
+/* The status has a FLOOR as well as a cap. It first shipped with only the cap
+   (96-120px) and width: 1%, which shrinks a cell to its longest single word: in
+   the preview harness "no folder linked" stacked into three lines and made five
+   of the seven sample rows twice as tall as their names, the opposite of the
+   quiet single-line list this page is. 140px holds every English status on one
+   line ("nothing imported", "never confirmed", "date unreadable" are ~100px of
+   text beside the dot); the 184px cap is the bound css-desktop-table-reach
+   holds, so a long translation (Xhosa's "akukho folda idityanisiweyo", 27
+   characters, ~170px) wraps to two lines rather than widening the table past a
+   760px pane. Not nowrap, for that same reason. Top-aligned dot, so it sits
+   beside the first line when a word does wrap. */
+.budget-app-root #acctTable td.acct-col-state { width: 1%; min-width: 140px; max-width: 184px; }
 .budget-app-root .acct-st {
   display: inline-flex; align-items: flex-start; gap: 6px;
   font-size: 12.5px; line-height: 1.35; color: var(--text-muted);
@@ -157,8 +165,12 @@
    Written at (0,3,0) so they out-rank Obsidian's `.is-tablet button:not(...)`
    padding (0,2,1) on an iPad without needing a padding twin in styles.css. */
 .budget-app-root .acct-insp-acts { display: flex; flex-direction: column; gap: 6px; margin-top: 12px; }
-.budget-app-root .acct-insp-acts-2 { display: flex; gap: 6px; }
-.budget-app-root .acct-insp-acts-2 .acct-insp-btn { flex: 1 1 0; min-width: 0; }
+/* Sized by their words, not split 50/50: "See transactions" beside "Ignore" in
+   a 272px inspector wrapped onto two lines inside an equal half while Ignore
+   sat in a half it did not need. Wrapping the ROW instead keeps every label on
+   one line when a translation is longer than the English. */
+.budget-app-root .acct-insp-acts-2 { display: flex; flex-wrap: wrap; gap: 6px; }
+.budget-app-root .acct-insp-acts-2 .acct-insp-btn { flex: 1 1 auto; width: auto; white-space: nowrap; }
 .budget-app-root .acct-insp .acct-insp-btn {
   display: inline-flex; align-items: center; justify-content: center; gap: 6px;
   width: 100%; min-height: 36px; box-sizing: border-box; padding: 6px 14px;

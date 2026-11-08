@@ -91,8 +91,20 @@ const want = (sel, prop, ctx, test, why) => {
    audit turned on — that no cell holds a line the table cannot narrow — is still
    the property, and it is held by the numbers the new rules carry. */
 {
-  const d = want(`${R} #acctTable td.acct-col-state`, 'max-width', [], v => px(v) > 0 && px(v) <= 120,
-    'cap the status column: "nothing imported" wraps to two short lines, which is what leaves the name a readable width on a 760px pane');
+  /* Bounded on both sides. The cap is the reach property: a status may wrap,
+     so it can never be the cell that widens the table past the pane (the
+     longest translation, Xhosa's 27-character nofolder label, wraps to two
+     lines under it). The floor is the row-height property: the first cut had
+     only a 120px cap, and width: 1% shrank the cell to its longest WORD, so
+     "no folder linked" stood three lines tall on five of seven sample rows. */
+  const d = want(`${R} #acctTable td.acct-col-state`, 'max-width', [], v => px(v) > 0 && px(v) <= 184,
+    'cap the status column so a long translated status wraps instead of widening the table past a 760px pane');
+  want(`${R} #acctTable td.acct-col-state`, 'min-width', [], v => px(v) >= 136 && px(v) <= 160,
+    'floor the status column so every English status ("nothing imported", "no folder linked") sits on one line instead of one word per line');
+  const ws = decl(`${R} #acctTable td.acct-col-state`, 'white-space', []);
+  const wsInner = decl(`${R} .acct-st`, 'white-space', []);
+  ok(!(ws && ws.value === 'nowrap') && !(wsInner && wsInner.value === 'nowrap'),
+    `the status column is never nowrap: an unwrappable cell is exactly what pushed the old table to 453px of State; found ${ws ? ws.value : wsInner ? wsInner.value : 'none'}`);
   const f = decl(`${R} #acctTable th:first-child`, 'min-width', []);
   ok(f && px(f.value) <= 160, `the name column's floor is at most 160px, so it cannot be the column that forces a scroll (found "${f && f.value}")`);
   void d;
