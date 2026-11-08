@@ -3,6 +3,42 @@
 All notable changes to Budget Vault. Versions match the plugin version in
 `manifest.json` and the release tag exactly (no `v` prefix).
 
+## 1.59.0 — 2026-11-08
+
+The Accounts page becomes a quiet list with one inspector beside it, and a
+Discovery Miles export now imports in rand at one rate instead of a Mile per
+rand.
+
+### Changed
+
+- **Accounts: a quiet list and an inspector.** The eight-column table is
+  gone. Each account is one line (name, balance, this period's movement and
+  a status word), with no buttons. The account you pick opens in an
+  inspector beside the list, which shows the disagreement worked out line
+  by line (stated on a date, the transactions since, what they imply today)
+  and holds Confirm, See transactions and Ignore, plus everything the old
+  drawer under the row used to show. With nothing picked, it opens the
+  first account that wants a look. On a phone the inspector sits below the
+  list as a sheet. Flagged rows used to grow to about 270px on a 760px pane
+  with their buttons clipped; every row is now a single line. Column
+  resizing went with the old columns.
+
+### Added
+
+- **Discovery Miles exports.** A Miles export has no amount column, and it
+  used to import every Mile as one rand. It is now recognised and read at
+  one fixed rate (R0.10 a Mile by default, `miles_rate` in Settings.md), so
+  the balance equals your Miles times the rate. The exact Miles count and
+  the bank's own detail go in the row's Note. It only routes to an account
+  that doesn't count toward the budget, and the import review says what the
+  file was read as and what it comes to.
+
+### Fixed
+
+- A bank statement now prefers the budget account when two accounts share
+  an account number.
+- The import date reading no longer stays on screen over the next file.
+
 ## 1.58.0 — 2026-11-05
 
 Setup talks back and ends with a door shutting on your new vault, the
