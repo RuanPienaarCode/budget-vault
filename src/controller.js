@@ -16,7 +16,7 @@ const i18n = require('./i18n');
 const { PALETTE_PRESETS, DEFAULT_PALETTE } = require('./constants');
 
 const books = require('./books');
-const { renderBookSwitcher, pickBook } = require('./book-switcher');
+const { renderBookSwitchers, pickBook } = require('./book-switcher');
 const registerIo = require('./io');
 const registerFxLive = require('./fx-live');
 const registerPeriod = require('./period');
@@ -904,16 +904,25 @@ function mountApp(view) {
      promises no budget content is in the DOM before the tap, and a book's
      label is usually a client's name; connectVault only runs after the tap, so
      the first real draw is after it. The sequence number drops a slow answer
-     (the home book's name is a file read) that a newer call has overtaken. */
+     (the home book's name is a file read) that a newer call has overtaken.
+
+     Two copies — the top bar's, and the drawer's that replaces it on a phone
+     (see src/book-switcher.js) — always drawn together from one model. The
+     ids are spelled out rather than built from a list so that
+     tests/shell-contract.test.cjs, which follows every literal id query in
+     src/, holds both of them to the shell. */
   let booksSeq = 0;
+  const bookSwitchers = () => [
+    [$('#bookSwitch'), $('#bookSelect')],
+    [$('#drawerBookSwitch'), $('#drawerBookSelect')],
+  ].filter(([wrap, select]) => wrap && select);
   async function applyBooks() {
     const seq = ++booksSeq;
-    const wrap = $('#bookSwitch');
-    const select = $('#bookSelect');
-    if (!wrap || !select) return;
+    const pairs = bookSwitchers();
+    if (!pairs.length) return;
     const s = plugin.settings || {};
     if (typeof plugin.activeFolder !== 'function' || (s.privacyLock && !plugin.budgetUnlocked)) {
-      return renderBookSwitcher(wrap, select, null);
+      return renderBookSwitchers(pairs, null);
     }
     const home = plugin.allBookFolders()[0];
     /* Only asked when the home book is not named by the list: a listed label
@@ -921,7 +930,7 @@ function mountApp(view) {
     const homeListed = books.bookFolders(s.books).includes(books.normalizeFolder(home));
     const homeName = homeListed || typeof plugin.homeBookName !== 'function' ? '' : await plugin.homeBookName();
     if (seq !== booksSeq) return;
-    renderBookSwitcher(wrap, select, books.bookChoices({
+    renderBookSwitchers(pairs, books.bookChoices({
       books: s.books,
       homeFolder: home,
       homeName,
@@ -1219,16 +1228,23 @@ function mountApp(view) {
   $('#prevPeriod').addEventListener('click', () => changePeriod(ctx.shiftPeriod(S.period, -1)));
   $('#nextPeriod').addEventListener('click', () => changePeriod(ctx.shiftPeriod(S.period, 1)));
   $('#currentPeriod').addEventListener('click', () => changePeriod(ctx.currentPeriod()));
-  /* A refusal is said by pickBook; either way the select is redrawn from the
-     plugin, so after a refusal it goes back to the book that is still open
-     rather than showing the one that was asked for. */
-  $('#bookSelect').addEventListener('change', async e => {
-    await pickBook(plugin, e.target.value, {
+  /* A refusal is said by pickBook; either way BOTH copies are redrawn from the
+     plugin, so after a refusal the one that was used goes back to the book that
+     is still open rather than showing the one that was asked for, and after a
+     switch the other copy follows. A switch made from the drawer closes it, as
+     a drawer link does: the reader asked for another book, and the drawer
+     staying over it would hide the answer. A refusal leaves it open, beside
+     the notice saying why. */
+  const onBookPicked = async e => {
+    const r = await pickBook(plugin, e.target.value, {
       notify: msg => new Notice(msg, 7000),
       t: i18n.t,
     });
+    if (r.ok && e.target.id === 'drawerBookSelect') closeDrawer();
     applyBooks().catch(() => {});
-  });
+  };
+  $('#bookSelect').addEventListener('change', onBookPicked);
+  $('#drawerBookSelect').addEventListener('change', onBookPicked);
   $('#menuBtn').addEventListener('click', () => $('#appDrawer').classList.contains('open') ? closeDrawer() : openDrawer());
   $('#drawerClose').addEventListener('click', closeDrawer);
   $('#drawerOverlay').addEventListener('click', closeDrawer);

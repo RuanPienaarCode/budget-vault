@@ -318,4 +318,41 @@ eq(shellSaveIds.filter(id => !registeredSave.has(id)), [],
     'the old claim is gone — the Accounts page button only exists on an account with no transactions');
 }
 
+/* ---- 9. the book switcher has a drawer copy, and it is the same control ----
+   On a phone the top bar's switcher squeezed the period label to ~0px at
+   375px, so at 600px and under (and on any .is-phone body) the stylesheet
+   hides it and shows a second copy as the drawer's first row
+   (tests/phone-375.test.cjs section 15 holds the arithmetic). That is only a
+   fix if the drawer copy is really there, really first, and really the same
+   control: shipped hidden (single-book mode never paints it, even for the
+   frame before the first render), named by the same i18n keys, drawn by the
+   same applyBooks call and changed through the same handler. Its behaviour —
+   hidden with one book, updated with the top bar one after a switch, a
+   relabel and the privacy splash — is driven against the fake DOM in
+   tests/books-switch.test.cjs section 3; this section holds the markup and
+   the wiring to it. */
+{
+  const drawer = /<nav class="app-drawer" id="appDrawer"[\s\S]*?<\/nav>/.exec(shell);
+  ok(drawer, 'shell.js still has the app drawer nav');
+  const d = drawer ? drawer[0] : '';
+  const at = d.indexOf('id="drawerBookSwitch"');
+  ok(at !== -1, 'the drawer carries the book switcher\'s phone copy, #drawerBookSwitch');
+  ok(at !== -1 && at < d.indexOf('class="drawer-link"') && at > d.indexOf('id="drawerClose"'),
+    '… as its first row: after the drawer head, before the first link');
+  ok(/<div class="drawer-book hidden" id="drawerBookSwitch">/.test(d), '… shipped hidden');
+  ok(/<select id="drawerBookSelect"/.test(d), '… around a native select, #drawerBookSelect');
+  const attrs = id => (new RegExp(`<select id="${id}"([^>]*)>`).exec(shell) || [, ''])[1];
+  eq(attrs('drawerBookSelect'), attrs('bookSelect'), 'the two selects carry identical accessible names and titles (topbar.book, topbar.bookTitle) — one control, two places');
+  const topbar = /<header class="topbar"[\s\S]*?<\/header>/.exec(shell);
+  ok(topbar && /id="bookSwitch"/.test(topbar[0]) && !/id="drawerBookSwitch"/.test(topbar[0]),
+    'the top bar keeps its own copy, #bookSwitch, for windows wider than a phone');
+  ok(/const onBookPicked = async e =>/.test(controller)
+    && /\$\('#bookSelect'\)\.addEventListener\('change', onBookPicked\)/.test(controller)
+    && /\$\('#drawerBookSelect'\)\.addEventListener\('change', onBookPicked\)/.test(controller),
+    'both selects change book through one handler (pickBook, then applyBooks redraws both)');
+  const apply = /async function applyBooks\(\) \{[\s\S]*?\n  \}/.exec(controller);
+  ok(apply && /bookSwitchers\(\)/.test(apply[0]) && /\$\('#drawerBookSwitch'\), \$\('#drawerBookSelect'\)/.test(controller),
+    'applyBooks — which main.js refreshBookSwitchers() calls after a settings write — draws the drawer copy with the top bar one');
+}
+
 console.log(`PASS — shell id contract + ctx namespace + DOMParser safety intact (${checks} checks, ${shellIds.size} ids, ${provided.size} ctx keys, ${shellSaveIds.length} save buttons).`);

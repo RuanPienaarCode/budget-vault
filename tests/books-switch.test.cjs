@@ -16,6 +16,8 @@
      3. the control: a single-book vault renders no visible switcher and no
         options; two books render both, the open one selected; a refusal is
         said, in the reader's language, and the select is not left lying;
+        the drawer copy (the phone's switcher) is drawn from the same model
+        as the top bar one and never disagrees with it;
      4. switchBook through the plugin:
           - ok: writes the per-device key (and ONLY that: no data.json write,
             budgetFolder untouched), reloads every open view, and tells the
@@ -151,6 +153,50 @@ const LIST = [{ folder: ACME, label: 'Acme' }, { folder: ZETA, label: 'Zeta' }];
     renderBookSwitcher(two.wrap, two.select, null);
     ok(two.wrap.classList.contains('hidden'), 'no model (privacy splash up) → hidden');
 
+    /* The two copies — the top bar's and the drawer's that replaces it on a
+       phone (tests/phone-375.test.cjs section 15 holds why) — drawn from ONE
+       model by one call, so they can never show different books, different
+       open books, or one visible and one not. Each wrapper is built with the
+       class list the shell actually ships, read out of src/shell.js, so a
+       copy that stopped shipping hidden would fail here too. */
+    {
+      const { renderBookSwitchers } = require('../src/book-switcher');
+      const shellSrc = require('fs').readFileSync(require('path').join(__dirname, '..', 'src', 'shell.js'), 'utf8');
+      const shipped = id => { const m = new RegExp(`<(?:label|div) class="([^"]*)" id="${id}">`).exec(shellSrc); return m ? m[1] : null; };
+      const copy = id => {
+        const wrap = document.createElement('div'); wrap.className = shipped(id) || '';
+        return { wrap, select: document.createElement('select') };
+      };
+      const top = copy('bookSwitch'), drawer = copy('drawerBookSwitch');
+      ok(top.wrap.classList.contains('hidden') && drawer.wrap.classList.contains('hidden'), 'both copies ship hidden (src/shell.js), so the first frame paints neither');
+      const pairs = [[top.wrap, top.select], [drawer.wrap, drawer.select]];
+      const same = () => top.select.options.map(o => `${o.attrs.value}=${o.textContent}`).join('|') === drawer.select.options.map(o => `${o.attrs.value}=${o.textContent}`).join('|')
+        && top.select.value === drawer.select.value
+        && top.wrap.classList.contains('hidden') === drawer.wrap.classList.contains('hidden');
+
+      renderBookSwitchers(pairs, bookChoices({ books: [], homeFolder: B, openFolder: B }));
+      ok(top.wrap.classList.contains('hidden') && drawer.wrap.classList.contains('hidden'), 'single-book vault: the drawer copy stays hidden with the top bar one');
+      eq(drawer.select.options.length, 0, '… and is just as empty');
+
+      renderBookSwitchers(pairs, bookChoices({ books: LIST, homeFolder: B, homeName: 'The Smiths', openFolder: B }));
+      ok(!drawer.wrap.classList.contains('hidden') && same(), 'books added: both copies show, with the same list and the same open book');
+      eq(drawer.select.value, B, '… the home book, as opened');
+
+      /* A switch from either copy ends in applyBooks redrawing both: the copy
+         that was NOT used follows. */
+      renderBookSwitchers(pairs, bookChoices({ books: LIST, homeFolder: B, homeName: 'The Smiths', openFolder: ZETA }));
+      ok(same() && top.select.value === ZETA, 'after a switch both copies say Zeta is open');
+
+      /* refreshBookSwitchers → applyBooks after a settings write: a relabel
+         reaches both. */
+      renderBookSwitchers(pairs, bookChoices({ books: [{ folder: ACME, label: 'Acme Holdings' }, LIST[1]], homeFolder: B, homeName: 'The Smiths', openFolder: ZETA }));
+      ok(same() && drawer.select.options.some(o => o.textContent === 'Acme Holdings'), 'a relabel in settings reaches the drawer copy as well as the top bar one');
+
+      renderBookSwitchers(pairs, null);
+      ok(same() && drawer.wrap.classList.contains('hidden') && drawer.select.options.length === 0,
+        'privacy splash up: both copies hidden and emptied — a client\'s name is in neither');
+    }
+
     /* pickBook: every refusal is said, in words, and ok is silent. */
     const said = [];
     const deps = { notify: m => said.push(m), t: i18n.t };
@@ -194,8 +240,20 @@ const LIST = [{ folder: ACME, label: 'Acme' }, { folder: ZETA, label: 'Zeta' }];
     const ctl = fs.readFileSync(path.join(__dirname, '..', 'src', 'controller.js'), 'utf8');
     ok(/<label class="book-switch hidden" id="bookSwitch">/.test(shell), 'the shell ships #bookSwitch with the hidden class');
     ok(/<select id="bookSelect"/.test(shell), '… wrapping a native <select id="bookSelect">');
-    ok(/\$\('#bookSelect'\)\.addEventListener\('change'[\s\S]{0,200}pickBook\(plugin, e\.target\.value/.test(ctl),
-      'a change of the select goes through pickBook, which says every refusal');
+    ok(/<div class="drawer-book hidden" id="drawerBookSwitch">/.test(shell), 'the shell ships the drawer copy #drawerBookSwitch with the hidden class');
+    ok(/<select id="drawerBookSelect"/.test(shell), '… wrapping its own native <select id="drawerBookSelect">');
+    {
+      const handler = /const onBookPicked = async e => \{([\s\S]*?)\n  \};/.exec(ctl);
+      ok(handler && /pickBook\(plugin, e\.target\.value/.test(handler[1]) && /applyBooks\(\)/.test(handler[1]),
+        'a change of either select goes through pickBook, which says every refusal, then redraws both copies');
+      ok(/\$\('#bookSelect'\)\.addEventListener\('change', onBookPicked\)/.test(ctl) && /\$\('#drawerBookSelect'\)\.addEventListener\('change', onBookPicked\)/.test(ctl),
+        '… and BOTH selects are wired to it, so the drawer copy is not a picker that does nothing');
+      const apply = /async function applyBooks\(\) \{[\s\S]*?\n  \}/.exec(ctl);
+      ok(apply && (apply[0].match(/renderBookSwitchers\(pairs, /g) || []).length === 2 && !/renderBookSwitcher\(/.test(apply[0]),
+        'applyBooks draws every copy through renderBookSwitchers, both when locked (null) and with a model — never one copy alone');
+      ok(/\[\$\('#bookSwitch'\), \$\('#bookSelect'\)\],\s*\[\$\('#drawerBookSwitch'\), \$\('#drawerBookSelect'\)\]/.test(ctl),
+        'the copies applyBooks draws are the top bar\'s and the drawer\'s');
+    }
     ok(/async function connectVault\(\) \{\s*applyBooks\(\)/.test(ctl), 'connectVault redraws the switcher, so every switch and reload ends in a fresh list');
     ok(/applyBooks,\s*\};/.test(ctl), 'the controller exposes applyBooks, which main.js refreshBookSwitchers() calls on a settings write');
 
