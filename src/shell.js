@@ -41,6 +41,25 @@ const SHELL_HTML = `
       <button type="button" class="drawer-close" aria-label="Close menu" data-i18n-aria="nav.close" id="drawerClose"><span class="ico" data-ico="x"></span></button>
     </div>
 
+    <!-- The book switcher's PHONE copy (ADR 0009). On a phone the top bar is
+         menu, period pill and avatar, and a switcher beside them left the
+         period label about 0px at 375px wide, so there the topbar copy is
+         hidden and this one, a full-width first row with room for a client's
+         whole name, is shown instead; on a wider window it is the other way
+         round. Both are filled from ONE bookChoices model by
+         renderBookSwitchers (src/book-switcher.js) and both change book
+         through pickBook, so they cannot disagree. Ships hidden, like the
+         topbar copy, so a single-book vault never paints it. -->
+    <div class="drawer-book hidden" id="drawerBookSwitch">
+      <div class="drawer-section-label" data-i18n="settings.books.name">Books</div>
+      <label class="book-switch book-switch-drawer">
+        <span class="ico book-switch-ico" data-ico="book-open|library|book" aria-hidden="true"></span>
+        <select id="drawerBookSelect" aria-label="Switch book" data-i18n-aria="topbar.book" title="Switch to another book" data-i18n-title="topbar.bookTitle"></select>
+        <span class="ico book-switch-chev" data-ico="chevron-down" aria-hidden="true"></span>
+      </label>
+      <div class="drawer-divider"></div>
+    </div>
+
     <div class="drawer-section-label" data-i18n="nav.section.budget">Budget</div>
     <button class="drawer-link" data-view="dashboard" aria-current="page">
       <span class="di"><span class="ico" data-ico="layout-dashboard"></span></span><span data-i18n="nav.dashboard">Dashboard</span>
@@ -135,8 +154,9 @@ const SHELL_HTML = `
 
     <div class="ml-auto">
       <label class="book-switch hidden" id="bookSwitch">
-        <span class="ico" data-ico="book-open|library|book" aria-hidden="true"></span>
+        <span class="ico book-switch-ico" data-ico="book-open|library|book" aria-hidden="true"></span>
         <select id="bookSelect" aria-label="Switch book" data-i18n-aria="topbar.book" title="Switch to another book" data-i18n-title="topbar.bookTitle"></select>
+        <span class="ico book-switch-chev" data-ico="chevron-down" aria-hidden="true"></span>
       </label>
       <button type="button" class="topbar-icon-btn hidden" id="topbarImport" aria-label="Import CSV" data-i18n-aria="topbar.import" title="Import a bank statement CSV" data-i18n-title="topbar.importTitle">
         <span class="ico" data-ico="import|file-input|cloud-upload|upload-cloud"></span>

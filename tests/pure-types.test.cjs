@@ -70,7 +70,7 @@ const HOST_SIDE = new Map([
   ['budget-export-modal.js', "an Obsidian modal — require('obsidian')"],
   ['receipt-modal.js',       "an Obsidian modal — require('obsidian')"],
   ['dom.js',                 'DOM helpers'],
-  ['book-switcher.js',       'fills the top bar\'s book <select> through dom.js; the rule it renders is books.js'],
+  ['book-switcher.js',       'fills the book <select>s (top bar, and drawer on a phone) through dom.js; the rule it renders is books.js'],
   ['book-settings.js',       "Settings → Books' two modals — require('obsidian'); the rules they apply are books.js"],
   ['chart.js',               'draws SVG into the DOM'],
   ['dash-motion.js',         "the Dashboard's arrival motion — document and window"],
