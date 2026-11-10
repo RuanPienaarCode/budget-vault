@@ -374,9 +374,182 @@ function bookChoices({ books, homeFolder, homeName, openFolder, homeFallback } =
   return { visible: items.length > 1, items, active: items.find(it => it.active) || null };
 }
 
+/* ---- changing the list (ADR 0009 §5, issue #168) -------------------------
+
+   Settings → Books adds, relabels and removes entries; the setup wizard adds
+   one at the end of its add-a-book mode. All three rules are here, pure, and
+   return a NEW list rather than editing the one they were handed — main.js
+   assigns the result and saves, and puts the old list back if the save throws,
+   which a list edited in place could not do.
+
+   validateNewBook({ books, homeFolder, folder, configDir }) → null | problem
+
+   May `folder` become a book? null when it may, else { reason, folder? }:
+
+     'empty'      nothing typed.
+     'root'       the vault root. A book there would CONTAIN every other book,
+                  and the wizard's create path would scaffold Categories/ and
+                  Transactions/ beside the reader's own notes.
+     'traversal'  a segment made only of dots ("..", "..."). Refused, never
+                  rebased, for the reason io.js destinationProblem gives: a
+                  folder quietly moved somewhere other than where it was typed
+                  is the silent correction this app does not make.
+     'hidden'     a dot-segment, or Obsidian's config folder. Obsidian indexes
+                  nothing under a dot-folder (vault-path.js hiddenSegment), so
+                  a book there is a folder the wizard can write and the app can
+                  never read back. `folder` names the offending segment.
+     'duplicate'  already a book — the home book or a listed one.
+     'nested'     inside another book's folder.
+     'contains'   another book's folder is inside this one.
+
+   The last three are the one rule the issue states: TWO BOOKS MUST NEVER SHARE
+   FILES. A client book at "Budget/Acme" inside a home book at "Budget" would
+   not, today, collide file-for-file — the loader reads Categories/ and
+   Transactions/ by name — but every recursive reader that will ever be written
+   (a search, an export of "everything under the book", a vault-wide rename)
+   would then see two books at once, and a remove followed by a delete of "the
+   old folder" would take the other book's files with it. So overlap is refused
+   outright, the home book included, and `folder` names the book it collides
+   with so the sentence can say which.
+
+   A home book AT THE VAULT ROOT therefore refuses every addition as 'nested'.
+   That is the rule working, not a corner case: such a vault already keeps its
+   budget among everything else, and there is no folder another book could
+   have that the home book does not contain.
+
+   Overlap is compared CASE-FOLDED, where resolveOpenBook deliberately is not.
+   The two errors run in opposite directions. Opening a book, folding could
+   open a folder the list never named, so exact is the safe side. Refusing an
+   overlap, "clients/acme" beside a listed "Clients/Acme" is ONE folder on
+   APFS, iOS and Windows — the filesystems most readers have — so folding is
+   the safe side: it refuses a pair that would have shared every file. */
+const { hiddenSegment } = require('./vault-path');
+const foldFolder = f => normalizeFolder(f).toLowerCase();
+/** @param {{ books?: any, homeFolder?: string, folder?: any, configDir?: string }} [args] */
+function validateNewBook({ books, homeFolder, folder, configDir } = {}) {
+  if (typeof folder !== 'string' || !folder.trim()) return { reason: 'empty' };
+  const want = normalizeFolder(folder);
+  if (!want) return { reason: 'root' };
+  if (want.split('/').some(s => /^\.+$/.test(s.trim()))) return { reason: 'traversal' };
+  const hidden = hiddenSegment(want);
+  if (hidden) return { reason: 'hidden', folder: hidden.trim() };
+  const w = foldFolder(want);
+  const cfg = foldFolder(configDir || '');
+  if (cfg && (w === cfg || w.startsWith(cfg + '/'))) return { reason: 'hidden', folder: normalizeFolder(configDir) };
+  const existing = allBookFolders({ books, homeFolder });
+  /* Three passes rather than one, so the reason is the most specific one true
+     of the folder — the same folder listed twice is a duplicate, not
+     "inside" anything, whichever order the list happens to hold it in. */
+  for (const f of existing) if (foldFolder(f) === w) return { reason: 'duplicate', folder: f };
+  for (const f of existing) {
+    const g = foldFolder(f);
+    if (g === '' || w.startsWith(g + '/')) return { reason: 'nested', folder: f };
+  }
+  for (const f of existing) if (foldFolder(f).startsWith(w + '/')) return { reason: 'contains', folder: f };
+  return null;
+}
+
+/* A label as stored: trimmed, and the folder's last segment when blank. A
+   label is what the switcher prints; a blank one would print nothing. */
+function cleanLabel(label, folder) {
+  const l = typeof label === 'string' ? label.trim() : '';
+  return l || lastSegment(folder);
+}
+const isEntry = b => !!b && typeof b === 'object' && typeof b.folder === 'string';
+
+/* bookListAdd({ books, homeFolder, homeLabel, folder, label, configDir })
+     → { ok: true, books, folder, label } | { ok: false, reason, folder? }
+
+   Validates (validateNewBook — the caller cannot skip it by calling this),
+   then appends `{ folder, label }` with the folder in the one normalised form.
+
+   The FIRST add on a single-book vault seeds the list with the home book
+   ahead of the new one, labelled `homeLabel` (the household name its own
+   Settings.md carries — read by the caller, this module reads no files) or its
+   folder's last segment. Seeded because ADR 0009 has the home book be the
+   first entry of the list, and because the label the reader sees for it in
+   the switcher should then be one they can change in Settings → Books like
+   any other book's. A list that already has entries is appended to as it
+   stands — even one a hand-edit left without its home entry, which
+   bookChoices() already puts first; re-ordering somebody's list on an add is
+   not this function's to do. */
+/** @param {{ books?: any, homeFolder?: string, homeLabel?: string, folder?: any, label?: string, configDir?: string }} [args] */
+function bookListAdd({ books, homeFolder, homeLabel, folder, label, configDir } = {}) {
+  const problem = validateNewBook({ books, homeFolder, folder, configDir });
+  if (problem) return Object.assign({ ok: false }, problem);
+  const list = Array.isArray(books) ? books.slice() : [];
+  if (!bookFolders(list).length) {
+    const home = normalizeFolder(homeFolder);
+    list.unshift({ folder: home, label: cleanLabel(homeLabel, home) });
+  }
+  const f = normalizeFolder(folder);
+  const entry = { folder: f, label: cleanLabel(label, f) };
+  list.push(entry);
+  return { ok: true, books: list, folder: entry.folder, label: entry.label };
+}
+
+/* bookListRelabel({ books, homeFolder, folder, label })
+     → { ok: true, books } | { ok: false, reason: 'unknown' }
+
+   Label only — the folder is the book's identity, and the per-device open
+   book is stored BY folder, so changing it here would quietly close the book
+   on every device that had it open. The home book may be relabelled; if a
+   hand-edited list does not carry it, it is put back at the front, which is
+   where ADR 0009 says it lives. Relabelling needs a list: in single-book mode
+   there is no switcher for a label to appear in, and Settings → Books does not
+   offer it there. */
+/** @param {{ books?: any, homeFolder?: string, folder?: any, label?: string }} [args] */
+function bookListRelabel({ books, homeFolder, folder, label } = {}) {
+  if (typeof folder !== 'string' || !bookFolders(books).length) return { ok: false, reason: 'unknown' };
+  const want = normalizeFolder(folder);
+  let hit = false;
+  const list = books.map(b => {
+    if (!isEntry(b) || normalizeFolder(b.folder) !== want) return b;
+    hit = true;
+    return Object.assign({}, b, { label: cleanLabel(label, b.folder) });
+  });
+  if (!hit) {
+    if (want !== normalizeFolder(homeFolder)) return { ok: false, reason: 'unknown' };
+    list.unshift({ folder: want, label: cleanLabel(label, want) });
+  }
+  return { ok: true, books: list };
+}
+
+/* bookListRemove({ books, homeFolder, folder })
+     → { ok: true, books } | { ok: false, reason: 'home' | 'unknown' }
+
+   Forgets the entry. Never anything more: this is a list edit, and the folder
+   and every file in it stay exactly where they are (ADR 0009, "No moving or
+   merging books") — main.js's removeBook() calls no vault API at all, and
+   tests/books-settings.test.cjs greps that it does not.
+
+   The home book cannot be removed: it is settings.budgetFolder, the fallback
+   every device lands on, and it is changed with the folder setting instead.
+
+   REMOVING DOWN TO THE HOME BOOK COLLAPSES THE LIST TO []. With only the home
+   book left there is one choice, so the switcher is already hidden
+   (bookChoices: visible is "more than one book") — what a one-entry list would
+   add over an empty one is a `books` key in data.json and a label shown
+   nowhere. Empty is single-book mode, which ADR 0009 defines as byte-for-byte
+   1.59's behaviour, and persistableSettings() then drops the key, so a vault
+   that tried books and stopped goes back to writing exactly what it wrote
+   before. The cost is the home book's label, which the next first add seeds
+   again from the household name. */
+/** @param {{ books?: any, homeFolder?: string, folder?: any }} [args] */
+function bookListRemove({ books, homeFolder, folder } = {}) {
+  if (typeof folder !== 'string') return { ok: false, reason: 'unknown' };
+  const want = normalizeFolder(folder);
+  const home = normalizeFolder(homeFolder);
+  if (want === home) return { ok: false, reason: 'home' };
+  if (!bookFolders(books).includes(want)) return { ok: false, reason: 'unknown' };
+  const list = books.filter(b => !(isEntry(b) && normalizeFolder(b.folder) === want));
+  return { ok: true, books: bookFolders(list).some(f => f !== home) ? list : [] };
+}
+
 module.exports = {
   normalizeFolder, bookFolders, allBookFolders, resolveOpenBook, persistableSettings,
   OPEN_BOOK_KEY, readStoredBook, writeStoredBook,
   activeFolderOf, allBookFoldersOf,
   switchDecision, bookChoices,
+  validateNewBook, bookListAdd, bookListRelabel, bookListRemove,
 };

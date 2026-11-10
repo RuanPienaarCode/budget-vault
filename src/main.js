@@ -232,6 +232,99 @@ class BudgetPlugin extends Plugin {
     try { this.forEachView(ctl => { if (typeof ctl.applyBooks === 'function') ctl.applyBooks(); }); } catch (e) { /* cosmetic */ }
   }
 
+  /* ---- Changing the book list (ADR 0009 §5, issue #168) -------------------
+     Settings → Books and the setup wizard's add-a-book mode change the list
+     ONLY through these three, so the rules (src/books.js bookListAdd /
+     bookListRelabel / bookListRemove, pure and tested there) are applied once.
+     Each returns { ok: true, … } or { ok: false, reason } and never throws for
+     a refusal; a failed data.json write does throw, after the list in memory
+     has been put back the way it was — so a change that did not reach disk is
+     not left looking made, and the next unrelated save cannot quietly persist
+     it. None of them reads settings.budgetFolder: the home book is
+     allBookFolders()[0], the seam's own answer (tests/books-one-seam). The
+     switcher redraws itself from saveData(). */
+
+  /* May `folder` become a book? null, or { reason, folder? } — the pure rule
+     with this vault's list, home book and config folder filled in. The Add
+     dialog asks before it opens the wizard, and the wizard asks again before
+     it writes a single file, because the list can change by sync while the
+     wizard is open. */
+  bookProblem(folder) {
+    const s = this.settings || {};
+    return books.validateNewBook({
+      books: s.books,
+      homeFolder: this.allBookFolders()[0],
+      folder,
+      configDir: this.app && this.app.vault && this.app.vault.configDir,
+    });
+  }
+  /* Append a book. The first add on a single-book vault seeds the home book
+     ahead of it, named by the household its Settings.md carries. Does NOT
+     open it: the wizard switches to it afterwards through switchBook(), the
+     one path that refuses over unsaved edits. */
+  async addBook({ folder, label } = {}) {
+    const s = this.settings;
+    const homeLabel = books.bookFolders(s.books).length ? '' : await this.homeBookName();
+    const r = books.bookListAdd({
+      books: s.books,
+      homeFolder: this.allBookFolders()[0],
+      homeLabel,
+      folder,
+      label,
+      configDir: this.app && this.app.vault && this.app.vault.configDir,
+    });
+    if (!r.ok) return r;
+    await this.commitBooks(r.books);
+    return { ok: true, folder: r.folder, label: r.label };
+  }
+  async relabelBook(folder, label) {
+    const r = books.bookListRelabel({ books: this.settings.books, homeFolder: this.allBookFolders()[0], folder, label });
+    if (!r.ok) return r;
+    await this.commitBooks(r.books);
+    return { ok: true };
+  }
+  /* Forget a book — the entry only. No vault call of any kind is made here,
+     on purpose and under test: the folder, its Settings.md and every
+     transaction in it stay where they are, and adding it again later connects
+     to it as it stands.
+
+     REMOVING THE OPEN BOOK SWITCHES TO THE HOME BOOK FIRST, through
+     switchBook(), and is refused with switchBook's own reason if that is. The
+     order matters: the moment the entry leaves the list, activeFolder()
+     resolves to the home book, so a page with an unsaved row typed into the
+     removed book would save it into the home book's files. Switching first
+     means the dirty refusal happens while nothing has changed yet. switchBook
+     also forgets this device's stored choice (the home book is stored as
+     null) and reloads every view. */
+  async removeBook(folder) {
+    const s = this.settings;
+    const home = this.allBookFolders()[0];
+    const r = books.bookListRemove({ books: s.books, homeFolder: home, folder });
+    if (!r.ok) return r;
+    const want = books.normalizeFolder(folder);
+    if (books.normalizeFolder(this.activeFolder()) === want) {
+      const sw = await this.switchBook(home);
+      if (!sw.ok) return sw;
+    }
+    /* A device whose stored choice names this book while it shows the home
+       book anyway (the folder had gone missing) would keep a choice that
+       points at nothing. Harmless — it resolves to home — but forgotten here
+       so that re-adding the folder later does not reopen it unasked. */
+    if (books.normalizeFolder(books.readStoredBook(this.app, () => window.localStorage) || '') === want) this.setOpenBookLocal(null);
+    await this.commitBooks(r.books);
+    return { ok: true };
+  }
+  async commitBooks(list) {
+    const prev = this.settings.books;
+    this.settings.books = list;
+    try {
+      await this.saveSettings();
+    } catch (e) {
+      this.settings.books = prev;
+      throw e;
+    }
+  }
+
   async activateView() {
     const ws = this.app.workspace;
     const existing = ws.getLeavesOfType(VIEW_TYPE)[0];
@@ -268,8 +361,28 @@ class BudgetPlugin extends Plugin {
     const { fm } = parseFrontmatter(await this.app.vault.cachedRead(f));
     return fm;
   }
-  async updateBudgetSettingsMd(key, value) {
-    const f = this.app.vault.getFileByPath(this.settingsMdPath());
+  /* `folder`, when given, names the book whose Settings.md is patched;
+     absent, it is the OPEN book's, which is what the settings tab edits.
+
+     THE SETUP WIZARD ALWAYS PASSES IT. The wizard is handed a folder — the
+     one on its finish screen — and every other file it writes is addressed
+     from that folder explicitly. Before #168 this method alone resolved
+     through settingsMdPath() → activeFolder(), so with a client's book open
+     on this device, re-running the wizard against the home folder assigned
+     budgetFolder to X while patching the CLIENT's Settings.md with the
+     household's name, period and currency: one book's settings written into
+     another book. A path the caller named cannot drift to whatever happens to
+     be open (tests/books-settings.test.cjs pins it).
+
+     The named-folder branch writes through writeVaultFile, the vault-ring
+     writer the wizard's own scaffold already uses (createVaultFileIfAbsent):
+     the folder was typed by the person sitting there, not built from synced
+     data, so the containment is "inside the vault", not "inside the open
+     book" — which, for a book that is not the open one, is the whole point. */
+  async updateBudgetSettingsMd(key, value, folder) {
+    const named = typeof folder === 'string';
+    const mdPath = named ? normalizePath(folder + '/Settings.md') : this.settingsMdPath();
+    const f = this.app.vault.getFileByPath(mdPath);
     /* One guarded writer for both branches. makeIo's writeFile is rooted at
        the budget folder ('Settings.md' resolves to settingsMdPath), does the
        create-or-modify split itself, carries the containment check this
@@ -310,7 +423,8 @@ class BudgetPlugin extends Plugin {
       defaults[key] = value;
       text = '---\n' + Object.entries(defaults).map(([k, v]) => `${k}: ${v}`).join('\n') + '\n---\n\n# Budget Settings\n';
     }
-    await io.writeFile('Settings.md', text);
+    if (named) await io.writeVaultFile(mdPath, text);
+    else await io.writeFile('Settings.md', text);
   }
 
   /* The privacy gate's way to the plugin-level session flag: controller.js

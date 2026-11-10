@@ -71,12 +71,17 @@ const ALLOWED = [
   { file: 'settings-tab.js', line: "control: { type: 'folder', key: 'budgetFolder', placeholder: DEFAULT_SETTINGS.budgetFolder },", count: 1,
     why: 'the 1.13 declarative definition of the home-book control' },
 
-  /* The setup wizard sets up the HOME book; #168 gives it an add-a-book mode
-     that appends to settings.books instead. Until then both lines are its own. */
+  /* The setup wizard sets up the HOME book, so both lines are its own. Its
+     add-a-book mode (#168) reads neither for the book it writes: the folder
+     comes from the Add dialog and overrides the prefill below, the assignment
+     sits in apply()'s `else` and add-a-book appends to settings.books instead
+     (tests/books-settings.test.cjs pins budgetFolder byte-identical there),
+     and every Settings.md write is addressed from the wizard's own folder,
+     never from the open book. */
   { file: 'onboarding.js', line: "folder: plugin.settings.budgetFolder || 'Finances/Budget',", count: 1,
-    why: 'the wizard prefills the folder it is about to (re)write — the home book' },
+    why: 'the setup wizard prefills the folder it is about to (re)write — the home book; add-a-book replaces it' },
   { file: 'onboarding.js', line: 'p.settings.budgetFolder = folder;', count: 1,
-    why: 'the wizard apply() assigning the home book (changed by #168, not here)' },
+    why: 'the setup wizard apply() assigning the home book — never reached in add-a-book mode' },
 
   /* A PARAMETER called budgetFolder, not a read of settings: the pure
      destination check takes the folder(s) to protect as arguments, and the

@@ -71,6 +71,7 @@ const HOST_SIDE = new Map([
   ['receipt-modal.js',       "an Obsidian modal — require('obsidian')"],
   ['dom.js',                 'DOM helpers'],
   ['book-switcher.js',       'fills the top bar\'s book <select> through dom.js; the rule it renders is books.js'],
+  ['book-settings.js',       "Settings → Books' two modals — require('obsidian'); the rules they apply are books.js"],
   ['chart.js',               'draws SVG into the DOM'],
   ['dash-motion.js',         "the Dashboard's arrival motion — document and window"],
   ['welcome-motion.js',      'builds the welcome animation with createDiv'],
