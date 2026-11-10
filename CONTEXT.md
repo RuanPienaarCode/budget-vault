@@ -6,6 +6,29 @@ could have written by hand.
 
 ## Language
 
+### Books
+
+See `docs/adr/0009-a-vault-can-hold-several-books.md`.
+
+**Book**:
+One budget folder: its own `Settings.md`, categories, budgets, transactions,
+accounts and ledgers. A vault may hold several; exactly one is open at a time,
+and no figure is ever computed across two.
+_Avoid_: workspace, profile, client, ledger
+
+**Home book**:
+The book `settings.budgetFolder` names. The first in the list, the one opened
+when the device has no choice stored or its choice has gone, and the only book
+an older build knows about. A switch never rewrites it.
+_Avoid_: default budget, main book
+
+**Open book**:
+The book this device is showing. Stored per device and never synced, so two
+devices may have different books open and cannot conflict over it. Every path
+resolves through `plugin.activeFolder()`; reading `settings.budgetFolder`
+directly reads the home book, which is the wrong book whenever a client's is open.
+_Avoid_: current book, active budget, selected folder
+
 ### Periods
 
 **Period**:
