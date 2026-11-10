@@ -18,7 +18,7 @@
 */
 
 const assert = require('assert');
-const { stubObsidian, makeCtx } = require('./helpers/harness.cjs');
+const { stubObsidian, makeCtx, bookSeam } = require('./helpers/harness.cjs');
 stubObsidian();
 
 let checks = 0;
@@ -95,7 +95,7 @@ const MONTHLY_BUDGET = [
 
   function tabWith(budgetBasenames, period_anchor = '2026-08-07') {
     const tab = Object.create(BudgetSettingTab.prototype);
-    tab.plugin = { settings: { budgetFolder: 'Budget' }, settingsMdPath: () => 'Budget/Settings.md' };
+    tab.plugin = bookSeam({ settings: { budgetFolder: 'Budget' }, settingsMdPath: () => 'Budget/Settings.md' });
     tab.app = {
       vault: {
         getMarkdownFiles: () => budgetBasenames.map(b => new (require('./helpers/harness.cjs').TFile)(`Budget/Budgets/${b}.md`)),
@@ -132,7 +132,7 @@ const MONTHLY_BUDGET = [
 
   function tabWith(budgetBasenames, mdExtra = {}) {
     const tab = Object.create(BudgetSettingTab.prototype);
-    tab.plugin = { settings: { budgetFolder: 'Budget' }, settingsMdPath: () => 'Budget/Settings.md' };
+    tab.plugin = bookSeam({ settings: { budgetFolder: 'Budget' }, settingsMdPath: () => 'Budget/Settings.md' });
     tab.app = {
       vault: {
         getMarkdownFiles: () => budgetBasenames.map(b => new (require('./helpers/harness.cjs').TFile)(`Budget/Budgets/${b}.md`)),

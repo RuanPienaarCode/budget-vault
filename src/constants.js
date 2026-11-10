@@ -27,7 +27,17 @@ const PALETTE_PRESETS = {
 const DEFAULT_PALETTE = 'vault-green';
 
 const DEFAULT_SETTINGS = {
+  /* The HOME book (ADR 0009, CONTEXT.md "Home book"). Nothing in src/ reads it
+     to build a path — every path resolves through main.js activeFolder(),
+     which picks this device's open book and falls back to this one. */
   budgetFolder: 'Finances/Budget',
+  /* The other books this vault holds, [{ folder, label }], synced in data.json.
+     Empty is single-book mode — every vault from before books existed, and
+     byte-for-byte that behaviour — and an empty list is never written back to
+     data.json (main.js saveData, src/books.js persistableSettings). Frozen because
+     loadSettings() copies this default by reference; a push onto it must throw
+     rather than add a book to every later load. */
+  books: Object.freeze([]),
   theme: 'auto',          // 'auto' (follow Obsidian) | 'dark' | 'light'
   /* Which colour palette the two themes above are drawn in. Orthogonal to
      `theme` on purpose: every palette defines BOTH a light and a dark block, so

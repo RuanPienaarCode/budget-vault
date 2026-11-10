@@ -39,7 +39,7 @@
      node tests/api-watcher.test.cjs
 */
 const assert = require('assert');
-const { stubObsidian, makeVault } = require('./helpers/harness.cjs');
+const { stubObsidian, makeVault, bookSeam } = require('./helpers/harness.cjs');
 stubObsidian();
 const { SEED, B } = require('./figures/household.cjs');
 const { buildApi } = require('../src/api');
@@ -68,11 +68,11 @@ function makeHost({ layoutReady = true } = {}) {
   const layoutBecomesReady = () => { ready = true; while (queued.length) queued.shift()(); };
 
   const events = [];
-  const plugin = {
+  const plugin = bookSeam({
     settings: { budgetFolder: B }, app: { vault, workspace }, _lastWrite: 0,
     register(cb) { events.push(cb); },
     registerEvent(ref) { this.register(() => ref.e.offref(ref)); },
-  };
+  });
   const unload = () => { while (events.length) events.pop()(); };
   return { plugin, counts, emit, handlerCount, layoutBecomesReady, unload };
 }

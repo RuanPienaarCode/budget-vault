@@ -135,6 +135,9 @@ class BudgetSettingTab extends PluginSettingTab {
     const { containerEl } = this;
     containerEl.empty();
 
+    /* The one control that edits the HOME book (ADR 0009) — so it, alone in
+       this file, reads and writes settings.budgetFolder rather than the open
+       book; tests/books-one-seam.test.cjs names it as an allowed site. */
     new Setting(containerEl)
       .setName(i18n.t('settings.folder.name'))
       .setDesc(i18n.t('settings.folder.desc'))
@@ -660,9 +663,15 @@ class BudgetSettingTab extends PluginSettingTab {
   /* Budget files named by date — the ones an anchor move can strand. Counted
      off getMarkdownFiles rather than walking the folder so no TFolder import
      is needed, and so a Budgets/ folder that doesn't exist yet reads as zero
-     instead of throwing. */
+     instead of throwing.
+
+     The OPEN book's Budgets/, as offPhaseBudgetCount and monthBudgetCount
+     below count too: the period keys these warnings are about live in the open
+     book's Settings.md (settingsMdPath), so counting the home book's files
+     would warn about a different book's budgets than the one whose period is
+     being changed. */
   datedBudgetCount() {
-    const base = `${this.plugin.settings.budgetFolder}/Budgets/`;
+    const base = `${this.plugin.activeFolder()}/Budgets/`;
     return this.app.vault.getMarkdownFiles()
       .filter(f => f.path.startsWith(base) && ISO_DATE.test(f.basename)).length;
   }
@@ -677,7 +686,7 @@ class BudgetSettingTab extends PluginSettingTab {
     const anchor = (this.mdSettings().period_anchor ?? '').toString().trim();
     if (!days || !isRealIsoDate(anchor)) return 0;
     const a = isoDayNumber(anchor);
-    const base = `${this.plugin.settings.budgetFolder}/Budgets/`;
+    const base = `${this.plugin.activeFolder()}/Budgets/`;
     return this.app.vault.getMarkdownFiles().filter(f =>
       f.path.startsWith(base) && ISO_DATE.test(f.basename) &&
       (isoDayNumber(f.basename) - a) % days !== 0).length;
@@ -704,7 +713,7 @@ class BudgetSettingTab extends PluginSettingTab {
     new Notice(i18n.t('settings.budgetsKept', { count: n }), 10000);
   }
   monthBudgetCount() {
-    const base = `${this.plugin.settings.budgetFolder}/Budgets/`;
+    const base = `${this.plugin.activeFolder()}/Budgets/`;
     return this.app.vault.getMarkdownFiles()
       .filter(f => f.path.startsWith(base) && /^\d{4}-\d{2}$/.test(f.basename)).length;
   }

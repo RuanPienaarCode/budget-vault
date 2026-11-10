@@ -21,7 +21,7 @@
      node tests/api.test.cjs
 */
 const assert = require('assert');
-const { stubObsidian, makeVault, makeCtx, loadInto } = require('./helpers/harness.cjs');
+const { stubObsidian, makeVault, makeCtx, loadInto, bookSeam } = require('./helpers/harness.cjs');
 stubObsidian();
 const { pinClock } = require('./helpers/figures.cjs');
 const { SEED, B, TODAY, PERIOD } = require('./figures/household.cjs');
@@ -32,7 +32,7 @@ const ok = (c, m) => { assert.ok(c, m); checks++; };
 const eq = (a, b, m) => { assert.deepStrictEqual(a, b, m); checks++; };
 
 function makePlugin(files, budgetFolder = B) {
-  return { settings: { budgetFolder }, app: { vault: makeVault(files) }, _lastWrite: 0 };
+  return bookSeam({ settings: { budgetFolder }, app: { vault: makeVault(files) }, _lastWrite: 0 });
 }
 
 (async () => {

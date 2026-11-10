@@ -144,6 +144,31 @@ function makeVault(files) {
   return vault;
 }
 
+/* ------------------------------- book seam -------------------------------- */
+/* ADR 0009 routes every path src/ builds through plugin.activeFolder() — io.js
+   basePath() among them — and the export guard through allBookFolders(). The
+   real plugin delegates both to src/books.js; a plain-object test plugin gets
+   the SAME two functions here, not a copy of their wiring, so a test plugin
+   resolves its open book by exactly the rule the shipped one does. Without a
+   book list that is simply its budgetFolder, which is what every test written
+   before books expects.
+
+   Local storage is the plugin's own `app.loadLocalStorage` / `saveLocalStorage`
+   when a test gives it an `app` with them (tests/books.test.cjs does, to open a
+   second book); otherwise nothing is ever stored and the home book opens.
+   Existing methods are left alone, so a test can still stub any of them. */
+function bookSeam(plugin) {
+  const books = require('../../src/books');
+  const normalize = require('obsidian').normalizePath;
+  const seam = {
+    activeFolder() { return books.activeFolderOf(this, { normalize }); },
+    allBookFolders() { return books.allBookFoldersOf(this, { normalize }); },
+    setOpenBookLocal(folder) { return books.writeStoredBook(this.app, null, folder); },
+  };
+  for (const k of Object.keys(seam)) if (typeof plugin[k] !== 'function') plugin[k] = seam[k];
+  return plugin;
+}
+
 /* --------------------------------- ctx ----------------------------------- */
 /* Builds the ctx a register* module sees, wired to an in-memory vault. Pass
    `files` as { 'Budget/Categories/Food.md': '...' }. Returns the ctx; call
@@ -174,7 +199,7 @@ function makeCtx(files = {}, { budgetFolder = 'Budget', settings = {} } = {}) {
     // Tests that DO want to force a rejection reassign this property
     // directly — it is a plain object, not a class method, so `ctx.plugin
     // .saveSettings = async () => { throw … }` is all that is needed.
-    plugin: { settings: { budgetFolder }, _lastWrite: 0, saveSettings: async () => {} },
+    plugin: bookSeam({ settings: { budgetFolder }, _lastWrite: 0, saveSettings: async () => {} }),
     S: {
       settings: { month_start_day: 23, currency: 'R', country: 'za', ...settings },
       categories: [], accounts: [], budgets: {}, budgetMeta: {}, txFiles: {},
@@ -265,4 +290,4 @@ async function loadInto(ctx) {
   return ctx.S;
 }
 
-module.exports = { stubObsidian, makeVault, makeCtx, loadInto, TFile, TFolder };
+module.exports = { stubObsidian, makeVault, makeCtx, loadInto, bookSeam, TFile, TFolder };

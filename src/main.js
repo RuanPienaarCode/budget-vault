@@ -18,6 +18,7 @@ const { BudgetView } = require('./view');
 const { BudgetSettingTab } = require('./settings-tab');
 const { OnboardingWizard } = require('./onboarding');
 const { buildApi } = require('./api');
+const books = require('./books');
 
 class BudgetPlugin extends Plugin {
   async onload() {
@@ -107,11 +108,45 @@ class BudgetPlugin extends Plugin {
     }
   }
 
-  /* True when the configured budget folder already contains budget files. */
+  /* True when the open book's folder already contains budget files. With no
+     book list (every vault before ADR 0009, and any vault that never adds one)
+     the open book IS the home book, so the first-run adoption below asks the
+     same question it always has. */
   hasBudgetData() {
     const v = this.app.vault;
     return !!v.getFileByPath(this.settingsMdPath()) ||
-      !!v.getFolderByPath(normalizePath(this.settings.budgetFolder + '/Categories'));
+      !!v.getFolderByPath(normalizePath(this.activeFolder() + '/Categories'));
+  }
+
+  /* ---- Books (ADR 0009) ----------------------------------------------------
+     The plugin's one door to the folder every path starts from: settings plus
+     this device's stored choice, resolved to the open book. io.js basePath(), settingsMdPath(), the
+     settings tab's Budgets/ counts and the export guard all ask here; a second
+     reader of settings.budgetFolder would read the home book while the screen
+     shows a client's, and tests/books-one-seam.test.cjs fails the build on one.
+     The rule and its wiring are src/books.js (resolveOpenBook, activeFolderOf),
+     pure and tested there; these methods only hand it the host's normalizePath
+     and localStorage. Called on every relPath(), so single-book mode — an
+     empty list — returns before local storage or the vault is consulted: a
+     1.59 vault pays no read for books existing. */
+  activeFolder() {
+    return books.activeFolderOf(this, { normalize: normalizePath, getStorage: () => window.localStorage });
+  }
+  /* Every book's folder — home first — normalised the way activeFolder()
+     returns one. The export guard refuses all of them, not only the open one,
+     so an export cannot land in client B's Transactions/ while A is open. */
+  allBookFolders() {
+    return books.allBookFoldersOf(this, { normalize: normalizePath });
+  }
+  /* Remember `folder` as THIS device's open book (null forgets it, so the home
+     book opens). Writes vault-scoped local storage only — never data.json,
+     never settings.budgetFolder — so a switch on the phone does not move the
+     laptop. It neither validates nor reloads: an unlisted or deleted folder
+     simply resolves to the home book in activeFolder(), and refusing a switch
+     while a page has unsaved edits is the switcher's job (#167, ADR 0009 §3).
+     Returns whether the choice was stored. */
+  setOpenBookLocal(folder) {
+    return books.writeStoredBook(this.app, () => window.localStorage, folder);
   }
 
   async activateView() {
@@ -136,7 +171,7 @@ class BudgetPlugin extends Plugin {
 
   /* ---- Settings.md (month_start_day / currency) read + in-place update ---- */
   settingsMdPath() {
-    return normalizePath(this.settings.budgetFolder + '/Settings.md');
+    return normalizePath(this.activeFolder() + '/Settings.md');
   }
   async readBudgetSettingsMd() {
     const f = this.app.vault.getFileByPath(this.settingsMdPath());
@@ -201,6 +236,11 @@ class BudgetPlugin extends Plugin {
 
   async loadSettings() {
     this.settings = Object.assign({}, DEFAULT_SETTINGS, await this.loadData());
+    /* A fresh list per load. Object.assign copies DEFAULT_SETTINGS.books by
+       REFERENCE when data.json has none, and the default is frozen so that a
+       push onto it throws instead of quietly adding a book to every later
+       load of the defaults. */
+    if (this.settings.books === DEFAULT_SETTINGS.books) this.settings.books = [];
   }
   async saveSettings() {
     await this.saveData(this.settings);
@@ -217,7 +257,12 @@ class BudgetPlugin extends Plugin {
      write fails (settings.err.save). */
   async saveData(data) {
     if (this.api) this.api._syncLock();
-    return super.saveData(data);
+    /* An empty book list is single-book mode and is not written: ADR 0009 has
+       single-book mode put no new key into data.json, and every save of every
+       existing vault would otherwise add `"books": []` (src/books.js
+       persistableSettings). Here rather than in saveSettings() for the reason
+       above — 1.13's settings tab reaches this method directly. */
+    return super.saveData(books.persistableSettings(data));
   }
 }
 

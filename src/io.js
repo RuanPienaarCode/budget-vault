@@ -1,7 +1,9 @@
 'use strict';
-/* Vault file access, rooted at the configured budget folder. All paths given
-   to these helpers are relative to that folder. Tracks the time of our own
-   writes so the change-watcher can tell them apart from external edits.
+/* Vault file access, rooted at the open book's folder (plugin.activeFolder(),
+   ADR 0009 — the home book unless this device has another book open). All
+   paths given to these helpers are relative to that folder. Tracks the time
+   of our own writes so the change-watcher can tell them apart from external
+   edits.
 
    A FACTORY plus a thin registrar, not a closure over a view ctx. The guards
    here only protect writers who can reach them, and two writers cannot go
@@ -27,7 +29,7 @@ const { lineEndingOf } = require('./table-schema');
    to every segment of a vault-root path. */
 const foldSeg = s => String(s ?? '').normalize('NFC').toLowerCase();
 
-/* destinationProblem(folder, { configDir, budgetFolder }) — may an export
+/* destinationProblem(folder, { configDir, budgetFolder, budgetFolders }) — may an export
    write into the folder the reader TYPED? The one answer for every export
    that takes a destination: the Report uses it; the Transactions export and
    the budget export are to adopt it rather than keep their partial copies.
@@ -51,7 +53,7 @@ const foldSeg = s => String(s ?? '').normalize('NFC').toLowerCase();
                                              file explorer will ever show
      { kind: 'managed', folder: 'Categories' | 'Accounts' | 'Budgets' |
                                 'Plans' | 'Tax' | 'Transactions' | 'Notes' }
-                                             inside the budget folder, at or
+                                             inside a book's folder, at or
                                              below a folder load.js reads, so
                                              the next load parses the export
                                              back in as data (src/report.js
@@ -69,15 +71,18 @@ const foldSeg = s => String(s ?? '').normalize('NFC').toLowerCase();
    them onto the real folder, and ".obsidian-notes" or
    "Budget/CategoriesOfSpending" are ordinary folders. An empty folder is
    null — the caller applies its own default. `configDir` defaults to
-   ".obsidian" and `budgetFolder` to the vault root; makeIo() below publishes
-   a copy bound to the live vault's config folder and the configured budget
-   folder, which is the one a view should call.
+   ".obsidian" and `budgetFolder` to the vault root; `budgetFolders`, when
+   given, adds more roots whose managed folders are refused just the same —
+   every book in the vault (ADR 0009), since an export in client B's
+   Transactions/ is B's data the next time B opens. makeIo() below publishes a
+   copy bound to the live vault's config folder, the open book and every other
+   book, which is the one a view should call.
 
    Pure apart from reading src/report.js's managed-folder list — required
    lazily, because io.js is the first module every boot path loads and the
    report's module graph (twelve language tables among it) has no business
    loading with it. */
-function destinationProblem(folder, { configDir, budgetFolder } = {}) {
+function destinationProblem(folder, { configDir, budgetFolder, budgetFolders } = {}) {
   const segs = String(folder ?? '').replace(/\\/g, '/').split('/')
     .map(s => s.trim()).filter(s => s && s !== '.');
   if (!segs.length) return null;
@@ -88,8 +93,16 @@ function destinationProblem(folder, { configDir, budgetFolder } = {}) {
     return { kind: 'configDir', folder: cfg };
   }
   const { managedFolderMatch } = require('./report');
-  const managed = managedFolderMatch(segs.join('/'), budgetFolder || '');
-  if (managed) return { kind: 'managed', folder: managed };
+  /* Every book's managed folders, not only one: `budgetFolders` lists the
+     vault's books (ADR 0009). With neither option given the root stands in,
+     as it always has; with only the list, the list alone is checked. */
+  const roots = [];
+  if (budgetFolder != null || !Array.isArray(budgetFolders)) roots.push(budgetFolder || '');
+  if (Array.isArray(budgetFolders)) for (const b of budgetFolders) roots.push(b || '');
+  for (const root of roots) {
+    const managed = managedFolderMatch(segs.join('/'), root);
+    if (managed) return { kind: 'managed', folder: managed };
+  }
   // Any other dot-segment: Obsidian indexes nothing under it (vault-path.js).
   const hidden = hiddenSegment(segs.join('/'));
   return hidden ? { kind: 'hidden', folder: hidden } : null;
@@ -200,7 +213,12 @@ function makeIo({ vault, plugin }, { view = false } = {}) {
   // An own-record entry is this io's echo if this io wrote it, or no view did.
   const mine = e => e.by === me || !(e.by && e.by.view);
 
-  const basePath = () => normalizePath(plugin.settings.budgetFolder);
+  /* The OPEN book's folder (ADR 0009), resolved afresh on every call so a
+     switch is seen by the next path built — the same freshness reading
+     settings.budgetFolder here always had. Never the home book directly: in a
+     vault with several books that would read and write the wrong client's
+     files while the screen showed the right one's. */
+  const basePath = () => normalizePath(plugin.activeFolder());
   const relPath = p => normalizePath(basePath() + '/' + p);
   const keyOf = p => foldSeg(p);
   /* The budget-relative form of a vault path, for a message a person reads. */
@@ -774,11 +792,14 @@ function makeIo({ vault, plugin }, { view = false } = {}) {
        it saw, a full reload brackets itself, the controller hears refusals. */
     observeChange, staleMark, staleClear, isStaleFile, onStaleWrite,
     /* destinationProblem (module level, above) bound to THIS vault: its own
-       config folder (vault.configDir, read at call time) and the configured
-       budget folder. `opts` still overrides either, for a caller that knows
-       better. Same contract and return as the unbound function. */
+       config folder (vault.configDir, read at call time), the open book, and
+       every other book the vault holds — an export written into client B's
+       Transactions/ while A is open is parsed back in as B's data the next
+       time B opens (ADR 0009 §4). `opts` still overrides any of them, for a
+       caller that knows better. Same contract and return as the unbound
+       function. */
     destinationProblem: (folder, opts) => destinationProblem(folder, {
-      configDir: vault.configDir, budgetFolder: plugin.settings.budgetFolder, ...(opts || {}),
+      configDir: vault.configDir, budgetFolder: plugin.activeFolder(), budgetFolders: plugin.allBookFolders(), ...(opts || {}),
     }),
     lastWriteAt: () => plugin._lastWrite || 0,
   };

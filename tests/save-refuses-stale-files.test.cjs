@@ -39,7 +39,7 @@
 const assert = require('assert');
 const fs = require('fs');
 const path = require('path');
-const { stubObsidian, makeVault } = require('./helpers/harness.cjs');
+const { stubObsidian, makeVault, bookSeam } = require('./helpers/harness.cjs');
 stubObsidian();
 const { makeIo } = require('../src/io');
 
@@ -64,7 +64,7 @@ const PHONE_ROW = '| 2026-09-02 | typed on the phone | -120.00 |\n';
    test can let them settle, or race them. */
 function rig(files, { announceOwn = true } = {}) {
   const vault = makeVault(files);
-  const plugin = { settings: { budgetFolder: B }, _lastWrite: 0 };
+  const plugin = bookSeam({ settings: { budgetFolder: B }, _lastWrite: 0 });
   const io = makeIo({ vault, plugin });
   const inflight = [];
   const tell = (kind, file, old) => {
