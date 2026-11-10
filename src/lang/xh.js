@@ -1669,6 +1669,8 @@ module.exports = {
 
   'io.stale.message': "{file} iguqulwe ngaphandle kweli phepha emva kokuba ilayishiwe, ngoko akukho nto ibhaliweyo",
   'io.stale.notice': "Ibhajethi: {file} iguqulwe ngaphandle kweli phepha (enye ikhompyuter okanye imbonakalo ye-markdown) emva kokuba ilayishiwe, ngoko ukugcina kwakho akubhalwanga. Iphepha liphinde lalayisha oko kukhoyo ngoku kwidiski — nceda wenze utshintsho kwakhona.",
+  'io.bookChanged.message': "Enye incwadi ivuliwe kwesi sixhobo emva kokuba eli phepha lifundiwe, ngoko {file} ayibhalwanga — ngeyingene kwincwadi engeyiyo. Phinda wenze utshintsho kwincwadi ekwiscreen ngoku",
+  'io.reloaded.message': "Ibhajethi: ibhajethi iphinde yafundwa ngoxa ibilinde impendulo yakho (enye incwadi ivuliwe, okanye iifayile zayo zitshintshile), ngoko akukho nto itshintshiweyo. Phinda ujonge iphepha uze uyiphinde ukuba useyiyo into oyifunayo.",
   'load.unreadable.head': "Iifayile ezithile azikwazanga ukufundwa: {list}.",
   'load.unreadable.item': "{file} ({why})",
   'load.unreadable.why.missing': "ayikho",

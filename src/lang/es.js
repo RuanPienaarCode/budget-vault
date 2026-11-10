@@ -1648,6 +1648,8 @@ module.exports = {
 
   'io.stale.message': "{file} se cambió fuera de esta página después de cargarse, así que no se escribió nada",
   'io.stale.notice': "Presupuesto: {file} se cambió fuera de esta página (otro dispositivo o la vista markdown) después de cargarse, así que no se escribió tu guardado. La página volvió a cargar lo que hay ahora en el disco — vuelve a hacer el cambio.",
+  'io.bookChanged.message': "Se abrió otro libro en este dispositivo después de leer esta página, así que no se escribió {file}: habría ido a parar al libro equivocado. Vuelve a hacer el cambio en el libro que ahora está en pantalla",
+  'io.reloaded.message': "Presupuesto: el presupuesto se volvió a leer mientras esperaba tu respuesta (se abrió otro libro o cambiaron sus archivos), así que no se cambió nada. Vuelve a mirar la página y repítelo si sigue siendo lo que quieres.",
   'load.unreadable.head': "Algunos archivos no se pudieron leer: {list}.",
   'load.unreadable.item': "{file} ({why})",
   'load.unreadable.why.missing': "falta",

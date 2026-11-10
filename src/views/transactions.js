@@ -1122,6 +1122,8 @@ module.exports = function registerTransactions(ctx) {
     // select a parent need not select its parts (they carry finer categories),
     // and parts left behind describe a line that no longer exists.
     const splits = rows.filter(t => splitRole(t._row.split)).length;
+    /* The load these row objects belong to, tested again after the dialog. */
+    const stamp = typeof ctx.loadedBook === 'function' ? ctx.loadedBook() : null;
     const go = await confirmModal(app, {
       title: i18n.t('tx.bulk.title'),
       message: i18n.t('tx.bulk.msg', { count: rows.length, range, filters: labels.join(', ') })
@@ -1130,6 +1132,20 @@ module.exports = function registerTransactions(ctx) {
       confirmText: i18n.t('tx.bulk.confirm', { count: rows.length }),
     });
     if (!go) return;
+    /* A book switch (the headless API, a second view, a popout) can land while
+       the dialog is open, and this page is clean, so switchBook's dirty
+       refusal does not stop it (ADR 0009, 2026-11 review). With the reload
+       landed, `rows` are the previous book's objects and txFileRel() resolves
+       into the new book: confirming appended the household's rows to the
+       client's delete log and wrote the household's month over the client's.
+       A same-book reload under the dialog is the same shape — the objects are
+       no longer the ones in memory. Refused, said, nothing written; io.js
+       refuses on its own for the window before the reload lands. */
+    const replaced = typeof ctx.stateReplaced === 'function' ? ctx.stateReplaced(stamp) : null;
+    if (replaced) {
+      renderTransactions();
+      return toast(replaced, true);
+    }
 
     /* The backup, before anything is touched. Appended rather than through a
        writer that could overwrite: read what is there, keep it, and add

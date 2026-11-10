@@ -321,7 +321,15 @@ function buildApi(plugin) {
   let generation = 0;
   let fresh = null;
   function outOfDate() { generation++; fresh = null; }
-  const reusable = () => !!fresh && fresh.generation === generation && elapsedMs() - fresh.at <= FRESH_MS;
+  /* …and only while the state that read left behind is still the OPEN book's
+     (ADR 0009). A switch retires `fresh` through syncLock(), but a read that
+     was already in flight when the switch landed belongs to the book it began
+     in; serving it as fresh afterwards would answer for the wrong book. */
+  const holdsOpenBook = () => {
+    const lb = ctx && typeof ctx.loadedBook === 'function' ? ctx.loadedBook() : null;
+    return !!lb && lb.folder === ctx.basePath();
+  };
+  const reusable = () => !!fresh && fresh.generation === generation && elapsedMs() - fresh.at <= FRESH_MS && holdsOpenBook();
 
   /* ---- the privacy lock (the header has the contract) ---- */
   const lockSetting = () => !!(plugin.settings && plugin.settings.privacyLock);
@@ -518,20 +526,51 @@ function buildApi(plugin) {
     return plugin.switchBook(folder);
   }
 
+  /* The book a figure is computed from, named from the model: the item whose
+     folder is the folder the state in memory was READ from (load.js
+     loadedBook), not the folder that happens to be open now. null when the
+     model does not list that folder — it was built for another list or
+     another open book, and is asked again. */
+  function bookOfState(c, model) {
+    const lb = typeof c.loadedBook === 'function' ? c.loadedBook() : null;
+    if (!lb) return null;
+    const folder = books.normalizeFolder(lb.folder);
+    const it = model.items.find(i => i.folder === folder);
+    return it ? { folder: it.folder, label: it.label } : null;
+  }
+
   async function currentPeriod() {
     const c = ensureCtx();
     if (!configured(c)) return null;
     if (isLocked()) return { locked: true };
-    /* The book is named BEFORE the read, off the open folder the read is about
-       to be made under: asked after, a switch landing while the home book's
-       name was being fetched would label book A's figure as book B's. */
-    const model = await bookModel();
-    if (!reusable()) await c.loadVault();
-    /* Locked while reading: the splash closed (Obsidian went to the
-       background, a gate closed) after this read began. What a consumer is
-       handed is decided at hand-over, not at request — the figure computed
-       for a reader who is no longer there stays here. */
-    if (isLocked()) return { locked: true };
+    /* THE FIGURE AND ITS LABEL MUST NAME ONE BOOK (ADR 0009, 2026-11 review).
+       The label used to be taken from the model BEFORE the read, on the
+       reasoning that the read was about to be made under that folder. But a
+       switch can land during the read, and the loader then follows it
+       (load.js rule 3) — so the numbers were the new book's under the old
+       book's name, or, before load.js followed switches at all, the old
+       book's numbers marked fresh and served under the new one's. Now the
+       label is looked up for the folder the state was actually read from,
+       after the read; a model that does not know that folder (the list or
+       the open book changed while the home book's name was being read) is
+       built again. Three rounds: a reader flipping books faster than a read
+       completes is answered for whichever book the last read was of, with
+       the folder named and no label rather than a label that could be wrong. */
+    let book = null;
+    for (let round = 0; round < 3 && !book; round++) {
+      const model = await bookModel();
+      if (!reusable()) await c.loadVault();
+      /* Locked while reading: the splash closed (Obsidian went to the
+         background, a gate closed) after this read began. What a consumer is
+         handed is decided at hand-over, not at request — the figure computed
+         for a reader who is no longer there stays here. */
+      if (isLocked()) return { locked: true };
+      book = bookOfState(c, model);
+    }
+    if (!book) {
+      const lb = typeof c.loadedBook === 'function' ? c.loadedBook() : null;
+      book = { folder: books.normalizeFolder(lb ? lb.folder : plugin.activeFolder()), label: '' };
+    }
     const p = c.currentPeriod();
     const F = c.periodFigures(p);
     /* views/dashboard.js's renderHero, verbatim: bud = F.budget (budgetTotals,
@@ -555,9 +594,7 @@ function buildApi(plugin) {
       over: overCategories(F.rows),
       currency: code ? { symbol, code } : { symbol },
       notes: heroNotes(F, moneyFor(c)),
-      book: model.active
-        ? { folder: model.active.folder, label: model.active.label }
-        : { folder: books.normalizeFolder(plugin.activeFolder()), label: '' },
+      book,
     };
   }
 

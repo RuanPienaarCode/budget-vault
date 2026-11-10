@@ -20,6 +20,21 @@ const { OnboardingWizard } = require('./onboarding');
 const { buildApi } = require('./api');
 const books = require('./books');
 
+/* data.json as the plugin holds it: the defaults, overlaid with whatever the
+   file carries. One definition for onload and for a synced change
+   (onExternalSettingsChange), so the two cannot disagree about a key the file
+   leaves out.
+
+   A fresh book list per read. Object.assign copies DEFAULT_SETTINGS.books by
+   REFERENCE when data.json has none, and the default is frozen so that a push
+   onto it throws instead of quietly adding a book to every later load of the
+   defaults. */
+function settingsFrom(data) {
+  const out = Object.assign({}, DEFAULT_SETTINGS, data);
+  if (out.books === DEFAULT_SETTINGS.books) out.books = [];
+  return out;
+}
+
 class BudgetPlugin extends Plugin {
   async onload() {
     await this.loadSettings();
@@ -258,6 +273,21 @@ class BudgetPlugin extends Plugin {
       configDir: this.app && this.app.vault && this.app.vault.configDir,
     });
   }
+  /* May the HOME book move to `folder`? null, or { reason, folder? } — the
+     overlap rule for budgetFolder itself (src/books.js validateHomeFolder),
+     with this vault's list, current home and config folder filled in. The
+     folder setting and the setup wizard's normal mode ask before assigning
+     budgetFolder: before the 2026-11 review neither did, so the home book
+     could be pointed inside, or over, a listed client's book. */
+  homeFolderProblem(folder) {
+    const s = this.settings || {};
+    return books.validateHomeFolder({
+      books: s.books,
+      homeFolder: this.allBookFolders()[0],
+      folder,
+      configDir: this.app && this.app.vault && this.app.vault.configDir,
+    });
+  }
   /* Append a book. The first add on a single-book vault seeds the home book
      ahead of it, named by the household its Settings.md carries. Does NOT
      open it: the wizard switches to it afterwards through switchBook(), the
@@ -438,12 +468,57 @@ class BudgetPlugin extends Plugin {
   }
 
   async loadSettings() {
-    this.settings = Object.assign({}, DEFAULT_SETTINGS, await this.loadData());
-    /* A fresh list per load. Object.assign copies DEFAULT_SETTINGS.books by
-       REFERENCE when data.json has none, and the default is frozen so that a
-       push onto it throws instead of quietly adding a book to every later
-       load of the defaults. */
-    if (this.settings.books === DEFAULT_SETTINGS.books) this.settings.books = [];
+    this.settings = settingsFrom(await this.loadData());
+  }
+
+  /* data.json changed under a running plugin — Obsidian calls this when a sync
+     client (Obsidian Sync, iCloud, Syncthing) rewrites the file. Defined, not
+     registered: Obsidian feature-detects the method, and a host that never
+     calls it loses nothing it had before.
+
+     WHY IT MATTERS NOW (ADR 0009, 2026-11 review). The book list lives in
+     data.json and syncs. This plugin read data.json once, at onload, so a
+     device open since before another device added a book still held the OLD
+     list — and its next unrelated saveSettings() (a theme toggle, a chart
+     pill) wrote that old list back over the new one. The book vanished from
+     every device, by a write nobody would connect with it.
+
+     So the file is re-read, merged with the defaults exactly as at onload
+     (settingsFrom), and assigned INTO the existing settings object rather than
+     replacing it: the settings tab and several closures hold `plugin.settings`
+     by reference, and a toggle written into an orphaned object would be lost
+     at its own save. Then:
+       - the headless API retires anything it was holding as fresh (_syncLock,
+         the call saveData makes for a settings write of our own — the privacy
+         lock or the home folder may be what changed);
+       - every open switcher redraws (the list may have changed);
+       - if the OPEN book now resolves differently — the other device removed
+         it from the list, or moved the home folder this device was showing —
+         every view reloads onto it. ctl.reload() declines over unsaved edits,
+         with its own notice; those edits then stay on screen against a state
+         read from a book that is no longer open, and io.js refuses to write
+         them anywhere else (loadedBook), so they cannot land in the wrong
+         book. The reader saves nothing they did not see refused. */
+  async onExternalSettingsChange() {
+    const before = this.activeFolder();
+    const fresh = settingsFrom(await this.loadData());
+    const s = this.settings;
+    if (s && typeof s === 'object') {
+      for (const k of Object.keys(s)) if (!(k in fresh)) delete s[k];
+      Object.assign(s, fresh);
+    } else {
+      this.settings = fresh;
+    }
+    if (this.api) this.api._syncLock();
+    this.refreshBookSwitchers();
+    if (this.activeFolder() !== before) {
+      try {
+        await this.reloadViews();
+        if (this.api) await this.api._reload();
+      } catch (e) {
+        console.error('Budget: reloading after a synced settings change failed', e);
+      }
+    }
   }
   async saveSettings() {
     await this.saveData(this.settings);

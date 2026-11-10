@@ -45,7 +45,14 @@
      7. the settings tab's rows, on both halves: single-book shows the home
         book alone with no Relabel and no Remove; with a list, the home book
         has no Remove and every other book has both; the Add dialog refuses an
-        overlapping folder inline and hands a good one to the wizard.
+        overlapping folder inline and hands a good one to the wizard;
+     8. the HOME folder obeys the overlap rule: the folder setting (both
+        halves of the tab) and the wizard's normal mode refuse a home folder
+        inside or over a listed book, say why, and write nothing — NEGATIVE
+        CONTROL: a clear folder is taken;
+     9. a book added on another device survives this device's next unrelated
+        save, through onExternalSettingsChange — NEGATIVE CONTROL first: the
+        same save without the hook erases it.
 
      node tests/books-settings.test.cjs */
 
@@ -619,6 +626,123 @@ const under = (paths, folder) => paths.every(p => p.replace(/^-/, '').startsWith
     eq(w.p.settings.books.length, 3, 'closing that wizard adds nothing');
   }
 
+  /* ---- 8. the HOME folder obeys the overlap rule too (review finding 5) ----
+     validateNewBook guarded the Add dialog and the wizard's add-a-book mode,
+     but the two places that set budgetFolder itself — the folder setting and
+     the wizard's normal mode — assigned whatever they were given, so the home
+     book could be pointed inside, or over, a listed client's book: two books
+     sharing files by the back door. */
+  {
+    const w = makeWorld(FILES(), { stored: { budgetFolder: HOME, onboarded: true, books: LIST } });
+    await w.p.loadSettings();
+    const tab = new BudgetSettingTab(w.p.app, w.p);
+    tab.display();
+    const folderInput = all(tab.containerEl, e => e.tagName === 'INPUT' && e.attrs.placeholder === 'Finances/Budget')[0];
+    ok(folderInput && typeof folderInput._onChange === 'function', 'fixture: the folder setting\'s text field');
+    const folderDesc = () => all(tab.containerEl, e => e.hasClass('setting-item-description'))[0].textContent;
+    const saves = w.p.saved.length;
+    for (const [typed, reason] of [['Clients', 'contains'], ['Clients/Beta/Sub', 'nested'], ['../Elsewhere', 'traversal'], ['.secret/Budget', 'hidden']]) {
+      await folderInput._onChange(typed);
+      eq(w.p.settings.budgetFolder, HOME, `home folder "${typed}" is refused (${reason}) — budgetFolder unchanged`);
+      eq(w.p.saved.length, saves, `… nothing written to data.json`);
+      eq(w.p.reloads, 0, '… no view reloaded');
+      eq(folderDesc(), i18n.t(`books.problem.${reason}`, { folder: (w.p.homeFolderProblem(typed) || {}).folder || '/' }),
+        `… and the setting says why, in place of its description`);
+    }
+    await folderInput._onChange('Personal');
+    eq(w.p.settings.budgetFolder, 'Personal', 'NEGATIVE CONTROL: a folder clear of every book is taken');
+    eq(w.p.saved.length, saves + 1, '… and saved');
+    eq(folderDesc(), i18n.t('settings.folder.desc'), '… and the description is the setting\'s own again');
+    await folderInput._onChange(BETA);
+    eq(w.p.settings.budgetFolder, BETA, 'making a LISTED book the home book is not an overlap — it is the same folder, one book');
+    await folderInput._onChange(HOME);
+
+    /* The 1.13 declarative half: validate() refuses (so the host never calls
+       setControlValue), and setControlValue refuses again if it is reached. */
+    const def = tab.getSettingDefinitions().find(d => d.control && d.control.key === 'budgetFolder');
+    ok(def && typeof def.control.validate === 'function', 'the declarative folder control has a validate()');
+    eq(def.control.validate('Clients'), i18n.t('books.problem.contains', { folder: BETA }), '… which refuses a folder holding a book, saying which');
+    eq(def.control.validate('Personal'), undefined, '… and passes a clear one');
+    const before = w.p.saved.length;
+    await tab.setControlValue('budgetFolder', 'Clients/Beta/Deeper');
+    eq([w.p.settings.budgetFolder, w.p.saved.length], [HOME, before], 'setControlValue refuses an overlapping home folder too');
+
+    /* The pure rule behind both. */
+    const hp = (folder, over = {}) => books.validateHomeFolder({ books: LIST, homeFolder: HOME, folder, configDir: '.obsidian', ...over });
+    eq(hp(HOME), null, 'the current home folder is fine (its own slot is ignored)');
+    eq(hp('Budget/Sub'), null, '… and so is a folder inside the CURRENT home — the home slot is being replaced, not kept');
+    eq(hp('Clients'), { reason: 'contains', folder: BETA }, 'a folder holding a listed book → contains');
+    eq(hp('clients/beta/x'), { reason: 'nested', folder: BETA }, 'inside a listed book, in any case → nested');
+    eq(hp(''), { reason: 'contains', folder: BETA }, 'the vault root, with another book listed → contains');
+    eq(books.validateHomeFolder({ books: [], homeFolder: HOME, folder: '' }), null, 'the vault root in single-book mode is today\'s behaviour — allowed');
+    eq(hp('.obsidian/x'), { reason: 'hidden', folder: '.obsidian' }, 'the config folder → hidden');
+  }
+  {
+    /* The wizard's normal mode, with a client's book open. */
+    const w = await openBeta();
+    const before = w.snap();
+    const wz = new OnboardingWizard(w.p.app, w.p);
+    wz.open();
+    await wz.adoptFolder('Clients');
+    answer(wz);
+    wz.goTo('finish');
+    await wz.next();
+    eq(changed(before, w.snap()), [], 'the setup wizard pointed at a folder HOLDING a book writes nothing');
+    eq(w.p.settings.budgetFolder, HOME, '… and does not move the home book');
+    eq(textOf(wz.contentEl, 'budget-onb-error'), i18n.t('books.problem.contains', { folder: BETA }), '… and says why, inline on its own screen');
+  }
+
+  /* ---- 9. a book added on another device survives this one's next save -----
+     (review note 4). data.json syncs; this plugin read it once, at onload. A
+     device open since before another device added a book held the OLD list,
+     and its next unrelated saveSettings() — a theme toggle, a chart pill —
+     wrote that list back over the new one: the book was gone from every
+     device. Obsidian calls onExternalSettingsChange() when data.json changes
+     under a running plugin; it now re-reads it. */
+  {
+    const kv = { [OPEN_BOOK_KEY]: BETA };
+    const w = makeWorld(FILES(), { stored: { budgetFolder: HOME, onboarded: true, books: LIST }, kv });
+    await w.p.loadSettings();
+    let applied = 0;
+    w.p.forEachView = fn => fn({ hasDirty: () => false, reload: async () => { w.p.reloads++; }, applyBooks() { applied++; } });
+    const ref = w.p.settings;
+
+    /* NEGATIVE CONTROL first: the trap is real. Another device adds Acme;
+       nothing tells this one; its theme toggle saves the old list. */
+    const synced = { ...JSON.parse(JSON.stringify(w.p.stored)), books: [...LIST, { folder: ACME, label: 'Acme' }] };
+    w.p.stored = JSON.parse(JSON.stringify(synced));
+    w.p.settings.theme = 'dark';
+    await w.p.saveSettings();
+    eq(w.p.stored.books.map(b => b.folder), [HOME, BETA], 'NEGATIVE CONTROL: without the hook, an unrelated save erases the book another device added');
+
+    /* With the hook. */
+    w.p.stored = JSON.parse(JSON.stringify(synced));
+    ok(typeof w.p.onExternalSettingsChange === 'function', 'the plugin defines onExternalSettingsChange (Obsidian calls it when data.json changes under it)');
+    const appliedBefore = applied;
+    await w.p.onExternalSettingsChange();
+    eq(w.p.settings.books.map(b => b.folder), [HOME, BETA, ACME], 'the list in memory is the synced one');
+    ok(w.p.settings === ref, '… updated IN PLACE, so a settings tab or closure holding the object sees it');
+    ok(applied > appliedBefore, '… and every open switcher is redrawn');
+    eq(w.p.reloads, 0, 'the open book did not change (Beta is still listed), so no view reloads');
+    w.p.settings.theme = 'light';
+    await w.p.saveSettings();
+    eq(w.p.stored.books.map(b => b.folder), [HOME, BETA, ACME], 'the next unrelated save keeps the book the other device added');
+    eq(w.p.stored.theme, 'light', '… and saves its own change');
+
+    /* The open book removed on the other device: this device's book resolves
+       to the home book, so its views are reloaded onto it. */
+    w.p.stored = { ...JSON.parse(JSON.stringify(w.p.stored)), books: [LIST[0], { folder: ACME, label: 'Acme' }] };
+    await w.p.onExternalSettingsChange();
+    eq(w.p.activeFolder(), HOME, 'Beta removed elsewhere → this device falls back to the home book');
+    eq(w.p.reloads, 1, '… and its views are reloaded onto it (dirty-aware: ctl.reload declines over unsaved edits)');
+
+    /* Keys data.json does not carry come back as their defaults, as at onload. */
+    w.p.stored = { budgetFolder: HOME, onboarded: true };
+    await w.p.onExternalSettingsChange();
+    eq(w.p.settings.books, [], 'a data.json with no books key is single-book mode, a fresh list');
+    eq(w.p.settings.theme, 'auto', '… and an absent key is its default, not the value from before');
+  }
+
   Module._load = prevLoad;
-  console.log(`PASS books-settings — add through the wizard, relabel, remove; no wrong-book write, no vault call on remove, no budgetFolder change on add (${checks} checks)`);
+  console.log(`PASS books-settings — add through the wizard, relabel, remove; no wrong-book write, no vault call on remove, no budgetFolder change on add; the home folder obeys the overlap rule; a book added on another device survives this one's next save (${checks} checks)`);
 })().catch(e => { console.error(e); process.exit(1); });

@@ -196,7 +196,8 @@ const isTextPath = p => /\.(md|csv|txt|json)$/i.test(p);
 /* `view: true` is the io a Budget view watches the vault through (registerIo
    below); main.js and the wizard build theirs without it. See the ledger's
    `by` above for what the difference decides. */
-function makeIo({ vault, plugin }, { view = false } = {}) {
+function makeIo(deps, { view = false } = {}) {
+  const { vault, plugin } = deps;
   // Write-guard timestamp lives on the plugin (not this closure) so writes made
   // outside the view — the Settings.md updater in main.js — can stamp it too and
   // be recognised as our own, suppressing a redundant watcher reload.
@@ -294,6 +295,63 @@ function makeIo({ vault, plugin }, { view = false } = {}) {
     for (const fn of Array.from(rec.listeners)) { try { fn({ rel, path: relPath(rel) }); } catch (e) { /* a listener must not mask the refusal */ } }
     return err;
   }
+  /* ---- the book a state was read from (ADR 0009) ----
+
+     Every whole-file writer serialises from the state its ctx's load built,
+     and addresses the file through basePath() — the OPEN book, resolved afresh
+     per call. Those two can disagree: a book switch writes the per-device key
+     first and reloads after, a reload can fail or be declined over unsaved
+     edits, and a load that was reading when the switch landed belongs to the
+     book it started in (load.js). In that window book A's rows sat in memory
+     while every path pointed into book B, and the next Save wrote A's rows
+     over B's files — on the 2026-11 review's repro, `Clients/Acme/
+     Transactions/Cheque/2026-01.md` ended up holding the household's row.
+
+     So a write is refused when the folder the ctx's state was LOADED from
+     (load.js publishes it as loadedBook(); absent for the boot-time writers
+     main.js and the wizard build, which serialise nothing from a load) is not
+     the folder the write would land in. Refused, never redirected: writing A's
+     rows back into A behind the reader's back, after the screen has moved to
+     B, is a correction nobody asked for. The page says what happened and
+     nothing is written; the reader makes the change again in the book now on
+     screen. Not a STALE refusal and does not tell the stale listeners — the
+     controller's handler for those forces a reload, which over unsaved edits
+     is exactly what this refusal is protecting. */
+  function loadedFolder() {
+    const lb = typeof deps.loadedBook === 'function' ? deps.loadedBook() : null;
+    return lb && typeof lb.folder === 'string' ? lb.folder : null;
+  }
+  function bookChangedError(rel) {
+    let message;
+    try {
+      message = require('./i18n').t('io.bookChanged.message', { file: rel });
+    } catch (e) { message = null; }
+    if (!message || message === 'io.bookChanged.message') {
+      message = `Another book was opened after this page was read, so ${rel} was not written`;
+    }
+    const err = new Error(message);
+    err.code = 'BOOK_CHANGED';
+    err.rel = rel;
+    return err;
+  }
+  /* Asked twice per write: before anything is awaited, and again straight
+     before the vault call, with nothing awaited in between — a switch landing
+     inside assertFresh's wait must not slip through on the first answer.
+     `path`, when given, must also still sit inside the loaded folder: it was
+     resolved before the wait. */
+  function assertSameBook(rel, path) {
+    const folder = loadedFolder();
+    if (folder === null) return;
+    const base = basePath();
+    if (folder !== base) throw bookChangedError(rel);
+    if (path != null) {
+      const root = collapsePath(base);
+      const resolved = collapsePath(path);
+      // collapsePath turns a book at the vault root ('/') into ''.
+      if (resolved === null || (root !== '' && resolved !== root && !resolved.startsWith(root + '/'))) throw bookChangedError(rel);
+    }
+  }
+
   /* Throws STALE when somebody else changed, moved or deleted this path since
      the page last read it. Waits first for any change event still being
      judged, so a Save clicked in the instant between an edit arriving and the
@@ -375,18 +433,8 @@ function makeIo({ vault, plugin }, { view = false } = {}) {
     const undo = ownRemember(path, DIR);
     try { await vault.createFolder(path); } catch (e) { undo(); /* raced into existence */ }
   }
-  async function readFile(rel) {
-    const path = relPath(rel);
-    const f = vault.getFileByPath(path);
-    const text = f ? await vault.cachedRead(f) : null;
-    /* The caller now holds this file's CURRENT bytes, so whatever it writes
-       back is built on them: whatever made the path stale is no longer a
-       reason to refuse. (Writers that read first — the rules file, the deleted
-       log, the Settings updater — rely on this; load-time writers never call
-       it between the load and the Save.) */
-    rec.stale.delete(keyOf(path));
-    return text;
-  }
+  const live = readersAt(basePath);
+  const readFile = live.readFile;
   // Defence in depth: refuse any write that resolves outside the budget
   // folder. normalizePath does NOT strip "../", so a label like
   // "../../evil" pulled from a synced Accounts file could otherwise escape;
@@ -492,8 +540,10 @@ function makeIo({ vault, plugin }, { view = false } = {}) {
      a moved file back as a second copy (L3-06). A path no event ever named is
      simply new, and is created. */
   async function writeFile(rel, content) {
+    assertSameBook(rel);
     const path = guardedPath(rel);
     await assertFresh(path, rel);
+    assertSameBook(rel, path);
     const undo = ownRemember(path, hashText(content));
     try {
       const f = vault.getFileByPath(path);
@@ -508,8 +558,10 @@ function makeIo({ vault, plugin }, { view = false } = {}) {
   /* Binary sibling of writeFile — same containment guard. Used for uploaded
      tax documents (PDFs, images). */
   async function writeBinary(rel, data) {
+    assertSameBook(rel);
     const path = guardedPath(rel);
     await assertFresh(path, rel);
+    assertSameBook(rel, path);
     const undo = ownRemember(path, BIN);
     try {
       const f = vault.getFileByPath(path);
@@ -569,6 +621,10 @@ function makeIo({ vault, plugin }, { view = false } = {}) {
      so rather than claim a success. */
   async function trashFile(file) {
     if (!file) return false;
+    /* A TFile taken before a dialog is a file of the book that was open THEN;
+       the same refusal as a write (assertSameBook, above), before and after
+       the wait. */
+    assertSameBook(relOf(file.path));
     /* Re-asked here, after whatever dialog the caller put the reader through
        (2026-10-14 audit, L3-13). A TFile follows its file through a rename, so
        a path that no longer resolves to THIS file means it is gone (nothing to
@@ -589,6 +645,7 @@ function makeIo({ vault, plugin }, { view = false } = {}) {
       && (now.stat && file.stat ? now.stat.ctime === file.stat.ctime : !now.stat && !file.stat));
     if (!same) throw staleError(relOf(file.path));
     await assertFresh(file.path, relOf(file.path));
+    assertSameBook(relOf(file.path), file.path);
     const undo = ownRemember(file.path, GONE);
     try { await vault.trash(file, false); } catch (e) { undo(); throw e; }
     stampWrite();
@@ -719,74 +776,112 @@ function makeIo({ vault, plugin }, { view = false } = {}) {
     }
     return false;
   }
-  function mdFilesIn(rel) {
-    const f = vault.getFolderByPath(relPath(rel));
-    if (!f) return [];
-    return f.children.filter(c => c instanceof TFile && c.extension === 'md');
-  }
-  /* Every .md at or below `rel`, depth-first.
+  const { mdFilesIn, mdFilesUnder, subfoldersIn, subfoldersUnder } = live;
 
-     mdFilesIn reads one level, and the reason is the WRITERS, not the folder.
-     No folder in this vault is flat by construction — it is user-writable
-     markdown, and filing dormant accounts into Accounts/Closed/ or a year of
-     notes into Notes/2026/ is an ordinary tidy-up. Notes/ is read with this
-     function because every note writer addresses `n.rel`, the path the note
-     was read from. Accounts/ joined it once its writers learned `a.rel` too
-     (ISSUE 60) — before that, a recursing loader plus one balance edit left
-     R88 000 nested and R90 000 flat, one account in two files. Categories/,
-     Budgets/, Plans/ and Tax/ are still read one level, because their writers
-     ASSEMBLE `<Folder>/<name>.md` and would fork a nested file the same way.
-     Switching a folder to this function means teaching its writers the path
-     FIRST; tests/account-file-paths.test.cjs holds that order.
+  /* readersAt(base) — the READ half of this io (readFile and the four folder
+     walkers), rooted at `base()` instead of the open book. The functions above
+     are readersAt(basePath): rooted at the open book, resolved per call, as
+     they always were.
 
-     Walks the tree rather than filtering vault.getMarkdownFiles(), so the cost
-     stays proportional to the folder rather than to the vault. */
-  function mdFilesUnder(rel) {
-    const root = vault.getFolderByPath(relPath(rel));
-    if (!root) return [];
-    const out = [];
-    const walk = folder => {
-      for (const c of folder.children) {
-        if (c instanceof TFile) { if (c.extension === 'md') out.push(c); }
-        else if (c instanceof TFolder) walk(c);
-      }
-    };
-    walk(root);
-    return out;
-  }
-  function subfoldersIn(rel) {
-    const f = vault.getFolderByPath(relPath(rel));
-    if (!f) return [];
-    return f.children.filter(c => c instanceof TFolder);
-  }
-  /* Every folder at or below `rel`, shallowest first. ISSUE 97.
+     WHY A LOAD NEEDS ITS OWN ROOT (ADR 0009, 2026-11 review). A full load is
+     dozens of awaited reads, and each one used to resolve its path through
+     activeFolder() at the moment it ran. A book switch landing mid-load
+     therefore split the load across two books — the household's categories
+     and Settings.md, the client's transaction rows — and that mixture was
+     handed to every caller as "the state". load.js now captures the folder
+     ONCE when a load starts and reads every file through readersAt() pinned
+     to it, so a load reads one book whatever happens to the open book while
+     it runs; whether its result is still wanted is load.js's decision.
 
-     subfoldersIn reads one level, and for Transactions/ that costs ROWS: an
-     account filed under Transactions/Closed/<name>/ loads its balance (since
-     ISSUE 60 taught Accounts/ to recurse) while its money silently is not
-     there. There is no disclosure list for transactions, so nothing says so.
-
-     Breadth-first is load-bearing, not tidiness. Two folders can present the
-     same leaf name — Transactions/<name>/ and Transactions/Closed/<name>/ —
-     and the label is the leaf. Shallowest-first makes "the first one wins"
-     mean the obvious one, deterministically, rather than depending on the
-     order the vault hands back its children; the losers are disclosed rather
-     than dropped. */
-  function subfoldersUnder(rel) {
-    const root = vault.getFolderByPath(relPath(rel));
-    if (!root) return [];
-    const out = [];
-    let level = root.children.filter(c => c instanceof TFolder);
-    while (level.length) {
-      const next = [];
-      for (const f of level) { out.push(f); for (const c of f.children) if (c instanceof TFolder) next.push(c); }
-      level = next;
+     Same per-io stale record as the live readers: a file read here is held
+     current by this io, exactly as before. Published on the view ctx as
+     `readersAt(folder)`, folder in basePath()'s form. */
+  function readersAt(base) {
+    const rp = p => normalizePath(base() + '/' + p);
+    async function readFile(rel) {
+      const path = rp(rel);
+      const f = vault.getFileByPath(path);
+      const text = f ? await vault.cachedRead(f) : null;
+      /* The caller now holds this file's CURRENT bytes, so whatever it writes
+         back is built on them: whatever made the path stale is no longer a
+         reason to refuse. (Writers that read first — the rules file, the deleted
+         log, the Settings updater — rely on this; load-time writers never call
+         it between the load and the Save.) */
+      rec.stale.delete(keyOf(path));
+      return text;
     }
-    return out;
+    function mdFilesIn(rel) {
+      const f = vault.getFolderByPath(rp(rel));
+      if (!f) return [];
+      return f.children.filter(c => c instanceof TFile && c.extension === 'md');
+    }
+    /* Every .md at or below `rel`, depth-first.
+
+       mdFilesIn reads one level, and the reason is the WRITERS, not the folder.
+       No folder in this vault is flat by construction — it is user-writable
+       markdown, and filing dormant accounts into Accounts/Closed/ or a year of
+       notes into Notes/2026/ is an ordinary tidy-up. Notes/ is read with this
+       function because every note writer addresses `n.rel`, the path the note
+       was read from. Accounts/ joined it once its writers learned `a.rel` too
+       (ISSUE 60) — before that, a recursing loader plus one balance edit left
+       R88 000 nested and R90 000 flat, one account in two files. Categories/,
+       Budgets/, Plans/ and Tax/ are still read one level, because their writers
+       ASSEMBLE `<Folder>/<name>.md` and would fork a nested file the same way.
+       Switching a folder to this function means teaching its writers the path
+       FIRST; tests/account-file-paths.test.cjs holds that order.
+
+       Walks the tree rather than filtering vault.getMarkdownFiles(), so the cost
+       stays proportional to the folder rather than to the vault. */
+    function mdFilesUnder(rel) {
+      const root = vault.getFolderByPath(rp(rel));
+      if (!root) return [];
+      const out = [];
+      const walk = folder => {
+        for (const c of folder.children) {
+          if (c instanceof TFile) { if (c.extension === 'md') out.push(c); }
+          else if (c instanceof TFolder) walk(c);
+        }
+      };
+      walk(root);
+      return out;
+    }
+    function subfoldersIn(rel) {
+      const f = vault.getFolderByPath(rp(rel));
+      if (!f) return [];
+      return f.children.filter(c => c instanceof TFolder);
+    }
+    /* Every folder at or below `rel`, shallowest first. ISSUE 97.
+
+       subfoldersIn reads one level, and for Transactions/ that costs ROWS: an
+       account filed under Transactions/Closed/<name>/ loads its balance (since
+       ISSUE 60 taught Accounts/ to recurse) while its money silently is not
+       there. There is no disclosure list for transactions, so nothing says so.
+
+       Breadth-first is load-bearing, not tidiness. Two folders can present the
+       same leaf name — Transactions/<name>/ and Transactions/Closed/<name>/ —
+       and the label is the leaf. Shallowest-first makes "the first one wins"
+       mean the obvious one, deterministically, rather than depending on the
+       order the vault hands back its children; the losers are disclosed rather
+       than dropped. */
+    function subfoldersUnder(rel) {
+      const root = vault.getFolderByPath(rp(rel));
+      if (!root) return [];
+      const out = [];
+      let level = root.children.filter(c => c instanceof TFolder);
+      while (level.length) {
+        const next = [];
+        for (const f of level) { out.push(f); for (const c of f.children) if (c instanceof TFolder) next.push(c); }
+        level = next;
+      }
+      return out;
+    }
+    return { basePath: base, relPath: rp, readFile, mdFilesIn, mdFilesUnder, subfoldersIn, subfoldersUnder };
   }
 
   return {
     basePath, relPath, readFile, writeFile, writeVaultFile, writeVaultBinary, writeBinary, patchFile, trashFile, fileAt, pathTaken, folderAt, mdFilesIn, mdFilesUnder, subfoldersIn, subfoldersUnder, ensureFolder,
+    /* A load's own root (see readersAt above): the read half, pinned. */
+    readersAt: folder => readersAt(() => normalizePath(folder)),
     createVaultFileIfAbsent, ensureVaultFolder, fileAtVaultPath, readVaultFile, folderAtVaultPath, vaultPathTaken,
     /* The change ledger (see the block above makeIo): the watcher reports what
        it saw, a full reload brackets itself, the controller hears refusals. */

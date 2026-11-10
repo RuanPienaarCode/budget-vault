@@ -1662,6 +1662,8 @@ module.exports = {
 
   'io.stale.message': "{file} foi alterado fora desta página depois de carregado, por isso nada foi escrito",
   'io.stale.notice': "Orçamento: {file} foi alterado fora desta página (outro dispositivo ou a vista markdown) depois de carregado, por isso a sua gravação não foi escrita. A página recarregou o que está agora no disco — volte a fazer a alteração.",
+  'io.bookChanged.message': "Outro livro foi aberto neste dispositivo depois de esta página ter sido lida, por isso {file} não foi escrito — teria ido parar ao livro errado. Volte a fazer a alteração no livro que está agora no ecrã",
+  'io.reloaded.message': "Orçamento: o orçamento foi lido de novo enquanto esperava pela sua resposta (outro livro foi aberto, ou os seus ficheiros mudaram), por isso nada foi alterado. Veja a página de novo e repita se ainda for o que pretende.",
   'load.unreadable.head': "Alguns ficheiros não puderam ser lidos: {list}.",
   'load.unreadable.item': "{file} ({why})",
   'load.unreadable.why.missing': "em falta",

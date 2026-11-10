@@ -1674,6 +1674,8 @@ module.exports = {
 
   'io.stale.message': "{file} iguquliwe ngaphandle kwaleli khasi ngemuva kokuthi ilayishwe, ngakho akukho okubhaliwe",
   'io.stale.notice': "Ibhajethi: {file} iguquliwe ngaphandle kwaleli khasi (enye idivayisi noma ukubuka kwe-markdown) ngemuva kokuthi ilayishwe, ngakho ukulondoloza kwakho akubhalwanga. Ikhasi selilayishe kabusha okukhona manje kudiski — sicela uphinde wenze ushintsho.",
+  'io.bookChanged.message': "Enye incwadi ivuliwe kule divayisi ngemuva kokuthi leli khasi lifundwe, ngakho {file} ayibhalwanga — ibizongena encwadini engeyiyo. Phinda wenze ushintsho encwadini esesikrinini manje",
+  'io.reloaded.message': "Ibhajethi: ibhajethi iphinde yafundwa ngesikhathi ilinde impendulo yakho (enye incwadi ivuliwe, noma amafayela ayo ashintshile), ngakho akukho okushintshiwe. Phinda ubheke ikhasi bese uyaphinda uma kuseyikho okufunayo.",
   'load.unreadable.head': "Amanye amafayela awakwazanga ukufundwa: {list}.",
   'load.unreadable.item': "{file} ({why})",
   'load.unreadable.why.missing': "ayikho",

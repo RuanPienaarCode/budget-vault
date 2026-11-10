@@ -139,15 +139,30 @@ class BudgetSettingTab extends PluginSettingTab {
 
     /* The one control that edits the HOME book (ADR 0009) — so it, alone in
        this file, reads and writes settings.budgetFolder rather than the open
-       book; tests/books-one-seam.test.cjs names it as an allowed site. */
-    new Setting(containerEl)
+       book; tests/books-one-seam.test.cjs names it as an allowed site.
+
+       A folder that would make the home book share files with a listed book
+       (inside one, or holding one) is REFUSED, not taken (homeFolderProblem,
+       src/books.js validateHomeFolder). This field saves on every keystroke,
+       so the refusal is said in place of the setting's description rather
+       than as a notice per key: typing "Clients/Acme2" past a listed
+       "Clients/Acme" passes through "Clients", and a toast for each letter
+       would bury the one that matters. Nothing is saved and nothing reloads
+       while the field holds a refused folder; the description comes back the
+       moment it does not. */
+    const folderSetting = new Setting(containerEl)
       .setName(i18n.t('settings.folder.name'))
-      .setDesc(i18n.t('settings.folder.desc'))
+      .setDesc(i18n.t('settings.folder.desc'));
+    folderSetting
       .addText(t => t
         .setPlaceholder(DEFAULT_SETTINGS.budgetFolder)
         .setValue(this.plugin.settings.budgetFolder)
         .onChange(async v => {
-          this.plugin.settings.budgetFolder = normalizePath(v.trim() || DEFAULT_SETTINGS.budgetFolder);
+          const next = normalizePath(v.trim() || DEFAULT_SETTINGS.budgetFolder);
+          const problem = this.homeFolderRefusal(next);
+          if (problem) { folderSetting.setDesc(problem); return; }
+          folderSetting.setDesc(i18n.t('settings.folder.desc'));
+          this.plugin.settings.budgetFolder = next;
           // Guarded like every other write in this tab: a rejected
           // saveSettings() used to be an unhandled rejection. reloadViews()
           // still runs either way — the folder picked is real in memory even
@@ -850,11 +865,26 @@ class BudgetSettingTab extends PluginSettingTab {
     return setting;
   }
 
+  /* The sentence that refuses `folder` as the home book's, or null when it
+     may be. One wording for both halves of the tab — display()'s text field
+     and the 1.13 declarative control's validate() — taken from the Add
+     dialog's own books.problem.* keys, since the rule is the same one. A
+     plugin without the seam (a bare test double) refuses nothing. */
+  homeFolderRefusal(folder) {
+    if (typeof this.plugin.homeFolderProblem !== 'function') return null;
+    const problem = this.plugin.homeFolderProblem(folder);
+    return problem ? i18n.t(`books.problem.${problem.reason}`, { folder: problem.folder || '/' }) : null;
+  }
+
   async setControlValue(key, value) {
     if (!MD_KEYS.has(key)) {
       // validate() rejects a bad value but never rewrites a good one, so the
       // folder path is normalised on the way to disk here.
       if (key === 'budgetFolder') value = normalizePath(String(value).trim() || DEFAULT_SETTINGS.budgetFolder);
+      /* validate() below refuses an overlapping home folder before the host
+         calls this; asked again in case a host reaches here without it — a
+         refused folder must never be written by the back door. */
+      if (key === 'budgetFolder' && this.homeFolderRefusal(value)) return;
       await super.setControlValue(key, value);
       // Both axes of the look are applied by the same call: applyTheme() sets
       // the dark class and the palette class together.
@@ -1074,7 +1104,10 @@ class BudgetSettingTab extends PluginSettingTab {
       {
         name: i18n.t('settings.folder.name'),
         desc: i18n.t('settings.folder.desc'),
-        control: { type: 'folder', key: 'budgetFolder', placeholder: DEFAULT_SETTINGS.budgetFolder },
+        control: {
+          type: 'folder', key: 'budgetFolder', placeholder: DEFAULT_SETTINGS.budgetFolder,
+          validate: v => this.homeFolderRefusal(normalizePath(String(v ?? '').trim() || DEFAULT_SETTINGS.budgetFolder)) || undefined,
+        },
       },
       {
         name: i18n.t('settings.theme.name'),

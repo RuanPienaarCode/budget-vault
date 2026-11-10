@@ -1647,6 +1647,8 @@ module.exports = {
 
   'io.stale.message': "{file} wurde nach dem Laden außerhalb dieser Seite geändert, daher wurde nichts geschrieben",
   'io.stale.notice': "Budget: {file} wurde nach dem Laden außerhalb dieser Seite geändert (anderes Gerät oder Markdown-Ansicht), daher wurde Ihr Speichern nicht geschrieben. Die Seite hat neu geladen, was jetzt auf dem Datenträger steht — bitte nehmen Sie die Änderung erneut vor.",
+  'io.bookChanged.message': "Nachdem diese Seite gelesen wurde, ist auf diesem Gerät ein anderes Buch geöffnet worden, daher wurde {file} nicht geschrieben — es wäre im falschen Buch gelandet. Nehmen Sie die Änderung im jetzt angezeigten Buch erneut vor",
+  'io.reloaded.message': "Budget: Das Budget wurde neu gelesen, während auf Ihre Antwort gewartet wurde (ein anderes Buch wurde geöffnet oder seine Dateien haben sich geändert), daher wurde nichts geändert. Sehen Sie sich die Seite erneut an und wiederholen Sie den Vorgang, wenn er noch gewünscht ist.",
   'load.unreadable.head': "Einige Dateien konnten nicht gelesen werden: {list}.",
   'load.unreadable.item': "{file} ({why})",
   'load.unreadable.why.missing': "fehlt",

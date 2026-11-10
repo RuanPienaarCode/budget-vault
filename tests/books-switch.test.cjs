@@ -198,6 +198,22 @@ const LIST = [{ folder: ACME, label: 'Acme' }, { folder: ZETA, label: 'Zeta' }];
       'a change of the select goes through pickBook, which says every refusal');
     ok(/async function connectVault\(\) \{\s*applyBooks\(\)/.test(ctl), 'connectVault redraws the switcher, so every switch and reload ends in a fresh list');
     ok(/applyBooks,\s*\};/.test(ctl), 'the controller exposes applyBooks, which main.js refreshBookSwitchers() calls on a settings write');
+
+    /* ---- 3c. the two gates section 4's stand-in controller re-spells -------
+       (2026-11 review: this file claimed "the real dirty rule and the real
+       decline-while-dirty reload" while running hand-copied ones.) Pinned in
+       the source instead, so a change to either in controller.js turns this
+       file red rather than leaving the stand-in testing a rule the app no
+       longer has. */
+    ok(/ctx\.registerDirty\(\(\) => Object\.values\(S\.txFiles\)\.some\(f => f\.dirty\)\);/.test(ctl),
+      'controller.js counts a tx file with unsaved rows as dirty — the stand-in\'s first clause');
+    ok(/ctx\.registerDirty\(\(\) => !!S\.pendingImport\);/.test(ctl), '… and a pending import — its second');
+    ok(/function hasDirty\(\) \{\s*return dirtyChecks\.some\(fn => fn\(\)\);\s*\}/.test(ctl), '… over every registerDirty predicate — its third (ctx._dirty)');
+    ok(/reload: async \(\) => \{\s*if \(hasDirty\(\)\) \{[\s\S]{0,120}return;\s*\}\s*await connectVault\(\);/.test(ctl),
+      'ctl.reload() declines while dirty, else connectVault() — the stand-in\'s reload');
+    ok(/async function connectVault\(\) \{[\s\S]{0,80}await doReloadFromDisk\(\);/.test(ctl)
+      && /const doReloadFromDisk = \(\) => reloadFromDisk\(ctx, S, \$, disableSaveButtons\);/.test(ctl),
+      'connectVault() reloads through the module-level reloadFromDisk() — the function the stand-in calls');
   }
 
   /* ---- 4-5. switchBook on the real plugin, over the real loader ------------- */
@@ -220,6 +236,7 @@ const LIST = [{ folder: ACME, label: 'Acme' }, { folder: ZETA, label: 'Zeta' }];
   };
   const BudgetPlugin = require('../src/main');
   const { BudgetView } = require('../src/view');
+  const { reloadFromDisk } = require('../src/controller');
   const { buildApi } = require('../src/api');
 
   const tx = (rows) => '---\nkind: transactions\n---\n\n'
@@ -239,9 +256,19 @@ const LIST = [{ folder: ACME, label: 'Acme' }, { folder: ZETA, label: 'Zeta' }];
   };
 
   /* One device: a vault holding the home household and two client books, a
-     real plugin onto it, a real API, and one "open view" whose controller is
-     the real loader plus the real dirty rule (controller.js: a tx file with
-     unsaved rows, or a pending import) and the real decline-while-dirty reload.
+     real plugin onto it, a real API, and one "open view" whose controller is a
+     STAND-IN — mountApp needs a DOMParser shell no bare-node test can build
+     (3b says so for the switcher too). What is real and what is re-spelled:
+       - the reload runs controller.js's OWN module-level reloadFromDisk() —
+         the function connectVault() calls, stale bracket and all — over the
+         real loader. This ctx mounts no Budget page, so there is no budget
+         draft for it to invalidate, and that one hook is a no-op;
+       - the two closure-level gates are RE-SPELLED, because they live inside
+         mountApp: hasDirty() (the views' registerDirty predicates plus the
+         controller's own two — a tx file with unsaved rows, a pending
+         import) and reload()'s decline-while-dirty. Section 3c pins those
+         lines in controller.js's source, so the stand-in cannot drift from
+         them without this file going red.
      `lock` turns the privacy splash on, as the setting does. */
   async function device({ lock = false, files = { ...SEED, ...ACME_FILES, ...ZETA_FILES }, settings = {} } = {}) {
     const vault = H.makeVault(files);
@@ -267,13 +294,14 @@ const LIST = [{ folder: ACME, label: 'Acme' }, { folder: ZETA, label: 'Zeta' }];
     ctx.vault = vault; ctx.app = app; ctx.plugin = plugin;
     await H.loadInto(ctx);
     const view = Object.create(BudgetView.prototype);
+    if (typeof ctx.invalidateBudgetDraft !== 'function') ctx.provide({ invalidateBudgetDraft: () => {} });
     const ctl = {
       reloads: 0, declined: 0,
       hasDirty: () => ctx._dirty() || Object.values(ctx.S.txFiles).some(f => f.dirty) || !!ctx.S.pendingImport,
       reload: async () => {
         if (ctl.hasDirty()) { ctl.declined++; return; }
         ctl.reloads++;
-        await ctx.loadVault();
+        await reloadFromDisk(ctx, ctx.S, ctx.$, () => {});
       },
     };
     view.appCtl = ctl;
@@ -451,5 +479,5 @@ const LIST = [{ folder: ACME, label: 'Acme' }, { folder: ZETA, label: 'Zeta' }];
     }
   } finally { unpin(); Module._load = prevLoad; }
 
-  console.log(`PASS books-switch — one safe switch path: refusals in their order, key-only write, reload, API told once, B's state and nothing of A's, no switcher in a single-book vault (${checks} checks)`);
+  console.log(`PASS books-switch — one safe switch path: refusals in their order, key-only write, reload (controller's reloadFromDisk; its dirty gates source-pinned), API told once, B's state and nothing of A's, no switcher in a single-book vault (${checks} checks)`);
 })().catch(e => { console.error(e); process.exit(1); });

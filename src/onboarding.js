@@ -1575,6 +1575,13 @@ class OnboardingWizard extends Modal {
         const problem = p.bookProblem(folder);
         if (problem) { this.fail(i18n.t(`books.problem.${problem.reason}`, { folder: problem.folder || '/' })); return; }
       } else {
+        /* The home book obeys the overlap rule too (2026-11 review): the setup
+           wizard pointed at a folder holding a listed book, or inside one,
+           would make two books share files. Refused before a single file is
+           written, with the Add dialog's own sentence, and budgetFolder left
+           where it was. */
+        const problem = typeof p.homeFolderProblem === 'function' ? p.homeFolderProblem(folder) : null;
+        if (problem) { this.fail(i18n.t(`books.problem.${problem.reason}`, { folder: problem.folder || '/' })); return; }
         p.settings.budgetFolder = folder;
       }
       if (this.registersOnly()) {

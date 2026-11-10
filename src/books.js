@@ -40,6 +40,8 @@
    at the bottom take the host and the storage getter as arguments, so the
    bare-node tests drive them with fakes and main.js hands them the real ones. */
 
+const { hiddenSegment } = require('./vault-path');
+
 /* A folder in the one form every comparison here uses. Mirrors what Obsidian's
    normalizePath does to the parts that decide whether two spellings are the
    same folder — `\` and `/` both separate, runs of separators collapse, no
@@ -65,17 +67,43 @@ function normalizeFolder(folder) {
     .normalize('NFC');
 }
 
+/* May this (normalised) folder stand in the LIST as a book at all? The same
+   three refusals validateNewBook() makes at Add time — the vault root, a
+   segment made only of dots, a dot-folder Obsidian never indexes — applied to
+   whatever data.json actually holds, because data.json is a file anyone can
+   edit and the Add dialog is not the only way in.
+
+   The root is the one that bit (2026-11 review of #166–#169): a hand-edited
+   `{ folder: "" }` normalised to the vault root, folderExists('/') is always
+   true, and a stored choice of '' then opened the WHOLE VAULT as a book — one
+   containing every other book, its Categories/ whatever happened to sit at the
+   top of the vault, and every Save rooted there. Dropped here, an entry like
+   that is not a book anywhere: not openable (resolveOpenBook), not offered
+   (bookChoices), not switched to (switchDecision), not guarded as one by the
+   export check (allBookFolders). The HOME book is not a list entry and is
+   never filtered — a budget kept at the vault root is today's behaviour and
+   stays so; only a LISTED root is refused. The config folder is not checked:
+   it is a dot-folder unless a vault renamed it, and this module is not handed
+   the vault (validateNewBook, which is, checks it). */
+function listableFolder(f) {
+  if (!f) return false;
+  if (f.split('/').some(s => /^\.+$/.test(s.trim()))) return false;
+  return !hiddenSegment(f);
+}
+
 /* The listed books' folders, normalised, in list order, each once. Tolerates a
    hand-edited data.json: a `books` that is not an array, an entry that is not
    an object, or one with no string `folder`, contributes nothing rather than
    throwing at boot — the same "a typo cannot break the app" contract
-   resolveLanguage() gives Settings.md. */
+   resolveLanguage() gives Settings.md. An entry naming a folder that can never
+   be a book (listableFolder, above) contributes nothing for the same reason. */
 function bookFolders(books) {
   if (!Array.isArray(books)) return [];
   const out = [];
   for (const b of books) {
     if (!b || typeof b !== 'object' || typeof b.folder !== 'string') continue;
     const f = normalizeFolder(b.folder);
+    if (!listableFolder(f)) continue;
     if (!out.includes(f)) out.push(f);
   }
   return out;
@@ -353,6 +381,9 @@ function bookChoices({ books, homeFolder, homeName, openFolder, homeFallback } =
     for (const b of books) {
       if (!b || typeof b !== 'object' || typeof b.folder !== 'string') continue;
       const f = normalizeFolder(b.folder);
+      /* bookFolders' filter, except for the home book's own entry: a home
+         book at the vault root may still carry the label its entry gives it. */
+      if (f !== home && !listableFolder(f)) continue;
       if (!listed.some(x => x.folder === f)) listed.push({ folder: f, label: labelOf(b) });
     }
   }
@@ -423,7 +454,6 @@ function bookChoices({ books, homeFolder, homeName, openFolder, homeFallback } =
    overlap, "clients/acme" beside a listed "Clients/Acme" is ONE folder on
    APFS, iOS and Windows — the filesystems most readers have — so folding is
    the safe side: it refuses a pair that would have shared every file. */
-const { hiddenSegment } = require('./vault-path');
 const foldFolder = f => normalizeFolder(f).toLowerCase();
 /** @param {{ books?: any, homeFolder?: string, folder?: any, configDir?: string }} [args] */
 function validateNewBook({ books, homeFolder, folder, configDir } = {}) {
@@ -446,6 +476,60 @@ function validateNewBook({ books, homeFolder, folder, configDir } = {}) {
     if (g === '' || w.startsWith(g + '/')) return { reason: 'nested', folder: f };
   }
   for (const f of existing) if (foldFolder(f).startsWith(w + '/')) return { reason: 'contains', folder: f };
+  return null;
+}
+
+/* validateHomeFolder({ books, homeFolder, folder, configDir }) → null | problem
+
+   May the HOME book (settings.budgetFolder) move to `folder`? The folder
+   setting and the setup wizard's normal mode are the two places that assign
+   budgetFolder, and until the 2026-11 review neither asked anything: the Add
+   dialog refused "Clients" beside a listed "Clients/Acme", and then the folder
+   setting accepted it for the home book — two books sharing files by the back
+   door, which is the one thing the overlap rule above exists to prevent.
+
+   validateNewBook's rule with the home SLOT ignored, because the home folder
+   is being REPLACED, not kept: a new home inside the old home's folder is
+   fine (the old one stops being a book), and so is the old home's own folder.
+   Every other book — each listed entry that is not the current home — must
+   not overlap the new home, case-folded for the reason validateNewBook gives.
+
+   Two differences from adding a book, each on purpose:
+
+     - the vault root is ALLOWED when no other book is listed. A budget kept at
+       the top of the vault is today's single-book behaviour and the folder
+       setting has always accepted it; with another book listed, the root
+       contains it and is refused as 'contains' like any other folder would be.
+       An empty `folder` is the root here too — the folder setting puts its own
+       default in place of an empty field before asking.
+     - a folder EQUAL to a listed book is allowed: that makes the listed book
+       the home book — one folder, one book, nothing shared.
+
+   Traversal, dot-folders and the config folder are refused with
+   validateNewBook's reasons: a home book there is one the app could never read
+   back, or one quietly rebased somewhere other than where it was typed. */
+/** @param {{ books?: any, homeFolder?: string, folder?: any, configDir?: string }} [args] */
+function validateHomeFolder({ books, homeFolder, folder, configDir } = {}) {
+  const want = normalizeFolder(typeof folder === 'string' ? folder : '');
+  if (want.split('/').some(s => /^\.+$/.test(s.trim()))) return { reason: 'traversal' };
+  const hidden = hiddenSegment(want);
+  if (hidden) return { reason: 'hidden', folder: hidden.trim() };
+  const w = foldFolder(want);
+  const cfg = foldFolder(configDir || '');
+  if (cfg && w && (w === cfg || w.startsWith(cfg + '/'))) return { reason: 'hidden', folder: normalizeFolder(configDir) };
+  const home = foldFolder(homeFolder);
+  const others = bookFolders(books).filter(f => foldFolder(f) !== home);
+  /* Two passes, nested first, for validateNewBook's reason: the most specific
+     true thing about the folder. No listed folder is '' (bookFolders drops a
+     listed root), so `g + '/'` never matches everything. */
+  for (const f of others) {
+    const g = foldFolder(f);
+    if (g !== w && w.startsWith(g + '/')) return { reason: 'nested', folder: f };
+  }
+  for (const f of others) {
+    const g = foldFolder(f);
+    if (g !== w && (w === '' || g.startsWith(w + '/'))) return { reason: 'contains', folder: f };
+  }
   return null;
 }
 
@@ -551,5 +635,5 @@ module.exports = {
   OPEN_BOOK_KEY, readStoredBook, writeStoredBook,
   activeFolderOf, allBookFoldersOf,
   switchDecision, bookChoices,
-  validateNewBook, bookListAdd, bookListRelabel, bookListRemove,
+  validateNewBook, validateHomeFolder, bookListAdd, bookListRelabel, bookListRemove,
 };

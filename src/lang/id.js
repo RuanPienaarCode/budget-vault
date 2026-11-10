@@ -1594,6 +1594,8 @@ module.exports = {
 
   'io.stale.message': "{file} diubah di luar halaman ini setelah dimuat, jadi tidak ada yang ditulis",
   'io.stale.notice': "Anggaran: {file} diubah di luar halaman ini (perangkat lain atau tampilan markdown) setelah dimuat, jadi simpanan Anda tidak ditulis. Halaman sudah memuat ulang isi yang kini ada di disk — silakan ulangi perubahannya.",
+  'io.bookChanged.message': "Buku lain dibuka di perangkat ini setelah halaman ini dibaca, jadi {file} tidak ditulis — file itu akan masuk ke buku yang salah. Lakukan perubahan lagi di buku yang kini tampil di layar",
+  'io.reloaded.message': "Anggaran: anggaran dibaca ulang saat menunggu jawaban Anda (buku lain dibuka, atau file-filenya berubah), jadi tidak ada yang diubah. Lihat halaman lagi dan ulangi jika memang masih itu yang Anda inginkan.",
   'load.unreadable.head': "Beberapa berkas tidak dapat dibaca: {list}.",
   'load.unreadable.item': "{file} ({why})",
   'load.unreadable.why.missing': "tidak ada",

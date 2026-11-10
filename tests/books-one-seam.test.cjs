@@ -62,14 +62,20 @@ const ALLOWED = [
     why: 'the home-book text field (pre-1.13 tab): its placeholder' },
   { file: 'settings-tab.js', line: '.setValue(this.plugin.settings.budgetFolder)', count: 1,
     why: 'the home-book text field shows the home book, not the open one' },
-  { file: 'settings-tab.js', line: 'this.plugin.settings.budgetFolder = normalizePath(v.trim() || DEFAULT_SETTINGS.budgetFolder);', count: 1,
-    why: 'the home-book text field writes the home book' },
+  { file: 'settings-tab.js', line: 'const next = normalizePath(v.trim() || DEFAULT_SETTINGS.budgetFolder);', count: 1,
+    why: 'the home-book text field normalising what was typed, before the overlap check (review finding 5)' },
+  { file: 'settings-tab.js', line: 'this.plugin.settings.budgetFolder = next;', count: 1,
+    why: 'the home-book text field writes the home book — once homeFolderProblem() has passed it' },
+  { file: 'settings-tab.js', line: "if (key === 'budgetFolder' && this.homeFolderRefusal(value)) return;", count: 1,
+    why: 'the 1.13 declarative tab refusing an overlapping home folder before it is written' },
   { file: 'settings-tab.js', line: "if (key === 'budgetFolder') value = normalizePath(String(value).trim() || DEFAULT_SETTINGS.budgetFolder);", count: 1,
     why: 'the 1.13 declarative tab normalising the home-book control on its way to disk' },
   { file: 'settings-tab.js', line: "else if (key === 'budgetFolder') this.plugin.reloadViews();", count: 1,
     why: 'the 1.13 declarative tab reloading after the home-book control changed' },
-  { file: 'settings-tab.js', line: "control: { type: 'folder', key: 'budgetFolder', placeholder: DEFAULT_SETTINGS.budgetFolder },", count: 1,
+  { file: 'settings-tab.js', line: "type: 'folder', key: 'budgetFolder', placeholder: DEFAULT_SETTINGS.budgetFolder,", count: 1,
     why: 'the 1.13 declarative definition of the home-book control' },
+  { file: 'settings-tab.js', line: "validate: v => this.homeFolderRefusal(normalizePath(String(v ?? '').trim() || DEFAULT_SETTINGS.budgetFolder)) || undefined,", count: 1,
+    why: 'the 1.13 declarative home-book control refusing an overlapping folder (validateHomeFolder)' },
 
   /* The setup wizard sets up the HOME book, so both lines are its own. Its
      add-a-book mode (#168) reads neither for the book it writes: the folder

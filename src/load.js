@@ -15,7 +15,8 @@ const { parseDelimited, sniffDelimiter, uncsvCell } = require('./csv');
    consumers of transaction rows still go through tx-role.js. */
 const { SCHEMAS, rowToObject, attachExtraCells, extraColsOf, knownColumns, lineEndingOf, keepsDigits } = require('./table-schema');
 const { PLAN_TABLES, TAX_TABLES } = require('./table-schema');
-const { setLanguage, defaultLanguage } = require('./i18n');
+const i18n = require('./i18n');
+const { setLanguage, defaultLanguage, resolveLanguage } = i18n;
 const { safeSeg } = require('./vault-path');
 const { isRealIsoDate } = require('./dates');
 const { parseOwners } = require('./owners');
@@ -166,7 +167,15 @@ function readFlatTable(schema, text) {
 }
 
 module.exports = function registerLoad(ctx) {
-  const { S, vault, readFile, basePath, mdFilesIn, mdFilesUnder, subfoldersIn, subfoldersUnder, currentPeriod, periodKeyValid } = ctx;
+  const { S, vault, currentPeriod, periodKeyValid } = ctx;
+
+  /* ADR-0007 · Every load starts from the default settings. The defaults are
+     what this ctx's S carried when the loader was registered — controller.js's
+     and api.js's literal (tests/api-state-settings-parity.test.cjs holds the
+     two together), or a test harness's own — copied, so no load can reach
+     back into them. Starting from the last load's instead let a key a book's
+     Settings.md leaves out inherit the PREVIOUS book's value. */
+  const SETTINGS_DEFAULTS = JSON.parse(JSON.stringify(S.settings || {}));
 
   /* ADR-0007 · Reads in parallel, parsing serial. The wait is I/O round trips, not work.
      ADR-0007 · read() is declared where loadNotes can reach it. Not inside loadVault. */
@@ -175,23 +184,68 @@ module.exports = function registerLoad(ctx) {
     return files.map((file, i) => ({ file, text: texts[i] }));
   };
 
-  /* ADR-0007 · loadVault is single-flight. Overlapping loads duplicate the array sections;
-     one latch joins a load already in flight instead of restarting it. */
-  let loadInFlight = null;
+  /* ---- which book is in memory, and the one rule for loading another ----
+     ADR-0007 · loadVault is single-flight. Only for one folder: a call for
+     another folder starts its own load.
+     ADR-0007 · A load is for one book, built aside, committed whole. It reads
+     every file through io.js readersAt() pinned to the folder it started for,
+     builds its state off to the side, and commits in one synchronous step only
+     if that folder is still open and no newer load has committed. A caller
+     whose load was superseded follows the switch. `committed` is the folder
+     the state in S was read from (basePath() form) and the load's sequence
+     number — io.js refuses a write into any other folder (loadedBook). */
+  let committed = null;     // { folder, seq } — frozen; replaced, never mutated
+  let seq = 0;
+  let inFlight = null;      // { folder, promise } — the load a same-folder caller joins
+  const openFolder = () => ctx.basePath();
+
   function loadVault() {
-    if (!loadInFlight) {
-      loadInFlight = doLoadVault().finally(() => { loadInFlight = null; });
-    }
-    return loadInFlight;
+    const folder = openFolder();
+    if (inFlight && inFlight.folder === folder) return inFlight.promise;
+    const entry = { folder, promise: null };
+    const mine = ++seq;
+    entry.promise = doLoadVault(folder, mine)
+      .finally(() => { if (inFlight === entry) inFlight = null; })
+      .then(() => {
+        /* Superseded: the open book moved while this read. Follow it; a load
+           already running for the new folder is joined, not doubled. */
+        if (!committed || committed.folder !== openFolder()) return loadVault();
+        return undefined;
+      });
+    inFlight = entry;
+    return entry.promise;
   }
 
-  async function doLoadVault() {
+  /* The book the state in memory was read from, or null before the first load:
+     { folder, seq }, one frozen object per committed load, so a caller holding
+     one across an await can tell "still the same load" by identity. */
+  function loadedBook() { return committed; }
+
+  /* ADR-0007 · A confirmation dialog takes a load stamp. Take loadedBook()
+     before the dialog, pass it here after: null while the state is still the
+     one the stamp was taken on, else the sentence to show — the state the
+     operation gathered was replaced under the dialog (another book opened, or
+     the vault re-read), so acting on it would write from a state nobody is
+     looking at any more. */
+  function stateReplaced(stamp) {
+    if (committed === stamp && (!committed || committed.folder === openFolder())) return null;
+    return i18n.t('io.reloaded.message');
+  }
+
+  async function doLoadVault(folder, mySeq) {
+    // Every read below goes through R, rooted at `folder`; T is committed at the end.
+    const R = ctx.readersAt(folder);
+    const T = { settings: JSON.parse(JSON.stringify(SETTINGS_DEFAULTS)) };
+    /* ADR-0007 · The interface language is set at commit. i18n.js holds it as a
+       global, so a superseded load must not set it; no Settings.md means the
+       default language, as at a fresh mount — not the previous book's. */
+    let language = defaultLanguage();
     /* ADR-0007 · Unreadable files are recorded, not swallowed. Every fallback
        below still opens the app; S.unreadableFiles ({ rel, why }, rel relative
        to the budget folder) names what it fell back past, for the page banner. */
     const unreadable = [];
-    S.unreadableFiles = unreadable;
-    const settingsTxt = await readFile('Settings.md');
+    T.unreadableFiles = unreadable;
+    const settingsTxt = await R.readFile('Settings.md');
     if (!settingsTxt || !settingsTxt.trim()) unreadable.push({ rel: 'Settings.md', why: 'missing' });
     else if (!hasFrontmatterBlock(settingsTxt)) unreadable.push({ rel: 'Settings.md', why: 'frontmatter' });
     if (settingsTxt) {
@@ -200,7 +254,7 @@ module.exports = function registerLoad(ctx) {
         // Clamp 1–28 even for hand-edited files: 29–31 skews period lengths and
         // misassigns rolled-over days (the settings UI already clamps).
         const n = parseInt(fm.month_start_day, 10) || 23;
-        S.settings.month_start_day = Math.min(28, Math.max(1, n));
+        T.settings.month_start_day = Math.min(28, Math.max(1, n));
       }
       /* ADR-0007 · Pay cycle is a length in days with an anchor. Absent means payday months;
          a cycle without an anchor is dropped with it. */
@@ -210,59 +264,60 @@ module.exports = function registerLoad(ctx) {
          screen sat there showing a cycle the app was not running. */
       const anchor = (fm.period_anchor || '').toString().trim();
       const anchorOk = isRealIsoDate(anchor);
-      S.settings.period_days = anchorOk ? periodDaysOrZero(fm.period_days) : 0;
-      S.settings.period_anchor = anchorOk ? anchor : '';
-      if (fm.currency) S.settings.currency = fm.currency;
+      T.settings.period_days = anchorOk ? periodDaysOrZero(fm.period_days) : 0;
+      T.settings.period_anchor = anchorOk ? anchor : '';
+      if (fm.currency) T.settings.currency = fm.currency;
       /* ADR-0007 · Exchange rates are opt-in and normalised to a boolean. ISSUE 30 — absent
          means off: zero network requests. */
-      S.settings.exchange_rates = String(fm.exchange_rates ?? '').trim().toLowerCase() === 'on';
+      T.settings.exchange_rates = String(fm.exchange_rates ?? '').trim().toLowerCase() === 'on';
       /* ADR-0007 · rate_refresh defaults to daily and is normalised. Through fx.normalizeCadence,
          so a hand-edited `hourly` falls back. */
-      S.settings.rate_refresh = normalizeCadence(fm.rate_refresh);
+      T.settings.rate_refresh = normalizeCadence(fm.rate_refresh);
       /* The ISO code the rate lookup asks for. The `currency` symbol above is
          what gets PRINTED; this says which currency that symbol means, because
          "$" is four of them. Blank is a complete answer — it just means rates
          cannot be fetched. */
-      S.settings.currency_code = normalizeCode(fm.currency_code);
+      T.settings.currency_code = normalizeCode(fm.currency_code);
       // Country code (za/us/uk/…) — localeFor falls back to za for unknown
       // values, so a hand-edited Settings.md can't break the app.
-      S.settings.country = (fm.country || 'za').toString().trim().toLowerCase();
+      T.settings.country = (fm.country || 'za').toString().trim().toLowerCase();
       /* ADR-0007 · Language is independent of country. Absent follows Obsidian's display
          language; an unknown value falls back to English. */
-      S.settings.language = setLanguage(fm.language || defaultLanguage());
+      language = resolveLanguage(fm.language || defaultLanguage());
+      T.settings.language = language;
       /* ADR-0007 · input_mode defaults to csv and is assigned unconditionally. inputMode() in
          constants.js is the one normaliser. */
-      S.settings.input_mode = inputMode(fm.input_mode);
-      S.settings.household = fm.household || '';
+      T.settings.input_mode = inputMode(fm.input_mode);
+      T.settings.household = fm.household || '';
       /* The people the household's accounts can belong to. Absent means "one
          person", which is what every vault written before this key existed
          says — and the Accounts page then hides the owner controls entirely
          rather than offering a question with one possible answer. */
-      S.settings.owners = parseOwners(fm.owners);
+      T.settings.owners = parseOwners(fm.owners);
       /* The household's own category groups and which groups the emergency
          maths may drop — see src/groups.js for the shape and the rules. Both
          absent means the built-in types only, which is what every vault
          written before these keys existed says. */
-      S.settings.groups = parseGroups(fm.groups);
-      S.settings.nonessential_groups = parseNonEssential(fm.nonessential_groups, S.settings.groups);
+      T.settings.groups = parseGroups(fm.groups);
+      T.settings.nonessential_groups = parseNonEssential(fm.nonessential_groups, T.settings.groups);
       /* ADR-0007 · overspend_lag is clamped to 1–12. A credit card settles a month in arrears;
          0 would read a deficit that is still growing. */
-      S.settings.overspend_lag = overspendLag(fm.overspend_lag);
+      T.settings.overspend_lag = overspendLag(fm.overspend_lag);
       /* ADR-0007 · emergency_target_months is assigned unconditionally. The clamp lives in
          constants.js beside the settings tab's. */
-      S.settings.emergency_target_months = emergencyTarget(fm.emergency_target_months);
+      T.settings.emergency_target_months = emergencyTarget(fm.emergency_target_months);
       /* The value of one Discovery Mile, in the household's currency, for the Miles
          importer (src/miles.js). Assigned unconditionally like the two above, and
          through the one definition, so a blank, zero or unreadable hand-edit
          reads as the default 10 Miles to the rand rather than as nothing. */
-      S.settings.miles_rate = milesRate(fm.miles_rate);
+      T.settings.miles_rate = milesRate(fm.miles_rate);
     }
-    S.categories = [];
-    for (const { file, text } of await read(mdFilesUnder('Categories'))) {
+    T.categories = [];
+    for (const { file, text } of await read(R.mdFilesUnder('Categories'))) {
       const { fm } = parseFrontmatter(text);
       // Prefer the exact name from frontmatter — filenames drop filesystem-illegal
       // chars, so the frontmatter `name` is the source of truth.
-      S.categories.push({
+      T.categories.push({
         name: fm.name || file.basename, type: fm.type || 'expense', color: fm.color || '#888',
         /* ADR-0007 · type_stated: an absent type is not an answer. `type` defaults to expense;
            ISSUE 32's pairing rule must not read the default as a statement. */
@@ -279,13 +334,13 @@ module.exports = function registerLoad(ctx) {
         /* Budget-folder-relative, because that is the currency readFile and
            writeFile deal in — file.path is absolute within the vault and would
            be re-prefixed by relPath into a path that does not exist. */
-        rel: file.path.slice(basePath().length + 1),   // ISSUE 97 — READ from, never assembled
+        rel: file.path.slice(R.basePath().length + 1),   // ISSUE 97 — READ from, never assembled
       });
     }
-    const order = typeOrder(S.settings.groups);
-    S.categories.sort((a, b) => typeRank(a.type, order) - typeRank(b.type, order) || a.name.localeCompare(b.name));
+    const order = typeOrder(T.settings.groups);
+    T.categories.sort((a, b) => typeRank(a.type, order) - typeRank(b.type, order) || a.name.localeCompare(b.name));
 
-    S.accounts = [];
+    T.accounts = [];
     /* ADR-0007 · Nested account files are named, not loaded. ISSUE 60: every write site
        addresses Accounts/<name>.md, so loading them would fork the file on the next save. */
     /* Found minus read, not "deeper than one level": the disclosure then states
@@ -296,13 +351,13 @@ module.exports = function registerLoad(ctx) {
        acctPath), so a file found deeper is edited in place instead of being
        forked to a second copy at the top level. That order was the whole
        blocker — tests/account-file-paths.test.cjs holds it. */
-    const acctFiles = mdFilesUnder('Accounts');
+    const acctFiles = R.mdFilesUnder('Accounts');
     const acctRead = new Set(acctFiles.map(f => f.path));
-    S.accountsIgnored = mdFilesUnder('Accounts').filter(f => !acctRead.has(f.path)).map(f => f.path);
+    T.accountsIgnored = R.mdFilesUnder('Accounts').filter(f => !acctRead.has(f.path)).map(f => f.path);
     /* ADR-0007 · Two accounts claiming one transaction folder. ISSUE 72: keyed the way
        accountForLabel keys; filled after the accounts loop below. */
-    S.accountsDuplicated = [];
-    const acctBase = ctx.basePath();
+    T.accountsDuplicated = [];
+    const acctBase = R.basePath();
     for (const { file: f, text: acctText } of await read(acctFiles)) {
       const { fm, body, raw } = parseFrontmatter(acctText);
       /* An account file that OPENS a frontmatter block and never closes it:
@@ -311,7 +366,7 @@ module.exports = function registerLoad(ctx) {
       if (startsFence(acctText) && !hasFrontmatterBlock(acctText)) {
         unreadable.push({ rel: f.path.slice(acctBase.length + 1), why: 'frontmatter' });
       }
-      S.accounts.push({
+      T.accounts.push({
         name: f.basename,
         /* The file this account WAS read from, from its own path — loadNotes'
            rule below, and categories' `rel`. `Accounts/<name>.md` is a guess
@@ -341,7 +396,7 @@ module.exports = function registerLoad(ctx) {
            HOME to currency.js and FOREIGN to fx.js (R1 000 vs R17 985,61); flagged here, where
            both halves are in scope, only for the contradictory case. */
         ...((clash => (clash ? { currency_conflict: clash } : {}))(
-          currencyConflict(fm.currency, fm.currency_code, S.settings.currency, S.settings.currency_code))),
+          currencyConflict(fm.currency, fm.currency_code, T.settings.currency, T.settings.currency_code))),
         /* Warnings this account has been told to stay quiet about — `true`, or
            a list like [no-transactions, unconfirmed]. Kept as the raw string;
            acct-status.js owns what the words mean, so there is one parser
@@ -366,7 +421,7 @@ module.exports = function registerLoad(ctx) {
         settle_monthly: /^(true|yes|on|1)$/i.test(String(fm.settle_monthly ?? '').trim()),
         settle_day: fmNum(fm.settle_day),
         /* ADR-0007 · Account numbers go through fmNum, never parseFloat. Every one is
-           written back by saveAccount's FM_WRITERS. */
+           written back by saveAccount's FM_WRITERT. */
         credit_limit: fmNum(fm.credit_limit),
         /* ADR-0007 · emergency_fund is tri-state. true (whole balance), a number (that slice),
            null (never asked, or unreadable). */
@@ -385,15 +440,15 @@ module.exports = function registerLoad(ctx) {
         body,
       });
     }
-    S.accounts.sort((a, b) => a.name.localeCompare(b.name));
+    T.accounts.sort((a, b) => a.name.localeCompare(b.name));
 
-    S.budgets = {};
-    S.budgetMeta = {};
+    T.budgets = {};
+    T.budgetMeta = {};
     /* Both period-name shapes load side by side. A vault that has switched
        between monthly and interval periods keeps both sets of files, and the
        one the active period type can't address simply never gets asked for —
        nothing is deleted, so switching back finds them where they were. */
-    for (const { file: f, text } of await read(mdFilesUnder('Budgets').filter(f => /^\d{4}-\d{2}(-\d{2})?$/.test(f.basename)))) {
+    for (const { file: f, text } of await read(R.mdFilesUnder('Budgets').filter(f => /^\d{4}-\d{2}(-\d{2})?$/.test(f.basename)))) {
       const period = f.basename;
       const { raw, body } = parseFrontmatter(text);
       // ISSUE 97 — `rel` beside the frontmatter: views/budgets.js writes the
@@ -430,44 +485,44 @@ module.exports = function registerLoad(ctx) {
         if (row.category) { rows.push(row); order.push(row.category); }
         else { unnamed.push(row); order.push(null); }
       }
-      S.budgets[period] = rows;
-      S.budgetMeta[period] = {
-        raw, rel: f.path.slice(basePath().length + 1), leadRaw: before, trailRaw: after,
+      T.budgets[period] = rows;
+      T.budgetMeta[period] = {
+        raw, rel: f.path.slice(R.basePath().length + 1), leadRaw: before, trailRaw: after,
         extraCols: extraColsOf(4, header, sep, dataRows), order, unnamed,
       };
     }
 
-    S.txFiles = {};
+    T.txFiles = {};
     /* ADR-0007 · The undo receipt is cleared beside the state it depends on. It holds
        references to the rows just replaced. */
-    S.lastImport = null;
+    T.lastImport = null;
     /* ADR-0007 · Every Transactions/ folder is recorded. S.txFiles is keyed per month
        file and cannot see an empty folder. */
     {
       const seen = new Map();
-      for (const a of S.accounts) {
+      for (const a of T.accounts) {
         const key = safeSeg(a.tx_label || a.name).toLowerCase();
-        if (seen.has(key)) S.accountsDuplicated.push({ label: a.tx_label || a.name, first: seen.get(key), second: a.name });
+        if (seen.has(key)) T.accountsDuplicated.push({ label: a.tx_label || a.name, first: seen.get(key), second: a.name });
         else seen.set(key, a.name);
       }
     }
-    S.txFolders = [];
-    S.txFolderPaths = {};
-    S.txFoldersIgnored = [];
+    T.txFolders = [];
+    T.txFolderPaths = {};
+    T.txFoldersIgnored = [];
     /* ADR-0007 · Transactions are read at any depth, and the label is the leaf.
        ISSUE 97 — read one level, an account under Transactions/Closed/<name>/
        lost its ROWS while ISSUE 60's fix kept its balance counting: R88 000
        present, its R250 of interest absent, nothing said. txFolderPaths is the
        seam the writers need — see txFileRel. */
     const txFiles = [];
-    for (const folder of subfoldersUnder('Transactions')) {
+    for (const folder of R.subfoldersUnder('Transactions')) {
       const months = folder.children.filter(f => f instanceof TFile && f.extension === 'md' && /^\d{4}-\d{2}$/.test(f.basename));
-      const rel = folder.path.slice(basePath().length + 1);
+      const rel = folder.path.slice(R.basePath().length + 1);
       const depth = rel.split('/').length - 1;          // Transactions/Cheque -> 1
-      if (S.txFolderPaths[folder.name] !== undefined) {
+      if (T.txFolderPaths[folder.name] !== undefined) {
         // A shallower folder already claimed this label. Only say so if this
         // one actually holds months — an empty namesake folder costs nothing.
-        if (months.length) S.txFoldersIgnored.push(rel);
+        if (months.length) T.txFoldersIgnored.push(rel);
         continue;
       }
       /* An empty folder at depth 1 is "linked, not imported yet" and MUST be
@@ -478,8 +533,8 @@ module.exports = function registerLoad(ctx) {
          months. Depth 1 therefore keeps exactly the semantics it always had,
          and recursion only ever ADDS folders that hold real rows. */
       if (depth > 1 && !months.length) continue;
-      S.txFolderPaths[folder.name] = rel;
-      S.txFolders.push(folder.name);
+      T.txFolderPaths[folder.name] = rel;
+      T.txFolders.push(folder.name);
       for (const f of months) txFiles.push({ acct: folder, f });
     }
     const txTexts = await Promise.all(txFiles.map(({ f }) => vault.cachedRead(f)));
@@ -500,9 +555,9 @@ module.exports = function registerLoad(ctx) {
       const splitCol = SCHEMAS.transactions.columns[6];
       const hasSplitHeader = !!(header && header[6] && header[6].trim().toLowerCase() === splitCol.header.toLowerCase());
       const known = hasSplitHeader ? 7 : 6;
-      S.txFiles[`${acct.name}/${month}`] = {
+      T.txFiles[`${acct.name}/${month}`] = {
         label: acct.name, month, dirty: false, fmRaw: raw,
-        rel: f.path.slice(basePath().length + 1),   // ISSUE 97 — the path it was READ from
+        rel: f.path.slice(R.basePath().length + 1),   // ISSUE 97 — the path it was READ from
         /* CONTRACT 1, the loader's half: the prose around the table and the
            file's own separator, which the next write of the month deleted or
            rewrote (L3-02, L3-22). Exactly what each holds: verbatimAroundTable;
@@ -534,50 +589,50 @@ module.exports = function registerLoad(ctx) {
        Delimiter sniffed, BOM dropped, every cell through uncsvCell; lines that
        are not rules are kept in S.rulesExtras, and a file that yields no rule
        at all sets S.rulesUnreadable so no rules write can empty it. */
-    S.rules = [];
-    S.rulesHeader = null;
-    S.rulesExtras = [];
-    S.rulesLoaded = [];
-    S.rulesUnreadable = false;
-    const rulesCsv = await readFile('Data/Categorisation Rules.csv');
+    T.rules = [];
+    T.rulesHeader = null;
+    T.rulesExtras = [];
+    T.rulesLoaded = [];
+    T.rulesUnreadable = false;
+    const rulesCsv = await R.readFile('Data/Categorisation Rules.csv');
     if (rulesCsv) {
       const rulesText = rulesCsv.charCodeAt(0) === 0xFEFF ? rulesCsv.slice(1) : rulesCsv;
       const rows = parseDelimited(rulesText, sniffDelimiter(rulesText)).map(row => row.map(uncsvCell));
-      if (rows.length) S.rulesHeader = rows[0];
+      if (rows.length) T.rulesHeader = rows[0];
       let prev = null;
       for (const row of rows.slice(1)) {
         if (row.length >= 2 && row[0]) {
           prev = { pattern: row[0], category: row[1], extra: row.slice(2) };
-          S.rules.push(prev);
+          T.rules.push(prev);
         } else {
-          S.rulesExtras.push({ prev, cells: row });
+          T.rulesExtras.push({ prev, cells: row });
         }
       }
-      S.rulesLoaded = S.rules.slice();
-      if (rows.length > 1 && !S.rules.length) {
-        S.rulesUnreadable = true;
+      T.rulesLoaded = T.rules.slice();
+      if (rows.length > 1 && !T.rules.length) {
+        T.rulesUnreadable = true;
         unreadable.push({ rel: 'Data/Categorisation Rules.csv', why: 'table' });
       }
     }
 
-    S.owed = []; S.owedDirty = false;
-    const owedTxt = await readFile('Owed Money.md');
+    T.owed = []; T.owedDirty = false;
+    const owedTxt = await R.readFile('Owed Money.md');
     // Keep the file's own frontmatter verbatim (tags etc.) for write-back.
-    S.owedFm = (owedTxt && parseFrontmatter(owedTxt).raw) || 'kind: owed';
+    T.owedFm = (owedTxt && parseFrontmatter(owedTxt).raw) || 'kind: owed';
     {
       const t = readFlatTable(SCHEMAS.owed, owedTxt);
       if (lacksTable(owedTxt)) unreadable.push({ rel: 'Owed Money.md', why: 'table' });
-      S.owedLead = t.lead; S.owedTrail = t.trail; S.owedExtraCols = t.extraCols;
-      S.owed.push(...t.rows);
+      T.owedLead = t.lead; T.owedTrail = t.trail; T.owedExtraCols = t.extraCols;
+      T.owed.push(...t.rows);
     }
 
-    S.debts = []; S.debtsDirty = false;
-    const debtTxt = await readFile('Debts.md');
-    S.debtsFm = (debtTxt && parseFrontmatter(debtTxt).raw) || 'kind: debts';
+    T.debts = []; T.debtsDirty = false;
+    const debtTxt = await R.readFile('Debts.md');
+    T.debtsFm = (debtTxt && parseFrontmatter(debtTxt).raw) || 'kind: debts';
     {
       const t = readFlatTable(SCHEMAS.debts, debtTxt);
       if (lacksTable(debtTxt)) unreadable.push({ rel: 'Debts.md', why: 'table' });
-      S.debtsLead = t.lead; S.debtsTrail = t.trail; S.debtsExtraCols = t.extraCols;
+      T.debtsLead = t.lead; T.debtsTrail = t.trail; T.debtsExtraCols = t.extraCols;
       for (const d of t.rows) {
         /* post() — the one fix-up a single cell cannot express (ADR-0003).
            Original is null when absent: a file written before the column
@@ -587,36 +642,36 @@ module.exports = function registerLoad(ctx) {
            lets the writer put the cell back empty. */
         if (d.original === null) { d.original = d.balance; d.originalStated = false; }
         else { d.originalStated = true; }
-        S.debts.push(d);
+        T.debts.push(d);
       }
     }
 
     /* Assets — what the household owns that is not an account. Columns,
        defaults and the strict-parse rules live in table-schema.js (ADR-0003):
        one declaration drives this read and the view's write. */
-    S.assets = []; S.assetsDirty = false;
-    const assetTxt = await readFile('Assets.md');
-    S.assetsFm = (assetTxt && parseFrontmatter(assetTxt).raw) || 'kind: assets';
+    T.assets = []; T.assetsDirty = false;
+    const assetTxt = await R.readFile('Assets.md');
+    T.assetsFm = (assetTxt && parseFrontmatter(assetTxt).raw) || 'kind: assets';
     {
       const t = readFlatTable(SCHEMAS.assets, assetTxt);
       if (lacksTable(assetTxt)) unreadable.push({ rel: 'Assets.md', why: 'table' });
-      S.assetsLead = t.lead; S.assetsTrail = t.trail; S.assetsExtraCols = t.extraCols;
-      S.assets.push(...t.rows);
+      T.assetsLead = t.lead; T.assetsTrail = t.trail; T.assetsExtraCols = t.extraCols;
+      T.assets.push(...t.rows);
     }
 
-    S.services = []; S.servicesDirty = false;
-    const svcTxt = await readFile('Services.md');
-    S.servicesFm = (svcTxt && parseFrontmatter(svcTxt).raw) || 'kind: services';
+    T.services = []; T.servicesDirty = false;
+    const svcTxt = await R.readFile('Services.md');
+    T.servicesFm = (svcTxt && parseFrontmatter(svcTxt).raw) || 'kind: services';
     {
       const t = readFlatTable(SCHEMAS.services, svcTxt);
       if (lacksTable(svcTxt)) unreadable.push({ rel: 'Services.md', why: 'table' });
-      S.servicesLead = t.lead; S.servicesTrail = t.trail; S.servicesExtraCols = t.extraCols;
-      S.services.push(...t.rows);
+      T.servicesLead = t.lead; T.servicesTrail = t.trail; T.servicesExtraCols = t.extraCols;
+      T.services.push(...t.rows);
     }
     /* ADR-0007 · Plans: one file per plan, sliced by heading. The section names are
        load-bearing (plan.js writes them). */
-    S.plans = {}; S.planDirty = false;
-    for (const { file: f, text } of await read(mdFilesUnder('Plans'))) {
+    T.plans = {}; T.planDirty = false;
+    for (const { file: f, text } of await read(R.mdFilesUnder('Plans'))) {
       const { fm, raw, body } = parseFrontmatter(text);
       // Money columns go through normalizeAmount for the reason the debt
       // balances do: a hand-typed "40 000,00" read as 40 would be written
@@ -663,11 +718,11 @@ module.exports = function registerLoad(ctx) {
         category: unescMd(c[5] || ''), notes: unescMd(c[6] || ''),
       }));
 
-      S.plans[f.basename] = {
+      T.plans[f.basename] = {
         /* ADR-0007 · Plans are keyed by basename, not display name. The file is the identity;
            writers derive the path from `file`. */
         file: f.basename,
-        rel: f.path.slice(basePath().length + 1),   // ISSUE 97 — READ from, never assembled
+        rel: f.path.slice(R.basePath().length + 1),   // ISSUE 97 — READ from, never assembled
         name: (fm.plan || '').toString().trim() || f.basename,
         fmRaw: raw,   // verbatim frontmatter, for lossless write-back
         leadRaw: plan67.lead, extras: plan67.extras,
@@ -687,11 +742,8 @@ module.exports = function registerLoad(ctx) {
         items: items.rows,
       };
     }
-    // Keep the open plan if it still exists; otherwise fall to the first by
-    // name, or null — which is what renders the empty state.
-    if (!S.planName || !S.plans[S.planName]) S.planName = Object.keys(S.plans).sort()[0] || null;
 
-    S.tax = {}; S.taxDirty = false;
+    T.tax = {}; T.taxDirty = false;
     /* ADR-0007 · A tax year file is one whose parent is not itself a year.
        ISSUE 97 — Tax/<year>/ is a DOCUMENTS folder (views/tax.js writes
        attachments into it), and the filter tests the basename only, so a
@@ -703,7 +755,7 @@ module.exports = function registerLoad(ctx) {
        would be a divergence waiting to be discovered in production. */
     const taxYearFile = f => /^\d{4}$/.test(f.basename)
       && !/^\d{4}$/.test(f.path.split('/').slice(-2, -1)[0] || '');
-    for (const { file: f, text } of await read(mdFilesUnder('Tax').filter(taxYearFile))) {
+    for (const { file: f, text } of await read(R.mdFilesUnder('Tax').filter(taxYearFile))) {
       const { fm, raw, body } = parseFrontmatter(text);
       // The body holds three tables under "## Progress", "## Documents" and
       // "## Figures". parseMdTable reads every table row in the text it's
@@ -760,9 +812,9 @@ module.exports = function registerLoad(ctx) {
         code: unescMd(c[0] || ''), description: unescMd(c[1] || ''),
         source: unescMd(c[2] || ''), ...cellMoney('amount', c[3]),
       }));
-      S.tax[f.basename] = {
+      T.tax[f.basename] = {
         fmRaw: raw,   // verbatim frontmatter, for lossless write-back of unmodeled keys
-        rel: f.path.slice(basePath().length + 1),   // ISSUE 97 — READ from, never assembled
+        rel: f.path.slice(R.basePath().length + 1),   // ISSUE 97 — READ from, never assembled
         leadRaw: tax67.lead, extras: tax67.extras, sectionLeads: tax67.leads,
         extraCols: { steps: steps.extraCols, docs: docs.extraCols, figures: figures.extraCols },
         /* The two frontmatter vocabularies go through cellVocab, the reader
@@ -790,22 +842,44 @@ module.exports = function registerLoad(ctx) {
         figures: figures.rows,
       };
     }
-    if (!S.taxYear || !S.tax[S.taxYear]) S.taxYear = Object.keys(S.tax).sort().pop() || null;
 
     // Prior-year certificates often land in Tax/<year>/ before anyone creates
     // the matching page, leaving the folder invisible to the view. Surface the
     // orphans so the Tax page can offer to seed a page for them.
-    S.taxOrphanYears = subfoldersIn('Tax')
-      .map(f => f.name).filter(n => /^\d{4}$/.test(n) && !S.tax[n]).sort();
+    T.taxOrphanYears = R.subfoldersIn('Tax')
+      .map(f => f.name).filter(n => /^\d{4}$/.test(n) && !T.tax[n]).sort();
 
+    await loadNotes(T, R);
+    await loadReceipts(T, R);
+
+    /* Commit — only if this load's folder is still the open book's, and no
+       load that started after it has committed already. Synchronous from here
+       to the end, so no render, write or second load can see half of it. */
+    if (folder !== openFolder() || (committed && mySeq < committed.seq)) return false;
+    Object.assign(S, T);
+    committed = Object.freeze({ folder, seq: mySeq });
+    setLanguage(language);
+    /* The three selections that survive a reload — the open plan, the open
+       tax year, the period on screen — are the reader's, kept when the
+       freshly committed state can still address them. Decided against S, now
+       that it holds this load's state; currentPeriod() and periodKeyValid()
+       read S.settings. */
+    // Keep the open plan if it still exists; otherwise fall to the first by
+    // name, or null — which is what renders the empty state.
+    if (!S.planName || !S.plans[S.planName]) S.planName = Object.keys(S.plans).sort()[0] || null;
+    if (!S.taxYear || !S.tax[S.taxYear]) S.taxYear = Object.keys(S.tax).sort().pop() || null;
     // The remembered period must still be one the current settings can address.
     // Changing the period length reaches this line via main.js's reload, and the
     // old name would otherwise survive it in a shape nothing can read.
     if (!S.period || !periodKeyValid(S.period)) S.period = currentPeriod();
-
-    await loadNotes();
-    await loadReceipts();
+    return true;
   }
+
+  /* The readers a standalone re-read of Notes/ or Receipts/ uses (views/notes.js
+     and views/food.js call these after their own writes): the book the state
+     in memory was read from, so a note list re-read in the window between a
+     switch and its reload is the same book's as everything beside it. */
+  const committedReaders = () => (committed ? ctx.readersAt(committed.folder) : ctx);
 
   /* Receipts/ — one file per till slip, read the way Notes are: under, not
      in (a household files them by month), in parallel, and a slip that
@@ -814,17 +888,19 @@ module.exports = function registerLoad(ctx) {
      its itemised account. Food Items.md lives in the same folder and is the
      one file under it that is not a receipt. Exposed on ctx because
      views/food.js re-reads after every write. */
-  async function loadReceipts() {
-    const files = mdFilesUnder(RECEIPTS_DIR);
+  /* `into`/`R`: a full load passes its own state-in-progress and pinned
+     readers; a standalone call (views/food.js) fills S from the committed book. */
+  async function loadReceipts(into = S, R = committedReaders()) {
+    const files = R.mdFilesUnder(RECEIPTS_DIR);
     const texts = await Promise.all(files.map(f => vault.cachedRead(f).catch(() => null)));
-    const base = basePath();
+    const base = R.basePath();
     const receipts = [];
-    S.foodItems = new Map();
+    into.foodItems = new Map();
     files.forEach((f, i) => {
       if (texts[i] == null) return;
       const rel = f.path.slice(base.length + 1);
       if (rel === FOOD_ITEMS_FILE) {
-        S.foodItems = parseFoodItems(texts[i]);
+        into.foodItems = parseFoodItems(texts[i]);
         return;
       }
       const fm = parseFrontmatter(texts[i]).fm;
@@ -832,19 +908,19 @@ module.exports = function registerLoad(ctx) {
       receipts.push(parseReceiptFile(texts[i], rel));
     });
     receipts.sort((a, b) => b.date.localeCompare(a.date) || String(b.time).localeCompare(String(a.time)));
-    S.receipts = receipts;
+    into.receipts = receipts;
   }
 
   /* ADR-0007 · A note that cannot be read is skipped. Per-file catch, so one bad note cannot
      take the budget down; exposed on ctx because views/notes.js re-reads after every write.
      ADR-0007 · Notes read in parallel. 172ms of a 233ms load at thirty notes when sequential. */
-  async function loadNotes() {
+  async function loadNotes(into = S, R = committedReaders()) {
     /* Under, not in: a user who files a year of notes into Notes/2026/ has
        tidied a folder of markdown, not deleted it, and the page must not go
        blank because of it. See mdFilesUnder in io.js. */
-    const files = mdFilesUnder(NOTES_DIR);
+    const files = R.mdFilesUnder(NOTES_DIR);
     const texts = await Promise.all(files.map(f => vault.cachedRead(f).catch(() => null)));
-    const base = ctx.basePath();
+    const base = R.basePath();
     const notes = [];
     files.forEach((f, i) => {
       if (texts[i] == null) return;
@@ -854,7 +930,7 @@ module.exports = function registerLoad(ctx) {
       const rel = f.path.slice(base.length + 1);
       notes.push({ rel, name: f.name, ...parseNote(texts[i], rel) });
     });
-    S.notes = sortNotes(notes);
+    into.notes = sortNotes(notes);
   }
 
   /* ADR-0007 · An existing transaction folder wins verbatim. Only a never-written label
@@ -879,5 +955,5 @@ module.exports = function registerLoad(ctx) {
     return `${folder}/${month}.md`;
   }
 
-  ctx.provide({ loadVault, loadNotes, loadReceipts, txSegment, txFileRel });
+  ctx.provide({ loadVault, loadNotes, loadReceipts, txSegment, txFileRel, loadedBook, stateReplaced });
 };

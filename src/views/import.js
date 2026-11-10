@@ -1254,6 +1254,9 @@ module.exports = function registerImport(ctx) {
   async function undoImport() {
     const r = S.lastImport;
     if (!r || !r.files.length) return;
+    /* The load this receipt's row objects belong to, taken before the dialog
+       below and tested after it (load.js stateReplaced). See the test there. */
+    const stamp = typeof ctx.loadedBook === 'function' ? ctx.loadedBook() : null;
 
     /* Resolved against the CURRENT model, not the receipt's own count: a row
        may already have been deleted by hand from the Transactions table since
@@ -1307,6 +1310,23 @@ module.exports = function registerImport(ctx) {
       confirmText: `Remove ${total} row${total === 1 ? '' : 's'}`,
     });
     if (!go) return;
+    /* The dialog is a window in which the state can be replaced under this
+       operation (ADR 0009, 2026-11 review): a book switch from the headless
+       API, a second Budget view or a popout reloads every view, and the dirty
+       refusal does not cover this page because an undo runs on a clean one.
+       `targets` then holds the PREVIOUS book's month objects while
+       txFileRel() resolves into the new book, and confirming wrote the
+       household's rows over the client's month of the same account and month.
+       A reload of the same book is the same hazard one step smaller — the
+       receipt's rows are objects nothing holds any more (S.lastImport is
+       cleared by every load). So: if the state the targets were gathered from
+       is gone, nothing is written, and the reader is told why. io.js refuses
+       the write too, for the window before the reload lands. */
+    const replaced = typeof ctx.stateReplaced === 'function' ? ctx.stateReplaced(stamp) : null;
+    if (replaced || S.lastImport !== r) {
+      ctx.renderTransactions();
+      return toast(replaced || i18n.t('io.reloaded.message'), true);
+    }
 
     let undone = 0, files = 0;
     try {

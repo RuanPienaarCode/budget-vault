@@ -1573,6 +1573,8 @@ module.exports = {
 
   'io.stale.message': "{file} 在加载后被页面之外修改，因此没有写入任何内容",
   'io.stale.notice': "预算：{file} 在加载后被此页面之外（其他设备或 Markdown 视图）修改，因此你的保存没有写入。页面已重新加载磁盘上的当前内容——请重新进行修改。",
+  'io.bookChanged.message': "读取此页面后，此设备上打开了另一本账簿，因此没有写入 {file}——否则它会进入错误的账簿。请在当前屏幕上的账簿中重新进行修改",
+  'io.reloaded.message': "预算：在等待你回答期间，预算被重新读取（打开了另一本账簿，或其文件已更改），因此没有做任何更改。请重新查看页面，如果仍然需要，请再次操作。",
   'load.unreadable.head': "有些文件无法读取：{list}。",
   'load.unreadable.item': "{file}（{why}）",
   'load.unreadable.why.missing': "缺失",

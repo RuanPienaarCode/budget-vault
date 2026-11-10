@@ -285,5 +285,45 @@ const exists = (...present) => f => present.includes(f);
     eq(open.basePath(), B, 'the choice forgotten: the very next path is the home book again (resolved per call)');
   }
 
+  /* ---- 6. a hand-edited entry cannot make the vault root (or worse) a book ---
+     (review note 6). validateNewBook refuses '', '..', and dot-folders at Add
+     time, but data.json is a file anyone can edit, and bookFolders() took any
+     string. `{ folder: "" }` normalised to the vault root; folderExists('/') is
+     always true; so a stored choice of '' opened the WHOLE VAULT as a book —
+     one that contains every other book, and whose Categories/ is whatever
+     happens to sit at the top of the vault. The pure helpers now drop such an
+     entry from the list, so it can be neither opened nor guarded as a book. */
+  {
+    const bad = [{ folder: '', label: 'Everything' }, { folder: '/', label: 'Slash' }, { folder: '../Outside', label: 'Up' },
+      { folder: 'Clients/../..', label: 'Climb' }, { folder: '.hidden/Book', label: 'Hidden' }, { folder: 'Clients/.trash', label: 'Trash' }];
+    const list = [...bad, ...LIST];
+    eq(bookFolders(list), [ACME, ZETA], 'bookFolders drops the root, a traversal and a hidden folder — keeping the real books');
+    for (const b of bad) {
+      eq(resolveOpenBook({ books: list, homeFolder: B, stored: b.folder, folderExists: () => true }), B,
+        `a stored choice of ${JSON.stringify(b.folder)} opens the HOME book, not the folder (even though it "exists")`);
+    }
+    eq(resolveOpenBook({ books: list, homeFolder: B, stored: ACME, folderExists: () => true }), ACME,
+      'NEGATIVE CONTROL: a real listed book beside them still opens');
+    eq(allBookFolders({ books: list, homeFolder: B }), [B, ACME, ZETA], 'the export guard\'s list carries only real books');
+    const choices = books.bookChoices({ books: list, homeFolder: B, openFolder: B, homeFallback: 'Home' });
+    eq(choices.items.map(i => i.folder), [B, ACME, ZETA], 'the switcher offers only real books');
+    eq(books.switchDecision({ books: list, homeFolder: B, open: B, target: '', folderExists: () => true }), { ok: false, reason: 'unknown' },
+      'and switching to "" is refused as unknown');
+    /* A home book AT the vault root is still the home book: the root is only
+       refused as a LISTED entry, never as budgetFolder (today's behaviour for a
+       budget kept at the top of the vault). */
+    eq(resolveOpenBook({ books: [{ folder: '', label: 'Root' }], homeFolder: '', stored: null }), '', 'a home book at the root still opens');
+    eq(books.bookChoices({ books: [{ folder: '', label: 'Root' }], homeFolder: '', openFolder: '', homeFallback: 'Home' }).items.map(i => i.label), ['Root'],
+      '… and keeps the label its own list entry gives it');
+
+    /* End to end through the plugin's seam: the stored choice is '', the
+       folder "exists" (the root always does), and the open book is the home. */
+    const kv = { [OPEN_BOOK_KEY]: '' };
+    const ctx = H.makeCtx({ ...SEED }, { budgetFolder: B });
+    ctx.plugin.settings.books = [{ folder: B, label: 'Home' }, { folder: '', label: 'Everything' }];
+    ctx.plugin.app = { vault: ctx.vault, loadLocalStorage: k => (k in kv ? kv[k] : null), saveLocalStorage() {} };
+    eq(ctx.plugin.activeFolder(), B, 'plugin.activeFolder() with a stored "" and a listed "" → the home book');
+  }
+
   console.log(`PASS books — open book resolution, per-device store, no new data.json key, every book guarded, the loader follows the seam (${checks} checks)`);
 })().catch(e => { console.error(e); process.exit(1); });
