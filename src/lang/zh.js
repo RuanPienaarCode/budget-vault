@@ -1712,4 +1712,10 @@ module.exports = {
   'imp.miles.banner': '已按 Discovery Miles 导出文件读取。每个 Mile 按 {rate} 记录（可在设置中更改），所以 {miles} Miles 合计 {value}。Miles 数量、印出的兰特金额（如有）以及银行自己的明细，都保存在每一行的备注里。',
   'imp.miles.budgetWarn': '{account} 计入你的预算，而 Miles 是奖励余额，不是银行里的钱 — 在这里它们会被算作收入。请改选或新建一个不计入预算的账户。',
   'imp.miles.newAccountName': 'Discovery Miles',
+  'topbar.book': '切换账簿',
+  'topbar.bookTitle': '切换到另一个账簿',
+  'books.homeFallback': '主账簿',
+  'books.switch.unknown': '预算：该账簿不在你的列表中，因此没有任何更改。',
+  'books.switch.dirty': '预算：你有尚未保存的更改。请先保存（或选择“从磁盘重新加载”以放弃），然后再切换账簿。',
+  'books.switch.locked': '预算：隐私屏幕仍处于开启状态。请先打开预算，然后再切换账簿。',
 };

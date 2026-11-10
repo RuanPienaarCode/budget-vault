@@ -134,6 +134,10 @@ const SHELL_HTML = `
     </div>
 
     <div class="ml-auto">
+      <label class="book-switch hidden" id="bookSwitch">
+        <span class="ico" data-ico="book-open|library|book" aria-hidden="true"></span>
+        <select id="bookSelect" aria-label="Switch book" data-i18n-aria="topbar.book" title="Switch to another book" data-i18n-title="topbar.bookTitle"></select>
+      </label>
       <button type="button" class="topbar-icon-btn hidden" id="topbarImport" aria-label="Import CSV" data-i18n-aria="topbar.import" title="Import a bank statement CSV" data-i18n-title="topbar.importTitle">
         <span class="ico" data-ico="import|file-input|cloud-upload|upload-cloud"></span>
       </button>

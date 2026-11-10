@@ -1819,4 +1819,10 @@ module.exports = {
   'imp.miles.banner': 'Ifundwe njengefayile ye-Discovery Miles. I-Mile nganye ibhalwa ku-{rate} (ibekwe kwiSeto), ngoko ii-Miles ezi-{miles} ziyi-{value}. Inani le-Miles, ixabiso elinyathelisiweyo ngeerandi (ukuba likho) neenkcukacha zebhanki zigcinwa kwinqaku lomqolo ngamnye.',
   'imp.miles.budgetWarn': '{account} ibalwa kwibhajethi yakho, kwaye ii-Miles yibhalansi yamabhaso, ayiyondawo yemali ebhankini — apha ziya kubalwa njengengeniso. Khetha okanye wenze iakhawunti engabalwa kwibhajethi endaweni yoko.',
   'imp.miles.newAccountName': 'Discovery Miles',
+  'topbar.book': 'Tshintsha incwadi',
+  'topbar.bookTitle': 'Tshintshela kwenye incwadi',
+  'books.homeFallback': 'Incwadi ephambili',
+  'books.switch.unknown': 'Ibhajethi: leyo ncwadi ayikho kuluhlu lwakho, ngoko akukho nto itshintshiweyo.',
+  'books.switch.dirty': 'Ibhajethi: unotshintsho olungasindisiwe. Lusindise (okanye ukhethe "Layisha kwakhona kwidiski" ukululahla), emva koko utshintshe incwadi.',
+  'books.switch.locked': 'Ibhajethi: isikrini sabucala sisaqhuba. Qala uvule ibhajethi, emva koko utshintshe incwadi.',
 };

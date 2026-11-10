@@ -2000,4 +2000,10 @@ module.exports = {
   'imp.miles.banner': 'Read as a Discovery Miles export. Each Mile is recorded at {rate} (set in Settings), so {miles} Miles come to {value}. The Miles count, any printed rand value and the bank’s own detail are kept in each row’s note.',
   'imp.miles.budgetWarn': '{account} counts toward your budget, and Miles are a rewards balance rather than money in the bank — here they would be counted as income. Choose or create a non-budget account instead.',
   'imp.miles.newAccountName': 'Discovery Miles',
+  'topbar.book': 'Switch book',
+  'topbar.bookTitle': 'Switch to another book',
+  'books.homeFallback': 'Home book',
+  'books.switch.unknown': 'Budget: that book is not in your list, so nothing was changed.',
+  'books.switch.dirty': 'Budget: you have unsaved changes. Save them (or choose "Reload from disk" to discard them), then switch books.',
+  'books.switch.locked': 'Budget: the privacy screen is still on. Open the budget first, then switch books.',
 };

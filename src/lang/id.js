@@ -1733,4 +1733,10 @@ module.exports = {
   'imp.miles.banner': 'Dibaca sebagai ekspor Discovery Miles. Setiap Mile dicatat pada {rate} (diatur di Pengaturan), jadi {miles} Miles menjadi {value}. Jumlah Miles, nilai rand yang tercetak (jika ada), dan keterangan dari bank disimpan di catatan setiap baris.',
   'imp.miles.budgetWarn': '{account} dihitung dalam anggaranmu, dan Miles adalah saldo hadiah, bukan uang di bank — di sini Miles akan dihitung sebagai pemasukan. Pilih atau buat akun yang tidak dihitung dalam anggaran.',
   'imp.miles.newAccountName': 'Discovery Miles',
+  'topbar.book': 'Ganti buku',
+  'topbar.bookTitle': 'Beralih ke buku lain',
+  'books.homeFallback': 'Buku utama',
+  'books.switch.unknown': 'Anggaran: buku itu tidak ada di daftarmu, jadi tidak ada yang diubah.',
+  'books.switch.dirty': 'Anggaran: kamu punya perubahan yang belum disimpan. Simpan dulu (atau pilih "Muat ulang dari disk" untuk membuangnya), lalu ganti buku.',
+  'books.switch.locked': 'Anggaran: layar privasi masih aktif. Buka anggaran terlebih dahulu, lalu ganti buku.',
 };

@@ -1712,4 +1712,10 @@ module.exports = {
   'imp.miles.banner': 'Discovery Miles のエクスポートとして読み込みました。各 Mile は {rate} で記録されます（設定で変更できます）。つまり {miles} Miles は {value} になります。Miles の数、印字されたランド額（あれば）、銀行の詳細は、各行のメモに残ります。',
   'imp.miles.budgetWarn': '{account} は予算に含まれますが、Miles は銀行のお金ではなく特典の残高です — ここでは収入として数えられてしまいます。代わりに、予算に含まれない口座を選ぶか作成してください。',
   'imp.miles.newAccountName': 'Discovery Miles',
+  'topbar.book': '帳簿を切り替える',
+  'topbar.bookTitle': '別の帳簿に切り替える',
+  'books.homeFallback': 'メインの帳簿',
+  'books.switch.unknown': '予算: その帳簿は一覧にないため、何も変更されていません。',
+  'books.switch.dirty': '予算: 保存されていない変更があります。保存するか（破棄するには「ディスクから再読み込み」を選択）、そのあとで帳簿を切り替えてください。',
+  'books.switch.locked': '予算: プライバシー画面がまだ表示されています。先に予算を開いてから、帳簿を切り替えてください。',
 };

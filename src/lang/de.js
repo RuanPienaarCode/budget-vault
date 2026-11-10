@@ -1797,4 +1797,10 @@ module.exports = {
   'imp.miles.banner': 'Als Discovery-Miles-Export gelesen. Jede Mile wird mit {rate} erfasst (in den Einstellungen festgelegt), also ergeben {miles} Miles {value}. Der Miles-Stand, ein etwaiger gedruckter Rand-Wert und die eigenen Angaben der Bank stehen in der Notiz jeder Zeile.',
   'imp.miles.budgetWarn': '{account} zählt zu deinem Budget, und Miles sind ein Prämienguthaben, kein Geld auf der Bank — hier würden sie als Einnahmen gezählt. Wähle stattdessen ein Konto, das nicht zum Budget zählt, oder lege eines an.',
   'imp.miles.newAccountName': 'Discovery Miles',
+  'topbar.book': 'Buch wechseln',
+  'topbar.bookTitle': 'Zu einem anderen Buch wechseln',
+  'books.homeFallback': 'Hauptbuch',
+  'books.switch.unknown': 'Budget: Dieses Buch steht nicht in deiner Liste, daher wurde nichts geändert.',
+  'books.switch.dirty': 'Budget: Du hast ungespeicherte Änderungen. Speichere sie (oder wähle „Vom Datenträger neu laden“, um sie zu verwerfen) und wechsle dann das Buch.',
+  'books.switch.locked': 'Budget: Der Datenschutzbildschirm ist noch aktiv. Öffne zuerst das Budget und wechsle dann das Buch.',
 };

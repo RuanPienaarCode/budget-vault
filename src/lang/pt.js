@@ -1812,4 +1812,10 @@ module.exports = {
   'imp.miles.banner': 'Lido como uma exportação Discovery Miles. Cada Mile é registrada a {rate} (definido em Ajustes), então {miles} Miles somam {value}. O número de Miles, o valor em rands impresso (se houver) e o detalhe do próprio banco ficam guardados na nota de cada linha.',
   'imp.miles.budgetWarn': '{account} conta para o seu orçamento, e Miles são um saldo de recompensas, não dinheiro no banco — aqui seriam contadas como receita. Escolha ou crie uma conta que não conte para o orçamento.',
   'imp.miles.newAccountName': 'Discovery Miles',
+  'topbar.book': 'Trocar de livro',
+  'topbar.bookTitle': 'Mudar para outro livro',
+  'books.homeFallback': 'Livro principal',
+  'books.switch.unknown': 'Orçamento: esse livro não está na sua lista, então nada foi alterado.',
+  'books.switch.dirty': 'Orçamento: você tem alterações não salvas. Salve-as (ou escolha "Recarregar do disco" para descartá-las) e depois troque de livro.',
+  'books.switch.locked': 'Orçamento: a tela de privacidade ainda está ativa. Abra primeiro o orçamento e depois troque de livro.',
 };

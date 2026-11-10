@@ -15,6 +15,8 @@ const { applyDom } = require('./i18n');
 const i18n = require('./i18n');
 const { PALETTE_PRESETS, DEFAULT_PALETTE } = require('./constants');
 
+const books = require('./books');
+const { renderBookSwitcher, pickBook } = require('./book-switcher');
 const registerIo = require('./io');
 const registerFxLive = require('./fx-live');
 const registerPeriod = require('./period');
@@ -891,6 +893,43 @@ function mountApp(view) {
     av.setAttribute('title', name ? `${name} · budget settings` : 'Budget settings');
   }
 
+  /* The top-bar book switcher (ADR 0009, src/book-switcher.js). Redrawn from
+     the plugin's own answers every time — the open book, the list, the home
+     book's name — never from state kept here, so there is no copy to go stale:
+     connectVault() calls it (which covers a switch, whose reload ends there),
+     and main.js's saveData() calls it through the controller when the LIST
+     changes, which produces no reload at all.
+
+     Left hidden and empty until the privacy splash has been opened. The gate
+     promises no budget content is in the DOM before the tap, and a book's
+     label is usually a client's name; connectVault only runs after the tap, so
+     the first real draw is after it. The sequence number drops a slow answer
+     (the home book's name is a file read) that a newer call has overtaken. */
+  let booksSeq = 0;
+  async function applyBooks() {
+    const seq = ++booksSeq;
+    const wrap = $('#bookSwitch');
+    const select = $('#bookSelect');
+    if (!wrap || !select) return;
+    const s = plugin.settings || {};
+    if (typeof plugin.activeFolder !== 'function' || (s.privacyLock && !plugin.budgetUnlocked)) {
+      return renderBookSwitcher(wrap, select, null);
+    }
+    const home = plugin.allBookFolders()[0];
+    /* Only asked when the home book is not named by the list: a listed label
+       is the reader's own and wins, so there is no file to read. */
+    const homeListed = books.bookFolders(s.books).includes(books.normalizeFolder(home));
+    const homeName = homeListed || typeof plugin.homeBookName !== 'function' ? '' : await plugin.homeBookName();
+    if (seq !== booksSeq) return;
+    renderBookSwitcher(wrap, select, books.bookChoices({
+      books: s.books,
+      homeFolder: home,
+      homeName,
+      openFolder: plugin.activeFolder(),
+      homeFallback: i18n.t('books.homeFallback'),
+    }));
+  }
+
   function applyTheme() {
     const pref = plugin.settings.theme;
     const dark = pref === 'dark' || (pref === 'auto' && document.body.classList.contains('theme-dark'));
@@ -940,6 +979,7 @@ function mountApp(view) {
   ctx.reloadFromDisk = doReloadFromDisk;
 
   async function connectVault() {
+    applyBooks().catch(() => {});
     try {
       await doReloadFromDisk();
     } catch (e) {
@@ -1179,6 +1219,16 @@ function mountApp(view) {
   $('#prevPeriod').addEventListener('click', () => changePeriod(ctx.shiftPeriod(S.period, -1)));
   $('#nextPeriod').addEventListener('click', () => changePeriod(ctx.shiftPeriod(S.period, 1)));
   $('#currentPeriod').addEventListener('click', () => changePeriod(ctx.currentPeriod()));
+  /* A refusal is said by pickBook; either way the select is redrawn from the
+     plugin, so after a refusal it goes back to the book that is still open
+     rather than showing the one that was asked for. */
+  $('#bookSelect').addEventListener('change', async e => {
+    await pickBook(plugin, e.target.value, {
+      notify: msg => new Notice(msg, 7000),
+      t: i18n.t,
+    });
+    applyBooks().catch(() => {});
+  });
   $('#menuBtn').addEventListener('click', () => $('#appDrawer').classList.contains('open') ? closeDrawer() : openDrawer());
   $('#drawerClose').addEventListener('click', closeDrawer);
   $('#drawerOverlay').addEventListener('click', closeDrawer);
@@ -1434,6 +1484,7 @@ function mountApp(view) {
       else S.view = v;
     },
     hasDirty,
+    applyBooks,
   };
 }
 

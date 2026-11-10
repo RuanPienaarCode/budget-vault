@@ -678,6 +678,38 @@ body.is-tablet .budget-app-root button:where(.fs-hide) { padding: 4px; }   /* fi
 .budget-app-root .topbar-icon-btn:hover { background: var(--color-primary-light); color: var(--color-primary); }
 .budget-app-root .topbar-icon-btn:focus-visible { outline: 2px solid var(--color-primary); outline-offset: 2px; }
 
+/* The book switcher (ADR 0009, src/book-switcher.js): a native <select> in the
+   top bar's right-hand cluster, beside the avatar, shown only when the vault
+   holds more than one book (the `hidden` class — `.hidden.hidden` above
+   outranks this display:flex). It is the same 36px as its neighbours so the
+   cluster reads as one row. The select is stripped back to its label — no
+   second border inside the pill — but keeps its native picker, which on a
+   phone is the OS sheet. The text is ellipsised, not wrapped: a client's name
+   is the one thing here with no length limit. */
+.budget-app-root .book-switch {
+  display: flex; align-items: center; gap: 0.35rem;
+  height: 36px; padding: 0 0.4rem 0 0.65rem; flex: 0 1 auto; min-width: 0;
+  border-radius: 12px;
+  border: 1px solid var(--border-color);
+  background: var(--surface-glass, transparent);
+  color: var(--text-muted);
+  cursor: pointer;
+  transition: background 0.15s, border-color 0.15s, color 0.15s;
+}
+.budget-app-root .book-switch:hover { background: var(--color-primary-light); color: var(--color-primary); }
+.budget-app-root .book-switch:focus-within { outline: 2px solid var(--color-primary); outline-offset: 2px; }
+.budget-app-root .book-switch .ico { display: grid; place-items: center; flex: none; }
+.budget-app-root .book-switch .ico svg { width: 16px; height: 16px; }
+.budget-app-root .book-switch select {
+  min-width: 0; max-width: 11rem; height: 34px;
+  padding: 0 0.25rem; margin: 0;
+  border: 0; background: transparent; box-shadow: none; outline: none;
+  color: var(--text-primary);
+  font: inherit; font-size: 0.8rem; font-weight: 600;
+  text-overflow: ellipsis; white-space: nowrap;
+  cursor: pointer;
+}
+
 /* Narrow panes / phones: menu + brand + period pill + avatar can't fit on one
    line, so the pill used to overlap the brand text and push the avatar off the
    edge. Drop the brand block — it's decoration, and Obsidian's own mobile
@@ -702,6 +734,13 @@ body.is-tablet .budget-app-root button:where(.fs-hide) { padding: 4px; }   /* fi
      inside its own slot, so it is never clipped and the buttons never leave
      the row. */
   .budget-app-root .topbar .topbar-icon-btn { display: none; }
+  /* The switcher keeps its place on a phone — it is the only way to change
+     book without opening settings — but gives the pill room: the icon goes and
+     the name is held to ~6.5rem, ellipsised. A 16px text size keeps iOS from
+     zooming the page when the picker opens. */
+  .budget-app-root .book-switch { padding: 0 0.2rem 0 0.5rem; }
+  .budget-app-root .book-switch .ico { display: none; }
+  .budget-app-root .book-switch select { max-width: 6.5rem; font-size: 16px; }
   .budget-app-root .header-period-pill {
     flex: 1 1 auto;
     min-width: 0;

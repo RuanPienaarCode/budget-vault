@@ -248,8 +248,135 @@ function allBookFoldersOf(plugin, { normalize } = {}) {
   return allBookFolders({ books: s.books, homeFolder: s.budgetFolder }).map(f => norm(f));
 }
 
+/* ---- switching (ADR 0009 §3) ---------------------------------------------
+
+   switchDecision() is the WHOLE rule for "may this device change its open book
+   now, and to what" — pure, so every refusal is driven in bare node. main.js's
+   switchBook() gathers the three facts it cannot know here (are any pages
+   dirty, is the privacy splash up, does the folder exist) and acts on the
+   answer; nothing else may decide.
+
+     { ok: false, reason }  'locked' | 'unknown' | 'dirty'
+     { ok: true, noop, folder, stored }
+                            `folder` is the target in normalised form; `noop`
+                            is true when it is already the open book (no write,
+                            no reload); `stored` is what to write as this
+                            device's choice — null for the home book.
+
+   THE ORDER IS THE POLICY.
+
+     1. locked first. ADR 0009 §6: while the splash is up a caller must not be
+        able to learn which books exist by switching through them, and 'unknown'
+        before 'locked' would answer exactly that — "unknown" for a folder that
+        is not a book, "locked" for one that is. Locked says nothing about the
+        list.
+     2. unknown before dirty, so a typo is reported as a typo rather than as
+        "save your work" for a switch that could never have happened.
+     3. already-open before dirty: asking for the book that is on screen
+        changes nothing, so it cannot put a row typed into one client into
+        another's files, and refusing it would only nag.
+     4. dirty last: REFUSE, never defer. A switch queued behind an unsaved row
+        is how a row typed into client A lands in client B.
+
+   The home book is stored as null ("no choice") rather than as its own
+   folder. Either resolves to the home book — resolveOpenBook returns home for
+   both — but null leaves nothing behind on a device that only ever uses the
+   home book, and a home folder that is later renamed in Settings cannot leave
+   a stale stored choice pointing at the old name.
+
+   `folderExists`, when given, is asked about a non-home target: a book that is
+   LISTED but whose folder has been deleted or renamed would resolve straight
+   back to the home book in activeFolder(), so reporting ok for it would claim
+   a switch that never happened. It is refused as 'unknown' — the folder is not
+   a book anyone can open. The home book is never asked, for the reason
+   resolveOpenBook gives. Absent, nothing is asked, so the pure cases need no
+   vault. */
+/** @param {{ books?: any, homeFolder?: string, open?: string, target?: any, dirty?: boolean, locked?: boolean, folderExists?: (folder: string) => boolean }} [args] */
+function switchDecision({ books, homeFolder, open, target, dirty, locked, folderExists } = {}) {
+  if (locked) return { ok: false, reason: 'locked' };
+  if (typeof target !== 'string') return { ok: false, reason: 'unknown' };
+  const want = normalizeFolder(target);
+  const home = normalizeFolder(homeFolder);
+  const isHome = want === home;
+  if (!isHome && !bookFolders(books).includes(want)) return { ok: false, reason: 'unknown' };
+  if (!isHome && typeof folderExists === 'function') {
+    let there = false;
+    try { there = !!folderExists(want); } catch (e) { there = false; }
+    if (!there) return { ok: false, reason: 'unknown' };
+  }
+  const stored = isHome ? null : want;
+  if (want === normalizeFolder(open)) return { ok: true, noop: true, folder: want, stored };
+  if (dirty) return { ok: false, reason: 'dirty' };
+  return { ok: true, noop: false, folder: want, stored };
+}
+
+/* ---- what the switcher shows --------------------------------------------
+
+   bookChoices({ books, homeFolder, homeName, openFolder, homeFallback }) →
+     { visible, items: [{ folder, label, home, active }], active }
+
+   The list the top-bar control renders, as data, so the rules for it run in
+   bare node: which books, in what order, under what name, and whether there is
+   anything to choose at all.
+
+   `visible` is "more than one book". Single-book mode (an empty list) is one
+   choice — the home book — and shows nothing: no control for a decision that
+   is not there, and no change at all for the vault every reader already has.
+   A list whose only entry IS the home folder is likewise one choice.
+
+   The home book is always the first item. If it is listed, its listed label
+   wins (the reader named it); if it is not, it is called by the household name
+   its own Settings.md carries (`homeName`, read by the caller — this module
+   reads no files), else by its folder's last segment, else `homeFallback` for
+   a book at the vault root, which has no segment to name it by.
+
+   Two books may carry the same label — nothing stops a bookkeeper typing
+   "Acme" twice — and in a native picker the two rows would then be
+   indistinguishable, so a repeated label is suffixed with its folder.
+
+   `active` is the item that is open, or null when `openFolder` is not any
+   book's (which cannot happen through activeFolder(), but the caller should
+   not crash on a hand-edited list). */
+function lastSegment(folder) {
+  const parts = normalizeFolder(folder).split('/');
+  return parts[parts.length - 1] || '';
+}
+function labelOf(entry) {
+  const l = entry && typeof entry.label === 'string' ? entry.label.trim() : '';
+  return l || lastSegment(entry && entry.folder);
+}
+/** @param {{ books?: any, homeFolder?: string, homeName?: string, openFolder?: string, homeFallback?: string }} [args] */
+function bookChoices({ books, homeFolder, homeName, openFolder, homeFallback } = {}) {
+  const home = normalizeFolder(homeFolder);
+  const listed = [];
+  if (Array.isArray(books)) {
+    for (const b of books) {
+      if (!b || typeof b !== 'object' || typeof b.folder !== 'string') continue;
+      const f = normalizeFolder(b.folder);
+      if (!listed.some(x => x.folder === f)) listed.push({ folder: f, label: labelOf(b) });
+    }
+  }
+  const homeListed = listed.find(x => x.folder === home);
+  const homeLabel = (homeListed && homeListed.label)
+    || (typeof homeName === 'string' && homeName.trim())
+    || lastSegment(home)
+    || homeFallback
+    || '';
+  const items = [{ folder: home, label: homeLabel, home: true }];
+  for (const x of listed) if (x.folder !== home) items.push({ folder: x.folder, label: x.label, home: false });
+  const seen = {};
+  for (const it of items) seen[it.label] = (seen[it.label] || 0) + 1;
+  for (const it of items) {
+    if (seen[it.label] > 1) it.label = `${it.label} (${it.folder || '/'})`;
+  }
+  const open = normalizeFolder(openFolder);
+  for (const it of items) it.active = it.folder === open;
+  return { visible: items.length > 1, items, active: items.find(it => it.active) || null };
+}
+
 module.exports = {
   normalizeFolder, bookFolders, allBookFolders, resolveOpenBook, persistableSettings,
   OPEN_BOOK_KEY, readStoredBook, writeStoredBook,
   activeFolderOf, allBookFoldersOf,
+  switchDecision, bookChoices,
 };

@@ -1824,4 +1824,10 @@ module.exports = {
   'imp.miles.banner': 'Ifundwe njengefayela le-Discovery Miles. I-Mile ngayinye iqoshwa ku-{rate} (ngokubekwe Kumasethingi), ngakho ama-Miles angu-{miles} aba ngu-{value}. Inani lama-Miles, inani eliphrintiwe ngama-rand (uma likhona) nemininingwane yebhange kugcinwa enothini lomugqa ngamunye.',
   'imp.miles.budgetWarn': '{account} ibalwa esabelomalini sakho, futhi ama-Miles ayibhalansi yemiklomelo, hhayi imali ebhange — lapha azobalwa njengemali engenayo. Khetha noma wenze i-akhawunti engabalwa esabelomalini esikhundleni.',
   'imp.miles.newAccountName': 'Discovery Miles',
+  'topbar.book': 'Shintsha incwadi',
+  'topbar.bookTitle': 'Shintshela kwenye incwadi',
+  'books.homeFallback': 'Incwadi eyinhloko',
+  'books.switch.unknown': 'Isabelomali: leyo ncwadi ayikhoohlwini lwakho, ngakho akukho okushintshiwe.',
+  'books.switch.dirty': 'Isabelomali: unezinguquko ezingakagcinwa. Zigcine (noma ukhethe "Layisha kabusha kudiski" ukuzilahla), bese ushintsha incwadi.',
+  'books.switch.locked': 'Isabelomali: isikrini sobumfihlo sisavuliwe. Qala uvule isabelomali, bese ushintsha incwadi.',
 };

@@ -1796,4 +1796,10 @@ module.exports = {
   'imp.miles.banner': 'Gelees as ’n Discovery Miles-uitvoer. Elke Mile word teen {rate} aangeteken (gestel onder Instellings), so {miles} Miles kom op {value} te staan. Die Miles-getal, enige gedrukte randwaarde en die bank se eie besonderhede word in elke ry se nota bewaar.',
   'imp.miles.budgetWarn': '{account} tel by jou begroting, en Miles is ’n belonings-saldo eerder as geld in die bank — hier sou hulle as inkomste getel word. Kies of skep eerder ’n rekening wat nie by die begroting tel nie.',
   'imp.miles.newAccountName': 'Discovery Miles',
+  'topbar.book': 'Wissel boek',
+  'topbar.bookTitle': 'Wissel na \'n ander boek',
+  'books.homeFallback': 'Tuisboek',
+  'books.switch.unknown': 'Begroting: daardie boek is nie in jou lys nie, so niks is verander nie.',
+  'books.switch.dirty': 'Begroting: jy het ongestoorde wysigings. Stoor hulle (of kies "Herlaai vanaf skyf" om dit weg te gooi), en wissel dan van boek.',
+  'books.switch.locked': 'Begroting: die privaatheidskerm is nog aan. Maak eers die begroting oop, en wissel dan van boek.',
 };
