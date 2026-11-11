@@ -137,6 +137,48 @@ const LANGUAGE_NAMES = {
   id: 'Bahasa Indonesia',
 };
 
+/* The BCP 47 tag each table is written in — what goes in a `lang` attribute.
+
+   The interface language is this plugin's own setting, not Obsidian's, so the
+   two disagree as a matter of course: an English Obsidian with the budget in
+   isiZulu, a German one with it in Afrikaans. A screen reader picks its voice
+   from the nearest `lang` up the tree, and until November 2026 the nearest one
+   was Obsidian's own, on <html> — so a French interface was read out by the
+   host's English voice, mispronounced end to end (audit of 11 Nov 2026,
+   task 19). The same attribute is what WebKit picks hyphenation rules, quote
+   marks and — for Chinese against Japanese, which share code points — the
+   glyphs themselves from.
+
+   Eleven of the twelve are the bare language subtag — the table's own code —
+   and deliberately no narrower. A region subtag would pick the reader's voice
+   for them: pt.js leans Brazilian where the two standards part but is written
+   to be read in Portugal too (its own header says why), and es.js names no
+   country at all, so `pt` and `es` leave the choice to the Portuguese or
+   Spanish voice the reader's own device already has. Chinese is the exception,
+   because the SCRIPT is not implied by the language: zh.js is Simplified, and
+   a bare `zh` leaves an engine to guess between Simplified and Traditional.
+
+   No `dir` anywhere, deliberately: every one of these is written left to
+   right, which is the document's default. A right-to-left table (Arabic,
+   Hebrew, Urdu) would need `dir="rtl"` set beside `lang` in followLanguage()
+   below — and a pass over the stylesheet's physical left/right properties,
+   which is the larger half of that job. tests/i18n-lang-attribute.test.cjs
+   fails if a table ships without a tag here. */
+const LANGUAGE_TAGS = {
+  en: 'en',
+  af: 'af',
+  de: 'de',
+  es: 'es',
+  fr: 'fr',
+  ja: 'ja',
+  zh: 'zh-Hans',
+  xh: 'xh',
+  zu: 'zu',
+  pt: 'pt',
+  hi: 'hi',
+  id: 'id',
+};
+
 /* Dropdown order — English first (the pre-language default), then the rest in
    the order they were added. Filtered against the loader list rather than
    trusted as hand-listed, so the dropdown can never offer a language that has
@@ -265,7 +307,75 @@ function resolveLanguage(code) {
 
 function setLanguage(code) {
   current = resolveLanguage(code);
+  restampLanguage();
   return current;
+}
+
+/* ------------------------------ the lang attribute ------------------------- */
+
+/* The tag for a language code — the active one when none is given. Falls back
+   to the code itself, which for every shipped table IS a valid BCP 47 primary
+   subtag, so a table added without an entry above still gets a usable tag
+   while the guard test reports the missing one. */
+function languageTag(code) {
+  const id = code === undefined ? current : resolveLanguage(code);
+  return Object.prototype.hasOwnProperty.call(LANGUAGE_TAGS, id) ? LANGUAGE_TAGS[id] : id;
+}
+
+/* The elements whose `lang` follows the interface language: the plugin root,
+   and every surface Obsidian mounts OUTSIDE it — a modal, the setup wizard,
+   the settings tab — which inherit Obsidian's `lang` from <html>, not ours.
+
+   Kept here rather than re-stamped by each caller, because the language moves
+   from four places (load.js on every read of Settings.md, the settings tab's
+   dropdown and its file watcher, the wizard's picker) and a root that is only
+   stamped where someone remembered to would be right at mount and wrong after
+   the first book switch. Everything that changes the language already goes
+   through setLanguage(); so that is the one place the attribute is written
+   again, and no caller can forget.
+
+   A Set of elements, so following the same one twice is harmless — the
+   settings tab's display() runs again on every re-open. */
+const following = new Set();
+
+function stampLanguage(node) {
+  try { node.setAttribute('lang', languageTag()); } catch (e) { /* not an element — nothing to stamp */ }
+}
+
+/* setLanguage()'s other half. An element that has left the document is
+   dropped rather than stamped: a closed modal is never told it closed (every
+   dialog would need an onClose for it), and without this the set would keep
+   every dialog ever opened alive. `isConnected === false` exactly — the
+   bare-node fakes the guard tests use have no such property, and are kept. */
+function restampLanguage() {
+  for (const node of following) {
+    if (node.isConnected === false) following.delete(node);
+    else stampLanguage(node);
+  }
+}
+
+/* Give `node` the active language's `lang` now, and keep it right from here
+   on. A missing node is ignored, so a caller can pass `this.modalEl` without
+   first asking whether the host (or a test's stub of it) built one. */
+function followLanguage(node) {
+  if (!node || typeof node.setAttribute !== 'function') return;
+  /* The same sweep restampLanguage() makes, here as well: the language can go
+     a whole session without changing, and every confirm and every field
+     dialog opened in that time would otherwise be held — its DOM and the
+     closures under it — until it did. Opening the next dialog lets go of the
+     ones already closed. */
+  for (const other of following) if (other.isConnected === false) following.delete(other);
+  following.add(node);
+  stampLanguage(node);
+}
+
+/* The undo, for an element that outlives its use: the view's contentEl is
+   Obsidian's and is handed to whatever view opens in that leaf next, which
+   must not inherit this plugin's language. */
+function unfollowLanguage(node) {
+  if (!node) return;
+  following.delete(node);
+  try { node.removeAttribute('lang'); } catch (e) { /* not an element */ }
 }
 
 /* Obsidian's own display language, for a vault that has never set `language`.
@@ -431,9 +541,13 @@ module.exports = {
   pluralCategory,
   day,
   applyDom,
+  languageTag,
+  followLanguage,
+  unfollowLanguage,
   interpolate,
   nbspFigure,
   TABLES,
   LANGUAGE_NAMES,
+  LANGUAGE_TAGS,
   LANGUAGE_ORDER,
 };

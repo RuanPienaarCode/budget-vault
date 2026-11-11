@@ -70,6 +70,8 @@ class BudgetExportModal extends Modal {
   }
 
   onOpen() {
+    // Body-mounted, so outside the plugin root and its `lang` (i18n.js followLanguage).
+    i18n.followLanguage(this.modalEl);
     this.titleEl.setText(i18n.t('bx.title'));
     this.modalEl.classList.add('budget-export-modal');
     this.draw();
@@ -297,6 +299,8 @@ function askBudgetExport(app, opts) {
 class BudgetExportDoneModal extends Modal {
   constructor(app, opts) { super(app); this.opts = opts; }
   onOpen() {
+    // Body-mounted, so outside the plugin root and its `lang` (i18n.js followLanguage).
+    i18n.followLanguage(this.modalEl);
     const { files, note, onOpen, onReveal } = this.opts;
     this.titleEl.setText(i18n.t('bx.done.title'));
     this.modalEl.classList.add('budget-export-modal');

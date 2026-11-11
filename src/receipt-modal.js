@@ -20,6 +20,7 @@ const { askFields } = require('./modal');
 const { parseReceiptText, itemsTotal } = require('./receipt-parse');
 const { suggestFiling, FOOD_CATEGORIES, OTHER } = require('./receipt-file');
 const { todayIso } = require('./dates');
+const i18n = require('./i18n');
 
 const NEW_CAT = '\u0001new';
 
@@ -96,6 +97,8 @@ class ReceiptModal extends Modal {
   }
 
   onOpen() {
+    // Body-mounted, so outside the plugin root and its `lang` (i18n.js followLanguage).
+    i18n.followLanguage(this.modalEl);
     this.titleEl.setText('Add a receipt');
     this.modalEl.addClass('bv-receipt-modal');
     this.stepPaste();

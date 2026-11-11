@@ -4,6 +4,7 @@
 const { ItemView, Notice } = require('obsidian');
 const { VIEW_TYPE } = require('./constants');
 const { mountApp } = require('./controller');
+const { unfollowLanguage } = require('./i18n');
 
 class BudgetView extends ItemView {
   constructor(leaf, plugin) {
@@ -66,6 +67,9 @@ class BudgetView extends ItemView {
     // contentEl is reused by the next view, and a stale height:Npx would cap it.
     this.contentEl.style.height = '';
     this.contentEl.classList.remove('budget-app-root', 'bud-dark');
+    // And the `lang` mountApp gave it, for the same reason: the next view in
+    // this leaf is not this plugin's, and must not be read in its language.
+    unfollowLanguage(this.contentEl);
   }
 }
 

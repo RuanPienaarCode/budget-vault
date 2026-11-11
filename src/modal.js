@@ -5,6 +5,8 @@
 const { Modal, Setting } = require('obsidian');
 const { el } = require('./dom');
 const { normalizeAmount } = require('./amount');
+// Namespaced, as everywhere in src/ — `t` is a local in half these files.
+const i18n = require('./i18n');
 
 /* Does Enter, pressed with focus on `target`, mean "I am done with this form"?
 
@@ -132,6 +134,8 @@ class FieldModal extends Modal {
     this.values = {};
   }
   onOpen() {
+    // Body-mounted, so outside the plugin root and its `lang` (i18n.js followLanguage).
+    i18n.followLanguage(this.modalEl);
     this.titleEl.setText(this.modalTitle);
     const firstInputs = [];
     for (const f of this.fieldDefs) {
@@ -261,6 +265,8 @@ class ConfirmModal extends Modal {
     this.answer = false;
   }
   onOpen() {
+    // Body-mounted, so outside the plugin root and its `lang` (i18n.js followLanguage).
+    i18n.followLanguage(this.modalEl);
     const { title, message, confirmText = 'Discard', cancelText = 'Cancel', primary = 'confirm' } = this.opts;
     const safeFirst = primary === 'cancel';
     if (title) this.titleEl.setText(title);
@@ -312,6 +318,8 @@ class SplitModal extends Modal {
   }
 
   onOpen() {
+    // Body-mounted, so outside the plugin root and its `lang` (i18n.js followLanguage).
+    i18n.followLanguage(this.modalEl);
     const { tx, money } = this.opts;
     this.titleEl.setText('Split transaction');
     const c = this.contentEl;
@@ -483,6 +491,8 @@ class RulesCleanupModal extends Modal {
   }
 
   onOpen() {
+    // Body-mounted, so outside the plugin root and its `lang` (i18n.js followLanguage).
+    i18n.followLanguage(this.modalEl);
     const { remove, redundant, blank, dormant, kept, checked, total } = this.report;
     this.titleEl.setText('Tidy categorisation rules');
     const c = this.contentEl;
@@ -567,6 +577,8 @@ class BudgetResliceModal extends Modal {
   }
 
   onOpen() {
+    // Body-mounted, so outside the plugin root and its `lang` (i18n.js followLanguage).
+    i18n.followLanguage(this.modalEl);
     const { rows, oldDays, dstDays, factor } = this.plan;
     this.titleEl.setText('Bring the amounts across');
     const c = this.contentEl;

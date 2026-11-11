@@ -356,6 +356,10 @@ class OnboardingWizard extends Modal {
        showed the user's actual language selected. Cheap, and it keeps the
        picker and the text it governs from ever disagreeing. */
     setLanguage(this.data.language);
+    /* And say which language that is. The wizard is a modal, mounted on
+       <body> outside the plugin root, so it carries its own `lang` — followed,
+       because its own picker changes the language while it is open. */
+    i18n.followLanguage(this.modalEl);
     this.titleEl.setText(i18n.t(this.adding ? 'wiz.book.title' : 'wiz.title'));
     /* Add-a-book decides its mode BEFORE the first render, synchronously, and
        never prefills from the folder. The mode decides the whole step list —

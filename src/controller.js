@@ -483,6 +483,14 @@ function mountApp(view) {
   const root = view.contentEl;
 
   root.classList.add('budget-app-root');
+  /* The interface language is the plugin's own setting, so the root says which
+     one it is in: without `lang` here a screen reader reads a French or isiZulu
+     budget in whatever voice Obsidian's <html> names (audit of 11 Nov 2026,
+     task 19). Followed rather than set once — Settings.md is only read after
+     this, and every later change of language goes through i18n.setLanguage(),
+     which re-stamps it. view.js lets go of it when the view closes. No `dir`:
+     no right-to-left language ships (i18n.js LANGUAGE_TAGS). */
+  i18n.followLanguage(root);
   // SHELL_HTML is a static developer-authored constant with no interpolation,
   // but assigning it via innerHTML trips Obsidian's plugin-review checks (and
   // any future CSP tightening). Parse it out-of-document instead: DOMParser
