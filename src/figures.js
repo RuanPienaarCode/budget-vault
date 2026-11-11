@@ -393,7 +393,10 @@ module.exports = function registerFigures(ctx) {
      printed one invested figure above a chart segment reading another some
      R 17 000 higher, and nothing on that page said the gap between them was
      rows nobody had confirmed yet. Both bases live here so a page
-     that prints one is handed the other, and the drift, with it.
+     that prints one is handed the other, and the drift, with it. Since the
+     2026-11-11 audit no page LEADS with `stated`: Accounts went implied with
+     discussion #124 and the Savings KPIs, the last, with task 7 — each prints
+     what the stated balances read beneath its implied figure.
 
      Home currency only, the way every total in this app is (currency.js);
      the foreign accounts are `others`, named beside the book and never

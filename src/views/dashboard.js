@@ -1613,9 +1613,11 @@ module.exports = function registerDashboard(ctx) {
     /* ISSUE 88 — figures.js's own contract: a page printing one base of the
        balance book must be handed the other's drift. This tile prints the
        IMPLIED savings+investment total (balances.implied.byType above) with
-       no caveat beside it, while the Savings page's own KPIs print STATED and
-       disclose the same gap — on the committed fixture R14 500 here against
-       R15 000 there, with nothing here explaining why. Read off
+       no caveat beside it, while the Savings page's own KPIs printed STATED
+       and disclosed the same gap — on the committed fixture R14 500 here
+       against R15 000 there, with nothing here explaining why. (Those KPIs
+       lead with implied too since the 2026-11-11 audit, task 7, and carry
+       this tile's sentence.) Read off
        balances.driftByType (figures.js), never recomputed: it is the exact
        figure the Savings page's own driftLine() sums, combined across both
        pool types because this tile prints them combined.

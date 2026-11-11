@@ -12,8 +12,12 @@
    a different page.
 
    bookFigures().balances is the one place both bases are summed, and every
-   page reads it. A page that prints the stated figure is handed the drift
-   with it, the way periodSummary hands over `foreign`, so it can say so.
+   page reads it. A page that prints one base is handed the drift to the
+   other with it, the way periodSummary hands over `foreign`, so it can say
+   so. Since the 2026-11-11 audit (task 7) no page LEADS with the stated
+   base: the Savings KPIs were the last, and now print the implied figure
+   with what the stated balances read beneath it, as the Dashboard tile and
+   the Accounts hero do.
 
    Runs in bare node against the REAL loader, period, figures and views.
      node tests/book-balances.test.cjs        # non-zero exit on failure */
@@ -238,17 +242,40 @@ async function mount(files = FILES) {
       ok(!/read R 1750(\.00)? less/.test(hero), 'and the "less" wording from the positive case does not leak into this one');
     }
 
-    /* ---- 4. the Savings KPIs print the STATED book and say what moved ------ */
+    /* ---- 4. the Savings KPIs lead with the IMPLIED book, the typed claim beneath --- */
     {
       const { ctx, text } = await mountView(FILES, 'savings');
       ctx.renderSavings();
       const kpis = text('savingsKpis');
-      ok(kpis.includes('R 20000.00'), `Savings KPI: stated savings (got: ${kpis.slice(0, 300)})`);
-      ok(kpis.includes('R 50000.00'), 'Investments KPI: stated investments');
+      /* R20 000 typed, R1 000 of rows dated after it: the tile leads with
+         R21 000, the figure the chart segment under it and the Dashboard tile
+         print (2026-11-11 audit, task 7). It read the stated R20 000 until
+         then, above a segment of R21 000 on the same page. */
+      ok(/SavingsR 21000\.00/.test(kpis), `Savings KPI: IMPLIED savings, stated 20 000 + 1 000 since (got: ${kpis.slice(0, 300)})`);
+      ok(!kpis.includes('R 20000.00'), 'and the typed total is not printed as a second headline beside it');
+      ok(kpis.includes('R 50000.00'), 'Investments KPI: nothing has moved, so implied and stated are the same figure');
       /* In cents under the cents KPI tile since the 2026-10-20 audit (D2-03). */
-      ok(/Transactions since then add up to R 1000\.00 more/.test(kpis),
-        'the Savings KPI names the rows that moved after its balance was stated — the same sentence the Dashboard\'s stale note uses');
-      ok(!/R 250(\.00)? less/.test(kpis), 'the checking drift belongs to no KPI on this page');
+      ok(/Your stated balances read R 1000\.00 less\./.test(kpis),
+        'the typed claim is beneath it, in the sentence the Dashboard tile and the Accounts hero use for an implied figure');
+      ok(!/Transactions since then add up to/.test(kpis),
+        'and NOT the stated-basis sentence: under an implied figure those rows are already counted, and a reader would add them twice (2026-10-20 audit, M2-02)');
+      ok(!/R 250(\.00)? (less|more)/.test(kpis), 'the checking drift belongs to no KPI on this page');
+      /* The implied book is what the page's own bookFigures() hands it — the
+         tile is read off the seam, not re-summed. */
+      const b = ctx.bookFigures().balances;
+      ok(kpis.includes(`Savings${ctx.money(b.implied.byType.savings)}`), 'the tile is balances.implied.byType.savings, to the cent');
+      ok(b.driftByType.savings === 1000 && b.stated.byType.savings === 20000, 'and the sentence beneath it is the seam\'s own driftByType against the stated base');
+    }
+    /* The other sign: NEG_FILES' withdrawal is bigger than its deposit, so
+       driftByType.savings is −1 500 and the stated balances read MORE than
+       the tile (R20 000 typed against R18 500 on screen). */
+    {
+      const { ctx, text } = await mountView(NEG_FILES, 'savings');
+      ctx.renderSavings();
+      const kpis = text('savingsKpis');
+      ok(/SavingsR 18500\.00/.test(kpis), `the tile leads with the implied R18 500 (got: ${kpis.slice(0, 300)})`);
+      ok(/Your stated balances read R 1500\.00 more\./.test(kpis), 'and a negative drift reads "more", as the Accounts hero words it');
+      ok(!/read R 1500(\.00)? less/.test(kpis), 'the "less" wording from the positive case does not leak into this one');
     }
     {
       const quiet = { ...FILES };
@@ -256,7 +283,7 @@ async function mount(files = FILES) {
       delete quiet[`${B}/Transactions/Cheque/2026-08.md`];
       const { ctx, text } = await mountView(quiet, 'savings');
       ctx.renderSavings();
-      ok(!/Transactions since then/.test(text('savingsKpis')), 'no drift, no sentence');
+      ok(!/Your stated balances read|Transactions since then/.test(text('savingsKpis')), 'no drift, no sentence');
     }
 
     /* ---- 5. the gate: no page sums balances on its own ---------------------- */

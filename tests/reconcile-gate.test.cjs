@@ -94,13 +94,14 @@ const EXPLAINED_DIFFERENCES = [
      here until discussion #124: the Accounts page leads with implied balances
      now, so its Savings group and the Dashboard tile print one figure and the
      pair is an ordinary check that must agree. */
-  /* The Savings page's KPI reads STATED balances and its worth chart IMPLIED
-     ones; the fixture's emergency fund has drifted, so the two differ by the
-     drift. This pair was unmeasurable while the segment lookup depended on a
-     context Map that collapsed every worth-chart segment into one — it comes
-     onto this list when the per-figure context (tests/helpers/figures.cjs)
-     let the check find its segment. */
-  'savings :: KPI "Savings" (stated) vs chart "Savings" segment (implied)',
+  /* 'savings :: KPI "Savings" (stated) vs chart "Savings" segment (implied)'
+     was the last entry here, until the 2026-11-11 audit (task 7): the Savings
+     page's two KPIs lead with the implied figure now, the way the Dashboard
+     tile and the Accounts page have since discussion #124, and print what the
+     stated balances read beneath it. The fixture's emergency fund has drifted
+     by R500, so the KPI read R15 000 above a chart segment of R14 500; both
+     read R14 500 now and the pair is an ordinary check that must agree.
+     EMPTY ON PURPOSE from here: no page prints two bases of one figure. */
   /* And "What's left: cash in your accounts vs implied bank balances" is GONE
      from this list, on purpose: it was the oracle that was wrong (it summed
      every non-pool account type, ignoring `budget:` and the balance date),
