@@ -63,11 +63,9 @@ const val = c => (c && typeof c === 'object' ? c.v : c);
     /* The same household without the reversed row: what Groceries came to
        before it, so the row's own R250 is what the figure must move by. */
     const base = await mountFor({ ...SEED }, { period: PERIOD, budgetFolder: B });
-    require('../src/views/budget-export')(base.ctx);
     const before = (await base.ctx.runBudgetExport(ANSWER)).model.budgets[0].rows.find(r => r.cat === 'Groceries').actual;
 
     const M = await mountFor(files, { period: PERIOD, budgetFolder: B });
-    require('../src/views/budget-export')(M.ctx);
     const { model } = await M.ctx.runBudgetExport(ANSWER);
     const groceries = model.budgets[0].rows.find(r => r.cat === 'Groceries');
     eq(groceries.actual, Math.round((before + 250) * 100) / 100,

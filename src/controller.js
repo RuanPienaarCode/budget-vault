@@ -28,6 +28,16 @@ const { showToast } = require('./toast');
    evaluating its views at first mount because of that. */
 const { wire, loadAll } = require('./wiring');
 loadAll();
+/* io.js once more, by name, for its two STATIC helpers — bookOwnsPath and
+   relUnder — which the vault watcher below asks before a book is mounted at
+   all. Registration is wiring.js's job now and this is not a second one. Two
+   branches of the 2026-11-11 audit met here: one taught the watcher to ask
+   io.js what a root book owns (through `registerIo`, the import this file had
+   then), the other moved every register(ctx) require into wiring.js and took
+   that import with it. Each was green alone; merged, the watcher threw
+   "registerIo is not defined" on the first vault event. Git saw no conflict —
+   tests/controller-watcher-rename.test.cjs did. */
+const registerIo = require('./io');
 
 /* The pure core of money formatting, pulled out of moneyIn() so it is
    testable without a live mount — see tests/controller-money.test.cjs.
