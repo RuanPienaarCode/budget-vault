@@ -487,6 +487,18 @@ module.exports = {
     other: 'imigqa engu-{count} evela kuma-akhawunti angaphandle kwesabelomali ifihliwe',
   },
   'tx.outside.show': 'Ibonise',
+  'tx.misfiled.file': {
+    one: '{file} inomsebenzi wemali ongu-{count} onosuku olungaphandle kwenyanga ifayela eliqanjwe ngayo, ngakho asikho isikhathi esiwubalayo noma esiwufaka ohlwini.',
+    other: '{file} inemisebenzi yemali engu-{count} enezinsuku ezingaphandle kwenyanga ifayela eliqanjwe ngayo, ngakho asikho isikhathi esiyibalayo noma esiyifaka ohlwini.',
+  },
+  'tx.misfiled.more': {
+    one: 'nelinye ifayela elingu-{count}',
+    other: 'namanye amafayela angu-{count}',
+  },
+  'tx.misfiled.why': {
+    one: 'Ibhalansi ye-akhawunti isawubala. Hambisa umugqa uwuyise efayeleni lenyanga yawo, noma ulungise usuku lwawo.',
+    other: 'Ibhalansi ye-akhawunti isayibala. Hambisa umugqa ngamunye uwuyise efayeleni lenyanga yawo, noma ulungise usuku lwawo.',
+  },
   'tx.future.hidden': {
     one: 'umugqa ongu-{count} onosuku lwangemva kwanamuhla ufihliwe',
     other: 'imigqa engu-{count} enosuku lwangemva kwanamuhla ifihliwe',
@@ -1692,6 +1704,10 @@ module.exports = {
   'dash.hero.unreadable': {
     one: 'Inani eli-{count} alikwazanga ukufundwa futhi libalwa njengo-0',
     other: 'Amanani angu-{count} awakwazanga ukufundwa futhi abalwa njengo-0',
+  },
+  'dash.hero.misfiled': {
+    one: 'Umsebenzi wemali ongu-{count} onosuku olukulesi sikhathi ugcinwe ngaphansi kwenye inyanga futhi awubalwa ({files})',
+    other: 'Imisebenzi yemali engu-{count} enezinsuku ezikulesi sikhathi igcinwe ngaphansi kwenye inyanga futhi ayibalwa ({files})',
   },
   'dash.split.otherSlice': 'Okunye ({count})',
   'bud.err.toggle': 'Ayikwazanga ukuvuselela inothi le-{category} ({error})',

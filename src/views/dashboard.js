@@ -3098,6 +3098,19 @@ function heroQualifiers(F, money) {
     add('unreadable', 'spent', i18n.t('dash.hero.unreadable', { count: unreadable.count }),
       { count: unreadable.count, budget: unreadable.budget || 0, tx: unreadable.tx || 0 });
   }
+  /* Rows dated inside this period that are filed under another month's file
+     are read by no period (2026-11-11 audit, task 5): reconcile() counts them,
+     the spent figure beside this line does not. The app keeps the filename
+     fast path and says so here rather than moving a row the reader typed. One
+     file is named — the Transactions page lists them all — and `+N` stands
+     for the rest in every language. `count` selects the plural form. */
+  const misfiled = (F && F.misfiled) || {};
+  if (misfiled.count > 0) {
+    const files = (misfiled.files || []).map(f => f.rel);
+    add('misfiled', 'spent', i18n.t('dash.hero.misfiled', {
+      count: misfiled.count, files: files[0] + (files.length > 1 ? ` +${files.length - 1}` : ''),
+    }), { count: misfiled.count, files });
+  }
   const sched = sum.scheduled || { income: 0, spend: 0 };
   const ahead = (sched.income || 0) + (sched.spend || 0);
   if (ahead > 0) add('scheduledAhead', 'scheduled', i18n.t('dash.scheduledAhead', { amount: money(ahead, 0) }), { amount: ahead });

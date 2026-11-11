@@ -284,6 +284,7 @@ module.exports = function registerFigures(ctx) {
   function periodFigures(p) {
     const summary = periodSummary(p);
     const budget = budgetTotals(p);
+    let misfiled;
     return {
       period: p,
       range: periodRange(p),
@@ -300,6 +301,21 @@ module.exports = function registerFigures(ctx) {
       foreign: summary.foreign,
       uncountedIncome: (summary.uncatIncome || 0) + ((summary.unknown && summary.unknown.income) || 0),
       unreadable: unreadableAmounts(p),
+      /* Rows dated inside this period that sit in another month's file, which
+         the file-month fast path (period.js txInRange, and unreadableAmounts
+         below) never reads for it: counted by reconcile(), in none of the
+         figures above (2026-11-11 audit, task 5). A count and the files, for
+         the hero's sentence; src/misfiled.js holds the rule. Only the rows
+         the BUDGET lens would have kept, like `unreadable` above: a misfiled
+         row the figures would have held out anyway is not what they are
+         short by. (The Transactions page lists every one.)
+
+         Read on first use and kept for THIS snapshot only: finding them walks
+         every row in the vault, a Dashboard paint builds this snapshot several
+         times, and only the hero's qualifier list (and the API that carries
+         it) asks. Eagerly it cost 2.7 ms of a 77 ms paint at five years of
+         history — in the pipeline the same audit's task 9 was thinning. */
+      get misfiled() { return misfiled || (misfiled = ctx.misfiledTx(p, { budgetOnly: true })); },
     };
   }
 

@@ -473,6 +473,18 @@ module.exports = {
     other: '{count} lignes de comptes hors budget sont masquées',
   },
   'tx.outside.show': 'Les afficher',
+  'tx.misfiled.file': {
+    one: '{file} contient {count} transaction datée hors du mois dont le fichier porte le nom ; aucune période ne la liste ni ne la compte.',
+    other: '{file} contient {count} transactions datées hors du mois dont le fichier porte le nom ; aucune période ne les liste ni ne les compte.',
+  },
+  'tx.misfiled.more': {
+    one: 'et {count} autre fichier',
+    other: 'et {count} autres fichiers',
+  },
+  'tx.misfiled.why': {
+    one: 'Le solde du compte la compte toujours. Déplacez la ligne dans le fichier de son propre mois, ou corrigez sa date.',
+    other: 'Le solde du compte les compte toujours. Déplacez chaque ligne dans le fichier de son propre mois, ou corrigez sa date.',
+  },
   'tx.future.hidden': {
     one: '{count} ligne datée après aujourd\'hui est masquée',
     other: '{count} lignes datées après aujourd\'hui sont masquées',
@@ -1678,6 +1690,10 @@ module.exports = {
   'dash.hero.unreadable': {
     one: '{count} montant illisible compte pour 0',
     other: '{count} montants illisibles comptent pour 0',
+  },
+  'dash.hero.misfiled': {
+    one: '{count} transaction datée dans cette période est classée sous un autre mois et n\'est pas comptée ({files})',
+    other: '{count} transactions datées dans cette période sont classées sous un autre mois et ne sont pas comptées ({files})',
   },
   'dash.split.otherSlice': 'Autres ({count})',
   'bud.err.toggle': 'Impossible de mettre à jour la note de {category} ({error})',

@@ -484,6 +484,18 @@ module.exports = {
     other: '{count} linhas de contas fora do orçamento estão ocultas',
   },
   'tx.outside.show': 'Mostrar',
+  'tx.misfiled.file': {
+    one: '{file} contém {count} transação com data fora do mês que dá nome ao arquivo, então nenhum período a lista nem a conta.',
+    other: '{file} contém {count} transações com data fora do mês que dá nome ao arquivo, então nenhum período as lista nem as conta.',
+  },
+  'tx.misfiled.more': {
+    one: 'e mais {count} arquivo',
+    other: 'e mais {count} arquivos',
+  },
+  'tx.misfiled.why': {
+    one: 'O saldo da conta ainda a conta. Mova a linha para o arquivo do seu próprio mês ou corrija a data.',
+    other: 'O saldo da conta ainda as conta. Mova cada linha para o arquivo do seu próprio mês ou corrija a data.',
+  },
   'tx.future.hidden': {
     one: '{count} linha com data posterior a hoje está oculta',
     other: '{count} linhas com data posterior a hoje estão ocultas',
@@ -1680,6 +1692,10 @@ module.exports = {
   'dash.hero.unreadable': {
     one: '{count} valor não pôde ser lido e conta como 0',
     other: '{count} valores não puderam ser lidos e contam como 0',
+  },
+  'dash.hero.misfiled': {
+    one: '{count} transação com data neste período está arquivada em outro mês e não é contada ({files})',
+    other: '{count} transações com data neste período estão arquivadas em outro mês e não são contadas ({files})',
   },
   'dash.split.otherSlice': 'Outros ({count})',
   'bud.err.toggle': 'Não foi possível atualizar a nota de {category} ({error})',

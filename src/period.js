@@ -25,7 +25,8 @@ const { reconcile } = require('./reconcile');
 const { savedFromOutside, poolCatType } = require('./savings-math');
 const { budgetUsedShare, budgetSpent, assumedProvision } = require('./money-flow');
 const { SET_ASIDE_TYPES, isPoolAccount } = require('./vocabulary');
-const { stamp, tally, LENSES } = require('./ledger');
+const { stamp, tally, LENSES, keeps } = require('./ledger');
+const { fileOutsideWindow, uncountedRows, summariseMisfiled } = require('./misfiled');
 
 /* ADR-0007 · Pay cycle is a number of days. A word would need a dialect; absent
    or zero means the payday month; periodDaysOrZero bands it on load. */
@@ -202,6 +203,45 @@ module.exports = function registerPeriod(ctx) {
     }
     out.sort((a, b) => a.date.localeCompare(b.date) || a.desc.localeCompare(b.desc));
     return out;
+  }
+
+  /* Misfiled rows are disclosed, not moved (2026-11-11 audit, task 5). The
+     file-month test above is a veto on top of the row's own date: 2026-09-03
+     sitting in 2026-08.md is out of August by date and out of September by
+     file, while reconcile() still counts it. The fast path stays (Ruan's
+     decision); these two name the rows it loses so a page can say so beside
+     the figure. The rule and its evidence are src/misfiled.js's header.
+
+     `p` null is the whole vault. With a period, the rows DATED inside it —
+     the money missing from that period — and, with `withFiles`, also the
+     ones sitting in a file the period reads, for the Transactions page, where
+     a reader is looking at that file. Today-free: the window of a row's own
+     period comes from the row's date, never the clock. */
+  function misfiledRowsIn(p, opts) {
+    const all = uncountedRows(S.txFiles, d => periodRange(currentPeriod(d)));
+    const o = opts || {};
+    let found = all;
+    if (p != null) {
+      const { start, end } = periodRange(p);
+      found = all.filter(({ file, row }) => (row.date >= start && row.date <= end)
+        || (!!o.withFiles && !fileOutsideWindow(file.month, start, end)));
+    }
+    /* `budgetOnly`: the rows the BUDGET lens would have kept had the period
+       read them — what the hero's own figures are short by. A misfiled row the
+       reader marked Excluded, or one in an account outside the budget, was
+       never in those figures, and naming it beside them would be a caveat with
+       no figure under it (the rule unreadableAmounts in figures.js follows).
+       Stamped by the ledger itself, so the vetoes are LENSES.BUDGET's. */
+    if (!o.budgetOnly || !found.length) return found;
+    const stamped = stamp(found.map(({ file, row }) => ({ ...row, label: file.label })), ledgerEnv());
+    return found.filter((_, i) => keeps(LENSES.BUDGET, stamped[i]));
+  }
+  /* { count, files: [{ label, month, rel, count }] } — what a page prints. A
+     month added this session has no `rel` yet; txFileRel names where it will
+     be written, which is the same path. */
+  function misfiledTx(p, opts) {
+    return summariseMisfiled(misfiledRowsIn(p, opts),
+      f => f.rel || (typeof ctx.txFileRel === 'function' ? ctx.txFileRel(f.label, f.month) : `Transactions/${f.label}/${f.month}.md`));
   }
 
   /* ---------------------------- calculations ---------------------------- */
@@ -615,6 +655,9 @@ module.exports = function registerPeriod(ctx) {
        window the same way movedToFunds does, rather than keeping a second
        copy of "as of today" that can drift from this one again. */
     periodWindowAsOf, txInRange, pairingRows,
+    /* 2026-11-11 audit, task 5. The rows the file-month fast path loses, for
+       every page that prints a period figure they are missing from. */
+    misfiledRowsIn, misfiledTx,
     /* Published for figures.js's categoryActualsInRange — the budget export's
        exact-date window reads the SAME tally periodSummary does, rather than a
        second walk over the ledger. */

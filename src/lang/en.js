@@ -509,6 +509,18 @@ module.exports = {
     other: '{count} rows from accounts outside the budget are hidden',
   },
   'tx.outside.show': 'Show them',
+  'tx.misfiled.file': {
+    one: '{file} holds {count} transaction dated outside the month the file is named for, so no period lists or counts it.',
+    other: '{file} holds {count} transactions dated outside the month the file is named for, so no period lists or counts them.',
+  },
+  'tx.misfiled.more': {
+    one: 'and {count} more file',
+    other: 'and {count} more files',
+  },
+  'tx.misfiled.why': {
+    one: 'The account balance still counts it. Move the row to the file for its own month, or correct its date.',
+    other: 'The account balance still counts them. Move each row to the file for its own month, or correct its date.',
+  },
   'tx.future.hidden': {
     one: '{count} row dated after today is hidden',
     other: '{count} rows dated after today are hidden',
@@ -1900,6 +1912,10 @@ module.exports = {
   'dash.hero.unreadable': {
     one: '{count} amount could not be read and counts as 0',
     other: '{count} amounts could not be read and count as 0',
+  },
+  'dash.hero.misfiled': {
+    one: '{count} transaction dated in this period is filed under another month and is not counted ({files})',
+    other: '{count} transactions dated in this period are filed under another month and are not counted ({files})',
   },
   'dash.split.otherSlice': 'Other ({count})',
   'bud.err.toggle': 'Could not update the note for {category} ({error})',

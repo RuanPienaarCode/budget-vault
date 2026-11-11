@@ -569,6 +569,7 @@ module.exports = function registerTransactions(ctx) {
         ...(orphaned.size ? [[MISSING, i18n.t('dash.stat.missing')]] : [])]);
     const { rows: filtered, token: renderToken, hiddenOutside, hiddenFuture, hiddenForeign, hiddenFund } = filteredRows();
     renderScopeNote({ outside: hiddenOutside, foreign: hiddenForeign, fund: hiddenFund, future: hiddenFuture });
+    require('./misfiled-note').renderMisfiledNote(ctx, $('#txScopeNote'), $('#txWholeHistory').checked ? null : S.period);
     let list = filtered;
     /* Window the table. The old shape sliced to 800 and built every one: ~13,600
        nodes and, before deferredCatSelect, 800 native <select>s — rebuilt in full

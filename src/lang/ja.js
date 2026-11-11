@@ -462,6 +462,15 @@ module.exports = {
     other: '予算外の口座の {count} 件の行を非表示にしています',
   },
   'tx.outside.show': '表示する',
+  'tx.misfiled.file': {
+    other: '{file} には、ファイル名の月以外の日付の取引が {count} 件あり、どの期間にも表示されず、集計もされません。',
+  },
+  'tx.misfiled.more': {
+    other: 'ほか {count} 個のファイル',
+  },
+  'tx.misfiled.why': {
+    other: '口座残高には引き続き含まれます。各行をその月のファイルに移すか、日付を修正してください。',
+  },
   'tx.future.hidden': {
     other: '今日より後の日付の {count} 件の行を非表示にしています',
   },
@@ -1590,6 +1599,9 @@ module.exports = {
   'bud.amount.unreadable': '「{raw}」を読み取れませんでした — 金額を入力し直すまで 0 として扱われます',
   'dash.hero.unreadable': {
     other: '読み取れない金額が {count} 件あり、0 として扱われます',
+  },
+  'dash.hero.misfiled': {
+    other: 'この期間の日付の取引 {count} 件が別の月のファイルにあり、集計されていません（{files}）',
   },
   'dash.split.otherSlice': 'その他（{count}）',
   'bud.err.toggle': '{category} のノートを更新できませんでした（{error}）',

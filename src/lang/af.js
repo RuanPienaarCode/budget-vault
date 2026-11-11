@@ -467,6 +467,18 @@ module.exports = {
     other: '{count} rye van rekeninge buite die begroting is versteek',
   },
   'tx.outside.show': 'Wys hulle',
+  'tx.misfiled.file': {
+    one: '{file} bevat {count} transaksie met \'n datum buite die maand waarna die lêer genoem is, so geen tydperk lys of tel dit nie.',
+    other: '{file} bevat {count} transaksies met datums buite die maand waarna die lêer genoem is, so geen tydperk lys of tel hulle nie.',
+  },
+  'tx.misfiled.more': {
+    one: 'en nog {count} lêer',
+    other: 'en nog {count} lêers',
+  },
+  'tx.misfiled.why': {
+    one: 'Die rekeningsaldo tel dit steeds. Skuif die ry na die lêer vir sy eie maand, of maak sy datum reg.',
+    other: 'Die rekeningsaldo tel hulle steeds. Skuif elke ry na die lêer vir sy eie maand, of maak sy datum reg.',
+  },
   'tx.future.hidden': {
     one: '{count} ry met \'n datum ná vandag is versteek',
     other: '{count} rye met \'n datum ná vandag is versteek',
@@ -1664,6 +1676,10 @@ module.exports = {
   'dash.hero.unreadable': {
     one: '{count} bedrag kon nie gelees word nie en tel as 0',
     other: '{count} bedrae kon nie gelees word nie en tel as 0',
+  },
+  'dash.hero.misfiled': {
+    one: '{count} transaksie met \'n datum in hierdie tydperk is onder \'n ander maand geliasseer en word nie getel nie ({files})',
+    other: '{count} transaksies met datums in hierdie tydperk is onder \'n ander maand geliasseer en word nie getel nie ({files})',
   },
   'dash.split.otherSlice': 'Ander ({count})',
   'bud.err.toggle': 'Kon nie die nota vir {category} opdateer nie ({error})',
