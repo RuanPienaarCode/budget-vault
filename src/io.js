@@ -704,9 +704,23 @@ function makeIo(deps, { view = false } = {}) {
     const at = foldSeg(resolved);
     return !(cfg && (at === cfg || at.startsWith(cfg + '/')));
   };
+  /* Hands back the path it CHECKED — collapsed — never the one it was given.
+     It used to check the collapsed path and return the uncollapsed one, so
+     for a rel that steps out and back (`Journal/../Accounts/Cheque.md`)
+     everything after the check worked on a spelling no vault event carries:
+     the stale check found no mark and a Save over a phone's edit landed, the
+     vault found no file at that key and CREATED one — making the folders the
+     detour named, which in a book at the vault root put a Journal/ at the top
+     of the reader's vault — and the write was remembered as ours under a key
+     its own echo never arrives with (found by the pre-merge review of the
+     root-book change; it ran "direct: STALE; via Journal/../: landed" in a
+     folder book and a root book alike). No caller in src/ builds such a rel;
+     this guard exists for the one that arrives by sync. For a rel with no
+     `.` or `..` segment the two are the same string, so nothing else moves
+     (tests/write-path-checked-is-written.test.cjs). */
   function guardedPath(rel) {
-    const path = relPath(rel);
-    if (!withinBudget(collapsePath(path))) {
+    const path = collapsePath(relPath(rel));
+    if (!withinBudget(path)) {
       throw new Error(`Refused write outside the budget folder: ${rel}`);
     }
     return path;
