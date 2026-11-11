@@ -746,7 +746,21 @@ function daysBetween(a, b) {
   return n === null ? 0 : n;
 }
 
+/* ADR-0007 · The printed chain balances as printed. Each term is rounded once
+   and the result DERIVED from the rounded terms, so the strip adds up by eye —
+   and may sit up to half a unit per term from `free`, which decides the word. */
+function printedChain(L) {
+  const showCardTerm = L.cardDue > 0 && !L.cycle;
+  const showEarmark = (L.earmarked || 0) >= 1;
+  const cash = L.cashKnown ? Math.round(L.cash) : null;
+  const committed = Math.round(L.committedOther);
+  const card = showCardTerm ? Math.round(L.cardDue) : 0;
+  const earmarked = showEarmark ? Math.round(L.earmarked) : 0;
+  const free = cash === null ? null : cash - earmarked - committed - card;
+  return { showCardTerm, showEarmark, cash, earmarked, committed, card, free };
+}
+
 module.exports = {
   WHOLE_MONTH_DAYS, nextOnDay, isCreditCard, isSettleCard,
-  knownTo, cashOnHand, cardsOwed, serviceCommitments, debitOrderCommitments, debtCommitments, cardCommitments, whatsLeft, debtMonthly,
+  knownTo, cashOnHand, cardsOwed, serviceCommitments, debitOrderCommitments, debtCommitments, cardCommitments, whatsLeft, printedChain, debtMonthly,
 };
