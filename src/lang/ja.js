@@ -1598,6 +1598,13 @@ module.exports = {
   'load.unreadable.why.table': "読み取れる表がありません",
   'load.unreadable.why.other': "読み取れませんでした",
   'load.unreadable.tail': "それらの内容は空、または初期設定として扱われるため、以下のすべての数字はそれを前提にしています。",
+  'load.misfiled.head': {
+    other: '日付とは別の月のファイルにある取引が {count} 件あります: {list}。',
+  },
+  'load.misfiled.item': '{file}（{count} 件）',
+  'load.misfiled.tail': {
+    other: 'どの期間にも表示されず、集計もされませんが、口座残高には引き続き含まれます。',
+  },
 
   'bud.amount.unreadableChip': '読み取れません',
   'bud.amount.unreadable': '「{raw}」を読み取れませんでした — 金額を入力し直すまで 0 として扱われます',

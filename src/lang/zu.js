@@ -1702,6 +1702,15 @@ module.exports = {
   'load.unreadable.why.table': "ayikho ithebula elifundekayo",
   'load.unreadable.why.other': "ayikwazanga ukufundwa",
   'load.unreadable.tail': "Okuqukethwe yiwo kuphathwa njengokungenalutho noma njengamasethingi asezingeni, ngakho wonke amanani aphansi abheka lokho.",
+  'load.misfiled.head': {
+    one: 'Umsebenzi wemali ongu-{count} ugcinwe ngaphansi kwenye inyanga: {list}.',
+    other: 'Imisebenzi yemali engu-{count} igcinwe ngaphansi kwenye inyanga: {list}.',
+  },
+  'load.misfiled.item': '{file} ({count})',
+  'load.misfiled.tail': {
+    one: 'Asikho isikhathi esiwubalayo noma esiwufaka ohlwini, kodwa ibhalansi ye-akhawunti isawubala.',
+    other: 'Asikho isikhathi esiyibalayo noma esiyifaka ohlwini, kodwa ibhalansi ye-akhawunti isayibala.',
+  },
 
   'bud.amount.unreadableChip': 'Ayikwazi ukufundwa',
   'bud.amount.unreadable': 'Ayikwazanga ukufunda "{raw}" — ibalwa njengo-0 kuze kube yilapho uphinda ufaka inani',

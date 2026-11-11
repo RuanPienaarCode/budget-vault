@@ -1688,6 +1688,15 @@ module.exports = {
   'load.unreadable.why.table': "aucun tableau lisible",
   'load.unreadable.why.other': "illisible",
   'load.unreadable.tail': "Ce qu'ils contiennent est traité comme vide ou comme réglages par défaut, donc tous les chiffres ci-dessous le supposent.",
+  'load.misfiled.head': {
+    one: '{count} transaction est classée sous un autre mois que celui de sa date : {list}.',
+    other: '{count} transactions sont classées sous un autre mois que celui de leur date : {list}.',
+  },
+  'load.misfiled.item': '{file} ({count})',
+  'load.misfiled.tail': {
+    one: 'Aucune période ne la liste ni ne la compte, alors que le solde du compte la compte toujours.',
+    other: 'Aucune période ne les liste ni ne les compte, alors que le solde du compte les compte toujours.',
+  },
 
   'bud.amount.unreadableChip': 'Illisible',
   'bud.amount.unreadable': 'Impossible de lire « {raw} » — compte pour 0 tant que vous ne saisissez pas à nouveau le montant',

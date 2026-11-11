@@ -145,15 +145,29 @@ function modalOpenIn(docs) {
 }
 
 function fsChangeInBudget(basePath, file, oldPath) {
-  const under = p => typeof p === 'string' && p !== '' && (p === basePath || p.startsWith(basePath + '/'));
+  /* io.js bookOwns, not a prefix spelled here (2026-11-11 audit, task 2). The
+     prefix was `p === basePath || p.startsWith(basePath + '/')`, and a book at
+     the vault root has '/' for a base, which no vault path starts with — so
+     every change in such a book was dropped here, io.observeChange was never
+     told, and nothing would have refused a Save over a phone's edit. That is
+     why a root book could not be allowed to write. bookOwns is also the test
+     io's write containment asks, deliberately the same one: at the root it is
+     the book's own files and folders, NOT every path in the vault — a root
+     book shares its folder with the reader's notes, and reloading the budget
+     after each save of one of those would be this bug's opposite. In a folder
+     it answers exactly as the prefix did (tests/root-book-watcher.test.cjs). */
+  const under = p => registerIo.bookOwnsPath(basePath, p);
   return under(file && file.path) || under(oldPath);
 }
 
 function classifyRename(basePath, oldPath, newPath, categories) {
   const bp = basePath;
   const kindOf = p => {
-    if (typeof p !== 'string' || (p !== bp && !p.startsWith(bp + '/'))) return null;
-    const rel = p.slice(bp.length + 1);
+    /* Root-aware, as fsChangeInBudget above: the slice dropped the first two
+       characters of every path in a root book ('Accounts/Cheque.md' →
+       'counts/Cheque.md'), so no rename there was ever an account's. */
+    if (!registerIo.bookOwnsPath(bp, p)) return null;
+    const rel = registerIo.relUnder(bp, p);
     if (/^Accounts\/[^/]+\.md$/.test(rel)) return 'account';
     if (/^Categories\/[^/]+\.md$/.test(rel)) return 'category';
     return null;
@@ -183,7 +197,7 @@ function classifyRename(basePath, oldPath, newPath, categories) {
      bug, and it is the second time in this repo (import.js, July: a safeSeg'd
      label probed against a raw one). */
   if (kind === 'category') {
-    const rel = oldPath.slice(bp.length + 1);
+    const rel = registerIo.relUnder(bp, oldPath);
     const cat = (categories || []).find(c => c.rel === rel);
     if (cat && cat.name !== base(oldPath)) return null;
   }
@@ -375,10 +389,34 @@ function visibleUnreadable(list, onboarded) {
   return items.filter(x => !(x && x.rel === 'Settings.md' && x.why === 'missing'));
 }
 
+/* The banner's second sentence: transactions filed under the wrong month's
+   file, which no period lists or counts while the account balance still does
+   (src/misfiled.js has the rule; period.js misfiledTx(null) hands over the
+   whole vault's as { count, files: [{ rel, count }] }). Wave 1 disclosed them
+   on the Dashboard hero and the Transactions page, and a reader on any other
+   page — Accounts, say, looking at the balance the row moved — was told
+   nothing (2026-11-11 audit, task 5 follow-up). Same shape as the sentence
+   above and the same limit: each file once with its own count, four of them,
+   then an ellipsis. It names the file and the count and what follows; the
+   row stays where the reader typed it. Read defensively, like `list` above:
+   the seam is another module's. */
+function misfiledSummary(found, t = i18n.t) {
+  const files = (found && Array.isArray(found.files) ? found.files : [])
+    .filter(f => f && typeof f.rel === 'string' && f.rel && f.count > 0);
+  const count = files.reduce((sum, f) => sum + f.count, 0);
+  if (!count) return '';
+  const shown = files.slice(0, 4).map(f => t('load.misfiled.item', { file: f.rel, count: f.count }));
+  if (files.length > shown.length) shown.push('…');
+  return t('load.misfiled.head', { count, list: shown.join('; ') }) + ' ' + t('load.misfiled.tail', { count });
+}
+
 /* The sentence the banner prints: '' when there is nothing to say. Split from
-   the closure so a bare node test can drive it. */
-function unreadableBannerText(list, onboarded, t = i18n.t) {
-  return unreadableSummary(visibleUnreadable(list, onboarded), t);
+   the closure so a bare node test can drive it. `misfiled` is optional and
+   comes last so every existing caller reads as it did; the unreadable files
+   are said first, because what they hold is missing from every figure, and
+   the misfiled rows after, which are missing from a period's. */
+function unreadableBannerText(list, onboarded, t = i18n.t, misfiled) {
+  return [unreadableSummary(visibleUnreadable(list, onboarded), t), misfiledSummary(misfiled, t)].filter(Boolean).join(' ');
 }
 
 /* The ONLY sanctioned way to re-read the vault. loadVault() is a whole-state
@@ -801,7 +839,9 @@ function mountApp(view) {
     root.classList.toggle('bv-cur-1', Array.from(sym).length === 1);
   }
   /* The one banner for files that are present but unreadable (S.unreadableFiles,
-     set by the loader). Built here rather than in the static shell because it
+     set by the loader) and, after them, for transactions filed under the wrong
+     month's file (ctx.misfiledTx — the whole vault's, because the banner sits
+     above every page and no one period is its subject). Built here rather than in the static shell because it
      exists only when something is wrong, and it sits above every page —
      whichever one the reader is on — since the figures on all of them are
      built from the same defaults. It is held by reference, not looked up by
@@ -815,7 +855,8 @@ function mountApp(view) {
   function renderUnreadableBanner() {
     const scroll = $('.bud-scroll');
     if (!scroll) return;
-    const text = unreadableBannerText(S.unreadableFiles, plugin.settings.onboarded);
+    const text = unreadableBannerText(S.unreadableFiles, plugin.settings.onboarded, i18n.t,
+      typeof ctx.misfiledTx === 'function' ? ctx.misfiledTx(null) : null);
     if (!text) {
       if (unreadableEl) unreadableEl.remove();
       unreadableEl = null;

@@ -72,6 +72,56 @@ function relUnder(base, path) {
   return path.startsWith(root + '/') ? path.slice(root.length + 1) : path;
 }
 
+/* ---- what a book at the vault root OWNS (2026-11-11 audit, task 2) ----
+
+   insideBook answers "is this path under the book's folder", and for a book in
+   a folder that is the whole of "is this the book's": the folder was given to
+   the budget, and everything in it has always been treated as the budget's.
+   At the vault root the two questions come apart. The folder is the VAULT,
+   and most of a vault is not a budget — the daily notes, a project folder,
+   another plugin's files. Asked only insideBook there, the watcher would
+   re-read the whole budget 800 ms after every save of any note in the vault
+   and mark that note stale, and the write containment would let a rel built
+   from bad data be written over, or trashed, anywhere the vault reaches.
+
+   So a root book owns what this app keeps in a book and nothing else, told by
+   the first segment of the path: the six files it reads and writes beside
+   Settings.md, and the nine folders it reads files from or writes them into
+   (load.js's mdFilesUnder / subfoldersUnder / readFile call sites, plus
+   Receipts/ and Data/, which report.js's MANAGED_SUBFOLDERS does not need).
+   A folder name on its own is the book's too: `Transactions` renamed away is
+   a change to every month in it. tests/root-book-watcher.test.cjs holds the
+   two lists to the names the rest of src/ spells, so a new book-level file
+   that is not added here fails that suite — and, in a root book, is refused
+   as outside the budget folder rather than written unwatched.
+
+   Compared the way the filesystem compares (foldSeg): `categories/Food.md` is
+   a file in Categories/ on APFS and iOS, and this one predicate is asked by
+   BOTH the watcher (controller.js fsChangeInBudget, api.js underBudget) and
+   the write containment (withinBudget, below) — a path one of them owned and
+   the other did not is exactly a write the stale ledger never hears about.
+   Folding can only ever add a reload or a refusal.
+
+   `resolved` is collapsePath's answer, as for insideBook. For a book in a
+   folder this IS insideBook: nothing about such a book changes. */
+const BOOK_FILES = ['Settings.md', 'Exchange Rates.md', 'Owed Money.md', 'Debts.md', 'Assets.md', 'Services.md'];
+const BOOK_FOLDERS = ['Categories', 'Accounts', 'Budgets', 'Plans', 'Tax', 'Transactions', 'Notes', 'Receipts', 'Data'];
+const BOOK_FILE_KEYS = BOOK_FILES.map(foldSeg);
+const BOOK_FOLDER_KEYS = BOOK_FOLDERS.map(foldSeg);
+function bookOwns(base, resolved) {
+  if (!insideBook(base, resolved)) return false;
+  if (collapsePath(base) !== '') return true;
+  const cut = resolved.indexOf('/');
+  const top = foldSeg(cut < 0 ? resolved : resolved.slice(0, cut));
+  return BOOK_FOLDER_KEYS.includes(top) || (cut < 0 && BOOK_FILE_KEYS.includes(top));
+}
+/* bookOwns for a path as a vault EVENT hands it over (a TAbstractFile's path,
+   or a rename's old path): anything that is not a non-empty string is no
+   path, and so nobody's. The spelling the three watchers share. */
+function bookOwnsPath(base, path) {
+  return typeof path === 'string' && path !== '' && bookOwns(base, collapsePath(path));
+}
+
 /* destinationProblem(folder, { configDir, budgetFolder, budgetFolders }) — may an export
    write into the folder the reader TYPED? The one answer for every export
    that takes a destination: the Report uses it; the Transactions export and
@@ -617,35 +667,60 @@ function makeIo(deps, { view = false } = {}) {
      one test both halves of a budget-rooted change go through: a write
      (guardedPath, below) and a delete (trashFile).
 
-     A BOOK AT THE VAULT ROOT IS STILL REFUSED HERE, and for now that is on
-     purpose (2026-11-11 audit, task 2). The prefix test is the one that
-     cannot see a root book — its base collapses to '' — and has refused every
-     write such a book makes since the first release. insideBook (top of this
-     file) is the test that can, and switching to it is one line. It is not
-     switched yet because this refusal is the only thing standing between a
-     root book and a lost edit: the vault watcher asks "is this change in the
-     budget?" with the same hand-spelled prefix (controller.js
-     fsChangeInBudget; api.js underBudget), so it drops every event in a root
-     book before io.observeChange hears it. No stale mark, no refusal, no
-     reload — a Save there would overwrite a phone's row unopposed. Reading is
-     right at the root now (load.js's rels, through relOf below); writing
-     follows the watcher.
+     It is bookOwns (top of this file), which is what lets a book at the
+     vault root write at all: the test here was a bare prefix match against a
+     base that collapses to '' there, and refused "Settings.md" as outside the
+     budget folder (2026-11-11 audit, task 2). For a book in a folder bookOwns
+     is that prefix match, so nothing about such a book moves.
 
-     Deletes are held by the same test, and that half is NEW. trashFile had no
-     containment of its own, and a root book could not reach it only by
-     accident: its garbled rels resolved to no file, so every delete was a
-     silent "nothing to delete". With the rels right, a confirmed delete would
-     have landed in a book where no Save can — and where nothing can say the
-     file had changed since it was read. (One write does reach a root book,
-     and is meant to: main.js's Settings.md updater, which re-reads the file
-     and patches the one key it was asked to, through writeVaultFile.) */
+     THIS ONLY HOLDS TOGETHER WITH THE WATCHER, and by being the watcher's own
+     predicate. A root book may write because a change somebody else makes in
+     one is now reported: controller.js fsChangeInBudget asks bookOwns too,
+     tells observeChange, and a Save over that file refuses as stale. Had this
+     asked a wider question than the watcher does — insideBook, say, which at
+     the root is every path in the vault — there would be paths a Save could
+     land on that no event is ever reported for. tests/root-book.test.cjs
+     holds the two to each other over a corpus, through the real io.
+
+     And it is why a root book cannot touch the rest of the vault. Its folder
+     holds the reader's journal and every other note they keep; the book owns
+     Settings.md, its five sibling files and its nine folders. A rel built
+     from bad data that resolves anywhere else is refused here as `../` is,
+     for a write and for a delete.
+
+     One thing a root book's folder holds that the lists cannot rule out on
+     their own: Obsidian's config folder (books.js refuses a book inside it;
+     the root merely contains it). Its name is the vault's to choose, and
+     data.json is in there. No budget file lives in it — Obsidian indexes
+     nothing under a dot-folder for the loader to have read — so a
+     budget-rooted write or delete resolving into it is refused whatever it is
+     called, compared the way the filesystem compares (foldSeg): `.Obsidian/`
+     is the same folder on APFS. */
   const withinBudget = resolved => {
-    const base = collapsePath(basePath());
-    return resolved !== null && (resolved === base || resolved.startsWith(base + '/'));
+    const base = basePath();
+    if (!bookOwns(base, resolved)) return false;
+    if (collapsePath(base) !== '') return true;
+    const cfg = foldSeg(collapsePath(normalizePath(String(vault.configDir || '.obsidian'))) || '');
+    const at = foldSeg(resolved);
+    return !(cfg && (at === cfg || at.startsWith(cfg + '/')));
   };
+  /* Hands back the path it CHECKED — collapsed — never the one it was given.
+     It used to check the collapsed path and return the uncollapsed one, so
+     for a rel that steps out and back (`Journal/../Accounts/Cheque.md`)
+     everything after the check worked on a spelling no vault event carries:
+     the stale check found no mark and a Save over a phone's edit landed, the
+     vault found no file at that key and CREATED one — making the folders the
+     detour named, which in a book at the vault root put a Journal/ at the top
+     of the reader's vault — and the write was remembered as ours under a key
+     its own echo never arrives with (found by the pre-merge review of the
+     root-book change; it ran "direct: STALE; via Journal/../: landed" in a
+     folder book and a root book alike). No caller in src/ builds such a rel;
+     this guard exists for the one that arrives by sync. For a rel with no
+     `.` or `..` segment the two are the same string, so nothing else moves
+     (tests/write-path-checked-is-written.test.cjs). */
   function guardedPath(rel) {
-    const path = relPath(rel);
-    if (!withinBudget(collapsePath(path))) {
+    const path = collapsePath(relPath(rel));
+    if (!withinBudget(path)) {
       throw new Error(`Refused write outside the budget folder: ${rel}`);
     }
     return path;
@@ -840,8 +915,9 @@ function makeIo(deps, { view = false } = {}) {
          the wait. */
       assertSameBook(relOf(file.path), null, stamp);
       /* And the containment a write gets (withinBudget, above): this app
-         deletes nothing outside the open book's folder — and, for as long as a
-         book at the vault root cannot be saved into, nothing inside one. */
+         deletes nothing outside the open book's folder — and, in a book at the
+         vault root, nothing that is not one of the book's own files, however
+         the caller came by the TFile. */
       if (!withinBudget(collapsePath(file.path))) {
         throw new Error(`Refused delete outside the budget folder: ${relOf(file.path)}`);
       }
@@ -1153,3 +1229,9 @@ module.exports.opWriterOf = opWriterOf;
    hand (see "a book at the vault root", top of this file). */
 module.exports.insideBook = insideBook;
 module.exports.relUnder = relUnder;
+/* And what a book owns — the same question at a folder, a narrower one at the
+   vault root (see "what a book at the vault root OWNS", above). */
+module.exports.bookOwns = bookOwns;
+module.exports.bookOwnsPath = bookOwnsPath;
+module.exports.BOOK_FILES = BOOK_FILES;
+module.exports.BOOK_FOLDERS = BOOK_FOLDERS;

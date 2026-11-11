@@ -64,7 +64,7 @@ eq(unreadableBannerText(FRESH, undefined), '', 'a plugin with no onboarded flag 
   const ctl = fs.readFileSync(path.join(SRC, 'controller.js'), 'utf8');
   ok(!/\$\('#unreadableBanner'\)/.test(ctl), 'the controller never queries an id the shell does not define');
   ok(!/unreadableBanner/.test(shell), 'the shell does not define a box that can vanish');
-  ok(/unreadableBannerText\(S\.unreadableFiles, plugin\.settings\.onboarded\)/.test(ctl),
+  ok(/unreadableBannerText\(S\.unreadableFiles, plugin\.settings\.onboarded, /.test(ctl),
     'render() hands the plugin\'s onboarded flag to the banner text');
 }
 

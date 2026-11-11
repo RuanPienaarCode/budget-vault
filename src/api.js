@@ -439,8 +439,13 @@ function buildApi(plugin) {
      that file had been part of (2026-10-07 audit, follow-up). */
   function underBudget(path) {
     if (typeof path !== 'string' || !path) return false;
-    const bp = ensureCtx().basePath();
-    return path === bp || path.startsWith(bp + '/');
+    /* io.js bookOwns — the one spelling the Budget view's watcher uses too
+       (controller.js fsChangeInBudget). The prefix that stood here could not
+       see a book at the vault root, whose base is '/': a sibling's card kept
+       its figure through every change in such a book (2026-11-11 audit,
+       task 2). At the root it is the book's own files and folders, not the
+       whole vault; in a folder it is the prefix's answer. */
+    return registerIo.bookOwnsPath(ensureCtx().basePath(), path);
   }
   function onFsChange(file, oldPath) {
     if (unloaded) return;

@@ -1690,6 +1690,15 @@ module.exports = {
   'load.unreadable.why.table': "sem tabela legível",
   'load.unreadable.why.other': "não pôde ser lido",
   'load.unreadable.tail': "O que contêm é tratado como vazio ou como definições predefinidas, por isso todos os valores abaixo assumem isso.",
+  'load.misfiled.head': {
+    one: '{count} transação está arquivada em um mês diferente do da sua data: {list}.',
+    other: '{count} transações estão arquivadas em um mês diferente do da sua data: {list}.',
+  },
+  'load.misfiled.item': '{file} ({count})',
+  'load.misfiled.tail': {
+    one: 'Nenhum período a lista nem a conta, enquanto o saldo da conta ainda a conta.',
+    other: 'Nenhum período as lista nem as conta, enquanto o saldo da conta ainda as conta.',
+  },
 
   'bud.amount.unreadableChip': 'Não foi possível ler',
   'bud.amount.unreadable': 'Não foi possível ler "{raw}" — conta como 0 até você digitar o valor novamente',

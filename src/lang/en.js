@@ -1918,6 +1918,15 @@ module.exports = {
   'load.unreadable.why.table': "no table it can read",
   'load.unreadable.why.other': "could not be read",
   'load.unreadable.tail': "What they hold is treated as empty or as default settings, so every figure below assumes that.",
+  'load.misfiled.head': {
+    one: '{count} transaction is filed under another month than its date: {list}.',
+    other: '{count} transactions are filed under another month than their date: {list}.',
+  },
+  'load.misfiled.item': '{file} ({count})',
+  'load.misfiled.tail': {
+    one: 'No period lists or counts it, while the account balance still does.',
+    other: 'No period lists or counts them, while the account balance still does.',
+  },
 
   'bud.amount.unreadableChip': 'Could not read',
   'bud.amount.unreadable': 'Could not read "{raw}" — it counts as 0 until you type the amount again',

@@ -131,7 +131,7 @@ function fakeClock() {
   /* ---- wiring (mountApp needs a DOM shell) ---- */
   {
     const src = fs.readFileSync(path.join(__dirname, '..', 'src', 'controller.js'), 'utf8');
-    ok(/renderUnreadableBanner\(\);/.test(src) && /unreadableBannerText\(S\.unreadableFiles, plugin\.settings\.onboarded\)/.test(src), 'render() prints the banner from S.unreadableFiles');
+    ok(/renderUnreadableBanner\(\);/.test(src) && /unreadableBannerText\(S\.unreadableFiles, plugin\.settings\.onboarded, /.test(src), 'render() prints the banner from S.unreadableFiles');
     ok(/new Notice\(i18n\.t\('io\.stale\.notice'/.test(src), 'a refused save is surfaced once as a Notice');
   }
 

@@ -1,5 +1,6 @@
 'use strict';
-/* A book at the vault root: read right, contained right — and not yet written
+/* A book at the vault root: read right, contained right — and written, where
+   the vault watcher can see it
    (2026-11-11 audit, task 2 — Medium).
 
    WHAT THE AUDIT FOUND. io.js guardedPath is the defence in depth on every
@@ -39,22 +40,25 @@
        hand-spelled prefix, so it drops every event in a root book: no stale
        mark, no refusal, no reload.
 
-   SO THE WRITE STAYS REFUSED, deliberately, until the watcher can see a root
-   book. That refusal is the only thing between such a book and a Save that
-   overwrites a phone's row unopposed; lifting it first would trade "cannot
-   save" for "can lose an edit". Section 3 pins both halves together, as a
-   ratchet: the day fsChangeInBudget answers true for a root book, this suite
-   fails and says to lift the refusal (io.js withinBudget — one line, onto
-   insideBook; branch fix/audit-root-book-writes carries it with its tests).
+   SO A ROOT BOOK WRITES ONLY WHAT THE WATCHER WATCHES. The write stayed
+   refused until the watcher could see a root book (the hold this suite pinned
+   through wave 1), and it is lifted now — onto io.js bookOwns, the SAME
+   predicate controller.js fsChangeInBudget and api.js underBudget ask. That
+   identity is the safety argument, so section 3 pins it as one: over a corpus
+   of paths, whatever a root book will write or delete is a path the watcher
+   reports a change to. A write the watcher could not see is a Save that
+   overwrites a phone's row unopposed.
 
-   AND SO DOES THE DELETE, which is new. io.trashFile had no containment of
-   its own; a root book could not reach it only because its garbled rels
-   resolved to no file, so every delete was a silent "nothing to delete".
-   Getting the rels right made the file findable — and, for one revision of
-   this fix, made every confirmed delete in a root book land while every Save
-   was still refused (the pre-merge review ran it: `trashFile: true (file
-   gone)` against 722b109's `false`). A delete now goes through the same
-   containment a write does.
+   AND ONLY WHAT IS THE BOOK'S. At the root, "inside the book's folder" is the
+   whole vault, and most of a vault is not a budget. The branch that first
+   lifted the refusal (fix/audit-root-book-writes, 95326b3) used insideBook
+   and carved out the config folder alone; under it `Journal/today.md` was a
+   path a root book could write and trash. bookOwns is the six files and nine
+   folders this app keeps in a book: everything else in the vault is refused
+   exactly as `../` is, config folder included.
+
+   Deletes go through the same containment as writes (trashFile had none of
+   its own), so a root book deletes what it could save and nothing else.
 
    What this suite pins:
 
@@ -64,12 +68,17 @@
         and a base that merely collapses to nothing;
      2. the traversal defence, unchanged: a folder book refuses `../` as it
         always did — and deletes only its own files;
-     3. the hold, and the reason for it, side by side: a root book writes
-        nothing and deletes nothing, through io directly and through the rels
-        the real loader now hands out;
+     3. a root book writes: an existing file, a new nested one, a binary, a
+        frontmatter patch, a delete — each at the vault path a reader expects;
+        `../` in any position that climbs out is refused and nothing is
+        created; a note that merely lives in the vault is neither written nor
+        deleted; Obsidian's config folder is refused whatever its case and
+        whatever the vault calls it — even a name a book folder has; and what
+        it writes is what the watcher watches, path for path;
      4. the REAL loader, over the committed household moved to the root, builds
         exactly the state it builds for the same files under Budget/ — every
-        `rel` included — and each rel names the file it was read from;
+        `rel` included — and writing each file back through its `rel` lands on
+        the file it was read from: no new path appears in the vault;
      5. the settings tab's stranded-budget counts see a root book's Budgets/.
 
      node tests/root-book.test.cjs */
@@ -176,9 +185,9 @@ function relsOf(S) {
     eq(ob.normalizePath(`${root}/Settings.md`), 'Settings.md', say('and a path under it is the bare vault path'));
 
     /* An io the way a view builds one, on a book at `folder`. */
-    const rig = (files, folder) => {
+    const rig = (files, folder, { configDir = '.obsidian' } = {}) => {
       const vault = H.makeVault(files);
-      vault.configDir = '.obsidian';
+      vault.configDir = configDir;
       const plugin = H.bookSeam({ settings: { budgetFolder: folder }, _lastWrite: 0 });
       return { vault, plugin, io: makeIo({ vault, plugin }), keys: () => [...vault._store.keys()].sort() };
     };
@@ -207,26 +216,119 @@ function relsOf(S) {
       eq(await r.io.trashFile(r.io.folderAt('Transactions/Cheque')), true, say('and its own folder'));
     }
 
-    /* ---- 3. the hold, and the reason for it ---- */
+    /* ---- 3. a root book writes what is its own, where the watcher sees it ---- */
     {
       const r = rig({ 'Settings.md': '---\nmonth_start_day: 1\n---\n', 'Categories/Food.md': '---\ntype: expense\n---\n' }, '/');
       eq(r.plugin.activeFolder(), root, say('the open book resolves to the vault root'));
+      /* THE CONDITION. Writes are only safe where a change made by somebody
+         else is reported to io — and that report starts with this predicate. */
+      eq(fsChangeInBudget(r.io.basePath(), { path: 'Transactions/Cheque/2026-07.md' }), true,
+        say('T2: the vault watcher sees a change in a root book. If this fails, the watcher drops every event there, '
+          + 'io\'s stale ledger is never told, and a Save would overwrite an external edit: put the refusal back in io.js withinBudget'));
+      await r.io.writeFile('Settings.md', '---\nmonth_start_day: 25\n---\n');
+      eq(r.vault._store.get('Settings.md'), '---\nmonth_start_day: 25\n---\n', say('T2: an existing file at the root is written'));
+      await r.io.writeFile('Transactions/Cheque/2026-10.md', 'new month');
+      eq(r.vault._store.get('Transactions/Cheque/2026-10.md'), 'new month', say('T2: a new nested file is created where its rel says'));
+      await r.io.writeBinary('Tax/2026/irp5.pdf', new Uint8Array([1, 2, 3]).buffer);
+      ok(r.vault._store.has('Tax/2026/irp5.pdf'), say('T2: and a binary'));
+      await r.io.patchFile('Categories/Food.md', 'type: expense', '\n', { color: '"#888888"' });
+      ok(/color:/.test(r.vault._store.get('Categories/Food.md')), say('T2: and a frontmatter patch'));
+      eq(await r.io.trashFile(r.io.fileAt('Categories/Food.md')), true, say('T2: and a delete'));
+      eq(await r.io.trashFile(r.io.folderAt('Transactions/Cheque')), true, say('T2: and an account\'s month folder'));
+      eq(r.keys().filter(k => !k.endsWith('/.folder')), ['Settings.md', 'Tax/2026/irp5.pdf'],
+        say('T2: nothing landed anywhere else'));
+    }
+    {
+      const r = rig({ 'Settings.md': 'x' }, '/');
       const before = r.keys();
-      for (const rel of ['Settings.md', 'Transactions/Cheque/2026-10.md', '../evil.md', 'Notes/../../evil.md']) {
-        await refused(() => r.io.writeFile(rel, 'x'), say(`a root book's write is refused (${rel})`));
+      for (const rel of ['../evil.md', '../../evil.md', 'Notes/../../evil.md', 'Accounts/../../../evil.md', '..', './../evil.md']) {
+        await refused(() => r.io.writeFile(rel, 'pwned'), say(`T2: ${rel} is refused at the root — out of the book is out of the vault`));
+        await refused(() => r.io.writeBinary(rel, new Uint8Array([1]).buffer), say(`T2: …and as a binary (${rel})`));
+        await refused(() => r.io.patchFile(rel, 'a: 1', '\n', { a: 2 }), say(`T2: …and as a patch (${rel})`));
       }
-      await refused(() => r.io.writeBinary('Tax/2026/irp5.pdf', new Uint8Array([1]).buffer), say('…a binary too'));
-      await refused(() => r.io.patchFile('Categories/Food.md', 'type: expense', '\n', { color: '"#888"' }), say('…and a patch'));
-      ok(r.io.fileAt('Categories/Food.md'), say('io finds a root book\'s file by its rel'));
-      await refused(() => r.io.trashFile(r.io.fileAt('Categories/Food.md')), say('T2: …and a root book\'s delete is refused with its writes'));
-      eq(r.keys(), before, say('and nothing in the vault moved'));
-      /* THE RATCHET. A root book may write only where the watcher can see a
-         change in it — otherwise io's stale ledger is never told, and a Save
-         overwrites whatever the phone wrote. Today it cannot. */
-      eq(fsChangeInBudget(r.io.basePath(), { path: 'Transactions/Cheque/2026-07.md' }), false,
-        say('the vault watcher does not see a change in a root book — which is WHY its writes are still refused. '
-          + 'If this is now true, the watcher has been taught the root: lift the refusal in io.js guardedPath '
-          + '(use insideBook; branch fix/audit-root-book-writes has it, with the config-folder refusal and its tests) and retire this section'));
+      eq(r.keys(), before, say('T2: and none of them created anything'));
+    }
+    {
+      /* The rest of the vault. A root book's folder holds all of it; the book
+         owns none of it. */
+      const STRANGERS = {
+        'Journal/2026-11-12.md': 'a day\n', 'README.md': 'this vault\n', 'Projects/Transactions/2026-09.md': 'a project\'s own table\n',
+        'Daily/Settings.md': 'not the budget\'s settings\n', 'Categories.md': 'a note about categories\n',
+      };
+      const r = rig({ 'Settings.md': 'x', 'Notes/Car.md': 'a budget note\n', ...STRANGERS }, '/');
+      const before = r.keys();
+      for (const rel of [...Object.keys(STRANGERS), 'Journal/new.md', 'New note.md', 'Notes/../Journal/2026-11-12.md', 'Settings.md/x.md',
+        'Exports/2026-09.csv', '.trash/Food.md', 'Transactions 2025/Cheque/2025-12.md']) {
+        await refused(() => r.io.writeFile(rel, 'budget rows'), say(`T2: a root book refuses to write ${rel} — it is not the book's file`));
+        await refused(() => r.io.writeBinary(rel, new Uint8Array([1]).buffer), say(`T2: …or as a binary (${rel})`));
+        await refused(() => r.io.patchFile(rel, 'a: 1', '\n', { a: 2 }), say(`T2: …or as a patch (${rel})`));
+      }
+      for (const p of Object.keys(STRANGERS))
+        await refused(() => r.io.trashFile(r.vault.getFileByPath(p)), say(`T2: a root book refuses to delete ${p}`));
+      await refused(() => r.io.trashFile(r.vault.getFolderByPath('Journal')), say('T2: …or the folder it is in'));
+      for (const whole of ['', '/', '.'])
+        await refused(() => r.io.trashFile({ path: whole, children: [] }), say(`T2: …or the vault itself (${JSON.stringify(whole)})`));
+      eq(r.keys(), before, say('T2: the reader\'s own notes are exactly as they were'));
+      for (const p of Object.keys(STRANGERS)) eq(r.vault._store.get(p), STRANGERS[p], say(`T2: ${p} byte for byte`));
+      eq(await r.io.trashFile(r.io.fileAt('Notes/Car.md')), true, say('T2: while a note of the budget\'s own is deleted'));
+    }
+    {
+      /* The config folder is inside a root book's folder, and is never a budget file. */
+      const r = rig({ 'Settings.md': 'x', '.obsidian/plugins/budget-app/data.json': '{"books":[]}' }, '/');
+      const before = r.keys();
+      for (const rel of ['.obsidian/plugins/budget-app/data.json', '.obsidian/app.json', '.Obsidian/app.json', '.obsidian', 'Notes/../.obsidian/app.json']) {
+        await refused(() => r.io.writeFile(rel, '{}'), say(`T2: a root book refuses a write into the config folder (${rel})`));
+      }
+      await refused(() => r.io.trashFile(r.vault.getFileByPath('.obsidian/plugins/budget-app/data.json')), say('T2: and a delete in it'));
+      eq(r.keys(), before, say('T2: data.json is as it was'));
+      const named = rig({ 'Settings.md': 'x' }, '/', { configDir: '.config' });
+      await refused(() => named.io.writeFile('.config/app.json', '{}'), say('T2: …under whatever name the vault gives it'));
+      /* Even a name one of the book's folders has. Obsidian's own field wants
+         a leading dot, but data is data: the folder holding data.json is
+         never written through a budget rel. */
+      const clash = rig({ 'Settings.md': 'x', 'Data/plugins/budget-app/data.json': '{}' }, '/', { configDir: 'Data' });
+      await refused(() => clash.io.writeFile('Data/Categorisation Rules.csv', 'pattern,category\n'), say('T2: a config folder named like a book folder is still the config folder'));
+      await refused(() => clash.io.writeFile('data/Categorisation Rules.csv', 'pattern,category\n'), say('T2: …in any case'));
+      await refused(() => clash.io.trashFile(clash.vault.getFileByPath('Data/plugins/budget-app/data.json')), say('T2: …and its files are not deleted'));
+      await clash.io.writeFile('Settings.md', 'y');
+      eq(clash.vault._store.get('Settings.md'), 'y', say('…while the rest of that book still writes'));
+      const folder = rig({ 'Budget/Settings.md': 'x' }, 'Budget');
+      await folder.io.writeFile('.obsidian/x.md', 'inside the book, not the vault\'s config');
+      ok(folder.vault._store.has('Budget/.obsidian/x.md'), say('a folder book\'s own paths are judged as they always were'));
+      await folder.io.writeFile('Journal/2026-11-12.md', 'a folder book owns its whole folder');
+      ok(folder.vault._store.has('Budget/Journal/2026-11-12.md'), say('…any name in it included'));
+    }
+    {
+      /* WHAT IT WRITES IS WHAT THE WATCHER WATCHES — the pairing the whole
+         change rests on, asked of the real io and the real gate over one
+         corpus. A path on the left of this and not the right would be a Save
+         nothing could ever refuse as stale. */
+      const corpus = ['Settings.md', 'Exchange Rates.md', 'Owed Money.md', 'Debts.md', 'Assets.md', 'Services.md',
+        'Categories/Food.md', 'Accounts/Closed/Old card.md', 'Budgets/2026-09.md', 'Plans/Holiday.md', 'Tax/2026.md', 'Tax/2026/irp5.pdf',
+        'Transactions/Cheque/2026-07.md', 'Notes/2026/Car.md', 'Receipts/2026-09/Checkers.md', 'Data/Categorisation Rules.csv',
+        'categories/food.md', 'SETTINGS.MD', 'Notes/../Settings.md',
+        'Journal/2026-11-12.md', 'README.md', 'Projects/Transactions/2026-09.md', 'Daily/Settings.md', 'Categories.md', 'Settings',
+        'Exports/x.csv', 'Reports/x.md', '.obsidian/app.json', '.trash/x.md', '../x.md', 'Notes/../../x.md', 'Notes/../Journal/x.md'];
+      const wrote = [], watched = [];
+      for (const rel of corpus) {
+        const r = rig({ 'Settings.md': 'x' }, '/');
+        let landed = true;
+        try { await r.io.writeFile(rel, 'x'); } catch (e) { landed = false; }
+        const at = collapsePath(r.io.relPath(rel));
+        if (landed) wrote.push(rel);
+        if (at !== null && fsChangeInBudget(r.io.basePath(), { path: at })) watched.push(rel);
+        /* And the delete agrees with the write, file by file. */
+        const there = rig({ [at === null || at === '' ? 'x' : at]: 'x' }, '/');
+        const file = at ? there.vault.getFileByPath(at) : null;
+        if (file) {
+          let trashed = true;
+          try { await there.io.trashFile(file); } catch (e) { trashed = false; }
+          eq(trashed, landed, say(`T2: ${rel} can be deleted exactly when it can be written`));
+        }
+      }
+      eq(wrote.filter(rel => !watched.includes(rel)), [], say('T2: a root book writes nothing the watcher does not watch'));
+      eq(watched.filter(rel => !wrote.includes(rel)), [], say('T2: …and (the config folder aside) refuses nothing it watches'));
+      ok(wrote.length === 19 && corpus.length - wrote.length === 13, say(`T2: the corpus exercises both sides (${wrote.length} written, ${corpus.length - wrote.length} refused)`));
     }
 
     /* ---- 4. the real loader at the root ---- */
@@ -244,16 +346,12 @@ function relsOf(S) {
       eq(S.txFolderPaths['Old card'], 'Transactions/Closed/Old card', say('T2: a month folder a level down keeps its own path'));
       eq(S.unreadableFiles.map(u => u.rel), ['Accounts/Closed/Old card.md'], say('T2: an unreadable file is named by its real path'));
       eq(ctx.txFileRel('Cheque', '2026-10'), 'Transactions/Cheque/2026-10.md', say('a new month is addressed beside the ones read'));
-      /* The hold, through the paths a page would actually use: every rel the
-         loader handed out now resolves to a real file, and none of them can
-         be saved over or deleted. */
+      /* Through the paths a page would actually use: every file written back
+         through the rel the loader handed out lands on the file it was read
+         from. */
       const files = [...ctx.vault._store.keys()].sort();
-      for (const rel of rels) {
-        await refused(() => ctx.writeFile(rel, 'rebuilt from state'), say(`T2: a Save to ${rel} in a root book is refused`));
-        await refused(() => ctx.trashFile(ctx.fileAt(rel)), say(`T2: …and so is its delete`));
-      }
-      await refused(() => ctx.trashFile(ctx.folderAt('Transactions/Cheque')), say('T2: an account\'s month folder cannot be deleted either'));
-      eq([...ctx.vault._store.keys()].sort(), files, say('T2: the vault is exactly as it was'));
+      for (const rel of rels) await ctx.writeFile(rel, ctx.vault._store.get(rel));
+      eq([...ctx.vault._store.keys()].sort(), files, say('T2: writing each file back through its rel forks nothing'));
       await ctx.loadVault();
       eq(stateOf(ctx.S), want, say('T2: a reload reads the same state'));
       await ctx.loadNotes();

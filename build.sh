@@ -11,9 +11,11 @@
 #
 # BOTH root main.js and root styles.css are BUILD OUTPUT. Neither is hand-edited:
 #   main.js     <- bundled from src/*.js
-#   styles.css  <- src/styles.css (hand-written) + src/styles-presets.css (generated)
-# Edit src/styles.css for ordinary CSS work; edit scripts/presets.cjs to change a
-# palette. An edit made directly to root styles.css is lost on the next build.
+#   styles.css  <- the files listed in scripts/css-sources.cjs, in that order,
+#                  then stripped of comments and whitespace (esbuild.config.mjs)
+# Edit src/styles.css or src/statement/*.css for ordinary CSS work; edit
+# scripts/presets.cjs to change a palette. An edit made directly to root
+# styles.css is lost on the next build.
 set -euo pipefail
 cd "$(dirname "$0")"
 

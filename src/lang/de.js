@@ -1675,6 +1675,15 @@ module.exports = {
   'load.unreadable.why.table': "keine lesbare Tabelle",
   'load.unreadable.why.other': "konnte nicht gelesen werden",
   'load.unreadable.tail': "Was sie enthalten, wird als leer oder als Standardeinstellung behandelt, daher gehen alle Zahlen unten davon aus.",
+  'load.misfiled.head': {
+    one: '{count} Transaktion liegt in der Datei eines anderen Monats als ihr Datum: {list}.',
+    other: '{count} Transaktionen liegen in der Datei eines anderen Monats als ihr Datum: {list}.',
+  },
+  'load.misfiled.item': '{file} ({count})',
+  'load.misfiled.tail': {
+    one: 'Kein Zeitraum listet oder zählt sie, während der Kontostand sie weiterhin zählt.',
+    other: 'Kein Zeitraum listet oder zählt sie, während der Kontostand sie weiterhin zählt.',
+  },
 
   'bud.amount.unreadableChip': 'Nicht lesbar',
   'bud.amount.unreadable': '„{raw}“ konnte nicht gelesen werden — es zählt als 0, bis Sie den Betrag erneut eingeben',
