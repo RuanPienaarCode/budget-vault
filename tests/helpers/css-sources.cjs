@@ -1,16 +1,23 @@
 'use strict';
 /* THE ONE WAY A GUARD TEST READS THE STYLESHEET.
 
-   Root styles.css is the concatenation of the files scripts/css-sources.cjs
-   lists (fonts, the legacy sheet, the statement foundation, three page lanes, the
-   generated palettes), in that order. A guard that read src/styles.css alone
-   would keep passing while a rule written into a lane file went unchecked, so
-   every CSS guard goes through here and sees all of them, in cascade order.
+   Root styles.css is built from the files scripts/css-sources.cjs lists (fonts,
+   the legacy sheet, the statement foundation, three page lanes, the generated
+   palettes), in that order. A guard that read src/styles.css alone would keep
+   passing while a rule written into a lane file went unchecked, so every CSS
+   guard goes through here and sees all of them, in cascade order.
+
+   The build strips the comments and whitespace out of that text before it
+   writes the root file, and changes nothing else — a claim
+   tests/css-shipped-minified.test.cjs proves rather than assumes. So what a
+   guard reads here is the shipped sheet's rules with the line numbers and
+   comments a failure message needs, which the root file no longer has.
 
      const { assembled, readRules, locate, sources } = require('./helpers/css-sources.cjs');
 
-   assembled()   the shipped stylesheet as a string, built from the SOURCES (not
-                 read from the root file, which may be stale mid-edit).
+   assembled()   the stylesheet as a string, as written — the SOURCES
+                 concatenated (not read from the root file, which is stripped
+                 of comments and may be stale mid-edit).
    sources()     [{ rel, text, start }] — each file and where it begins.
    readRules()   every rule of the assembled sheet as { selectors, prelude,
                  context, decls, line }. `line` is the 1-based line in the

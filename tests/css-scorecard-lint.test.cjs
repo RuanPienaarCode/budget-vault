@@ -30,8 +30,10 @@
 
    Reads the build input — every file scripts/css-sources.cjs lists (the legacy
    sheet, the statement foundation and page lanes, the generated fonts and
-   palettes), byte-for-byte what ships as styles.css, which is the file the
-   scorecard lints.
+   palettes), rule for rule what ships as styles.css, which is the file the
+   scorecard lints. (The build strips comments and whitespace from this text
+   and nothing else; tests/css-shipped-minified.test.cjs proves the rules are
+   the same, which is what lets a guard over the sources speak for the file.)
      node tests/css-scorecard-lint.test.cjs */
 
 let checks = 0;

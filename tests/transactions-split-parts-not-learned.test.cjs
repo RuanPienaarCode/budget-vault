@@ -26,7 +26,6 @@ const assert = require('assert');
 const Module = require('module');
 
 let checks = 0;
-const ok = (c, m) => { assert.ok(c, m); checks++; };
 const eq = (a, b, m) => { assert.deepStrictEqual(a, b, m); checks++; };
 
 const confirms = [];
@@ -140,6 +139,5 @@ function mount() {
     eq(learned, [{ desc: 'Corner Cafe', cat: 'Dining' }], 'control: a first pick on an ordinary row is still learned');
   }
 
-  ok(true, 'done');
   console.log(`PASS transactions-split-parts-not-learned — a split part is never a rule, and the rule question defaults to "Just this row" (${checks} checks)`);
 })().catch(e => { console.error(e); process.exit(1); });

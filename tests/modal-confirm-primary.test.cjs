@@ -23,7 +23,6 @@ const assert = require('assert');
 const Module = require('module');
 
 let checks = 0;
-const ok = (c, m) => { assert.ok(c, m); checks++; };
 const eq = (a, b, m) => { assert.deepStrictEqual(a, b, m); checks++; };
 
 class FakeEl {
@@ -110,6 +109,5 @@ const style = b => ['mod-cta', 'mod-warning'].filter(c => b.hasClass(c));
     Modal.last.close();
     eq(await p, false, 'closing the dialog any other way resolves false');
   }
-  ok(true, 'done');
   console.log(`PASS modal-confirm-primary — a confirmation can mark its safe answer as the one to press (${checks} checks)`);
 })().catch(e => { console.error(e); process.exit(1); });

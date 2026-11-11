@@ -25,24 +25,15 @@
        is a cost paid by 280 installs for no benefit.
 
    src/tx-role.js, src/reconcile.js and src/savings-math.js are pure, so those
-   run with no stub. The serializer needs the obsidian stub, same as
-   tests/split-transaction.test.cjs.
+   run with no stub. The serializer and the loader need the obsidian stub, and
+   the shape-on-disk section reads its files back through the REAL loadVault
+   over an in-memory vault — both from tests/helpers/harness.cjs.
 
      node tests/split-integrity.test.cjs        # non-zero exit on failure */
 
 const assert = require('assert');
-const Module = require('module');
-
-const origLoad = Module._load;
-const STUB = {
-  setIcon() {}, normalizePath: (p) => p,
-  Notice: class {}, Modal: class {}, Setting: class {}, PluginSettingTab: class {},
-  ItemView: class {}, Plugin: class {}, TFile: class {}, TFolder: class {},
-};
-Module._load = function (request) {
-  if (request === 'obsidian') return STUB;
-  return origLoad.apply(this, arguments);
-};
+const { stubObsidian, makeCtx, loadInto } = require('./helpers/harness.cjs');
+stubObsidian();
 
 const {
   SPLIT_PARENT, SPLIT_PART, splitRole, supersededBySplit, isSplitPart, applySplit, splitShortfall,
@@ -51,8 +42,6 @@ const { reconcile } = require('../src/reconcile');
 const { splitFlows, accountFlows } = require('../src/savings-math');
 const { buildIndex, flagItems } = require('../src/dedupe');
 const { matchCharges, chargeStats } = require('../src/recurring');
-const { parseNum } = require('../src/amount');
-const { parseMdTable, unescMd } = require('../src/markdown');
 const registerTransactions = require('../src/views/transactions');
 
 let checks = 0;
@@ -342,12 +331,33 @@ const ctx = { S: {}, registerDirty() {}, registerSaveButton: () => () => {}, pro
 registerTransactions(ctx);
 const { serializeTxFile } = ctx;
 
-const readBack = (text) => parseMdTable(text).slice(1).map((c) => ({
-  date: c[0], desc: unescMd(c[1]), cat: unescMd(c[2]), amount: parseNum(c[3]).value,
-  excluded: (c[4] || '').toLowerCase() === 'yes', note: unescMd(c[5] || ''),
-  split: splitRole(c[6]),
-}));
+/* The rows of one month file, as the app itself would read them: the text is
+   put in an in-memory vault and loaded by the REAL loadVault (src/load.js).
 
+   Until November 2026 this was six lines of the loader retyped here —
+   `date: c[0] … excluded: c[4] … note: c[5] … split: splitRole(c[6])` — which
+   is the exact shape this repo's own rules warn against, and for the reason
+   tests/vault-roundtrip.test.cjs gives in its header: a copy of the column
+   mapping guards the serializer against the COPY. Move a column in load.js and
+   that readBack went on reading the old positions, so "rows read back off disk
+   imply the same balance" stayed green while every real load put the role in
+   the wrong field — which is the bug this file exists to prevent, reintroduced
+   and invisible. The columns are positional; there is one place that knows the
+   positions, and this now asks it.
+
+   What this section adds beyond vault-roundtrip (which already proves the
+   roles survive load, serialise and load) is what is DONE with the rows that
+   come back: they are reconciled, and must imply the balance the in-memory
+   rows did. That needs the loader's rows, not a mirror's. */
+const MONTH = 'Budget/Transactions/FNB Cheque/2026-08.md';
+const readBack = async (text) => {
+  const S = await loadInto(makeCtx({ [MONTH]: text }));
+  const file = S.txFiles['FNB Cheque/2026-08'];
+  ok(file, 'the real loader finds the month file under the account folder it was written to');
+  return file.rows;
+};
+
+(async () => {
 {
   const text = serializeTxFile({
     label: 'FNB Cheque', month: '2026-08', fmRaw: 'kind: transactions',
@@ -356,7 +366,7 @@ const readBack = (text) => parseMdTable(text).slice(1).map((c) => ({
   ok(/\| Date \| Description \| Category \| Amount \| Excluded \| Note \| Split \|/.test(text),
     'a file containing a split writes the Split column');
 
-  const back = readBack(text);
+  const back = await readBack(text);
   const parents = back.filter(r => r.split === SPLIT_PARENT);
   const parts = back.filter(r => r.split === SPLIT_PART);
   eq(parents.length, 1, 'exactly one parent survives the round trip');
@@ -402,10 +412,11 @@ const readBack = (text) => parseMdTable(text).slice(1).map((c) => ({
     '| 2026-08-04 | VIRGIN ACTIVE | Gym | -600.00 |  |  |',
     '| 2026-08-07 | OLD TRANSFER | Transfer | -1000.00 | yes | moved to savings |',
   ].join('\n');
-  const back = readBack(legacy);
+  const back = await readBack(legacy);
   eq(back.map(r => r.split), ['', ''], 'no row in a legacy file has a role');
   eq(reconcile({ balance: 5000, balance_updated: '2026-08-01' }, back, TODAY).delta, -1600,
     'a legacy excluded transfer still counts, exactly as it did before this column existed');
 }
 
 console.log(`PASS — a split charge is counted once by reconcile, savings flows and the serializer (${checks} assertions).`);
+})().catch((e) => { console.error(e); process.exit(1); });

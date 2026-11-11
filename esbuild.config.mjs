@@ -13,7 +13,8 @@
    BOTH root main.js and root styles.css are BUILD OUTPUT. Neither is
    hand-edited:
      main.js     <- bundled from src/*.js
-     styles.css  <- the files listed in scripts/css-sources.cjs, in that order:
+     styles.css  <- the files listed in scripts/css-sources.cjs, in that order,
+                    then stripped of comments and whitespace:
                     src/styles-fonts.css (generated: scripts/fonts.cjs)
                     src/styles.css (hand-written, legacy)
                     src/statement/foundation.css + one file per page lane
@@ -48,8 +49,14 @@ execFileSync(process.execPath, [rel('scripts/fonts.cjs')], { stdio: 'inherit' })
    build and the tests cannot disagree about what "the stylesheet" is.
 
    Done in Node rather than `cat` so the build behaves the same wherever the
-   verifier runs it, and so the byte output cannot drift with a shell. */
-writeFileSync(rel('styles.css'), require('./scripts/css-sources.cjs').assemble());
+   verifier runs it, and so the byte output cannot drift with a shell.
+
+   `shipped()` is that concatenation with its comments and whitespace removed
+   (esbuild, whitespace-only) under the bundled font's licence notice — 598 KB
+   of sources ship as 332 KB. scripts/css-sources.cjs says why it stops at
+   whitespace, and tests/css-shipped-minified.test.cjs proves the result is
+   still the same rules. */
+writeFileSync(rel('styles.css'), require('./scripts/css-sources.cjs').shipped());
 
 /* minify: this source is commented far more heavily than most, and every one of
    those comments was being parsed by the engine on every plugin load — 175KB of
@@ -71,7 +78,18 @@ writeFileSync(rel('styles.css'), require('./scripts/css-sources.cjs').assemble()
    and `??`, which Safari 15 supports natively (36KB of pointless expansion),
    while an ES-year target says nothing about the engine anyone is running.
    Letting esbuild pick its own default would make the floor an accident of
-   whichever version happened to be installed. */
+   whichever version happened to be installed.
+
+   charset utf8: esbuild's default writes the bundle as ASCII and spells every
+   character above U+007E as a six-byte \uXXXX escape. With twelve language
+   tables in the bundle that default was 96,607 escapes and 307 KB — lang/hi.js
+   alone came to 354 KB, most of it backslashes — for text UTF-8 stores in two
+   or three bytes a character. Obsidian reads main.js as UTF-8 on every
+   platform, so both spellings evaluate to the same strings; this one is just
+   the smaller file to download, sync and parse. esbuild still escapes U+2028
+   and U+2029 under it, the two characters that would end a line inside a
+   string for an older parser. tests/bundle-charset.test.cjs holds the setting
+   and checks the built file is strictly valid UTF-8 with no byte-order mark. */
 await esbuild.build({
   entryPoints: [rel('src/main.js')],
   outfile: rel('main.js'),
@@ -81,6 +99,7 @@ await esbuild.build({
   target: 'safari15',
   external: ['obsidian'],
   minify: true,
+  charset: 'utf8',
   legalComments: 'none',
   logLevel: 'info',
 });

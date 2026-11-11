@@ -20,23 +20,103 @@
    iOS 15 / WebKit floor: no regex lookbehind anywhere in this file (it is a
    parse-time SyntaxError that kills the WHOLE bundle, not just this module). */
 
-const en = require('./lang/en');
-const af = require('./lang/af');
-const de = require('./lang/de');
-const es = require('./lang/es');
-const fr = require('./lang/fr');
-const ja = require('./lang/ja');
-const zh = require('./lang/zh');
-const xh = require('./lang/xh');
-const zu = require('./lang/zu');
-const pt = require('./lang/pt');
-const hi = require('./lang/hi');
-const id = require('./lang/id');
+/* The tables that actually ship, each behind the function that loads it.
+   Adding a language is: write src/lang/xx.js, add its loader here, add its name
+   below. tests/i18n.test.cjs fails the build if a table is missing keys English
+   has, or carries keys English doesn't.
 
-/* The tables that actually ship. Adding a language is: write src/lang/xx.js,
-   add it here, add its name below. tests/i18n.test.cjs fails the build if a
-   table is missing keys English has, or carries keys English doesn't. */
-const TABLES = { en, af, de, es, fr, ja, zh, xh, zu, pt, hi, id };
+   LOADED ON FIRST READ, NOT AT PLUGIN LOAD. Until November 2026 this file
+   required all twelve at the top, and every reader paid for eleven languages
+   they would never see: measured on the 1.59.0 bundle the tables were 1.77 MB
+   of its 2.63 MB, and requiring the bundle kept 8.9 MB of heap where 6.0 MB
+   does. Nothing about the bundler had to change to stop that — esbuild wraps
+   each CommonJS module in a function that runs on its first require(), so a
+   require() that is only reached from inside a function costs nothing until it
+   is called. That is all each entry below is.
+
+   Each path is spelled out as a string literal on purpose. esbuild can only
+   bundle a require() whose argument it can read; `require('./lang/' + code)`
+   would be left in the bundle as a runtime call to a file that does not exist
+   beside main.js. tests/i18n-lazy-tables.test.cjs pins both halves: every file
+   in src/lang/ has its loader here, and no table is evaluated by loading the
+   plugin. */
+const LOADERS = {
+  en: () => require('./lang/en'),
+  af: () => require('./lang/af'),
+  de: () => require('./lang/de'),
+  es: () => require('./lang/es'),
+  fr: () => require('./lang/fr'),
+  ja: () => require('./lang/ja'),
+  zh: () => require('./lang/zh'),
+  xh: () => require('./lang/xh'),
+  zu: () => require('./lang/zu'),
+  pt: () => require('./lang/pt'),
+  hi: () => require('./lang/hi'),
+  id: () => require('./lang/id'),
+};
+
+/* "Does this language ship" — answered from the loader list, WITHOUT loading
+   the table. Everything that only needs to know whether a code is real asks
+   this (the dropdown order, resolveLanguage, defaultLanguage); asking the table
+   itself would pull all twelve in at module load and undo the point of the
+   list above.
+
+   An own-property test rather than `LOADERS[code]`: the code can come from a
+   hand-edited Settings.md, and plain indexing calls `constructor` and
+   `toString` languages, because every object inherits them. (Not
+   Object.hasOwn — that is Safari 15.4, above the iOS 15.0 floor.) */
+const ships = code => Object.prototype.hasOwnProperty.call(LOADERS, code);
+
+/* code -> its table, or null for one that could not be loaded. Filled on the
+   first read of each language and never emptied. */
+const loaded = Object.create(null);
+
+/* The one place a table is loaded.
+
+   A table that cannot be loaded is remembered as null and reads as "no such
+   key" for every key, which is the case t() already handles: the lookup falls
+   through to English, and to the key itself if English is the one that failed.
+   So a broken table degrades to an English interface instead of a view that
+   throws on its first string — the same contract a half-translated table has
+   always had, extended to a table that is entirely missing.
+
+   Remembered rather than retried: a render makes hundreds of lookups, and a
+   require() that threw once will throw the same way every time. Reported once
+   on the console for the same reason it must be reported at all — an interface
+   that quietly turned English with no trace is a bug report nobody can act on.
+   The app argues rather than hides, even about itself. */
+function tableFor(code) {
+  if (code in loaded) return loaded[code];
+  if (!ships(code)) return undefined;
+  let table = null;
+  let why = 'it did not export a table';
+  try {
+    const mod = LOADERS[code]();
+    if (mod && typeof mod === 'object') table = mod;
+  } catch (e) {
+    why = (e && e.message) || String(e);
+  }
+  if (!table) {
+    try {
+      console.error(`Budget Vault: the "${code}" language table could not be loaded — `
+        + `showing English instead. (${why})`);
+    } catch (e) { /* no console — nothing else can be done about it */ }
+  }
+  loaded[code] = table;
+  return table;
+}
+
+/* The public face of the tables, kept exactly as it was when they were loaded
+   eagerly: one enumerable key per shipped language, whose value is the table
+   itself — the same object t() reads, so a key a test writes through
+   TABLES.en is a key t() then finds. Each value is a getter, so listing the
+   languages (Object.keys, `in`) loads nothing and reading one loads only that
+   one. A table that could not be loaded reads as undefined, never as an empty
+   object: "absent" is what it is. */
+const TABLES = {};
+for (const code of Object.keys(LOADERS)) {
+  Object.defineProperty(TABLES, code, { enumerable: true, get: () => tableFor(code) || undefined });
+}
 
 /* Every language's name written the way its own speakers write it — never
    translated into the current interface language, because someone who has
@@ -58,10 +138,11 @@ const LANGUAGE_NAMES = {
 };
 
 /* Dropdown order — English first (the pre-language default), then the rest in
-   the order they were added. Derived from TABLES rather than hand-listed so the
-   dropdown can never offer a language that has no table behind it. */
+   the order they were added. Filtered against the loader list rather than
+   trusted as hand-listed, so the dropdown can never offer a language that has
+   no table behind it. */
 const LANGUAGE_ORDER = ['en', 'af', 'de', 'es', 'fr', 'pt', 'ja', 'zh', 'hi', 'id', 'xh', 'zu']
-  .filter(code => TABLES[code]);
+  .filter(ships);
 
 /* --------------------------- plural categories ---------------------------- */
 
@@ -179,7 +260,7 @@ let current = defaultLanguage();
    gives `country`. */
 function resolveLanguage(code) {
   const id = (code || '').toString().trim().toLowerCase();
-  return TABLES[id] ? id : 'en';
+  return ships(id) ? id : 'en';
 }
 
 function setLanguage(code) {
@@ -195,11 +276,11 @@ function defaultLanguage() {
   const base = v => (v || '').toString().trim().toLowerCase().split(/[-_]/)[0];
   try {
     const obsidian = base(window.localStorage.getItem('language'));
-    if (TABLES[obsidian]) return obsidian;
+    if (ships(obsidian)) return obsidian;
   } catch (e) { /* no window, or localStorage unavailable */ }
   try {
     const nav = base(navigator.language);
-    if (TABLES[nav]) return nav;
+    if (ships(nav)) return nav;
   } catch (e) { /* no navigator */ }
   return 'en';
 }
@@ -287,7 +368,7 @@ function interpolate(s, params) {
    category; a table that gives only `other` (Chinese, Japanese) still answers a
    `one` lookup, because pluralCategory never asks those languages for `one`. */
 function lookup(lang, key, count) {
-  const table = TABLES[lang];
+  const table = tableFor(lang);
   if (!table) return undefined;
   const v = table[key];
   if (v === undefined || v === null) return undefined;

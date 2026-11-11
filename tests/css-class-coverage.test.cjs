@@ -146,17 +146,24 @@ eq([...KNOWN_UNSTYLED].sort(), [...KNOWN_UNSTYLED],
 
 /* ---- 4. the build output is assembled from the source ------------------ */
 
-/* The other half of the same failure: root styles.css IS the concatenation of
-   the sources scripts/css-sources.cjs lists, so a hand edit to the root file is
-   lost. Checking the identity here means a stale or hand-edited build output
-   fails the suite rather than shipping. */
-/* Compared by digest, not by content: these are a quarter of a megabyte each,
+/* The other half of the same failure: root styles.css IS what the build makes
+   of the sources scripts/css-sources.cjs lists, so a hand edit to the root file
+   is lost. Checking the identity here means a stale or hand-edited build output
+   fails the suite rather than shipping.
+
+   "What the build makes" is `shipped()`: the concatenation with its comments
+   and whitespace removed (November 2026 — the root file used to be the bare
+   concatenation). The comparison is against that function's output, computed
+   here from the sources, so it is still an identity and still fails on a
+   single hand-edited byte. That the stripping changes no rule is
+   tests/css-shipped-minified.test.cjs. */
+/* Compared by digest, not by content: these are a third of a megabyte each,
    and a deepStrictEqual on the strings prints both of them into the failure. */
 const sha = t => require('crypto').createHash('sha256').update(t).digest('hex').slice(0, 12);
 const built = read('styles.css');
-const assembledText = assembled();
+const assembledText = require('../scripts/css-sources.cjs').shipped(assembled());
 ok(sha(built) === sha(assembledText),
-  'repo-root styles.css is not the concatenation of the sources in scripts/css-sources.cjs '
+  'repo-root styles.css is not what the build writes from the sources in scripts/css-sources.cjs '
   + `(built ${sha(built)}/${built.length}B vs source ${sha(assembledText)}/${assembledText.length}B).\n`
   + '    Either you hand-edited the build output — it is overwritten on every build,\n'
   + '    put the rule in src/styles.css or a src/statement/*.css file instead — or you need to run npm run build.');

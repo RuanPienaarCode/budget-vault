@@ -84,8 +84,14 @@ const wallet = extra => ({ name: 'Cash', balance: 500, balance_updated: TODAY, .
   const a = wallet({ ignore_warnings: 'true' });
   const rows = [{ date: '2026-08-09', amount: 0, label: 'Cash' }];
   const s = statusOf(a, rows, TODAY, true);
-  if (s.state === 'ok') eq(s.muted, false, 'an agreeing account is not "muted"');
-  else ok(true, 'this fixture did not reach ok; covered by case 3');
+  /* The state is ASSERTED, not branched on. This case used to read
+     `if (s.state === 'ok') … else ok(true, …)`, which counted a check whether
+     or not the fixture ever reached the state it is about — so a change to
+     statusOf() that sent this account anywhere else would have turned the one
+     assertion here into a pass with nothing behind it. */
+  eq(s.state, 'ok', 'fixture: a confirmed balance and a row that moves nothing agree');
+  eq(s.muted, false, 'an agreeing account is not "muted"');
+  eq(wantsALook(s), false, 'and it stays out of the queue because it agrees, not because it was silenced');
 }
 
 /* ---- 6. the words a reader would actually type all resolve ---- */

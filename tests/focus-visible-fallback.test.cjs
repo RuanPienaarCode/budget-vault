@@ -31,9 +31,10 @@
    is no longer anchored to a class name.
 
    Reads the build INPUT — src/styles.css and the generated
-   src/styles-presets.css, which together are byte-for-byte the shipped
-   styles.css (css-class-coverage.test.cjs asserts that identity) — rather
-   than the repo-root build output. Reading the output meant running this
+   src/styles-presets.css, which together are rule for rule the shipped
+   styles.css (css-class-coverage.test.cjs asserts the root file is the build
+   of them, css-shipped-minified.test.cjs that the build strips only comments
+   and whitespace) — rather than the repo-root build output. Reading the output meant running this
    file directly while editing (the workflow CLAUDE.md describes) checked
    whatever the last build left behind, not the stylesheet being edited.
 
