@@ -19,7 +19,7 @@
    serialized from state. See the header of src/notes.js. */
 
 const { opWriterOf } = require('../io');
-const { el, kpiTiles, icoEl } = require('../dom');
+const { el, kpiTiles, icoEl, refocus, caveatChip } = require('../dom');
 const { askFields, confirmModal } = require('../modal');
 const { yamlStr, parseFrontmatter } = require('../markdown');
 const { todayIso } = require('../dates');
@@ -172,10 +172,17 @@ module.exports = function registerNotes(ctx) {
       orphans.length ? 'subject no longer exists' : '');
   }
 
-  function noteCard(n, known) {
+  /* `i` is the card's position in the list as drawn. Every action on a card
+     ends in renderNotes(), which rebuilds the list the pressed button is in,
+     so each button carries a focus key (dom.js refocus) and its handler says
+     where the reader lands: on the same note when it is still there, on the
+     note that moved up when it is not (audit of 11 Nov 2026, task 16).
+     Position for the ones that remove a card; the note's own path for the one
+     that keeps it, because a re-pointed note can move in the list. */
+  function noteCard(n, known, i) {
     const orphan = isOrphan(n, known.get(n.kind) || new Set());
     const head = el('div', { class: 'note-card-h' },
-      el('button', { type: 'button', class: 'note-title', onclick: () => openNote(n) }, n.title),
+      el('button', { type: 'button', class: 'note-title', 'data-focus-key': `note-title:${i}`, onclick: () => openNote(n, i) }, n.title),
       el('span', { class: 'note-date num' }, n.created || ''));
 
     const meta = el('div', { class: 'note-meta' });
@@ -191,21 +198,27 @@ module.exports = function registerNotes(ctx) {
          a cell in Debts.md, or an account renamed while the plugin was closed,
          cannot be observed at all — so the note says plainly that its subject
          has gone and puts the fix one tap away rather than pretending. */
-      meta.append(el('button', {
-        type: 'button', class: 'category-badge badge-dup note-orphan',
-        title: `Nothing in your ${KIND_LABELS[n.kind].toLowerCase()} list is called "${n.subject}" any more — it was probably renamed. Tap to point this note at something else.`,
-        onclick: () => repointOne(n),
-      }, icoEl(['unlink', 'link-2off', 'alert-triangle']), 'unmatched'));
+      /* "Says plainly" was only true under a mouse. This was a button whose
+         one tap went straight to the re-point dialog, with the sentence that
+         explains WHY in its `title` — so on a phone the reader was asked what
+         the note is about before being told that anything was wrong with it
+         (audit of 11 Nov 2026, task 18). It is a chip now (dom.js caveatChip):
+         the tap reveals the reason, and the reason names the button that
+         fixes it, which sits on this same card. */
+      meta.append(caveatChip(
+        [icoEl(['unlink', 'link-2off', 'alert-triangle']), 'unmatched'],
+        `Nothing in your ${KIND_LABELS[n.kind].toLowerCase()} list is called "${n.subject}" any more — it was probably renamed. Use Change subject, below, to point this note at something else.`,
+        'category-badge badge-dup note-orphan'));
     }
 
     const card = el('div', { class: 'note-card' }, head, meta);
     if (n.excerpt) card.append(el('div', { class: 'note-excerpt' }, n.excerpt));
     card.append(el('div', { class: 'note-actions' },
-      el('button', { class: 'btn-ghost btn-ghost-sm', onclick: () => openNote(n) },
+      el('button', { class: 'btn-ghost btn-ghost-sm', onclick: () => openNote(n, i) },
         icoEl(['file-pen', 'file-edit', 'pencil']), 'Open'),
-      el('button', { class: 'btn-ghost btn-ghost-sm', onclick: () => repointOne(n) },
+      el('button', { class: 'btn-ghost btn-ghost-sm', 'data-focus-key': `note-subject:${n.rel}`, onclick: () => repointOne(n) },
         icoEl(['link', 'link-2']), 'Change subject'),
-      el('button', { class: 'btn-ghost btn-ghost-sm', 'aria-label': `Delete ${n.title}`, onclick: () => deleteNote(n) },
+      el('button', { class: 'btn-ghost btn-ghost-sm', 'aria-label': `Delete ${n.title}`, 'data-focus-key': `note-del:${i}`, onclick: () => deleteNote(n, i) },
         icoEl(['trash-2', 'trash']), 'Delete')));
     return card;
   }
@@ -251,8 +264,12 @@ module.exports = function registerNotes(ctx) {
        card. A list restores "item 3 of 15" and the list rotor, and costs one
        element per card. */
     const known = knownNames();
-    for (const n of rows) list.append(el('li', {}, noteCard(n, known)));
+    for (const [i, n] of rows.entries()) list.append(el('li', {}, noteCard(n, known, i)));
   }
+
+  /* Where a reader lands when the card they were on has gone: the note that
+     moved up into its place, else the one above, else New note. */
+  const afterCard = (key, i) => refocus($('#notesList'), [`${key}:${i}`, `${key}:${i - 1}`, $('#noteAdd')]);
 
   /* ------------------------------ creating ------------------------------- */
 
@@ -334,9 +351,9 @@ module.exports = function registerNotes(ctx) {
     toast(`Created ${NOTES_DIR}/${rel.split('/').pop()}`);
   }
 
-  async function openNote(n) {
+  async function openNote(n, i) {
     const f = fileAt(n.rel);
-    if (!f) { await ctx.loadNotes(); renderNotes(); return toast('That note is no longer in the vault', true); }
+    if (!f) { await ctx.loadNotes(); renderNotes(); afterCard('note-title', i); return toast('That note is no longer in the vault', true); }
     // A new tab, not this one — the budget view is a workspace leaf like any
     // other, and opening in place would close the app the reader is using.
     await app.workspace.getLeaf('tab').openFile(f);
@@ -399,6 +416,9 @@ module.exports = function registerNotes(ctx) {
     if (!(await writeSubject(n, kind, subject, op))) return toast('That note is no longer in the vault', true);
     await ctx.loadNotes();
     renderNotes();
+    // Still the same note, wherever it now sits; New note if the About filter
+    // it was listed under no longer shows it.
+    refocus($('#notesList'), [`note-subject:${n.rel}`, $('#noteAdd')]);
     toast('Note re-pointed');
   }
 
@@ -425,7 +445,7 @@ module.exports = function registerNotes(ctx) {
     return hits.length;
   }
 
-  async function deleteNote(n) {
+  async function deleteNote(n, i) {
     /* Resolved BEFORE the confirm, and the TFile is what gets trashed.
        Resolving afterwards meant re-reading a path across an await the user
        spends seconds inside: if the note was renamed meanwhile, that path is
@@ -433,7 +453,7 @@ module.exports = function registerNotes(ctx) {
        having deleted nothing — or now points at a DIFFERENT file, which it
        would then trash. A TFile survives a rename; a path does not. */
     const f = fileAt(n.rel);
-    if (!f) { await ctx.loadNotes(); renderNotes(); return toast('That note is no longer in the vault', true); }
+    if (!f) { await ctx.loadNotes(); renderNotes(); afterCard('note-del', i); return toast('That note is no longer in the vault', true); }
     const op = opWriterOf(ctx);   // the state this dialog was opened over (io.js opWriter)
     const go = await confirmModal(app, {
       title: 'Delete note',
@@ -459,9 +479,10 @@ module.exports = function registerNotes(ctx) {
     } catch (e) {
       return toast(`Could not delete that note: ${(e && e.message) || e}`, true);
     }
-    if (!trashed) { await ctx.loadNotes(); renderNotes(); return toast('That note is no longer in the vault', true); }
+    if (!trashed) { await ctx.loadNotes(); renderNotes(); afterCard('note-del', i); return toast('That note is no longer in the vault', true); }
     await ctx.loadNotes();
     renderNotes();
+    afterCard('note-del', i);
     toast('Note deleted');
   }
 

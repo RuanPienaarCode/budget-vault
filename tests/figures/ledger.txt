@@ -670,6 +670,10 @@ money	R 500,00	500	owedKpis/div.mini[1]/div.v[1]
 number	1	-	owedKpis/div.mini[2]/div.v[1]
 number	93	-	owedTable/tbody/tr/td[0]/div.owed-age
 money	R 1 500	1500	owedTable/tbody/tr/td[5]/button.status-pill
+money	R 500	500	owedTable/tbody/tr/td[5]/span.caveat-chip/button.caveat-chip-btn
+money	R 2 000,00	2000	owedTable/tbody/tr/td[5]/span.caveat-chip/div.caveat-chip-detail
+money	R 500,00	500	owedTable/tbody/tr/td[5]/span.caveat-chip/div.caveat-chip-detail
+money	R 1 500,00	1500	owedTable/tbody/tr/td[5]/span.caveat-chip/div.caveat-chip-detail
 
 ## services
 money	R 1 000,00	1000	servicesKpis/div.mini[0]/div.v[1]

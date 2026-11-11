@@ -7,7 +7,7 @@
    Edit seeded sources to match your own banks, providers and income. */
 
 const { opWriterOf } = require('../io');
-const { el, kpiTiles, dateInput, keepScroll, icoEl, tableCells } = require('../dom');
+const { el, kpiTiles, dateInput, keepScroll, refocus, icoEl, tableCells } = require('../dom');
 const { normalizeAmount } = require('../amount');
 const { escMd, patchFrontmatter, yamlStr, freshLeadLines, withLeadExtra } = require('../markdown');
 const { TAX_TABLES, plainTableLines } = require('../table-schema');
@@ -91,6 +91,10 @@ module.exports = function registerTax(ctx) {
         // set. The orphan stays offered next render, exactly as it was.
         if (!(await saveTax())) { delete S.tax[y]; S.taxYear = prevYear; renderTax(); return; }
         renderTax();
+        /* The offer is gone once it is taken — the year has a page now — and
+           this button went with it. The year picker beside it is showing the
+           year just created, so that is where the reader is put. */
+        refocus(box, $('#taxYearSel'));
       });
       box.append(b);
     }
@@ -151,13 +155,18 @@ module.exports = function registerTax(ctx) {
     // status change which fields exist and what the season message says. Safe
     // to do here: a select commits on close, with no keyboard and no next tap
     // already in flight.
+    /* ...and the card they rebuild is the one they are IN, so each puts focus
+       back on its own replacement (dom.js refocus). Without it a keyboard
+       reader setting both — which is the first thing anyone does on this
+       page — was sent to the top of it between the two (audit of 11 Nov 2026,
+       task 16). */
     b.append(el('div', { class: 'row tax-season-row' },
-      field('Taxpayer type', el('select', { class: 'form-select form-select-sm',
-        onchange: e => { t.taxpayer_type = e.target.value; mark(); renderSeason(t); refreshDerived(t); } },
+      field('Taxpayer type', el('select', { class: 'form-select form-select-sm', 'data-focus-key': 'taxpayer',
+        onchange: e => { t.taxpayer_type = e.target.value; mark(); renderSeason(t); refreshDerived(t); refocus(b, 'taxpayer'); } },
         ...loc.taxpayerTypes
           .map(([v, l]) => el('option', { value: v, ...(t.taxpayer_type === v ? { selected: '' } : {}) }, l)))),
-      field('Assessment', el('select', { class: 'form-select form-select-sm',
-        onchange: e => { t.assessment = e.target.value; mark(); renderSeason(t); refreshDerived(t); } },
+      field('Assessment', el('select', { class: 'form-select form-select-sm', 'data-focus-key': 'assessment',
+        onchange: e => { t.assessment = e.target.value; mark(); renderSeason(t); refreshDerived(t); refocus(b, 'assessment'); } },
         ...loc.assessments
           .map(([v, l]) => el('option', { value: v, ...(t.assessment === v ? { selected: '' } : {}) }, l)))),
       // Only the Deadline KPI tile reads these.
@@ -269,7 +278,7 @@ module.exports = function registerTax(ctx) {
         value: obj[key], 'aria-label': `${key} for figure ${obj.code || ''}`.trim(),
         onchange: e => { obj[key] = e.target.value; mark(); } });
       const refresh = () => { mark(); refreshDerived(t); };
-      for (const f of figures) {
+      for (const [i, f] of figures.entries()) {
         body.append(el('tr', {},
           el('td', {}, el('input', { type: 'text', class: 'form-control form-control-sm', value: f.code,
             'aria-label': `${loc.figureCodeLabel} for ${f.description || 'this figure'}`,
@@ -298,11 +307,14 @@ module.exports = function registerTax(ctx) {
               }
               f.amount = n; f.amountRaw = null; refresh();
             } })),
-          el('td', {}, el('button', { class: 'btn-ghost btn-ghost-sm',
+          el('td', {}, el('button', { class: 'btn-ghost btn-ghost-sm', 'data-focus-key': `del:${i}`,
             'aria-label': `Remove figure ${f.code}`,
             onclick: () => {
-              figures.splice(figures.indexOf(f), 1);
+              const row = figures.indexOf(f);
+              figures.splice(row, 1);
               mark(); renderFigures(t); refreshDerived(t);
+              // The figure that moved up, else the one above, else Add figure.
+              refocus(tbl, [`del:${row}`, `del:${row - 1}`, $('#taxAddFigure')]);
             } }, '✕'))));
       }
       if (!figures.length) {
@@ -375,10 +387,19 @@ module.exports = function registerTax(ctx) {
 
   const stepOverdue = s => s.status !== 'done' && s.status !== 'n/a' && daysTo(s.due) !== null && daysTo(s.due) < 0;
 
-  /* focusStep / focusDoc: rebuilding a table drops focus to <body>, and cycling
-     a status pill is the main interaction on this page — without this a keyboard
-     or screen-reader user is ejected to the top on every single click. */
-  function renderSteps(t, focusStep) {
+  /* landing (both tables): where focus goes back to after the rebuild — a
+     focus key, or a list of them (dom.js refocus). Rebuilding a table drops
+     focus to <body>, and cycling a status pill is the main interaction on this
+     page — without this a keyboard or screen-reader user is ejected to the top
+     on every single click.
+
+     Keyed by the row's index. The restore this replaces looked the row up by
+     its NAME and took the first match, which is the bug views/owed.js and
+     views/debts.js each record fixing: the ZA seed ships two "IT3(b) interest
+     certificate" rows, and cycling the second one's status put focus on the
+     first. It also only knew the pills, so every Remove on this page left the
+     reader on <body> (audit of 11 Nov 2026, task 16). */
+  function renderSteps(t, landing) {
     const tbl = $('#taxStepsTable');
     keepScroll(tbl, () => {
       tbl.empty();
@@ -386,11 +407,11 @@ module.exports = function registerTax(ctx) {
         el('th', { scope: 'col' }, 'Step'), el('th', { scope: 'col' }, 'Status'),
         el('th', { scope: 'col' }, 'Due'), el('th', { scope: 'col' }, 'Notes'), el('th', { scope: 'col' }, ''))));
       const body = el('tbody', {});
-      for (const s of t.steps) {
-        const pill = el('button', { class: `status-pill tax-${s.status.replace('/', '')}`,
+      for (const [i, s] of t.steps.entries()) {
+        const pill = el('button', { class: `status-pill tax-${s.status.replace('/', '')}`, 'data-focus-key': `pill:${i}`,
           'aria-label': `Status: ${STEP_LABEL[s.status]} — click to change` },
           icoEl(STEP_ICO[s.status]), STEP_LABEL[s.status]);
-        pill.addEventListener('click', () => { s.status = STEP_CYCLE[s.status]; mark(); renderSteps(t, s.step); renderTaxKpis(t); });
+        pill.addEventListener('click', () => { s.status = STEP_CYCLE[s.status]; mark(); renderSteps(t, `pill:${t.steps.indexOf(s)}`); renderTaxKpis(t); });
         body.append(el('tr', { class: s.status === 'n/a' ? 'svc-inactive' : '' },
           el('td', { style: 'font-weight:600' }, s.step),
           el('td', {}, pill),
@@ -402,26 +423,26 @@ module.exports = function registerTax(ctx) {
           el('td', {}, el('input', { type: 'text', class: 'form-control form-control-sm', value: s.notes,
             'aria-label': `Notes for ${s.step}`,
             onchange: e => { s.notes = e.target.value; mark(); } })),
-          el('td', {}, el('button', { class: 'btn-ghost btn-ghost-sm',
+          el('td', {}, el('button', { class: 'btn-ghost btn-ghost-sm', 'data-focus-key': `del:${i}`,
             'aria-label': `Remove step ${s.step}`,
-            onclick: () => { t.steps.splice(t.steps.indexOf(s), 1); mark(); renderSteps(t); renderTaxKpis(t); } }, '✕'))));
+            onclick: () => {
+              const row = t.steps.indexOf(s);
+              t.steps.splice(row, 1); mark();
+              renderSteps(t, [`del:${row}`, `del:${row - 1}`, $('#taxAddStep')]); renderTaxKpis(t);
+            } }, '✕'))));
       }
       if (!t.steps.length) body.append(el('tr', {}, el('td', { colspan: '5', class: 'text-muted' }, 'No steps yet.')));
       tbl.append(body);
       tableCells(tbl, ['Step', 'Status', 'Due', 'Notes', null]);
     });
-    if (focusStep) {
-      const i = t.steps.findIndex(s => s.step === focusStep);
-      const pill = tbl.querySelectorAll('.status-pill')[i];
-      if (pill) pill.focus();
-    }
+    if (landing !== undefined) refocus(tbl, landing);
   }
 
   const DOC_CYCLE = { needed: 'n/a', uploaded: 'needed', 'n/a': 'needed' };
   const DOC_LABEL = { needed: 'Needed', uploaded: 'Uploaded', 'n/a': 'N/A' };
   const DOC_ICO = { needed: ['hourglass'], uploaded: ['circle-check', 'check-circle'], 'n/a': ['circle-slash', 'slash'] };
 
-  function renderDocs(t, focusDoc) {
+  function renderDocs(t, landing) {
     $('#taxDocsSub').empty();
     $('#taxDocsSub').append('Certificates & records for the return · files stored in ', el('code', {}, `Tax/${S.taxYear}/`));
     const tbl = $('#taxDocsTable');
@@ -431,13 +452,13 @@ module.exports = function registerTax(ctx) {
         el('th', { scope: 'col' }, 'Document'), el('th', { scope: 'col' }, 'Source'), el('th', { scope: 'col' }, 'Status'),
         el('th', { scope: 'col' }, 'File'), el('th', { scope: 'col' }, 'Notes'), el('th', { scope: 'col' }, ''))));
       const body = el('tbody', {});
-      for (const d of t.docs) {
-        const pill = el('button', { class: `status-pill tax-${d.status.replace('/', '')}`,
+      for (const [i, d] of t.docs.entries()) {
+        const pill = el('button', { class: `status-pill tax-${d.status.replace('/', '')}`, 'data-focus-key': `pill:${i}`,
           'aria-label': `Status: ${DOC_LABEL[d.status]} — click to change` },
           icoEl(DOC_ICO[d.status]), DOC_LABEL[d.status]);
         // Cycling away from "uploaded" only changes the status — the file link
         // (and the file itself) stays.
-        pill.addEventListener('click', () => { d.status = DOC_CYCLE[d.status]; mark(); renderDocs(t, d.name); renderTaxKpis(t); });
+        pill.addEventListener('click', () => { d.status = DOC_CYCLE[d.status]; mark(); renderDocs(t, `pill:${t.docs.indexOf(d)}`); renderTaxKpis(t); });
 
         // A row can carry several certificates — providers routinely issue an
         // IT3(b), IT3(c) and IT3(s) against what the seed treats as one row.
@@ -448,7 +469,7 @@ module.exports = function registerTax(ctx) {
           link.addEventListener('click', () => openDoc(name));
           fileCell.append(link);
         }
-        const addBtn = el('button', { class: 'btn-ghost btn-ghost-sm',
+        const addBtn = el('button', { class: 'btn-ghost btn-ghost-sm', 'data-focus-key': `upload:${i}`,
           'aria-label': `${d.file ? 'Add another file to' : 'Upload file for'} ${d.name}` },
           icoEl(['cloud-upload', 'upload-cloud']), d.file ? ' Add' : ' Upload');
         addBtn.addEventListener('click', () => { pendingDocTarget = d; $('#taxFileInput').click(); });
@@ -461,7 +482,7 @@ module.exports = function registerTax(ctx) {
           el('td', {}, el('input', { type: 'text', class: 'form-control form-control-sm', value: d.notes,
             'aria-label': `Notes for ${d.name}`,
             onchange: e => { d.notes = e.target.value; mark(); } })),
-          el('td', {}, el('button', { class: 'btn-ghost btn-ghost-sm',
+          el('td', {}, el('button', { class: 'btn-ghost btn-ghost-sm', 'data-focus-key': `del:${i}`,
             'aria-label': `Remove document ${d.name}`,
             onclick: async () => {
               const kept = fileList(d);
@@ -473,18 +494,16 @@ module.exports = function registerTax(ctx) {
               });
               if (!go) return;
               if (op.replaced()) return toast(op.replaced(), true);
-              t.docs.splice(t.docs.indexOf(d), 1); mark(); renderDocs(t); renderTaxKpis(t);
+              const row = t.docs.indexOf(d);
+              t.docs.splice(row, 1); mark();
+              renderDocs(t, [`del:${row}`, `del:${row - 1}`, $('#taxAddDoc')]); renderTaxKpis(t);
             } }, '✕'))));
       }
       if (!t.docs.length) body.append(el('tr', {}, el('td', { colspan: '6', class: 'text-muted' }, 'No documents yet.')));
       tbl.append(body);
       tableCells(tbl, ['Document', 'Source', 'Status', 'File', 'Notes', null]);
     });
-    if (focusDoc) {
-      const i = t.docs.findIndex(d => d.name === focusDoc);
-      const pill = tbl.querySelectorAll('.status-pill')[i];
-      if (pill) pill.focus();
-    }
+    if (landing !== undefined) refocus(tbl, landing);
   }
 
   /* The File cell holds a ';'-separated list. A bare filename parses as a
@@ -627,7 +646,12 @@ module.exports = function registerTax(ctx) {
     }
     // Show the new attachment (and the "Documents in" tile) before the write —
     // the row was only in memory until now, so nothing on screen reflected it.
-    renderDocs(t); renderTaxKpis(t);
+    /* Back on the row's own upload button, now reading "Add": the file picker
+       handed focus to the button that opened it, and this redraw then
+       destroyed that button. A file dropped on the page, or attached to a row
+       made a moment ago, lands on that row's button too — the row the file
+       went to is the one worth being on. */
+    renderDocs(t, `upload:${t.docs.indexOf(target)}`); renderTaxKpis(t);
     // The binary is already on disk — save the markdown too so the two never
     // drift apart. If THAT write fails they drift apart anyway, for now:
     // saveTax() has already toasted it, and mark() lights the Save button so
@@ -688,8 +712,12 @@ module.exports = function registerTax(ctx) {
     // but mark() so the Save button lights and the metadata mismatch can be
     // retried, and hold back the "Linked" toast so a failure doesn't read as
     // a success landing right under its own error.
-    if (!(await saveTax())) { mark(); renderTax(); return; }
+    // Either way the whole page is redrawn, the upload button that started
+    // this included: back on the row the file was linked to.
+    const landing = `upload:${t.docs.indexOf(target)}`;
+    if (!(await saveTax())) { mark(); renderTax(); refocus($('#taxDocsTable'), landing); return; }
     renderTax();
+    refocus($('#taxDocsTable'), landing);
     toast(`Linked ${name} — no second copy written.`);
   }
 
@@ -906,6 +934,11 @@ module.exports = function registerTax(ctx) {
     // record standing with no successful write behind it.
     if (!(await saveTax())) { delete S.tax[String(year)]; S.taxYear = prevYear; renderTax(); return; }
     renderTax();
+    /* The button that started this sits in the empty-state card, which is
+       hidden the moment a year exists — so the reader's first press on this
+       page left them on a control that is no longer displayed. The year picker
+       is the first control of the page that replaced it. */
+    refocus($('#taxContent'), $('#taxYearSel'));
   }
 
   async function newTaxYear() {
@@ -990,6 +1023,11 @@ module.exports = function registerTax(ctx) {
     clearDirty();
     S.taxYear = Object.keys(S.tax).sort().pop() || null;
     renderTax();
+    /* Deleting the LAST year swaps the page for its empty state and hides the
+       button that was pressed with it; the way back in is Start. With a year
+       still standing the button is still there, holds focus, and this leaves
+       it alone. */
+    refocus($('#taxEmptyCard'), $('#taxStart'));
     toast(`Deleted the ${year} tax year`);
   }
 

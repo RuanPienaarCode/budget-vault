@@ -1487,11 +1487,15 @@ module.exports = {
 
   /* --- Debt page: "Interest this month" says what it covers, because a debt
      with a blank rate is unknown rather than zero (the why is in en.js) --- */
+  'owed.repaid.chip': '{amount} ibuyile',
   'debt.interest.noRates': 'engeza izinga kunoma yisiphi isikweletu ukuze ubone lokhu',
   'debt.interest.partial': {
     one: 'ihlanganisa {shown} kwezikweletu ezingu-{total} · {missing} asinazinga',
     other: 'ihlanganisa {shown} kwezikweletu ezingu-{total} · {missing} azinazinga',
   },
+  'debt.curve.aria': 'Isamba sesikweletu ngaphansi kohlelo ngalunye lokukhokha, kusukela ku-{from} kuya ku-{to}, kuqalwa ku-{start}. {plans}',
+  'debt.curve.aria.cleared': '{plan}: sikhokhwe sonke ngo-{month}.',
+  'debt.curve.aria.owed': '{plan}: kusakweletwa {amount} ngo-{month}.',
 
   /* --- report.* / nav.report / shell.tx.report — machine-assisted, added
      alongside the Report feature (views/report.js, src/report.js). --- */

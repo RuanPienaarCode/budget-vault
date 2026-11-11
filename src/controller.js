@@ -16,7 +16,9 @@ const i18n = require('./i18n');
 const { PALETTE_PRESETS, DEFAULT_PALETTE } = require('./constants');
 
 const books = require('./books');
-const { renderBookSwitchers, pickBook } = require('./book-switcher');
+const { renderBookSwitchers, settleBookSelect, pickBook } = require('./book-switcher');
+const drawer = require('./drawer');
+const { showToast } = require('./toast');
 const registerIo = require('./io');
 const registerFxLive = require('./fx-live');
 const registerPeriod = require('./period');
@@ -601,21 +603,10 @@ function mountApp(view) {
     _foodQ: 0,                 // Food items-search debounce timer handle
   };
 
-  function toast(msg, bad = false) {
-    const t = $('#toast');
-    if (!t) return;
-    t.textContent = msg;
-    t.className = bad ? 'bad' : 'good';
-    t.classList.add('show');
-    /* Long enough to read. A flat 2.6 s suited "Saved"; it cut off the
-       two-sentence toasts — the drift warning after a balance edit, the
-       "counts as already inside that balance" note after Add transaction —
-       before a reader reached the second sentence. ~55 ms a character is a
-       slow reading pace; short toasts keep the old floor, and a cap stops a
-       paragraph from parking over the page. */
-    const ms = Math.min(9000, Math.max(2600, String(msg).length * 55));
-    clearTimeout(t._h); t._h = setTimeout(() => t.classList.remove('show'), ms);
-  }
+  /* Which region a message goes into, and how long it stays, is src/toast.js:
+     an error is an alert that stays twice as long as a success, and a toast
+     that has gone leaves no text behind. */
+  function toast(msg, bad = false) { showToast($, msg, bad); }
 
   /* Country locale profile for the configured country (Settings.md `country`,
      default South Africa). Resolved per call so a settings change applies on
@@ -901,23 +892,11 @@ function mountApp(view) {
     : null;
   if (dockObserver) dockObserver.observe(root, { subtree: true, attributes: true, attributeFilter: ['disabled'] });
   /* ---------------------- drawer + theme (app shell) --------------------- */
-  function openDrawer() {
-    const d = $('#appDrawer');
-    d.classList.add('open');
-    setInert(d, false);                         // re-enter the tab / AT order
-    $('#drawerOverlay').classList.add('open');
-    $('#menuBtn').setAttribute('aria-expanded', 'true');
-    $('#drawerClose').focus();                  // move focus into the drawer
-  }
-  function closeDrawer() {
-    const d = $('#appDrawer');
-    const wasOpen = d.classList.contains('open');
-    d.classList.remove('open');
-    setInert(d, true);                          // leave the tab / AT order
-    $('#drawerOverlay').classList.remove('open');
-    $('#menuBtn').setAttribute('aria-expanded', 'false');
-    if (wasOpen) $('#menuBtn').focus();         // restore focus only on a real close
-  }
+  /* What each state does to the drawer AND to the app behind it lives in
+     src/drawer.js, where a guard test can reach it: the open drawer is modal,
+     and a close releases only what an open locked. */
+  function openDrawer() { drawer.openDrawer($); }
+  function closeDrawer() { drawer.closeDrawer($); }
   /* Topbar personalisation from Settings.md `household` — brand subtitle and
      avatar initials (first + last word, e.g. "Jane & John Smith" → JS). */
   function applyIdentity() {
@@ -1296,17 +1275,25 @@ function mountApp(view) {
      switch the other copy follows. A switch made from the drawer closes it, as
      a drawer link does: the reader asked for another book, and the drawer
      staying over it would hide the answer. A refusal leaves it open, beside
-     the notice saying why. */
-  const onBookPicked = async e => {
-    const r = await pickBook(plugin, e.target.value, {
+     the notice saying why.
+
+     Called when the reader has SETTLED on a book, which is not every `change`
+     of the select: a keyboard stepping through a closed select fires one per
+     book passed, and each used to be a full reload. settleBookSelect
+     (src/book-switcher.js) holds those until Enter or blur, and passes a
+     mouse or a phone's pick straight through. Escape on a held step redraws
+     both copies, so the select goes back to the book that is actually open. */
+  const onBookPicked = async select => {
+    const r = await pickBook(plugin, select.value, {
       notify: msg => new Notice(msg, 7000),
       t: i18n.t,
     });
-    if (r.ok && e.target.id === 'drawerBookSelect') closeDrawer();
+    if (r.ok && select.id === 'drawerBookSelect') closeDrawer();
     applyBooks().catch(() => {});
   };
-  $('#bookSelect').addEventListener('change', onBookPicked);
-  $('#drawerBookSelect').addEventListener('change', onBookPicked);
+  for (const select of [$('#bookSelect'), $('#drawerBookSelect')]) {
+    settleBookSelect(select, () => onBookPicked(select), () => { applyBooks().catch(() => {}); });
+  }
   $('#menuBtn').addEventListener('click', () => $('#appDrawer').classList.contains('open') ? closeDrawer() : openDrawer());
   $('#drawerClose').addEventListener('click', closeDrawer);
   $('#drawerOverlay').addEventListener('click', closeDrawer);

@@ -92,6 +92,83 @@ function keepScroll(elm, rebuild) {
   if (box) box.scrollLeft = left;
 }
 
+/* Put focus back after a rebuild took it away.
+
+   Nearly every page here redraws by emptying a container and building it
+   again. A control that lived INSIDE that container and asked for the redraw
+   — a row's delete, a status pill, "Show more", a range pill — is destroyed
+   with the rest, and the browser parks focus on <body>. A keyboard reader is
+   then at the top of the page after every press; a screen reader hears
+   nothing. Four views had each written their own restore (tax, debts, owed,
+   assets, all by position in a querySelectorAll list) and the other handlers
+   had none: Transactions' "Show more", every row delete, the chart range
+   pills (audit of 11 Nov 2026, task 16).
+
+   The contract is one attribute. A control worth finding again carries
+   `data-focus-key`, and the handler that rebuilt its container says where the
+   reader should be:
+
+     renderOwed(); refocus(table, [`del:${i}`, `del:${i - 1}`, addButton]);
+
+   `keys` is one key or a list, first match wins — which is how "the row that
+   took this one's place, else the one above, else the Add button" is said in
+   one call. An entry may be an element, for a landing outside the rebuilt
+   root. A candidate that cannot take focus (disabled, or inside a hidden bar)
+   is passed over rather than counted as a landing, which is why the loop
+   checks where focus actually went.
+
+   It only ever RESTORES. If focus is on a live control when this runs — the
+   control survived, or the reader moved to the search box while a save was in
+   flight — it is left exactly there: taking it would be a second defect. So
+   it is safe to call after any rebuild, including one that turned out to
+   destroy nothing.
+
+   "Live" means still on the page AND still displayed. A control removed from
+   the page stops being the active element at once; one that is merely HIDDEN
+   (its card gained `hidden`) stays document.activeElement until the browser's
+   next frame, and only then is focus dropped to <body>. Asking at this moment
+   would find it "focused", decline, and lose focus a frame later — so a
+   focused control with no box counts as lost here.
+
+   Deliberately not conditional on focus having been inside `root` beforehand.
+   A tap on iOS does not focus the button it lands on, so "was focus in here?"
+   answers no for a VoiceOver user who has just activated that very control —
+   and they are the reader a rebuild strands most completely. The four
+   hand-written restores this replaces focused unconditionally for the same
+   reason. The cost is a focus ring after a tap on the engines that have no
+   :focus-visible, which those four already paid.
+
+   Keys are matched as an attribute value, so the two characters that could
+   end the quoted string early are escaped; a key built from a file path (the
+   Notes page) is safe to pass as it is. */
+const NATIVE_FOCUS = /^(A|BUTTON|INPUT|SELECT|TEXTAREA|SUMMARY)$/i;
+function refocus(root, keys) {
+  if (!root || typeof root.querySelector !== 'function') return null;
+  const doc = root.ownerDocument || (typeof document !== 'undefined' ? document : null);
+  if (!doc) return null;
+  const live = doc.activeElement;
+  const displayed = typeof (live && live.getClientRects) !== 'function' || live.getClientRects().length > 0;
+  if (live && live !== doc.body && live !== doc.documentElement && displayed) return null;
+  for (const k of [].concat(keys)) {
+    if (k === null || k === undefined || k === '') continue;
+    const hit = typeof k === 'string'
+      ? root.querySelector(`[data-focus-key="${k.replace(/["\\]/g, '\\$&')}"]`)
+      : k;
+    if (!hit || typeof hit.focus !== 'function' || hit.disabled) continue;
+    /* A landing that is not a control — a table row, for "Show more" — is made
+       focusable here, at the moment it is needed, and not where it is built.
+       tabindex="-1" on every row of every table would make each one
+       click-focusable for good, and on the engines without :focus-visible
+       that is a focus ring on any row a reader happens to tap. */
+    if (!NATIVE_FOCUS.test(hit.tagName || '') && typeof hit.hasAttribute === 'function' && !hit.hasAttribute('tabindex')) {
+      hit.setAttribute('tabindex', '-1');
+    }
+    hit.focus();
+    if (doc.activeElement === hit) return hit;
+  }
+  return null;
+}
+
 /* Lucide icons: try each name until one renders (icon names occasionally get
    renamed between the lucide versions Obsidian ships).
 
@@ -142,11 +219,21 @@ function icoEl(names, cls) {
    button (the way the score ring centres its own) keeps that positioning
    without a fight.
 
+   `cls` dresses the button as something the page already has. A FLAG — the
+   "not seen" on a service, the "transfer?" on an import row — was a
+   `.category-badge` <span> with its reason in a `title`, and its colour is
+   part of what it says: a price above the listed one is the debt colour,
+   below it the savings one. Making those the chip's own outlined pill would
+   have thrown that away, so the chip takes the badge's classes instead of its
+   own. A badge on a <button> is already styled (the Notes page's "unmatched"
+   has been one since it was written), and `badge-chip` adds the two things a
+   span never needed: a pointer cursor and a focus ring.
+
    Returns the wrapping `<span>`; append it wherever a bare `title=` used to
    sit — the whole point is that nothing else about the call site changes. */
-function caveatChip(shortText, detailText) {
+function caveatChip(shortText, detailText, cls = 'caveat-chip-btn') {
   const btn = el('button', {
-    type: 'button', class: 'caveat-chip-btn', title: detailText, 'aria-expanded': 'false',
+    type: 'button', class: cls, title: detailText, 'aria-expanded': 'false',
   }, shortText);
   const detail = el('div', { class: 'caveat-chip-detail hidden' }, detailText);
   btn.addEventListener('click', e => {
@@ -249,4 +336,4 @@ function setInert(elm, on) {
   }
 }
 
-module.exports = { el, dateInput, keepScroll, setIco, icoEl, caveatChip, kpiTiles, setInert, tableCells, longFig };
+module.exports = { el, dateInput, keepScroll, refocus, setIco, icoEl, caveatChip, kpiTiles, setInert, tableCells, longFig };

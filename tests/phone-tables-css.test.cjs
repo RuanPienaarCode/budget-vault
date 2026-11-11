@@ -190,7 +190,8 @@ ok(!rules.some(r => isPhoneCtx(r) && r.selectors.some(s => /svg text/.test(s)) &
   }
   // views/tax.js was not asked to change behaviour: the five cells, in order, and the write paths
   const taxSrc = fs.readFileSync(path.join(__dirname, '..', 'src', 'views', 'tax.js'), 'utf8');
-  const rs = /function renderSteps\(t, focusStep\) \{[\s\S]*?\n  \}\n/.exec(taxSrc);
+  // `landing` is the focus key the rebuild restores to (src/dom.js refocus); it was `focusStep`.
+  const rs = /function renderSteps\(t, landing\) \{[\s\S]*?\n  \}\n/.exec(taxSrc);
   ok(rs && /tableCells\(tbl, \['Step', 'Status', 'Due', 'Notes', null\]\)/.test(rs[0]), 'Tax steps still stamps Step | Status | Due | Notes | (actions) in that column order');
   ok(rs && /s\.due = v/.test(rs[0]) && /s\.notes = e\.target\.value/.test(rs[0]) && /s\.status = STEP_CYCLE\[s\.status\]/.test(rs[0]) && /t\.steps\.splice/.test(rs[0]),
     'and every write path (status, due, notes, remove) is still wired to the step it belongs to');

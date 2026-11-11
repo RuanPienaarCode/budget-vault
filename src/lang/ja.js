@@ -1388,10 +1388,14 @@ module.exports = {
 
   /* --- Debt page: "Interest this month" says what it covers, because a debt
      with a blank rate is unknown rather than zero (the why is in en.js) --- */
+  'owed.repaid.chip': '{amount} 返済済み',
   'debt.interest.noRates': 'いずれかの負債に金利を記録すると表示されます',
   'debt.interest.partial': {
     other: '{total} 件中 {shown} 件が対象 · {missing} 件に金利の記録なし',
   },
+  'debt.curve.aria': '各返済プランでの負債総額（{from}〜{to}、開始時 {start}）。{plans}',
+  'debt.curve.aria.cleared': '{plan}：{month}までに完済。',
+  'debt.curve.aria.owed': '{plan}：{month}時点で残り {amount}。',
 
   /* --- report.* / nav.report / shell.tx.report — machine-assisted, added
      alongside the Report feature (views/report.js, src/report.js). --- */

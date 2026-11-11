@@ -1388,10 +1388,14 @@ module.exports = {
 
   /* --- Debt page: "Interest this month" says what it covers, because a debt
      with a blank rate is unknown rather than zero (the why is in en.js) --- */
+  'owed.repaid.chip': '已还 {amount}',
   'debt.interest.noRates': '为任一债务记录利率后才会显示',
   'debt.interest.partial': {
     other: '涵盖 {total} 笔债务中的 {shown} 笔 · {missing} 笔没有利率',
   },
+  'debt.curve.aria': '各还款方案下的欠款总额，{from} 至 {to}，起始为 {start}。{plans}',
+  'debt.curve.aria.cleared': '{plan}：{month} 前还清。',
+  'debt.curve.aria.owed': '{plan}：到 {month} 仍欠 {amount}。',
 
   /* --- report.* / nav.report / shell.tx.report — machine-assisted, added
      alongside the Report feature (views/report.js, src/report.js). --- */

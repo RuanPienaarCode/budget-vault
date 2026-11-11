@@ -313,12 +313,15 @@ const SHELL_HTML = `
              this is the screen where a statement dropped into the wrong account
              is actually noticed, and an undo you have to navigate back to find
              is one you will not find in time. Built by renderTransactions from
-             S.lastImport; hidden when there is nothing to undo. -->
-        <div class="tx-undo hidden" id="txUndoBar" role="status"></div>
+             S.lastImport; hidden when there is nothing to undo. It is the
+             VISIBLE half only: what a screen reader is told goes into
+             #txUndoSay at the foot of the shell, for the reason given there. -->
+        <div class="tx-undo hidden" id="txUndoBar"></div>
         <!-- What a Dashboard drill-through left out: "N rows from accounts
              outside the budget are hidden", with a way to show them. Built by
-             renderTransactions; hidden when nothing was left out. -->
-        <div class="tx-undo hidden" id="txScopeNote" role="status"></div>
+             renderTransactions; hidden when nothing was left out. Announced
+             through #txScopeSay, like the bar above. -->
+        <div class="tx-undo hidden" id="txScopeNote"></div>
         <div class="card">
           <!-- Two stacked rows, not two columns. Side by side, the four filters
                and the five actions fought for one line and the filters lost:
@@ -1059,7 +1062,26 @@ const SHELL_HTML = `
     </button>
   </nav>
 
+  <!-- The live regions. They are HERE, at the top level and never display:none,
+       because a live region has to be in the accessibility tree before it is
+       written to: one that appears already carrying its text has not changed,
+       and most screen readers report nothing. Everything inside a page section
+       fails that test whenever another page is open.
+
+       #toast takes a success and #toastAlert an error (src/toast.js): two
+       elements with a fixed role each, so an error interrupts and a "Saved"
+       does not.
+
+       #txUndoSay and #txScopeSay are the spoken half of the two bars above the
+       Transactions table. Those bars were role="status" and hidden until the
+       moment they were filled — and they are filled exactly when their page is
+       shown — so the import's undo offer and the drill-through's "N rows are
+       hidden" were announced to nobody. views/transactions.js writes the
+       sentence here, and only the sentence: the bars' buttons stay out of it. -->
   <div id="toast" role="status" aria-live="polite"></div>
+  <div id="toastAlert" role="alert"></div>
+  <div class="sr-only" id="txUndoSay" role="status"></div>
+  <div class="sr-only" id="txScopeSay" role="status"></div>
 `;
 
 module.exports = { SHELL_HTML };

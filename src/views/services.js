@@ -3,7 +3,7 @@
    Services.md. */
 
 const { opWriterOf } = require('../io');
-const { el, kpiTiles, dateInput, keepScroll, icoEl, tableCells } = require('../dom');
+const { el, kpiTiles, dateInput, keepScroll, refocus, icoEl, caveatChip, tableCells } = require('../dom');
 const { normalizeAmount } = require('../amount');
 const { SCHEMAS, mdTableFile, CYCLES } = require('../table-schema');
 const { askFields } = require('../modal');
@@ -290,24 +290,30 @@ module.exports = function registerServices(ctx) {
   /* Badges beside the service name. Every one of them is a QUESTION or an
      observation, never an assertion: this can see an absence of charges, and an
      absence is not a cancellation — a bank posts late, a card gets reissued,
-     an annual plan is silent for eleven months by design. */
+     an annual plan is silent for eleven months by design.
+
+     Every one is a chip (dom.js caveatChip), not a <span> with a `title`. The
+     flag is two words and the sentence behind it is the whole point — "not
+     seen" means nothing until it says which name it looked for — and a title
+     on a span is reachable by a mouse and by nothing else: no focus, so no
+     keyboard, and no hover on a phone (audit of 11 Nov 2026, task 18). The
+     badge classes ride along so each keeps its colour. */
+  const flag = (badge, text, why) => caveatChip(text, why, `category-badge ${badge} badge-chip`);
   function svcFlags(s, c) {
     const out = [];
     /* "Not seen" is a claim about EVERY charge, so it is read from every
        charge (c.seen) — never from the price stats, which are empty whenever
        the charges are in another currency (SVC-4). */
     if (!c.seen) {
-      out.push(el('span', { class: 'category-badge badge-dup',
-        title: `No charge in your transactions matches "${s.provider || s.name}". Either it is paid from an account you have not imported, or the name here does not match what your bank prints.` },
-      'not seen'));
+      out.push(flag('badge-dup', 'not seen',
+        `No charge in your transactions matches "${s.provider || s.name}". Either it is paid from an account you have not imported, or the name here does not match what your bank prints.`));
       return out;
     }
     if (s.active && c.status && c.status.state === 'overdue') {
       const months = Math.round(c.status.daysSince / 30);
       // c.seen.last: the charge the overdue reading itself was measured from.
-      out.push(el('span', { class: 'category-badge badge-transfer',
-        title: `Last charged ${c.seen.last}. Still marked active — has it been cancelled?` },
-      `last charged ${months}mo ago`));
+      out.push(flag('badge-transfer', `last charged ${months}mo ago`,
+        `Last charged ${c.seen.last}. Still marked active — has it been cancelled?`));
     }
     /* A price verdict is printed in the service's OWN currency — the one both
        sides of the comparison are now in (SVC-1). money() for the household's,
@@ -323,14 +329,12 @@ module.exports = function registerServices(ctx) {
          simply cannot check its price. Saying so beats both alternatives —
          a silent blank reads as "checked and fine", and the old behaviour
          asserted a price change that never happened. */
-      out.push(el('span', { class: 'category-badge badge-dup',
-        title: `This service is billed in ${c.otherSymbols.join(' · ')}, and the amount on this page is in ${c.symbol}. `
-          + 'Comparing them would need an exchange rate for the day of each charge, which this vault does not store — so no price check is offered rather than a wrong one.' },
-      `billed in ${c.otherSymbols.join(' · ')}`));
+      out.push(flag('badge-dup', `billed in ${c.otherSymbols.join(' · ')}`,
+        `This service is billed in ${c.otherSymbols.join(' · ')}, and the amount on this page is in ${c.symbol}. `
+          + 'Comparing them would need an exchange rate for the day of each charge, which this vault does not store — so no price check is offered rather than a wrong one.'));
     } else if (c.price && c.price.varies) {
-      out.push(el('span', { class: 'category-badge badge-dup',
-        title: 'The recent charges for this merchant differ too much from each other to call any of them the price — top-ups, or several products billed under one name.' },
-      'varies'));
+      out.push(flag('badge-dup', 'varies',
+        'The recent charges for this merchant differ too much from each other to call any of them the price — top-ups, or several products billed under one name.'));
     } else if (c.price && !c.price.agrees) {
       const d = c.price.diff;
       /* A settled price (SVC-2) says so: the verdict rests on the last two
@@ -339,8 +343,7 @@ module.exports = function registerServices(ctx) {
       const basis = c.price.settled
         ? `Your last two charges were ${fmt(c.price.actual)}, not ${fmt(c.price.stated)} — the price looks to have changed.`
         : `Your bank is charging ${fmt(c.price.actual)}, not ${fmt(c.price.stated)}. Based on the last few charges, so a price rise shows up here rather than an old average.`;
-      out.push(el('span', { class: `category-badge ${d > 0 ? 'badge-debt' : 'badge-savings'}`, title: basis },
-      `really ${fmt(c.price.actual, 0)}`));
+      out.push(flag(d > 0 ? 'badge-debt' : 'badge-savings', `really ${fmt(c.price.actual, 0)}`, basis));
     }
     return out;
   }
@@ -373,7 +376,7 @@ module.exports = function registerServices(ctx) {
      while the tooltip quoted the main charge on the 5th). The cadence is
      worded by the cycle; "around day N each week" read a day-of-the-MONTH
      median as if a week had thirty days. */
-  function svcNextHint(s, c, date) {
+  function svcNextHint(s, c, date, n) {
     const stale = !s.next || s.next < todayIso();
     const { last, first, skipped } = c.next;
     const title = `Last charged ${last}, billed every ${CYCLE_NOUN[s.cycle] || 'month'}, so the next charge is due ${date}.`
@@ -381,10 +384,15 @@ module.exports = function registerServices(ctx) {
         /* The records stop before the date: nothing says it did not happen. */
         ? ` ${first} has passed, but ${c.paidFrom.name} is not imported yet that far (${c.paidFrom.byImport ? 'last import' : 'balance confirmed'} ${c.paidFrom.through}), so this is the next date after today.`
         : ` ${first} has passed with no charge in your transactions yet, so this is the next date after today.`) : '');
-    const btn = el('button', { type: 'button', class: 'svc-next-hint', title,
+    const btn = el('button', { type: 'button', class: 'svc-next-hint', title, 'data-focus-key': `hint:${n}`,
       'aria-label': `Set next billing for ${s.name} to ${date}` },
     icoEl(['calendar-check', 'calendar']), stale ? `due ${date}` : date);
-    btn.addEventListener('click', () => { s.next = date; mark(); renderServices(); });
+    /* Taking the date removes the offer: the stored date now matches, so the
+       redraw has no hint to draw and the button that was pressed is gone. The
+       reader lands on the service's ROW, which now reads the date they took.
+       Not on the date field beside it — focusing a date input from inside a
+       tap opens the picker on a phone, for a date that has just been set. */
+    btn.addEventListener('click', () => { s.next = date; mark(); renderServices(); refocus($('#svcTable'), `row:${n}`); });
     return btn;
   }
 
@@ -399,11 +407,18 @@ module.exports = function registerServices(ctx) {
         el('th', { scope: 'col' }, 'Cycle'), el('th', { scope: 'col' }, 'Next billing'), el('th', { scope: 'col' }, 'Active'), el('th', { scope: 'col' }, ''))));
       const body = el('tbody', {});
       const groups = serviceGroups();
+      /* `n` counts service rows in the order they are drawn, across the
+         category bars — the position the focus keys below are built from
+         (dom.js refocus). S.services' own index would not do: the page groups
+         and sorts, so "the row that moved up" is the next one DRAWN. */
+      let n = -1;
       for (const cat of Object.keys(groups).sort()) {
         body.append(el('tr', { class: 'type-row', 'data-cat': cat },
           el('td', { colspan: '6' }, cat),
           el('td', { class: 'num' }, subtotalText(groups[cat]))));
         for (const s of groups[cat]) {
+          n++;
+          const at = n;
           /* Beside the Amount field, updated in place by its own editor (the row
              is not rebuilt on an amount edit — see renderServicesKpis). Empty
              unless the figure is below zero, whether typed now or already in a
@@ -416,7 +431,7 @@ module.exports = function registerServices(ctx) {
           const refresh = () => { mark(); renderServicesKpis(); renderServiceSubtotals(); };
           const c = charged.get(s) || {};
           const hintDate = offeredNext(s, c);
-          body.append(el('tr', { class: s.active ? '' : 'svc-inactive' },
+          body.append(el('tr', { class: s.active ? '' : 'svc-inactive', 'data-focus-key': `row:${at}` },
             el('td', { style: 'font-weight:600' }, s.name, ctx.noteButton('service', s.name), ...svcFlags(s, c)),
             el('td', { class: 'text-muted' }, s.provider),
             el('td', { class: 'num' }, el('input', { type: 'number', step: '0.01', class: 'form-control form-control-sm', value: s.amount || '',
@@ -451,14 +466,22 @@ module.exports = function registerServices(ctx) {
                next is 2 August. Offered rather than written, because the reader
                may be tracking a plan change the history cannot know about —
                see offeredNext for when it is held back. */
-            ...(hintDate ? [svcNextHint(s, c, hintDate)] : [])),
+            ...(hintDate ? [svcNextHint(s, c, hintDate, at)] : [])),
             /* In a <label> so the phone card can give the tick a 44px target
                without inflating the native glyph (a checkbox renders no
                ::after for the house overlay trick). Inert on a desktop. */
+            /* Both handlers below redraw the table they sit in, so each says
+               where the reader should be afterwards (dom.js refocus): on the
+               same tick, and — after a removal — on the service that moved up
+               into this one's place, else the one above, else New service. */
             el('td', {}, el('label', { class: 'tbl-tick' }, el('input', { type: 'checkbox', 'aria-label': `${s.name} is active`, ...(s.active ? { checked: '' } : {}),
-              onchange: e => { s.active = e.target.checked; mark(); renderServices(); } }))),
-            el('td', {}, el('button', { class: 'btn-ghost btn-ghost-sm', 'aria-label': `Remove ${s.name}`,
-              onclick: () => { S.services.splice(S.services.indexOf(s), 1); mark(); renderServices(); } }, '✕'))));
+              'data-focus-key': `active:${at}`,
+              onchange: e => { s.active = e.target.checked; mark(); renderServices(); refocus($('#svcTable'), `active:${at}`); } }))),
+            el('td', {}, el('button', { class: 'btn-ghost btn-ghost-sm', 'aria-label': `Remove ${s.name}`, 'data-focus-key': `del:${at}`,
+              onclick: () => {
+                S.services.splice(S.services.indexOf(s), 1); mark(); renderServices();
+                refocus($('#svcTable'), [`del:${at}`, `del:${at - 1}`, $('#svcAdd')]);
+              } }, '✕'))));
         }
       }
       if (!S.services.length) body.append(el('tr', {}, el('td', { colspan: '7', class: 'text-muted' }, 'No services yet.')));

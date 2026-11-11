@@ -2,7 +2,12 @@
 /* Owed Money — who owes the household what, saved to Owed Money.md. */
 
 const { opWriterOf } = require('../io');
-const { el, kpiTiles, dateInput, keepScroll, icoEl, tableCells } = require('../dom');
+const { el, kpiTiles, dateInput, keepScroll, refocus, icoEl, caveatChip, tableCells } = require('../dom');
+/* Imported as a namespace, the way every view does: `t` is a local in several
+   of them. This page's own strings are still plain English (the i18n sweep is
+   a later wave); the namespace is here for the one accessible name added
+   since — the repaid chip below. */
+const i18n = require('../i18n');
 const { normalizeAmount } = require('../amount');
 const { SCHEMAS, mdTableFile } = require('../table-schema');
 const { askFields } = require('../modal');
@@ -75,19 +80,24 @@ module.exports = function registerOwed(ctx) {
     tile('Entries', String(s.entries));
   }
 
-  /* focusRow: index into S.owed whose status pill should get focus back after
-     a rebuild. Rebuilding the table drops focus to <body>, and cycling status
-     is the main interaction here — a keyboard or screen-reader user was being
-     ejected to the top of the page on every single click.
+  /* landing: where focus goes back to after the rebuild — a focus key, or a
+     list of them (dom.js refocus). Rebuilding the table drops focus to <body>,
+     and cycling status is the main interaction here — a keyboard or
+     screen-reader user was being ejected to the top of the page on every
+     single click.
 
-     An INDEX rather than a name — two rows can share a person's name (Sam
-     twice is the normal case for two separate loans to the same person), and
-     the previous version looked the row up with S.owed.findIndex(person ===
-     focusPerson), which returns the FIRST match: clicking the second Sam's
-     pill returned focus to the first one. views/debts.js carries the same
-     comment for the identical bug, fixed there by index — this ripples that
-     fix over here. */
-  function renderOwed(focusRow) {
+     Every key is built from the row's INDEX rather than a name — two rows can
+     share a person's name (Sam twice is the normal case for two separate loans
+     to the same person), and the first version of this looked the row up with
+     S.owed.findIndex(person === focusPerson), which returns the FIRST match:
+     clicking the second Sam's pill returned focus to the first one.
+     views/debts.js carries the same comment for the identical bug.
+
+     This was a hand-written restore that only knew the status pill, so the
+     row's Remove button had none and left the reader on <body> (audit of
+     11 Nov 2026, task 16). The pill, lent-date and repayment landings are
+     unchanged; Remove now lands on the entry that moved up. */
+  function renderOwed(landing) {
     renderOwedKpis();
     const t = $('#owedTable');
     keepScroll(t, () => {
@@ -98,15 +108,24 @@ module.exports = function registerOwed(ctx) {
         el('th', { scope: 'col' }, 'Lent'), el('th', { scope: 'col' }, 'Due date'),
         el('th', { scope: 'col' }, 'Status'), el('th', { scope: 'col' }, ''))));
       const body = el('tbody', {});
-      for (const o of S.owed) {
+      for (const [i, o] of S.owed.entries()) {
         const settled = isSettled(o);
         const left = outstandingOf(o);
         const label = settled ? 'Paid' : (o.repaid > 0 ? `${oMoney(o, left, 0)} left` : 'Outstanding');
-        const pill = el('button', { class: `status-pill status-${settled ? 'paid' : 'outstanding'}`,
-          title: o.repaid > 0 ? `${oMoney(o, o.amount)} lent · ${oMoney(o, o.repaid)} back · ${oMoney(o, left)} outstanding` : '',
+        const pill = el('button', { class: `status-pill status-${settled ? 'paid' : 'outstanding'}`, 'data-focus-key': `pill:${i}`,
           'aria-label': `${o.person}: ${label} — click to change` },
           icoEl(settled ? ['circle-check', 'check-circle'] : ['hourglass']), label);
-        pill.addEventListener('click', () => { const row = S.owed.indexOf(o); o.status = settled ? 'outstanding' : 'paid'; mark(); renderOwed(row); });
+        /* What has come back, and the sum it belongs to. This was the pill's
+           `title`: lent · back · outstanding, on a button whose one press
+           flips the status, so a phone could not read it without changing the
+           entry and a keyboard could not read it at all (audit of 11 Nov 2026,
+           task 18). A chip beside the pill instead (dom.js caveatChip) — its
+           own button, so asking how much is back never marks anything paid. */
+        const repaidChip = o.repaid > 0
+          ? caveatChip(i18n.t('owed.repaid.chip', { amount: oMoney(o, o.repaid, 0) }),
+            `${oMoney(o, o.amount)} lent · ${oMoney(o, o.repaid)} back · ${oMoney(o, left)} outstanding`)
+          : null;
+        pill.addEventListener('click', () => { const row = S.owed.indexOf(o); o.status = settled ? 'outstanding' : 'paid'; mark(); renderOwed(`pill:${row}`); });
         /* Age, not the due date. The due-date column was empty on every row of
            the vault this was built against — it asks for something you do not
            have when you lend to family. How long the money has been gone is
@@ -177,18 +196,24 @@ module.exports = function registerOwed(ctx) {
           /* The age caption under the person's name is derived from this, so
              editing it re-renders the row rather than only marking dirty —
              unlike the amount field, whose figure is read by the KPI tiles and
-             not by the row itself. renderOwed(row) restores focus to the
-             status pill, matching what the pill's own handler does. */
+             not by the row itself. The landing is the row's status pill,
+             matching what the pill's own handler does. */
           el('td', {}, dateInput(o.lent, { class: 'form-control form-control-sm', 'aria-label': `Date lent to ${o.person}` },
-            v => { const row = S.owed.indexOf(o); o.lent = v; mark(); renderOwed(row); })),
+            v => { const row = S.owed.indexOf(o); o.lent = v; mark(); renderOwed(`pill:${row}`); })),
           el('td', {}, dateInput(o.due, { class: 'form-control form-control-sm', 'aria-label': `Due date for ${o.person}` },
             v => { o.due = v; mark(); })),
-          el('td', {}, pill),
+          el('td', {}, pill, ...(repaidChip ? [repaidChip] : [])),
           el('td', {}, el('div', { class: 'owed-acts' },
             el('button', { class: 'btn-ghost btn-ghost-sm', 'aria-label': `Record a repayment from ${o.person}`,
               title: 'Record money that came back', onclick: () => recordRepayment(o) }, icoEl(['plus'])),
-            el('button', { class: 'btn-ghost btn-ghost-sm', 'aria-label': `Remove ${o.person}`,
-              onclick: () => { S.owed.splice(S.owed.indexOf(o), 1); mark(); renderOwed(); } }, '✕')))));
+            el('button', { class: 'btn-ghost btn-ghost-sm', 'aria-label': `Remove ${o.person}`, 'data-focus-key': `del:${i}`,
+              // The entry that moved up into this one's place, else the one
+              // above, else New entry — never the top of the page.
+              onclick: () => {
+                const row = S.owed.indexOf(o);
+                S.owed.splice(row, 1); mark();
+                renderOwed([`del:${row}`, `del:${row - 1}`, $('#owedAdd')]);
+              } }, '✕')))));
       }
       if (!S.owed.length) body.append(el('tr', {}, el('td', { colspan: '7', class: 'text-muted' }, 'No entries yet.')));
       t.append(body);
@@ -196,10 +221,7 @@ module.exports = function registerOwed(ctx) {
          keep the column names and the table semantics (dom.js tableCells). */
       tableCells(t, ['Person', 'Description', 'Amount', 'Lent', 'Due date', 'Status', null]);
     });
-    if (focusRow !== undefined && focusRow >= 0) {
-      const pill = t.querySelectorAll('.status-pill')[focusRow];
-      if (pill) pill.focus();
-    }
+    if (landing !== undefined) refocus(t, landing);
   }
 
   /* Money that came back. Recorded by hand rather than matched automatically:
@@ -224,7 +246,7 @@ module.exports = function registerOwed(ctx) {
     // to `left.toFixed(2)`, which rounds DOWN a three-decimal cell and can
     // leave a sub-cent residue that exact equality never clears.
     if (isSettled(o)) o.status = 'paid';
-    mark(); renderOwed(S.owed.indexOf(o));
+    mark(); renderOwed(`pill:${S.owed.indexOf(o)}`);
     toast(`${oMoney(o, amount)} back from ${o.person}`);
   }
 

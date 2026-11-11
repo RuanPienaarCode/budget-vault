@@ -243,10 +243,13 @@ const LIST = [{ folder: ACME, label: 'Acme' }, { folder: ZETA, label: 'Zeta' }];
     ok(/<div class="drawer-book hidden" id="drawerBookSwitch">/.test(shell), 'the shell ships the drawer copy #drawerBookSwitch with the hidden class');
     ok(/<select id="drawerBookSelect"/.test(shell), '… wrapping its own native <select id="drawerBookSelect">');
     {
-      const handler = /const onBookPicked = async e => \{([\s\S]*?)\n  \};/.exec(ctl);
-      ok(handler && /pickBook\(plugin, e\.target\.value/.test(handler[1]) && /applyBooks\(\)/.test(handler[1]),
-        'a change of either select goes through pickBook, which says every refusal, then redraws both copies');
-      ok(/\$\('#bookSelect'\)\.addEventListener\('change', onBookPicked\)/.test(ctl) && /\$\('#drawerBookSelect'\)\.addEventListener\('change', onBookPicked\)/.test(ctl),
+      /* The handler takes the select, not a change event: it is called by
+         settleBookSelect once the reader has settled on a book, which is not
+         every `change` (tests/book-switcher-commit.test.cjs). */
+      const handler = /const onBookPicked = async select => \{([\s\S]*?)\n  \};/.exec(ctl);
+      ok(handler && /pickBook\(plugin, select\.value/.test(handler[1]) && /applyBooks\(\)/.test(handler[1]),
+        'a pick from either select goes through pickBook, which says every refusal, then redraws both copies');
+      ok(/for \(const select of \[\$\('#bookSelect'\), \$\('#drawerBookSelect'\)\]\) \{\s*settleBookSelect\(select, \(\) => onBookPicked\(select\)/.test(ctl),
         '… and BOTH selects are wired to it, so the drawer copy is not a picker that does nothing');
       const apply = /async function applyBooks\(\) \{[\s\S]*?\n  \}/.exec(ctl);
       ok(apply && (apply[0].match(/renderBookSwitchers\(pairs, /g) || []).length === 2 && !/renderBookSwitcher\(/.test(apply[0]),

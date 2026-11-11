@@ -1324,6 +1324,15 @@ body.is-phone .budget-app-root .drawer-book:not(.hidden) { display: block; }
 .budget-app-root .table tbody tr:last-child td { border-bottom: none; }
 .budget-app-root .table tbody tr { transition: background 0.12s; }
 .budget-app-root .table.table-hover tbody tr:hover { background: var(--color-primary-light); }
+/* A row that focus LANDS on: the first row "Show more" reveals on Transactions
+   and the import review, and a service's row once its offered billing date is
+   taken (src/dom.js refocus). A row is the landing there because nothing in it
+   is safe to focus — the category cell opens its picker on focus, and a date
+   field raises the phone's picker. refocus gives the row tabindex="-1" at that
+   moment, so it is in no tab order and this ring only ever shows on a row
+   focus was put on. Inset, the same as an Accounts row, so it cannot spill
+   out of the table's scroll box. */
+.budget-app-root .table tbody tr[data-focus-key]:focus-visible { outline: 2px solid var(--color-primary); outline-offset: -2px; }
 /* Money never wraps. In a narrow pane the amount columns get tight enough that
    "R 12,000.00" breaks after the currency symbol, which doubles the height of
    every row it hits and leaves the table looking ragged — the horizontal scroll
@@ -1488,6 +1497,17 @@ body.is-phone .budget-app-root .drawer-book:not(.hidden) { display: block; }
 @supports (color: color-mix(in srgb, red, blue)) {
   .budget-app-root.bud-dark .badge-giving { color: #ef5ca4; }
 }
+/* A badge that is a chip — src/dom.js caveatChip() wearing a badge's classes.
+   The flags on Services ("not seen", "really R 219") and the import review
+   ("transfer?") were spans with their reason in a `title`; they are buttons
+   now, so the reason opens on a tap. The badge rules above already dress a
+   <button> (the Notes page's "unmatched" has been one from the start, and the
+   tablet padding twin for .category-badge is in the block at the top of this
+   file), so all this adds is what a span never needed: the pointer, and a
+   focus ring. No colour of its own — the badge keeps the one that says what
+   kind of flag it is. */
+.budget-app-root .badge-chip { cursor: pointer; }
+.budget-app-root .badge-chip:focus-visible { outline: 2px solid var(--color-primary); outline-offset: 2px; }
 
 /* ============================================================
    CATEGORY USAGE BARS (Budget page)
@@ -2606,7 +2626,8 @@ body.is-phone .budget-app-root .drawer-book:not(.hidden) { display: block; }
 /* ============================================================
    ALERTS / TOAST
    ============================================================ */
-.budget-app-root #toast {
+.budget-app-root #toast,
+.budget-app-root #toastAlert {
   position: absolute;
   bottom: max(22px, calc(22px + env(safe-area-inset-bottom))); left: 50%;
   transform: translateX(-50%);
@@ -2627,9 +2648,17 @@ body.is-phone .budget-app-root .drawer-book:not(.hidden) { display: block; }
   overflow: hidden;
   text-overflow: ellipsis;
 }
-.budget-app-root.bud-dark #toast { background: var(--surface-glass-hi); -webkit-backdrop-filter: blur(20px); backdrop-filter: blur(20px); }
-.budget-app-root #toast.show { opacity: 1; }
-.budget-app-root #toast.bad { border-left: 4px solid var(--color-danger); }
+.budget-app-root.bud-dark #toast,
+.budget-app-root.bud-dark #toastAlert { background: var(--surface-glass-hi); -webkit-backdrop-filter: blur(20px); backdrop-filter: blur(20px); }
+.budget-app-root #toast.show,
+.budget-app-root #toastAlert.show { opacity: 1; }
+/* #toastAlert is the same toast with a different role: an error is written
+   into it so a screen reader announces it at once, where #toast is polite
+   (src/toast.js). Only one of the two ever shows, so they share one place on
+   screen and every rule here names both. `.bad` can still land on #toast: a
+   shell with no alert region shows the error in the one it has. */
+.budget-app-root #toast.bad,
+.budget-app-root #toastAlert.bad { border-left: 4px solid var(--color-danger); }
 .budget-app-root #toast.good { border-left: 4px solid var(--color-primary); }
 
 /* Reduced motion for the shared transitions. Placed AFTER the last of the rules
@@ -2645,6 +2674,7 @@ body.is-phone .budget-app-root .drawer-book:not(.hidden) { display: block; }
   .budget-app-root .card,
   .budget-app-root .upload-area,
   .budget-app-root #toast,
+  .budget-app-root #toastAlert,
   .budget-app-root .table tbody tr { transition: none; }
   /* The grow animations are decoration — the bar reads identically at rest. */
   .budget-app-root .cat-bar-fill,
@@ -2726,6 +2756,18 @@ body.is-phone .budget-app-root .drawer-book:not(.hidden) { display: block; }
 .budget-app-root .trend-tip-delta:empty { display: none; }
 .budget-app-root .trend-tip-delta.is-over { color: var(--color-danger-ink); }
 
+/* The plain readout — chart.js pointReadout(), under the Debt page's payoff
+   curve and the Savings page's growth chart. One line of text that says the
+   point being inspected, by arrow key, finger or mouse. The height is held
+   whether or not it has anything to say, so inspecting a point never moves
+   the page under the reader's finger; tabular figures so the amounts do not
+   jitter as the months go by. */
+.budget-app-root .chart-readout {
+  min-height: 1.5em; margin-top: 8px;
+  font-size: 12.5px; line-height: 1.5; color: var(--text-muted);
+  font-variant-numeric: tabular-nums;
+}
+
 /* All decoration — the readout still appears and still carries every figure,
    it just stops fading and the line stops easing. */
 @media (prefers-reduced-motion: reduce) {
@@ -2774,6 +2816,12 @@ body.is-phone .budget-app-root .drawer-book:not(.hidden) { display: block; }
    rather than against the page. */
 .budget-app-root .stack-wrap { width: 100%; position: relative; }
 .budget-app-root .stack-wrap svg { width: 100%; height: auto; display: block; }
+/* The growth chart takes a tab stop now (its months are read out by arrow key,
+   chart.js pointReadout), so it needs a focus ring like the trend chart's. The
+   net-worth bar beside it in this wrapper does not take focus, and is not
+   named here. Its iOS 15.0-15.3 twin is in the @supports block at the foot of
+   this file. */
+.budget-app-root .stack-wrap svg.growth-svg:focus-visible { outline: 2px solid var(--color-primary); outline-offset: 2px; border-radius: 8px; }
 /* The Savings charts draw into a 1000-unit viewBox that scales with its card
    (about 0.85 at a 1024px window, 1.0 from ~1200px), so their text, written in
    those units, came out at 8.1px ("Growth with no date", 9.5 units), 10.2px
@@ -3666,7 +3714,8 @@ body.is-phone .budget-app-root .drawer-book:not(.hidden) { display: block; }
   }
 
   /* Same reason — a toast pinned 22px off the bottom lands behind the toolbar. */
-  .budget-app-root #toast {
+  .budget-app-root #toast,
+  .budget-app-root #toastAlert {
     bottom: max(22px, var(--bud-bottom-chrome));
   }
 
@@ -4110,11 +4159,14 @@ body.is-phone .budget-app-root .drawer-book:not(.hidden) { display: block; }
   .budget-app-root .tx-undo-x:focus { outline: 2px solid var(--color-primary); outline-offset: 2px; }
   .budget-app-root .table thead th button:focus { outline: 2px solid var(--color-primary); outline-offset: 2px; }
   .budget-app-root .table tbody tr.acct-row:focus { outline: 2px solid var(--color-primary); outline-offset: -2px; }
+  .budget-app-root .table tbody tr[data-focus-key]:focus { outline: 2px solid var(--color-primary); outline-offset: -2px; }
   .budget-app-root .chart-range-btn:focus { outline: 2px solid var(--color-primary); outline-offset: 2px; }
   .budget-app-root .trend-svg-wrap svg:focus { outline: 2px solid var(--color-primary); outline-offset: 2px; border-radius: 8px; }
+  .budget-app-root .stack-wrap svg.growth-svg:focus { outline: 2px solid var(--color-primary); outline-offset: 2px; border-radius: 8px; }
   .budget-app-root .acct-recon-btn:focus { outline: 2px solid var(--color-primary); outline-offset: 2px; }
   .budget-app-root .kpi-caveat-btn:focus { outline: 2px solid var(--color-primary); outline-offset: 2px; }
   .budget-app-root .caveat-chip-btn:focus { outline: 2px solid var(--color-primary); outline-offset: 2px; }
+  .budget-app-root .badge-chip:focus { outline: 2px solid var(--color-primary); outline-offset: 2px; }
   .budget-app-root .svc-next-hint:focus { outline: 2px solid var(--color-primary); outline-offset: 2px; }
   .budget-app-root .import-help summary:focus { outline: 2px solid var(--text-muted); outline-offset: 2px; border-radius: 4px; }
   .budget-app-root .cat-cell-btn:focus { outline: 2px solid var(--color-accent); outline-offset: 1px; }
@@ -6270,7 +6322,8 @@ body.is-phone .budget-app-root .drawer-book:not(.hidden) { display: block; }
 .budget-app-root.has-dock .main-content {
   padding-bottom: calc(var(--bv-dock-bottom) + var(--bv-dock-h) + 2rem);
 }
-.budget-app-root.has-dock #toast {
+.budget-app-root.has-dock #toast,
+.budget-app-root.has-dock #toastAlert {
   bottom: calc(var(--bv-dock-bottom) + var(--bv-dock-h) + 10px);
 }
 

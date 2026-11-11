@@ -1414,10 +1414,14 @@ module.exports = {
 
   /* --- Debt page: "Interest this month" says what it covers, because a debt
      with a blank rate is unknown rather than zero (the why is in en.js) --- */
+  'owed.repaid.chip': '{amount} kembali',
   'debt.interest.noRates': 'tambahkan suku bunga pada salah satu utang untuk melihat ini',
   'debt.interest.partial': {
     other: 'mencakup {shown} dari {total} utang · {missing} tanpa suku bunga',
   },
+  'debt.curve.aria': 'Total utang menurut tiap rencana pelunasan, {from} sampai {to}, mulai dari {start}. {plans}',
+  'debt.curve.aria.cleared': '{plan}: lunas pada {month}.',
+  'debt.curve.aria.owed': '{plan}: masih terutang {amount} pada {month}.',
 
   /* --------------------------------- report ------------------------------- */
   'report.pageSub': 'Satu catatan Markdown · baca di Obsidian, bagikan, atau tempelkan ke obrolan AI',

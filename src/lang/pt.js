@@ -1480,11 +1480,15 @@ module.exports = {
 
   /* --- Debt page: "Interest this month" says what it covers, because a debt
      with a blank rate is unknown rather than zero (the why is in en.js) --- */
+  'owed.repaid.chip': '{amount} devolvido',
   'debt.interest.noRates': 'adicione uma taxa a alguma dívida para ver isto',
   'debt.interest.partial': {
     one: 'cobre {shown} de {total} dívidas · {missing} não tem taxa',
     other: 'cobre {shown} de {total} dívidas · {missing} não têm taxa',
   },
+  'debt.curve.aria': 'Total em dívida com cada plano de pagamento, de {from} a {to}, a partir de {start}. {plans}',
+  'debt.curve.aria.cleared': '{plan}: liquidado em {month}.',
+  'debt.curve.aria.owed': '{plan}: ainda {amount} em dívida em {month}.',
 
   /* --------------------------------- report ------------------------------- */
   'report.pageSub': 'Uma nota em Markdown · leia no Obsidian, compartilhe, ou cole num chat de IA',

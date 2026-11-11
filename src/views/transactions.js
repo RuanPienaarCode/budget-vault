@@ -3,7 +3,7 @@
    editing, saved back to Transactions/<account>/<month>.md files. */
 
 const { opWriterOf } = require('../io');
-const { el, icoEl, tableCells, caveatChip } = require('../dom');
+const { el, icoEl, tableCells, caveatChip, refocus } = require('../dom');
 const { normalizeAmount } = require('../amount');
 const { patchFrontmatter, yamlStr, parseMdTableWithSeparator } = require('../markdown');
 const { SCHEMAS, headerLines, rowLine, headerLinesWithExtras, rowLineWithExtras } = require('../table-schema');
@@ -492,6 +492,47 @@ module.exports = function registerTransactions(ctx) {
     sel.value = [...sel.options].some(o => o.value === keep) ? keep : '';
   }
 
+  /* Where a reader lands when the bar they just pressed a button in is gone.
+
+     Both bars above the table remove themselves when used: dismissing or
+     taking the undo drops the receipt, and "show them" drops the scope. The
+     button goes with its bar, so focus fell to <body> (audit of 11 Nov 2026,
+     task 16). The next thing down the page is the table those buttons were
+     about, so its first row is the landing; with no rows at all it is the Add
+     button, which is always there. */
+  const afterBar = () => ['row:0', $('#txAdd')];
+
+  /* What a screen reader is told when one of the two bars above the table
+     appears, and when it goes.
+
+     The bars themselves cannot do it. They were role="status" and `hidden`
+     until the moment they were filled, and a live region that is not in the
+     accessibility tree is not being listened to: it appears already carrying
+     its text, nothing has CHANGED, and most screen readers say nothing. Nor
+     would un-hiding them have helped — their whole page section is
+     display:none while another page is open, and both bars are filled at the
+     moment it is shown (an import sends the reader here; so does a Dashboard
+     drill-through). So "42 rows imported, undo is available" reached everyone
+     but the reader who could not see it (audit of 11 Nov 2026, task 18).
+
+     The shell carries two regions for this at its top level (#txUndoSay,
+     #txScopeSay): always in the tree, empty at rest. `say` writes the sentence
+     into one — the sentence alone, never the bar's buttons, which a status
+     region would read out as part of the message.
+
+     Written only when it CHANGES. This runs on every render, and a render is
+     every keystroke in the search box: writing the same sentence again is a
+     change as far as a screen reader is concerned, and it would say it again.
+     Remembered here rather than read back off the element, so a region some
+     harness hands out as a stand-in is never trusted to hold state. */
+  const spoken = {};
+  function say(sel, text) {
+    if (spoken[sel] === text || (!text && spoken[sel] === undefined)) return;
+    spoken[sel] = text;
+    const live = $(sel);
+    if (live) live.textContent = text;
+  }
+
   /* The undo offer for the import that just landed on this page.
      Rebuilt on every render from S.lastImport, which import.js writes on commit
      and clears once it has been used or has become unusable — so there is
@@ -504,20 +545,28 @@ module.exports = function registerTransactions(ctx) {
     const r = S.lastImport;
     bar.empty();
     bar.classList.toggle('hidden', !r);
+    // What was imported, and how long the offer lasts: the two sentences the
+    // bar prints, without the filename, which is a detail and not the news.
+    say('#txUndoSay', r ? `${i18n.t('tx.undo.what', { count: r.count, label: r.label, at: r.at })} ${i18n.t('tx.undo.session')}` : '');
     if (!r) return;
     bar.append(el('div', { class: 'tx-undo-txt' },
       i18n.t('tx.undo.what', { count: r.count, label: r.label, at: r.at }),
       r.filename ? el('span', { class: 'tx-undo-file' }, r.filename) : '',
       el('div', { class: 'tx-undo-note' }, i18n.t('tx.undo.session'))));
     const undo = el('button', { type: 'button', class: 'tx-undo-btn' }, i18n.t('tx.undo.do'));
-    undo.addEventListener('click', () => ctx.undoImport());
+    /* An undo that goes through takes this bar with it, and the button that
+       was pressed is part of the bar. Awaited so the landing is chosen once
+       the page has settled; when the bar is still there (the confirmation was
+       declined) the dialog has already handed focus back to this button and
+       refocus leaves it alone. */
+    undo.addEventListener('click', async () => { await ctx.undoImport(); refocus($('#txTable'), afterBar()); });
     const hide = el('button', { type: 'button', class: 'tx-undo-x',
       'aria-label': i18n.t('tx.undo.dismiss') }, '✕');
     /* Dismiss drops the receipt rather than only hiding the bar. Keeping it
        alive behind a closed banner would leave an undo that is still armed and
        no longer visible — and the next thing the reader does on this page is
        edit the rows it would silently take back. */
-    hide.addEventListener('click', () => { S.lastImport = null; renderUndoBar(); });
+    hide.addEventListener('click', () => { S.lastImport = null; renderUndoBar(); refocus($('#txTable'), afterBar()); });
     bar.append(el('div', { class: 'tx-undo-acts' }, undo, hide));
   }
 
@@ -534,16 +583,19 @@ module.exports = function registerTransactions(ctx) {
     note.empty();
     const any = outside + foreign + fund + future;
     note.classList.toggle('hidden', !any);
+    /* One sentence per reason, as before — the same strings are printed in the
+       note and spoken through #txScopeSay (see `say`). */
+    const lines = [];
+    if (outside) lines.push(i18n.t('tx.outside.hidden', { count: outside }));
+    if (foreign) lines.push(i18n.t('tx.foreign.hidden', { count: foreign }));
+    if (fund) lines.push(i18n.t('tx.fund.hidden', { count: fund }));
+    if (future) lines.push(i18n.t('tx.future.hidden', { count: future }));
+    say('#txScopeSay', lines.join(' '));
     if (!any) return;
     const show = el('button', { type: 'button', class: 'tx-undo-btn' }, i18n.t('tx.outside.show'));
-    show.addEventListener('click', () => { inBudgetFor = null; renderTransactions(); });
-    const said = [];
-    if (outside) said.push(el('div', {}, i18n.t('tx.outside.hidden', { count: outside })));
-    if (foreign) said.push(el('div', {}, i18n.t('tx.foreign.hidden', { count: foreign })));
-    if (fund) said.push(el('div', {}, i18n.t('tx.fund.hidden', { count: fund })));
-    if (future) said.push(el('div', {}, i18n.t('tx.future.hidden', { count: future })));
+    show.addEventListener('click', () => { inBudgetFor = null; renderTransactions(); refocus($('#txTable'), afterBar()); });
     note.append(
-      el('div', { class: 'tx-undo-txt' }, said),
+      el('div', { class: 'tx-undo-txt' }, lines.map(line => el('div', {}, line))),
       el('div', { class: 'tx-undo-acts' }, show));
   }
 
@@ -618,7 +670,11 @@ module.exports = function registerTransactions(ctx) {
        or no usable colour, simply gets no dot. */
     const catDots = new Map();
     for (const c of S.categories || []) if (c && c.name && DOT_HEX.test(String(c.color || ''))) catDots.set(c.name, c.color);
-    for (const item of list) {
+    /* `i` is the row's position in what is on screen, and the focus keys
+       below are built from it (dom.js refocus). Position, not identity, on
+       purpose: after a delete the row that takes index i is the one the
+       reader should be on next, and a transaction has no id to key by anyway. */
+    for (const [i, item] of list.entries()) {
       const r = item._row;
       const mark = () => { item._file.dirty = true; $('#txSave').disabled = false; };
       // Captured once per render, before any edit — the on-disk category this
@@ -628,7 +684,12 @@ module.exports = function registerTransactions(ctx) {
       // "already categorised" and wrongly exempt it from the empty-only rule
       // just below.
       const origCat = r.cat;
-      body.append(el('tr', {},
+      /* The row itself is keyed, as the landing for "Show more". Not the
+         category control, the first thing in it a reader could Tab to:
+         deferredCatSelect swaps to a real <select> and opens its picker the
+         moment it takes focus (categories.js), so landing there would open a
+         category list nobody asked for. */
+      body.append(el('tr', { 'data-focus-key': `row:${i}` },
         el('td', { class: 'text-muted' }, r.date),
         el('td', {}, r.desc),
         el('td', { class: 'text-muted' }, item.label),
@@ -681,11 +742,11 @@ module.exports = function registerTransactions(ctx) {
            (amountCell, rowFlow), not the stylesheet's. `num` stays the first
            class: the figures harness addresses this cell as td.num[4]. */
         amountCell(item),
-        el('td', {}, excludedCell(item, mark)),
+        el('td', {}, excludedCell(item, mark, i)),
         el('td', {}, el('input', { type: 'text', class: 'form-control form-control-sm', value: r.note, style: 'width:130px',
           'aria-label': i18n.t('tx.aria.note', { date: r.date, desc: r.desc }),
           onchange: e => { r.note = e.target.value; mark(); } })),
-        el('td', {}, splitButton(item), deleteButton(item))));
+        el('td', {}, splitButton(item, i), deleteButton(item, i))));
     }
     if (!list.length) body.append(el('tr', {}, el('td', { colspan: '8', class: 'text-muted' }, i18n.t('tx.none'))));
     if (total > list.length) {
@@ -693,11 +754,17 @@ module.exports = function registerTransactions(ctx) {
       /* "Show 55 more of 55 remaining" says the same number twice. When what is
          left fits in one page the button takes all of it, so it says that;
          otherwise it still names the page and the pile. */
-      const more = el('button', { class: 'btn-ghost', style: 'width:100%;padding:0.6rem' },
+      const more = el('button', { class: 'btn-ghost', style: 'width:100%;padding:0.6rem', 'data-focus-key': 'more' },
         remaining <= PAGE
           ? i18n.t('tx.showRest', { remaining, count: remaining })
           : i18n.t('tx.showMore', { n: PAGE, remaining, count: remaining }));
-      more.addEventListener('click', () => { shown += PAGE; renderTransactions(); });
+      /* The press rebuilds the table, this button included, and focus fell to
+         <body>: a keyboard reader paging through a long month was returned to
+         the top of the page after every hundred rows. They land on the first
+         row the press revealed — the next thing to read — and on the button
+         itself if somehow nothing new arrived. */
+      const revealedFrom = list.length;
+      more.addEventListener('click', () => { shown += PAGE; renderTransactions(); refocus(t, [`row:${revealedFrom}`, 'more']); });
       body.append(el('tr', {}, el('td', { colspan: '8', style: 'padding:0' }, more)));
     }
     t.append(body);
@@ -724,17 +791,20 @@ module.exports = function registerTransactions(ctx) {
          parts and silently double-count it. Keeping the parent keeps the key.
        • It is reversible by hand in the markdown: untick Excluded, delete the
          parts. Nothing about the split is a one-way door. */
-  function splitButton(item) {
+  function splitButton(item, i) {
     const r = item._row;
     const b = el('button', {
-      type: 'button', class: 'btn-ghost btn-ghost-sm',
+      type: 'button', class: 'btn-ghost btn-ghost-sm', 'data-focus-key': `split:${i}`,
       'aria-label': i18n.t('tx.aria.split', { date: r.date, desc: r.desc }), title: i18n.t('tx.title.split'),
     }, icoEl(['split', 'git-fork', 'scissors']));
-    b.addEventListener('click', () => splitTransaction(item));
+    b.addEventListener('click', () => splitTransaction(item, i));
     return b;
   }
 
-  async function splitTransaction(item) {
+  /* `i`: the row's position on screen, for the focus restore after the
+     rebuild (dom.js refocus). Optional — a caller with no row on screen to
+     return to simply gets no restore. */
+  async function splitTransaction(item, i) {
     const r = item._row;
     if (!r.amount) return toast(i18n.t('tx.split.zero'), true);
     if (r.excluded) return toast(i18n.t('tx.split.excluded'), true);
@@ -788,6 +858,10 @@ module.exports = function registerTransactions(ctx) {
        with different categories, so learning from them would teach the
        auto-categoriser a rule that contradicts itself on every import. */
     renderTransactions();
+    // The parent stays where it was, now followed by its parts: back on its
+    // own split button, which the dialog returned focus to before the rebuild
+    // destroyed it.
+    refocus($('#txTable'), `split:${i}`);
     // The split MODAL itself (src/modal.js — not an owner file here) does not
     // gate on every part having a category, only on the remainder being zero
     // and every part being positive: a 60/40 split can be committed with the
@@ -840,7 +914,7 @@ module.exports = function registerTransactions(ctx) {
      join. Function declaration, so it is hoisted; kept there rather than moved
      because that is the header explaining why the match is date + description
      and deliberately narrow.) */
-  function excludedCell(item, mark) {
+  function excludedCell(item, mark, i) {
     const r = item._row;
     if (splitRole(r.split) !== SPLIT_PARENT) {
       /* In a .tbl-tick <label>, like Services' Active and Import's tick: on a
@@ -851,7 +925,11 @@ module.exports = function registerTransactions(ctx) {
          (phone.css, #txTable .tbl-tick). On a desktop the label is
          display:contents and adds no box. The aria-label and the handler are
          the input's own, as they were. */
+      /* Keyed the same as the chip a split parent gets in this cell (below):
+         an un-split replaces that chip with this checkbox, and the reader who
+         pressed the chip lands on what took its place. */
       return el('label', { class: 'tbl-tick' }, el('input', { type: 'checkbox', 'aria-label': i18n.t('tx.aria.exclude', { desc: r.desc }),
+        'data-focus-key': `excl:${i}`,
         ...(r.excluded ? { checked: '' } : {}), onchange: e => { r.excluded = e.target.checked; mark(); } }));
     }
     const parts = splitPartsOf(item._file, r);
@@ -875,9 +953,9 @@ module.exports = function registerTransactions(ctx) {
        outline, and the palette is sealed — a new chip style would mean moving
        scripts/presets.cjs and src/styles.css together for an affordance that
        already exists. */
-    const b = el('button', { type: 'button', class: 'caveat-chip-btn',
+    const b = el('button', { type: 'button', class: 'caveat-chip-btn', 'data-focus-key': `excl:${i}`,
       'aria-label': i18n.t('tx.aria.splitChip', { desc: r.desc, date: r.date }) }, label);
-    b.addEventListener('click', () => unsplitTransaction(item));
+    b.addEventListener('click', () => unsplitTransaction(item, i));
     return b;
   }
 
@@ -905,7 +983,7 @@ module.exports = function registerTransactions(ctx) {
      something to slip into a wave about other strings. The row itself is the
      feedback here in a way it is not after a delete: the chip is replaced by an
      ordinary unticked checkbox, the parts are visibly gone, and Save lights up. */
-  async function unsplitTransaction(item) {
+  async function unsplitTransaction(item, i) {
     const r = item._row, f = item._file;
     const parts = splitPartsOf(f, r);
     const op = opWriterOf(ctx);
@@ -938,6 +1016,8 @@ module.exports = function registerTransactions(ctx) {
     f.dirty = true;
     $('#txSave').disabled = false;
     renderTransactions();
+    // The chip that was pressed is gone; the ordinary checkbox is in its cell.
+    refocus($('#txTable'), `excl:${i}`);
   }
 
   /* ------------------------------- deleting --------------------------------
@@ -970,13 +1050,13 @@ module.exports = function registerTransactions(ctx) {
          see supersededBySplit in tx-role.js, which requires BOTH columns. The
          way back is the one that module documents: untick Excluded on the
          original. */
-  function deleteButton(item) {
+  function deleteButton(item, i) {
     const r = item._row;
     const b = el('button', {
-      type: 'button', class: 'btn-ghost btn-ghost-sm',
+      type: 'button', class: 'btn-ghost btn-ghost-sm', 'data-focus-key': `del:${i}`,
       'aria-label': i18n.t('tx.aria.delete', { date: r.date, desc: r.desc }), title: i18n.t('tx.title.delete'),
     }, icoEl(['trash-2', 'trash']));
-    b.addEventListener('click', () => deleteTransaction(item));
+    b.addEventListener('click', () => deleteTransaction(item, i));
     return b;
   }
 
@@ -992,7 +1072,7 @@ module.exports = function registerTransactions(ctx) {
       && x.date === parent.date && x.desc === parent.desc);
   }
 
-  async function deleteTransaction(item) {
+  async function deleteTransaction(item, i) {
     const r = item._row, f = item._file;
     const role = splitRole(r.split);
     const parts = role === 'parent' ? splitPartsOf(f, r) : [];
@@ -1020,6 +1100,12 @@ module.exports = function registerTransactions(ctx) {
     f.dirty = true;
     $('#txSave').disabled = false;
     renderTransactions();
+    /* The row that moved up into this one's place, so deleting three in a row
+       is three presses of the same key. Else the row above (this was the last
+       one on screen), else "Show more", else the Add button — an emptied table
+       still leaves the reader somewhere. A split parent takes its parts with
+       it, and index i is then the row after them, which is the same answer. */
+    refocus($('#txTable'), [`del:${i}`, `del:${i - 1}`, 'more', $('#txAdd')]);
     toast(i18n.t('tx.deleted', { count: doomed.size }));
   }
 

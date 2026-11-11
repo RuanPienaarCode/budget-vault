@@ -1459,11 +1459,15 @@ module.exports = {
 
   /* --- Debt page: "Interest this month" says what it covers, because a debt
      with a blank rate is unknown rather than zero (the why is in en.js) --- */
+  'owed.repaid.chip': '{amount} terug',
   'debt.interest.noRates': 'voeg \'n koers by enige skuld om dit te sien',
   'debt.interest.partial': {
     one: 'dek {shown} van {total} skulde · {missing} sonder koers',
     other: 'dek {shown} van {total} skulde · {missing} sonder koers',
   },
+  'debt.curve.aria': 'Totaal verskuldig onder elke afbetalingsplan, {from} tot {to}, met {start} as beginpunt. {plans}',
+  'debt.curve.aria.cleared': '{plan}: afbetaal teen {month}.',
+  'debt.curve.aria.owed': '{plan}: {amount} steeds verskuldig in {month}.',
 
   /* --- report.* / nav.report / shell.tx.report — machine-assisted, added
      alongside the Report feature (views/report.js, src/report.js). --- */
