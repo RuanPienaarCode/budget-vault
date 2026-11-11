@@ -6,6 +6,46 @@ const { Modal, Setting } = require('obsidian');
 const { el } = require('./dom');
 const { normalizeAmount } = require('./amount');
 
+/* Does Enter, pressed with focus on `target`, mean "I am done with this form"?
+
+   Only where Enter has no meaning of its own. The handler this serves is on the
+   dialog's SCOPE, which Obsidian runs from a keydown listener on `window` in
+   the capture phase — before the focused control sees the key. It used to let
+   a <textarea> off and take the key from everything else, so:
+
+     - Enter on Cancel SAVED the form. The button's own activation never ran,
+       and the one control whose whole meaning is "do not do this" did it
+       (audit of 11 Nov 2026, task 14).
+     - Enter on a dropdown submitted, where Enter is how an open list is
+       committed on Windows and Linux.
+     - Enter on a toggle flipped it AND closed the dialog: Obsidian's toggle is
+       a <label class="checkbox-container" tabindex="0"> whose own keydown
+       turns Enter and Space into a flip (read out of app.js, same date).
+
+   The <textarea> exception is the original one and stays: Enter there is the
+   only way to start a new paragraph, and without it a note was saved holding
+   the one sentence typed so far.
+
+   The input types named below are the ones a value is not typed into. Listed
+   as the exceptions, not the rule, so a text-like type nobody thought of here
+   (search, tel, month) keeps submitting like the text field it is. Anything
+   that is not a control at all — the dialog's own padding, or no target —
+   submits as it always did, so a reader who clicked beside a field is not left
+   with a dead key. */
+const ENTER_OWN_TAGS = new Set(['TEXTAREA', 'BUTTON', 'SELECT', 'A', 'SUMMARY']);
+const ENTER_OWN_INPUTS = new Set(['checkbox', 'radio', 'button', 'submit', 'reset', 'file', 'range', 'color', 'image']);
+const ENTER_OWN_ROLES = new Set(['button', 'switch', 'checkbox', 'link', 'menuitem', 'option', 'tab']);
+function enterSubmits(target) {
+  if (!target || !target.tagName) return true;
+  if (ENTER_OWN_TAGS.has(target.tagName)) return false;
+  if (target.tagName === 'INPUT') return !ENTER_OWN_INPUTS.has(String(target.type || 'text').toLowerCase());
+  if (target.isContentEditable) return false;
+  if (typeof target.getAttribute === 'function' && ENTER_OWN_ROLES.has(target.getAttribute('role'))) return false;
+  // The toggle's tab stop is a <label>, which no tag or type test above names.
+  if (typeof target.closest === 'function' && target.closest('.checkbox-container')) return false;
+  return true;
+}
+
 class FieldModal extends Modal {
   constructor(app, title, fields, resolve) {
     super(app);
@@ -84,13 +124,15 @@ class FieldModal extends Modal {
     new Setting(this.contentEl)
       .addButton(b => b.setButtonText('Cancel').onClick(() => this.close()))
       .addButton(b => b.setButtonText('OK').setCta().onClick(() => this.submit()));
-    /* Enter submits — except inside a textarea, where it is the only way to
-       start a new paragraph. Without this guard adding the `textarea` field
-       type above would have silently made every multi-line field single-line:
-       the key never reaches the control, the modal closes, and the note is
-       saved holding the one sentence typed so far. */
+    /* Enter submits from a field you type a value into, and is left alone
+       everywhere it already means something (enterSubmits, above).
+
+       Returning without preventDefault is what hands the key back: Obsidian
+       runs this from a capture-phase listener on `window`, ahead of the
+       focused control, and only an explicit preventDefault (or a `false`
+       return) takes the key away from it. */
     this.scope.register([], 'Enter', evt => {
-      if (evt.target && evt.target.tagName === 'TEXTAREA') return;
+      if (!enterSubmits(evt.target)) return;
       evt.preventDefault();
       this.submit();
     });
