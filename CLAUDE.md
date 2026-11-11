@@ -66,7 +66,13 @@ more exotic than a household:
 ```
 npm run reconcile -- --obsidian-vault "<vault root>"   # writes a page, real data
 npm run reconcile:household                            # same, no private data
+npm run reconcile -- --household fx                    # same, exchange rates ON
 ```
+
+The third is `tests/figures/household-fx.cjs`: the first household with a fixed
+rate table, gated by `tests/reconcile-gate-fx.test.cjs`. It is the only fixture
+in which the converted Accounts hero exists, and it never reaches the network —
+the rates are a file in the fixture, and the gate fails if `requestUrl` is called.
 
 Never commit the output of the first: `tests/figures/live/` is gitignored
 because the page embeds real balances and rows.

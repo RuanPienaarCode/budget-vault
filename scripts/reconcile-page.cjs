@@ -3,6 +3,7 @@
 
      node scripts/reconcile-page.cjs --vault "<abs path to the budget folder>"
      node scripts/reconcile-page.cjs --obsidian-vault "<abs path to the vault root>"
+     node scripts/reconcile-page.cjs --household [fx]     # a committed synthetic household
      options: --today YYYY-MM-DD   --period YYYY-MM   --out <file.html>
 
    Why this exists. The recurring bug shape in this repo is "two figures
@@ -59,9 +60,17 @@ const flag = n => { const i = argv.indexOf(`--${n}`); return i < 0 ? null : (arg
    earmarked outflow), which is more of that per row than a real household
    carries. Expect it to reconcile differently, and read tests/reconcile-gate
    for what is currently unexplained. */
-function householdVault() {
-  const { SEED, B, TODAY, PERIOD } = require('../tests/figures/household.cjs');
-  return { files: { ...SEED }, budgetFolder: B, today: TODAY, period: PERIOD };
+function householdVault(which) {
+  /* `--household fx` is the mixed-currency variant (2026-11-11 audit, task 8):
+     the same household with exchange rates on and a fixed rate table, so the
+     converted Accounts hero can be read on the page this script writes. Any
+     other name is refused rather than falling back to the first household —
+     a page headed with the wrong fixture's name is worse than no page. */
+  const FIXTURES = { household: '../tests/figures/household.cjs', fx: '../tests/figures/household-fx.cjs' };
+  const name = which == null || which === true ? 'household' : String(which);
+  if (!FIXTURES[name]) throw new Error(`No committed household "${name}" — known: ${Object.keys(FIXTURES).join(', ')}`);
+  const { SEED, B, TODAY, PERIOD } = require(FIXTURES[name]);
+  return { files: { ...SEED }, budgetFolder: B, today: TODAY, period: PERIOD, source: FIXTURES[name].replace('../', '') };
 }
 
 function resolveBudgetFolder() {
@@ -92,7 +101,10 @@ async function reconcile({ files, budgetFolder, today, period: wantPeriod }) {
     const M = await mountFor(files, { budgetFolder });
     const period = String(wantPeriod || M.ctx.currentPeriod());
     M.S.period = period;
-    const G = globals(M.ctx, M.S, period, today);
+    /* The book's own rate cache, as TEXT: the fx oracle below reads it with its
+       own two patterns rather than through fx-fetch.js. Absent on every vault
+       that has never switched exchange rates on. */
+    const G = globals(M.ctx, M.S, period, today, files[`${budgetFolder}/${RATES_FILE}`]);
     M.restore();
     const pages = await harvestPages(files, { period, budgetFolder });
     return { G, pages, checks: runChecks(G, pages), matrix: presenceMatrix(G, pages), period, today };
@@ -134,8 +146,84 @@ function primitives(obj) {
 }
 const sortedPairs = m => Object.entries(m || {}).map(([k, v]) => ({ key: k, value: v })).sort((a, b) => a.value - b.value);
 
+/* ---- the fx oracle: this file's own conversion, no fx.js -----------------
+   2026-11-11 audit, task 8. The Accounts hero's "Converted total" is the one
+   place a converted figure reaches a screen, and fxConvert (fx-live.js) over
+   convertAccounts (fx.js) is the one rule that produces it. A third reading
+   that called either would be agreeing with itself, so this one is spelled
+   from the vault's own files and nothing in src/: the rate table is read out
+   of `Exchange Rates.md` as text, the currency of each account off its own
+   frontmatter fields, and the arithmetic is written here.
+
+   The RULES it restates are the ones fx.js documents, because an oracle has to
+   be an oracle OF something:
+
+     - conversion runs only when the setting is on, the household has a code,
+       and the table quotes that code;
+     - an account's currency is its `currency_code`, else the household's when
+       its symbol is the household's or blank, else unknown;
+     - each balance converts on its own and is rounded to the cent, the way a
+       statement would print it — NOT the sum converted once. With several
+       accounts in one currency the two differ by cents, and the app's rule is
+       the first;
+     - a balance with no code, with a code the table does not quote, or worth
+       less than half a cent of the household's currency is NAMED, never
+       counted;
+     - a table seven or more days old (or dated ahead of today) is stale.
+
+   `accounts` are live (implied) balances that could be read. Returns null when
+   conversion would not run. */
+const RATES_FILE = 'Exchange Rates.md';
+function fxOracle({ accounts, settings, ratesText, today }) {
+  const text = String(ratesText || '');
+  const cur = String(settings.currency || '').trim();
+  const homeCode = String(settings.currency_code || '').trim().toUpperCase();
+  const front = /^---\n([\s\S]*?)\n---/.exec(text);
+  const field = name => {
+    const m = front && new RegExp(`^${name}:[ \\t]*"?([^"\\n]*)"?[ \\t]*$`, 'm').exec(front[1]);
+    return m ? m[1].trim() : '';
+  };
+  const base = field('base').toUpperCase();
+  const date = field('date');
+  /* "One <base> buys this many <code>" — so <code> -> home is perBase[home] / perBase[code]. */
+  const perBase = {};
+  for (const line of text.split('\n')) {
+    const cells = line.trim().split('|').map(c => c.trim());
+    if (cells.length === 4 && /^[A-Za-z]{3}$/.test(cells[1]) && Number(cells[2]) > 0) perBase[cells[1].toUpperCase()] = Number(cells[2]);
+  }
+  if (base) perBase[base] = 1;
+  if (settings.exchange_rates !== true || !homeCode || !base || !/^\d{4}-\d{2}-\d{2}$/.test(date) || !(perBase[homeCode] > 0)) return null;
+
+  const round2 = v => Math.round(v * 100) / 100 || 0;
+  let home = 0;
+  const byCode = {};
+  const unconvertible = [];
+  for (const a of accounts) {
+    const bal = Number(a.balance) || 0;
+    const symbol = String(a.currency || '').trim();
+    const own = String(a.currency_code || '').trim().toUpperCase();
+    const code = own || (symbol && symbol !== cur ? '' : homeCode);
+    if (code === homeCode) { home += bal; continue; }
+    const inHome = code && perBase[code] > 0 ? round2(bal * perBase[homeCode] / perBase[code]) : null;
+    if (inHome === null || (inHome === 0 && Math.round(bal * 100) !== 0)) {
+      unconvertible.push({ name: a.name, symbol, amount: bal });
+      continue;
+    }
+    const at = byCode[code] || (byCode[code] = { code, amount: 0, inHome: 0 });
+    at.amount += bal; at.inHome += inHome;
+  }
+  const converted = Object.values(byCode).map(c => ({ code: c.code, amount: round2(c.amount), inHome: round2(c.inHome) }));
+  const day = iso => { const [y, m, d] = iso.split('-').map(Number); return Date.UTC(y, m - 1, d) / 86400000; };
+  const age = day(today) - day(date);
+  return {
+    home: round2(home), converted, unconvertible,
+    total: round2(home + converted.reduce((t, c) => t + c.inHome, 0)),
+    date, age, stale: !(age >= 0 && age < 7),
+  };
+}
+
 /* ---- the global totals ------------------------------------------------ */
-function globals(ctx, S, period, today) {
+function globals(ctx, S, period, today, ratesText) {
   const { worth } = require('../src/worth');
   const { isForeign, symbolOf } = require('../src/currency');
   const { accountType, isPoolAccount } = require('../src/vocabulary');
@@ -337,6 +425,23 @@ function globals(ctx, S, period, today) {
   });
   const driftSum = accounts.filter(a => !a.foreign && a.rec.state === 'drift').reduce((t, a) => t + (a.rec.delta || 0), 0);
 
+  /* The converted total, on two readings (the third is the page's own line).
+     The SEAM is fxConvert over the live book exactly as the Accounts hero
+     hands it over — bookFigures' implied accounts, home and foreign. The
+     ORACLE is fxOracle above, over this function's own list of live readable
+     accounts and the rate file's text. Both null on a vault with rates off,
+     which is every household but the mixed-currency one; the checks then assert
+     only that no converted line is drawn. */
+  const fxSeam = typeof ctx.fxConvert === 'function'
+    ? ctx.fxConvert([...book.balances.implied.accounts, ...book.balances.implied.foreignAccounts]) : null;
+  const fx = {
+    seam: fxSeam && {
+      total: fxSeam.total, home: fxSeam.home, converted: fxSeam.converted, date: fxSeam.date, age: fxSeam.age, stale: fxSeam.stale,
+      unconvertible: fxSeam.unconvertible.map(u => ({ name: u.account.name, symbol: u.symbol, amount: Number(u.account.balance) || 0 })),
+    },
+    oracle: fxOracle({ accounts: implied.filter(readable), settings: S.settings, ratesText, today }),
+  };
+
   /* Cash on hand, spelled as committed.js's cashOnHand() defines it (ADR-0007):
      the IMPLIED balance of every account that is in the budget, in the
      household's currency, and has a balance date — only when positive, pool
@@ -430,7 +535,7 @@ function globals(ctx, S, period, today) {
       byTypeLive: byType(liveHome), byOwnerLive: byOwner(implied.filter(readable), liveHome) },
     book: { drift: book.drift, stale: primitives(book.stale), overdrawn: book.overdrawn,
       unplaced: [...book.unplacedBy.entries()], confirmDay: [...book.confirmDayBy.entries()].map(([k, v]) => [k, v]) },
-    accounts, cash, txPage,
+    accounts, cash, txPage, fx,
     health: { metrics: primitives(health.metrics), breakdown: health.breakdown, target: health.target,
       debtInterest: health.debtInterest, earmarks: primitives(health.earmarks), empty: health.empty, debtsRecorded: health.debtsRecorded },
     assets: (S.assets || []).map(x => ({ name: x.name, type: x.type, value: x.value, valued: x.valued || x.valued_on || null, foreign: isForeign(x, cur) })),
@@ -1485,6 +1590,90 @@ function runChecks(G, pages) {
       pageValue: matched, pageSource: `${matched} of ${chips.length} chips matched${miss.length ? ` · unmatched: ${miss.join(', ')}` : ''}`, globalValue: chips.length, globalSource: 'chips on the page', tol: 0 });
   }
 
+  /* ---- accounts: the converted total ------------------------------------
+     Opt-in, so most households have neither reading; the page must then draw
+     no converted line at all, and that absence is the check. With rates on,
+     the line is checked three ways: against the seam, against the oracle, and
+     against the figures printed around it — the headline it sits under and
+     the holdings the sentence beneath says it is made of. */
+  {
+    const X = G.fx || { seam: null, oracle: null };
+    const convertedLine = /^acctSummary\/div\.card\[0\]\/div\.acct-hero-converted/;
+    const heroSub = C.figs(A, /^acctSummary\/div\.card\[0\]\/div\.hero-sub/);
+    const count = ({ name, formula, matched, of, missing, globalSource }) => C.add({ page: A, name, formula, kind: 'count', tol: 0,
+      pageValue: matched, pageSource: `${matched} of ${of} found${missing.length ? ` · missing: ${missing.join(', ')}` : ''}`,
+      globalValue: of, globalSource });
+    if (!X.seam && !X.oracle) {
+      const drawn = C.figs(A, convertedLine).length;
+      C.checks.push({ page: A, name: 'Hero: no converted total while exchange rates are off', formula: 'fxConvert() is null → the hero prints the un-converted split and no converted line',
+        kind: 'count', pageValue: drawn, pageSource: `${drawn} figure(s) on a converted line`, globalValue: 0, globalSource: 'fxConvert() = null; the oracle would not convert either',
+        status: drawn === 0 ? 'pass' : 'fail', delta: null, why: [], note: '' });
+    } else {
+      identity({ page: A, name: 'Oracle: conversion runs exactly when fxConvert does', formula: 'setting on, a household code, a table that quotes it', kind: 'count', tol: 0,
+        left: X.oracle ? 1 : 0, leftSource: 'this script, from Settings and the rate file', right: X.seam ? 1 : 0, rightSource: 'fxConvert() !== null' });
+    }
+    if (X.seam && X.oracle) {
+      const S_ = X.seam, O = X.oracle;
+      dom({ page: A, name: 'Hero: converted total', formula: 'fxConvert(live accounts).total', re: convertedLine, globalValue: S_.total, globalSource: 'fxConvert([...implied home, ...implied foreign]).total' });
+      identity({ page: A, name: 'Oracle converted total = fxConvert total', formula: 'Σ live home + Σ round(live foreign × rate), each balance to the cent',
+        left: O.total, leftSource: 'this script, from the rate file', right: S_.total, rightSource: 'fxConvert().total' });
+      identity({ page: A, name: 'Oracle: the home part of the converted total = the headline\'s live home total', formula: 'accounts whose currency is the household\'s, summed un-converted',
+        left: O.home, leftSource: 'this script: Σ live balances with the household\'s code', right: liveNet, rightSource: 'Σ live home balances' });
+      {
+        const headline = C.fig(A, /^acctSummary\/div\.card\[0\]\/div\.hero-num/), line = C.fig(A, convertedLine);
+        C.add({ page: A, name: 'Converted total = headline + Σ converted holdings (as printed)', formula: 'the line under the headline is the headline plus what each foreign holding converts to',
+          pageValue: headline ? figValue(headline) + O.converted.reduce((t, c) => t + c.inHome, 0) : null,
+          pageSource: `${headline ? headline.text : 'no headline'} + ${O.converted.map(c => `${c.code} ${c.amount} → ${c.inHome}`).join(' + ') || 'nothing converted'}`,
+          globalValue: figValue(line), globalSource: line ? `${line.address} = "${line.text}"` : 'no converted line', tol: figTol(line) });
+      }
+      {
+        const key = c => `${c.code}:${cents(c.amount)}:${cents(c.inHome)}`;
+        const seam = new Set(S_.converted.map(key));
+        const missing = O.converted.filter(c => !seam.has(key(c))).map(c => `${c.code} ${c.amount} → ${c.inHome}`);
+        count({ name: 'Oracle converted holdings = fxConvert\'s, currency by currency', formula: 'per code: Σ live balance, and Σ of each balance converted to the cent',
+          matched: O.converted.length - missing.length, of: Math.max(O.converted.length, S_.converted.length), missing, globalSource: 'fxConvert().converted' });
+      }
+      {
+        /* The sentence prints each holding as "<CODE> <amount>" in whole units
+           of ITS currency. The harvest reads a run such as "Aug 23, 10 days
+           old" as one number, so every figure's text is cut at ", " before it
+           is read — which is also how the age below is found. */
+        const printed = heroSub.flatMap(f => String(f.text).split(/,\s+/)).map(parseNum).filter(isNum);
+        /* A holding is matched only against figures that are NOT that
+           date-and-age run, or a holding of ten units would be "named" by a
+           table ten days old. */
+        const holdings = heroSub.filter(f => !/,\s/.test(String(f.text))).map(f => parseNum(f.text)).filter(isNum);
+        const missing = O.converted.filter(c => !holdings.some(v => near(v, c.amount, 0.51))).map(c => `${c.code} ${c.amount}`);
+        count({ name: 'Converted sentence names each holding in its own currency', formula: '"Plus USD 1 000 · EUR 400 — converted on the line above"',
+          matched: O.converted.length - missing.length, of: O.converted.length, missing, globalSource: 'this script: Σ live balance per currency code' });
+        if (O.stale) {
+          /* Pushed with its own verdict rather than through add(): add() reads
+             a missing figure as "unverified", and a stale table printed with no
+             age beside it is not unmeasurable — it is the defect. */
+          const said = printed.some(v => v === O.age);
+          C.checks.push({ page: A, name: 'Stale rates: the sentence says how many days old', formula: 'today − the rate table\'s date, printed once the table is 7 days old', kind: 'count',
+            pageValue: said ? O.age : null, pageSource: said ? `"${O.age}" in the hero sentence` : `NOT PRINTED — no ${O.age} in the hero sentence, and the table is stale`,
+            globalValue: O.age, globalSource: `this script: ${O.date} → ${G.meta.today}`, status: said ? 'pass' : 'fail', delta: null, why: [], note: '' });
+        }
+      }
+      {
+        const named = new Map();
+        for (const u of O.unconvertible) named.set(u.symbol, (named.get(u.symbol) || 0) + u.amount);
+        const money_ = heroSub.filter(f => f.kind === 'money');
+        const missing = [...named].filter(([sym, v]) => !money_.some(f => f.text.startsWith(sym) && near(figValue(f), v, figTol(f)))).map(([sym, v]) => `${sym} ${v}`);
+        count({ name: 'Unconvertible holdings are named beside the total, in their own currency', formula: 'no code, or no rate for it → "held in other currencies, not converted"',
+          matched: named.size - missing.length, of: named.size, missing, globalSource: 'this script: live balances with no convertible currency' });
+        identity({ page: A, name: 'Oracle unconvertible accounts = fxConvert\'s', formula: 'the accounts left OUT of the converted total', kind: 'count', tol: 0,
+          left: O.unconvertible.length, leftSource: O.unconvertible.map(u => u.name).sort().join(', ') || 'none',
+          right: S_.unconvertible.length, rightSource: S_.unconvertible.map(u => u.name).sort().join(', ') || 'none' });
+      }
+      identity({ page: A, name: 'Oracle rate age (days) = fxConvert age', formula: 'today − the rate table\'s date', kind: 'count', tol: 0,
+        left: O.age, leftSource: `${O.date} → ${G.meta.today}`, right: S_.age, rightSource: `fxConvert().age, table dated ${S_.date}` });
+      identity({ page: A, name: 'Oracle staleness = fxConvert stale', formula: '7 days or older, or dated ahead of today', kind: 'count', tol: 0,
+        left: O.stale ? 1 : 0, leftSource: `age ${O.age}`, right: S_.stale ? 1 : 0, rightSource: 'fxConvert().stale' });
+    }
+  }
+
   /* ---- assets / owed / services / debts ---------------------------------- */
   dom({ page: 'assets', name: 'Hero: total', formula: 'assetTotal(assets, household)', re: /assets-hero-num/, globalValue: W.implied.ownedAssets, globalSource: 'worth().ownedAssets' });
   dom({ page: 'owed', name: 'KPI: outstanding', formula: 'Σ outstandingOf(o) over unsettled home rows', re: /^owedKpis\/div\.mini\[0\]\/div\.v/, globalValue: W.implied.ownedOwed, globalSource: 'worth().ownedOwed' });
@@ -1610,6 +1799,18 @@ function rowsTable(rows, limit = 400) {
 }
 
 /* What each page reads, in words — the calculation beside the number. */
+/* The converted total's working, for the Accounts section of the page: what
+   the oracle read out of the rate file and what each holding came to. */
+function fxCalcs(G) {
+  const O = G.fx && G.fx.oracle;
+  if (!O) return [];
+  return [
+    ['Converted total', money(O.total), `home ${money(O.home)} + Σ converted holdings, rates for ${O.date} (${O.age} days old${O.stale ? ', stale' : ''})`],
+    ...O.converted.map(c => [`Converted: ${c.code}`, `${money(c.amount)} → ${money(c.inHome)}`, 'each live balance × rate, rounded to the cent, then summed']),
+    ...O.unconvertible.map(u => [`Not converted: ${u.name}`, `${esc(u.symbol)} ${money(u.amount)}`, 'no currency code, or no rate for it — named, never counted']),
+  ];
+}
+
 function pageCalcs(view, G) {
   const S = G.summary, U = G.used, B = G.budget, F = G.figures, W = G.worth, H = G.health.metrics;
   const period = [
@@ -1663,7 +1864,7 @@ function pageCalcs(view, G) {
       ['Excluded rows', String(G.oracle.whole.all.excluded), ''], ['Split parents / parts', `${G.oracle.whole.all.splitParents} / ${G.oracle.whole.all.splitParts}`, ''],
     ],
     savings: balance,
-    accounts: [...balance, ...Object.entries(W.byTypeStated).map(([t, v]) => [`Σ stated: ${t}`, money(v), 'by account type']), ...Object.entries(W.byOwnerStated).map(([o, v]) => [`Σ stated: owner ${o}`, money(v), 'by owner'])],
+    accounts: [...balance, ...fxCalcs(G), ...Object.entries(W.byTypeStated).map(([t, v]) => [`Σ stated: ${t}`, money(v), 'by account type']), ...Object.entries(W.byOwnerStated).map(([o, v]) => [`Σ stated: owner ${o}`, money(v), 'by owner'])],
     assets: [balance[4], ...G.assets.map(a => [a.name, money(a.value), `${a.type || ''}${a.foreign ? ' · foreign, held out' : ''}`])],
     owed: [balance[5], ['Total lent', money(G.owedTotals.lent), 'Σ amount'], ...G.owed.map(o => [o.who, `${money(o.amount)} → ${money(o.outstanding)} outstanding`, o.settled ? 'settled' : 'open'])],
     debts: [balance[6], ...G.debts.rows.map(d => [d.name, money(d.balance), `rate ${d.rate ?? '—'} · payment ${money(d.payment)}`])],
@@ -1872,9 +2073,13 @@ if (require.main === module) (async () => {
   /* --household runs over the committed fixture; everything else reads a real
      vault off disk. The fixture path writes its output beside the live one but
      under a different name, because only the live page holds real balances. */
-  const useHousehold = !!flag('household');
-  const H = useHousehold ? householdVault() : null;
-  const abs = useHousehold ? 'tests/figures/household.cjs (synthetic)' : resolveBudgetFolder();
+  /* `--household` alone, or followed by another option, is the first household;
+     `--household fx` names a variant. */
+  const named = flag('household');
+  const which = named && named !== true && !String(named).startsWith('--') ? String(named) : null;
+  const useHousehold = !!named;
+  const H = useHousehold ? householdVault(which) : null;
+  const abs = useHousehold ? `${H.source} (synthetic)` : resolveBudgetFolder();
   if (!useHousehold && !fs.existsSync(abs)) { console.error(`No such budget folder: ${abs}`); process.exit(1); }
   const budgetFolder = useHousehold ? H.budgetFolder : path.basename(abs);
   let files;
@@ -1884,7 +2089,8 @@ if (require.main === module) (async () => {
     for (const [k, v] of Object.entries(readVault(abs))) files[`${budgetFolder}/${k}`] = v;
   }
   const today = String(flag('today') || (useHousehold ? H.today : localToday()));
-  const defaultOut = useHousehold ? 'reconcile-household.html' : 'reconcile.html';
+  const defaultOut = !useHousehold ? 'reconcile.html'
+    : which ? `reconcile-household-${which}.html` : 'reconcile-household.html';
   const out = path.resolve(String(flag('out') || path.join(__dirname, '..', 'tests', 'figures', 'live', defaultOut)));
   const version = JSON.parse(fs.readFileSync(path.join(__dirname, '..', 'manifest.json'), 'utf8')).version;
 
@@ -1917,4 +2123,4 @@ if (require.main === module) (async () => {
    passing has not been shown to check anything. readVault is exported for
    tests/reconcile-reads-vault-tree.test.cjs, which reads a folder off disk the
    way --vault does. */
-module.exports = { reconcile, householdVault, runChecks, makeChecker, readVault };
+module.exports = { reconcile, householdVault, runChecks, makeChecker, readVault, fxOracle };
