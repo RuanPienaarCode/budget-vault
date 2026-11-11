@@ -19,6 +19,7 @@ const { reconcile } = require('./reconcile');
    mark returnPercentText prints with — see those two functions. Both pure. */
 const { sharePercentLabel } = require('./share-percents');
 const { decimalText } = require('./locale');
+const { isForeign } = require('./currency');
 
 /* ADR-0007 · poolCatType is built once and shared byte-for-byte. Passing
    ctx.catType instead reverts that one screen to the old rule (two call
@@ -370,6 +371,28 @@ function growthTotals(entries, typeOf, opts) {
   return { growth, rateGrowth, rateCapital, measured, unmeasured, negCapital, total: measured + unmeasured };
 }
 
+/* ADR-0007 · The growth tile pools one currency. Is this entry's account
+   stated in the household's own currency? The one test a pooled figure may
+   gate on; a conflicted account is foreign (currency.js isForeign). */
+const isHomeEntry = (e, currency) => !isForeign(e.account, currency);
+
+/* ADR-0007 · The growth tile pools one currency. The tile's three readings:
+   the totals over the home-currency entries, how many of those may be
+   overstated, and the entries left out — named by the tile, never dropped. */
+function growthTileFigures(entries, typeOf, opts) {
+  const { today, currency } = opts;
+  const home = entries.filter(e => isHomeEntry(e, currency));
+  const overstated = home.filter(e => {
+    const r = totalReturn(e.account, e.rows, typeOf, { today });
+    return chartable(e.account, r) && (r.trust === 'history-gap' || r.trust === 'no-records');
+  }).length;
+  return {
+    totals: growthTotals(home, typeOf, { today }),
+    overstated,
+    foreign: entries.filter(e => !isHomeEntry(e, currency)),
+  };
+}
+
 function growthSeries(entries, typeOf, opts) {
   /* Normalised the way totalReturn normalises it: the bands below are cut at
      this date, and must be cut where the capital sum was. */
@@ -634,4 +657,4 @@ function goalPercentLabel(balance, goal, decimalSep) {
   return label === '100' ? `99${decimalSep || '.'}99` : label;
 }
 
-module.exports = { splitFlows, savedFromOutside, accountFlows, totalReturn, growthTotals, growthSeries, classifyRow, chartable, poolCatType, growthRate, goalPercentLabel, returnPercentText };
+module.exports = { splitFlows, savedFromOutside, accountFlows, totalReturn, growthTotals, growthTileFigures, isHomeEntry, growthSeries, classifyRow, chartable, poolCatType, growthRate, goalPercentLabel, returnPercentText };

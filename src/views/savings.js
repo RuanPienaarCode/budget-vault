@@ -6,7 +6,7 @@ const { accountsOfType, accountType } = require('../vocabulary');
 const { themeColors, createChart, tip, pointReadout, parseColor, distinctColors, phoneLayout } = require('../chart');
 const { isStale, isStaleValuation, stalenessSummary } = require('../reconcile');
 const { todayIso } = require('../dates');
-const { accountFlows, totalReturn, growthTotals, growthSeries, chartable, poolCatType, growthRate,
+const { accountFlows, totalReturn, growthTileFigures, isHomeEntry, growthSeries, poolCatType, growthRate,
   goalPercentLabel, returnPercentText } = require('../savings-math');
 const { worth, cardOverlap, accountGroups, debtsByType, assetsByType,
   otherCurrencyNet } = require('../worth');
@@ -215,7 +215,7 @@ module.exports = function registerSavings(ctx) {
 
   /* Is this entry's account stated in the household's own currency? The one
      test the pooled figures on this page are allowed to gate on. */
-  const homeEntry = e => !split([e.account]).others.length;
+  const homeEntry = e => isHomeEntry(e, S.settings.currency);
 
   /* The household's own decimal mark: "+13.7%" beside a Budget page printing
      "100,2%" on the same household (audit L2a-N09). */
@@ -252,8 +252,9 @@ module.exports = function registerSavings(ctx) {
        account's own return divides its own figures and is currency-neutral by
        construction, which is why the cards below still show a rate for a
        foreign account even though this tile cannot include it. */
-    const foreignEntries = entries.filter(e => !homeEntry(e));
-    const g = growthTotals(entries.filter(homeEntry), poolType, { today: todayIso() });
+    /* savings-math.js growthTileFigures: the pool, the count of overstated
+       accounts further down, and the entries left out — pure, `today` handed in. */
+    const { totals: g, overstated, foreign: foreignEntries } = growthTileFigures(entries, poolType, { today: todayIso(), currency: S.settings.currency });
     if (!g.total && !foreignEntries.length) return;
     if (!g.measured) {
       /* Names the field AND where to set it — "no account records what it
@@ -274,9 +275,6 @@ module.exports = function registerSavings(ctx) {
        warnings: on the vault this was found on, two of the ten accounts behind
        it said "growth may be overstated" and the tile said nothing (audit
        L2a-N06). Counted over the same set growthTotals counts. */
-    const overstated = entries.filter(homeEntry)
-      .filter(e => { const r = ret(e); return chartable(e.account, r) && (r.trust === 'history-gap' || r.trust === 'no-records'); })
-      .length;
     const sub = [
       growthRate(g) !== null ? `${pct(growthRate(g))} on ${money(g.rateCapital, 0)} put in` : null,
       overstated ? `${overstated} of ${g.measured} may be overstated — records start late` : null,

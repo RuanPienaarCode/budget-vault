@@ -34,6 +34,22 @@ const { fileOutsideWindow } = require('./misfiled');
    hold an unreadable balance out on this one test. */
 const balanceReadable = a => !(a.balanceRaw != null && normalizeAmount(a.balanceRaw) === null);
 
+/* The figure the Accounts page leads with (GitHub discussion #124, 2 Oct
+   2026): what the transactions say, exactly as impliedAccounts() rolls it for
+   every other page — the implied balance when the account has drifted from
+   its stated one, the stated balance otherwise. `rec` is the account's
+   reconcile() verdict. An unreadable balance is handed back as it is: rolling
+   a fabricated zero forward would print a number nobody ever had.
+
+   Here, beside balanceReadable and the balance book it has to agree with,
+   since the 2026-11-11 audit (task 23); it sat in views/accounts.js, where no
+   bare-node guard could hold it to that. The page's own comment on why it
+   leads with this figure stays with the page. */
+function liveBalance(a, rec) {
+  if (!balanceReadable(a)) return a.balance;
+  return rec && rec.state === 'drift' ? rec.implied : a.balance;
+}
+
 /* The same rule for a row's AMOUNT cell (2026-10-14 audit, L8-02). The loader
    reads a cell it cannot parse as 0 and keeps the reader's own text in
    `amountRaw` — for budget rows and transaction rows alike — so that the next
@@ -465,6 +481,7 @@ module.exports = function registerFigures(ctx) {
   ctx.provide({ categoryActualsInRange, budgetVsActualRows, categorySpendRows, categoryGap, planFigures, periodFigures, bookFigures });
 };
 module.exports.balanceReadable = balanceReadable;
+module.exports.liveBalance = liveBalance;
 module.exports.amountUnreadable = amountUnreadable;
 module.exports.remainderDecimals = remainderDecimals;
 module.exports.printedRemainder = printedRemainder;
