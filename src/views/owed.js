@@ -1,6 +1,7 @@
 'use strict';
 /* Owed Money — who owes the household what, saved to Owed Money.md. */
 
+const { opWriterOf } = require('../io');
 const { el, kpiTiles, dateInput, keepScroll, icoEl, tableCells } = require('../dom');
 const { normalizeAmount } = require('../amount');
 const { SCHEMAS, mdTableFile } = require('../table-schema');
@@ -207,11 +208,13 @@ module.exports = function registerOwed(ctx) {
      missing one, and not one the reader would ever spot. */
   async function recordRepayment(o) {
     const left = outstandingOf(o);
+    const op = opWriterOf(ctx);   // the state this dialog was opened over (io.js opWriter)
     const r = await askFields(app, `Repayment from ${o.person}`, [
       { key: 'amount', label: 'Amount that came back', type: 'number', value: left ? left.toFixed(2) : '',
         desc: `${oMoney(o, o.amount)} lent · ${oMoney(o, o.repaid || 0)} back so far.` },
     ]);
     if (!r) return;
+    if (op.replaced()) return toast(op.replaced(), true);
     const amount = normalizeAmount(r.amount);
     if (amount === null || amount <= 0) return toast('Not a number', true);
     o.repaid = (o.repaid || 0) + amount; o.repaidRaw = null;
@@ -261,6 +264,7 @@ module.exports = function registerOwed(ctx) {
   }
 
   async function addOwed() {
+    const op = opWriterOf(ctx);   // the state this dialog was opened over (io.js opWriter)
     const r = await askFields(app, 'New owed entry', [
       /* One direction only, because that is all this page can count:
          owedSummary() treats every entry as a receivable and worth.js adds
@@ -281,6 +285,7 @@ module.exports = function registerOwed(ctx) {
         desc: 'Leave blank if it is in your own currency. Set it if this one is not — the figure is then shown in its own currency and stated separately rather than added into your totals.' },
     ]);
     if (!r || !r.person.trim()) return;
+    if (op.replaced()) return toast(op.replaced(), true);
     const amount = normalizeAmount(r.amount);
     if (amount === null) return toast('Not a number', true);
     // Kept as typed, the same as the in-table Amount field — see the comment

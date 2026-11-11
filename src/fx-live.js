@@ -22,6 +22,7 @@
 
 const fx = require('./fx');
 const { fetchRates, readCache } = require('./fx-fetch');
+const { opWriterOf } = require('./io');
 const { todayIso } = require('./dates');
 
 module.exports = function registerFxLive(ctx) {
@@ -100,7 +101,12 @@ module.exports = function registerFxLive(ctx) {
       const now = Date.now();
       if (fx.refreshDue(table, todayIso(), cadence())
         && fx.requestAllowed({ lastSuccessAt, lastFailureAt, failures }, now, cadence())) {
-        const fetched = await fetchRates(ctx, household().code);
+        /* The table is fetched for THIS book's currency code and written into
+           its Exchange Rates.md after a network round trip — bound to the load
+           it was asked under (io.js opWriter), so a book switched in the
+           meantime does not get this book's table written over its own. A
+           refused write is swallowed by fetchRates like any other. */
+        const fetched = await fetchRates(opWriterOf(ctx), household().code);
         if (fetched) {
           table = fetched;
           lastSuccessAt = now; lastFailureAt = null; failures = 0;

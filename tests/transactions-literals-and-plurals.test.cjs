@@ -204,7 +204,12 @@ const clear = () => { seen.fields.length = 0; seen.confirms.length = 0; };
       clear(); answer.confirm = true;
       await ctx.deleteFilteredTransactions();
       const msg = lastToast(ctx);
-      eq(msg, i.t('tx.bulk.failedNone', { error: 'EBUSY' }), `${lang}: nothing written has its own sentence`);
+      /* The delete log was written before the month that failed, so the
+         sentence is followed by the one saying the log lists rows that are
+         still in place (tx.bulk.logKept, the 2026-11 re-review). */
+      const none = i.t('tx.bulk.failedNone', { error: 'EBUSY' });
+      eq(msg, none + (/[.!?。]$/.test(none) ? ' ' : '. ') + i.t('tx.bulk.logKept', { path: 'Data/Deleted transactions.csv' }),
+        `${lang}: nothing written has its own sentence, then says the delete log lists the rows anyway`);
       ok(/EBUSY/.test(msg), `${lang}: it still carries the error`);
       ok(msg !== i.t('tx.bulk.failed', { count: 0, error: 'EBUSY' }) || lang === 'en' || lang === 'af', `${lang}: and is not the plural entry that 0 maps onto`);
       ok(!/\b1\b/.test(msg), `${lang}: no hard-coded "1" in a sentence about zero files: ${msg}`);
@@ -223,7 +228,9 @@ const clear = () => { seen.fields.length = 0; seen.confirms.length = 0; };
       };
       clear(); answer.confirm = true;
       await ctx.deleteFilteredTransactions();
-      eq(lastToast(ctx), I().t('tx.bulk.failed', { count: 1, error: 'EBUSY' }), 'control: one file written before the failure keeps the counted sentence');
+      const one = I().t('tx.bulk.failed', { count: 1, error: 'EBUSY' });
+      eq(lastToast(ctx), one + (/[.!?。]$/.test(one) ? ' ' : '. ') + I().t('tx.bulk.logKept', { path: 'Data/Deleted transactions.csv' }),
+        'control: one file written before the failure keeps the counted sentence');
     }
 
     /* ---- L8-08: many rows, ONE file -> "from 1 file" ------------------------- */

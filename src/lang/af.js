@@ -1648,6 +1648,8 @@ module.exports = {
   'io.stale.notice': "Begroting: {file} is buite hierdie bladsy verander (ander toestel of die markdown-aansig) nadat dit gelaai is, so jou stoor is nie geskryf nie. Die bladsy het weer gelaai wat nou op skyf is — maak asseblief die wysiging weer.",
   'io.bookChanged.message': "’n Ander boek is op hierdie toestel oopgemaak nadat hierdie bladsy gelees is, so {file} is nie geskryf nie — dit sou in die verkeerde boek beland het. Maak die wysiging weer in die boek wat nou op die skerm is",
   'io.reloaded.message': "Begroting: die begroting is weer gelees terwyl dit op jou antwoord gewag het (’n ander boek is oopgemaak, of sy lêers het verander), so niks is verander nie. Kyk weer na die bladsy en herhaal dit as dit steeds is wat jy wil hê.",
+  'io.reloadedWrite.message': "Die begroting is weer gelees nadat dit begin het (sy lêers het verander, of ’n ander boek is oopgemaak), so {file} is nie geskryf nie",
+  'tx.bulk.logKept': "{path} lys reeds hierdie rye, al is dié wat nog in hul lêers is nie geskrap nie.",
   'load.unreadable.head': "Sommige lêers kon nie gelees word nie: {list}.",
   'load.unreadable.item': "{file} ({why})",
   'load.unreadable.why.missing': "ontbreek",

@@ -6,6 +6,7 @@
    profile in locale.js (Settings.md `country`, default South Africa / SARS).
    Edit seeded sources to match your own banks, providers and income. */
 
+const { opWriterOf } = require('../io');
 const { el, kpiTiles, dateInput, keepScroll, icoEl, tableCells } = require('../dom');
 const { normalizeAmount } = require('../amount');
 const { escMd, patchFrontmatter, yamlStr, freshLeadLines, withLeadExtra } = require('../markdown');
@@ -464,12 +465,14 @@ module.exports = function registerTax(ctx) {
             'aria-label': `Remove document ${d.name}`,
             onclick: async () => {
               const kept = fileList(d);
+              const op = opWriterOf(ctx);   // the state this dialog was opened over (io.js opWriter)
               const go = !kept.length || await confirmModal(app, {
                 title: 'Remove document row',
                 message: `Remove "${d.name}" from the list? ${kept.length === 1 ? `The uploaded file ${kept[0]} stays` : `The ${kept.length} uploaded files stay`} in Tax/${S.taxYear}/ — delete them from the vault yourself if you want them gone.`,
                 confirmText: 'Remove row',
               });
               if (!go) return;
+              if (op.replaced()) return toast(op.replaced(), true);
               t.docs.splice(t.docs.indexOf(d), 1); mark(); renderDocs(t); renderTaxKpis(t);
             } }, '✕'))));
       }
@@ -508,6 +511,12 @@ module.exports = function registerTax(ctx) {
     let target = pendingDocTarget && t.docs.includes(pendingDocTarget) ? pendingDocTarget : null;
     pendingDocTarget = null;
     let created = false;   // did THIS call push a new row? (rolled back on write failure)
+    /* `t` and the year are this load's, and this function awaits the file, a
+       hash of every filed document and up to three dialogs before it writes:
+       the binary write is bound to the load (io.js opWriter), and asked again
+       after each dialog, so a switch in the middle cannot file one book's
+       certificate into another book's Tax/ folder. */
+    const op = opWriterOf(ctx);
 
     const buf = await file.arrayBuffer();
 
@@ -520,6 +529,7 @@ module.exports = function registerTax(ctx) {
         message: `"${file.name}" is byte-identical to ${dupe}, already stored in Tax/${S.taxYear}/. Point the row at the existing file instead of saving a second copy?`,
         confirmText: 'Use the existing file',
       });
+      if (op.replaced()) return toast(op.replaced(), true);
       if (reuse) return attachExisting(t, dupe);
     }
 
@@ -536,12 +546,14 @@ module.exports = function registerTax(ctx) {
           options: [...options, { value: NEW, label: NEW }], value: options.length ? '0' : NEW },
       ]);
       if (!r) return;
+      if (op.replaced()) return toast(op.replaced(), true);
       if (r.to === NEW) {
         const n = await askFields(app, 'New document', [
           { key: 'name', label: 'Document name', type: 'text', value: file.name.replace(/\.[^.]+$/, '') },
           { key: 'source', label: 'Source', type: 'text' },
         ]);
         if (!n || !n.name.trim()) return;
+        if (op.replaced()) return toast(op.replaced(), true);
         target = { name: n.name.trim(), source: (n.source || '').trim(), status: 'needed', file: '', notes: '' };
         t.docs.push(target);
         created = true;
@@ -563,12 +575,18 @@ module.exports = function registerTax(ctx) {
       name = `${stem} (${i})${ext}`;
     }
     try {
-      await writeBinary(`Tax/${S.taxYear}/${name}`, buf);
+      await op.writeBinary(`Tax/${S.taxYear}/${name}`, buf);
     } catch (e) {
       // A row created a moment ago for this upload has nothing behind it now —
       // leaving it would show an empty "Needed" row that no save was told about.
       if (created) t.docs.splice(t.docs.indexOf(target), 1);
       return toast(e.message || String(e), true);
+    }
+    /* Landed, in this book's folder. A reload that committed while it was
+       writing makes `t` another load's: the file is said, and nothing of the
+       state that won is touched or saved. */
+    if (op.replaced()) {
+      return toast(`${name} was saved, but the budget was read again while it was writing (another book opened, or its files changed), so no document row was linked to it. Open that book's Tax page to attach it.`, true);
     }
     setFileList(target, [...fileList(target), name]);
     target.status = 'uploaded';
@@ -618,11 +636,13 @@ module.exports = function registerTax(ctx) {
   async function attachExisting(t, name) {
     const NEW = '＋ New document row';
     const options = t.docs.map((d, i) => ({ value: String(i), label: `${d.name} — ${d.source}` }));
+    const op = opWriterOf(ctx);   // the state this dialog was opened over (io.js opWriter)
     const r = await askFields(app, `Point a row at "${name}"`, [
       { key: 'to', label: 'Attach to', type: 'select',
         options: [...options, { value: NEW, label: NEW }], value: options.length ? '0' : NEW },
     ]);
     if (!r) return;
+    if (op.replaced()) return toast(op.replaced(), true);
     let target;
     if (r.to === NEW) {
       const n = await askFields(app, 'New document', [
@@ -630,6 +650,7 @@ module.exports = function registerTax(ctx) {
         { key: 'source', label: 'Source', type: 'text' },
       ]);
       if (!n || !n.name.trim()) return;
+      if (op.replaced()) return toast(op.replaced(), true);
       target = { name: n.name.trim(), source: (n.source || '').trim(), status: 'needed', file: '', notes: '' };
       t.docs.push(target);
     } else {
@@ -788,27 +809,32 @@ module.exports = function registerTax(ctx) {
 
   /* ------------------------------ actions -------------------------------- */
   async function addTaxStep() {
+    const op = opWriterOf(ctx);   // the state this dialog was opened over (io.js opWriter)
     const r = await askFields(app, 'New step', [
       { key: 'step', label: 'Step', type: 'text' },
       { key: 'due', label: 'Due (optional)', type: 'text', placeholder: 'YYYY-MM-DD' },
     ]);
     if (!r || !r.step.trim()) return;
+    if (op.replaced()) return toast(op.replaced(), true);
     T().steps.push({ step: r.step.trim(), status: 'todo', due: (r.due || '').trim(), notes: '' });
     mark(); renderTax();
   }
 
   async function addTaxDoc() {
+    const op = opWriterOf(ctx);   // the state this dialog was opened over (io.js opWriter)
     const r = await askFields(app, 'New document', [
       { key: 'name', label: 'Document name', type: 'text' },
       { key: 'source', label: 'Source (who issues it)', type: 'text' },
     ]);
     if (!r || !r.name.trim()) return;
+    if (op.replaced()) return toast(op.replaced(), true);
     T().docs.push({ name: r.name.trim(), source: (r.source || '').trim(), status: 'needed', file: '', notes: '' });
     mark(); renderTax();
   }
 
   async function addTaxFigure() {
     if (!S.taxYear) return;
+    const op = opWriterOf(ctx);   // the state this dialog was opened over (io.js opWriter)
     const r = await askFields(app, 'New figure', [
       { key: 'code', label: locale().figureCodeLabel, type: 'text' },
       { key: 'description', label: 'Description', type: 'text' },
@@ -816,6 +842,7 @@ module.exports = function registerTax(ctx) {
       { key: 'amount', label: 'Amount', type: 'text', placeholder: '0.00' },
     ]);
     if (!r || !r.code.trim()) return;
+    if (op.replaced()) return toast(op.replaced(), true);
     /* Same reader as the table cell and the loader. Left blank, the figure is
        still added, to be filled in from the table — the field is optional and
        a blank TEXT field is what the reader left. Text with no number in it
@@ -860,10 +887,12 @@ module.exports = function registerTax(ctx) {
   async function newTaxYear() {
     const years = Object.keys(S.tax).map(Number);
     const suggested = years.length ? Math.max(...years) + 1 : currentTaxYear();
+    const op = opWriterOf(ctx);   // the state this dialog was opened over (io.js opWriter)
     const r = await askFields(app, 'New tax year', [
       { key: 'year', label: locale().yearHint, type: 'number', value: String(suggested) },
     ]);
     if (!r) return;
+    if (op.replaced()) return toast(op.replaced(), true);
     const year = parseInt(r.year, 10);
     if (!year || year < 2000 || year > 2100) return toast('Not a valid year', true);
     if (S.tax[String(year)]) return changeTaxYear(String(year));
@@ -900,6 +929,7 @@ module.exports = function registerTax(ctx) {
     const folder = ctx.folderAt(`Tax/${year}`);
     const docs = (t.docs || []).length;
     const steps = (t.steps || []).length;
+    const op = opWriterOf(ctx);   // the state this dialog was opened over (io.js opWriter)
     const go = await confirmModal(app, {
       title: `Delete tax year ${year}`,
       message: (file
@@ -914,9 +944,10 @@ module.exports = function registerTax(ctx) {
       confirmText: 'Delete year',
     });
     if (!go) return;
+    if (op.replaced()) return toast(op.replaced(), true);
     if (file) {
       try {
-        await ctx.trashFile(file);
+        await op.trashFile(file);
       } catch (e) {
         return toast(`Could not delete that tax year: ${(e && e.message) || e}`, true);
       }

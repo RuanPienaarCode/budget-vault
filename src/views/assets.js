@@ -12,6 +12,7 @@
    shown on every row and summarised above the table, because a net worth
    dominated by one number somebody typed four years ago should say so. */
 
+const { opWriterOf } = require('../io');
 const { el, dateInput, keepScroll, icoEl, tableCells } = require('../dom');
 const { normalizeAmount } = require('../amount');
 const { SCHEMAS, mdTableFile } = require('../table-schema');
@@ -429,6 +430,7 @@ module.exports = function registerAssets(ctx) {
   }
 
   async function addAsset() {
+    const op = opWriterOf(ctx);   // the state this dialog was opened over (io.js opWriter)
     const r = await askFields(app, 'New asset', [
       { key: 'name', label: 'What is it?', type: 'text', placeholder: 'e.g. The house' },
       { key: 'type', label: 'Kind', type: 'select', value: 'property',
@@ -448,6 +450,7 @@ module.exports = function registerAssets(ctx) {
         desc: `Leave blank if it is in ${S.settings.currency || 'your own currency'}. Set it for something held abroad — the value is then shown in that currency and left out of totals rather than added to them.` },
     ]);
     if (!r || !r.name.trim()) return;
+    if (op.replaced()) return toast(op.replaced(), true);
     const value = normalizeAmount(r.value);
     if (value === null) return toast('Value must be a number', true);
     /* Deliberately not unique — "Car" once per car is the normal case. Nothing

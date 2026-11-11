@@ -28,6 +28,7 @@
    is the one piece of honesty this page owes: a plan that lets you allocate an
    unpaid refund into a purchase you make today is a plan that overdraws you. */
 
+const { opWriterOf } = require('../io');
 const { el, keepScroll, icoEl } = require('../dom');
 const { normalizeAmount } = require('../amount');
 const { escMd, patchFrontmatter, yamlStr, freshLeadLines, withLeadExtra } = require('../markdown');
@@ -365,6 +366,7 @@ module.exports = function registerPlan(ctx) {
      date — "the money arrives early or late", per addSource()'s note — and
      silently recomputing it here would take that back. */
   async function editSource(p, s) {
+    const op = opWriterOf(ctx);   // the state this dialog was opened over (io.js opWriter)
     const r = await askFields(app, s.name, [
       { key: 'name', label: i18n.t('plan.source.fieldName'), type: 'text', value: s.name },
       { key: 'kind', label: i18n.t('plan.source.fieldKind'), type: 'select', value: s.kind || 'Other',
@@ -382,6 +384,7 @@ module.exports = function registerPlan(ctx) {
         options: [{ value: 'yes', label: i18n.t('plan.source.fieldRemoveYes') }] },
     ]);
     if (!r) return;
+    if (op.replaced()) return toast(op.replaced(), true);
     if ((r.remove || []).includes('yes')) return removeSource(p, s);
     const amount = normalizeAmount(r.amount);
     if (amount === null) return toast('Not a number', true);
@@ -794,6 +797,7 @@ module.exports = function registerPlan(ctx) {
 
   async function addSource(p = P()) {
     if (!p) return;
+    const op = opWriterOf(ctx);   // the state this dialog was opened over (io.js opWriter)
     const r = await askFields(app, 'New source', [
       { key: 'name', label: 'What is it?', type: 'text', placeholder: 'UIF maternity payout' },
       { key: 'kind', label: 'Kind', type: 'select', options: SOURCE_KINDS, value: 'Other',
@@ -803,6 +807,7 @@ module.exports = function registerPlan(ctx) {
         desc: 'A date in the future counts toward the plan, but not toward what you can spend today.' },
     ]);
     if (!r || !r.name.trim()) return;
+    if (op.replaced()) return toast(op.replaced(), true);
     const amount = normalizeAmount(r.amount);
     if (amount === null) return toast('Not a number', true);
     /* Status is concluded from the date, not asked for separately: two ways to
@@ -817,6 +822,7 @@ module.exports = function registerPlan(ctx) {
 
   async function addEnvelope(p = P(), suggested = 0) {
     if (!p) return;
+    const op = opWriterOf(ctx);   // the state this dialog was opened over (io.js opWriter)
     const r = await askFields(app, 'New spending bucket', [
       { key: 'name', label: 'What is this money for?', type: 'text', placeholder: 'For the baby' },
       { key: 'amount', label: 'How much goes in it?', type: 'number',
@@ -824,6 +830,7 @@ module.exports = function registerPlan(ctx) {
       { key: 'note', label: 'Note (optional)', type: 'text' },
     ]);
     if (!r || !r.name.trim()) return;
+    if (op.replaced()) return toast(op.replaced(), true);
     const name = r.name.trim();
     if (p.envelopes.some(e => e.name === name)) return toast('That spending bucket already exists', true);
     const amount = normalizeAmount(r.amount);
@@ -836,11 +843,13 @@ module.exports = function registerPlan(ctx) {
   }
 
   async function renameEnvelope(p, env) {
+    const op = opWriterOf(ctx);   // the state this dialog was opened over (io.js opWriter)
     const r = await askFields(app, 'Rename spending bucket', [
       { key: 'name', label: 'Name', type: 'text', value: env.name },
       { key: 'note', label: 'Note', type: 'text', value: env.note || '' },
     ]);
     if (!r || !r.name.trim()) return;
+    if (op.replaced()) return toast(op.replaced(), true);
     const name = r.name.trim();
     if (name !== env.name) {
       if (p.envelopes.some(e => e.name === name)) return toast('That spending bucket already exists', true);
@@ -860,10 +869,12 @@ module.exports = function registerPlan(ctx) {
   }
 
   async function editEnvelopeAmount(env) {
+    const op = opWriterOf(ctx);   // the state this dialog was opened over (io.js opWriter)
     const r = await askFields(app, env.name, [
       { key: 'amount', label: 'Amount in this spending bucket', type: 'number', value: env.amount.toFixed(2) },
     ]);
     if (!r) return;
+    if (op.replaced()) return toast(op.replaced(), true);
     const amount = normalizeAmount(r.amount);
     if (amount === null) return toast('Not a number', true);
     env.amount = amount;
@@ -875,6 +886,7 @@ module.exports = function registerPlan(ctx) {
     /* "no longer spoken for": the key's own words for where a bucket's money
        goes when the bucket does — it said "back to unplaced", a word on no
        part of the page (2026-10-20 audit, D2-14). */
+    const op = opWriterOf(ctx);   // the state this dialog was opened over (io.js opWriter)
     const ok = await confirmModal(app, {
       title: `Remove ${env.name}?`,
       message: items.length
@@ -883,12 +895,14 @@ module.exports = function registerPlan(ctx) {
       confirmText: 'Remove',
     });
     if (!ok) return;
+    if (op.replaced()) return toast(op.replaced(), true);
     p.items = p.items.filter(i => i.envelope !== env.name);
     p.envelopes.splice(p.envelopes.indexOf(env), 1);
     mark(); renderPlan();
   }
 
   async function addItem(p, envelope) {
+    const op = opWriterOf(ctx);   // the state this dialog was opened over (io.js opWriter)
     const r = await askFields(app, `New item in ${envelope}`, [
       { key: 'name', label: 'What is it?', type: 'text', placeholder: 'Pram & car seat' },
       { key: 'amount', label: 'What do you expect it to cost?', type: 'number', value: '0' },
@@ -896,6 +910,7 @@ module.exports = function registerPlan(ctx) {
         desc: 'Used when this lands as a real transaction.' },
     ]);
     if (!r || !r.name.trim()) return;
+    if (op.replaced()) return toast(op.replaced(), true);
     const amount = normalizeAmount(r.amount);
     if (amount === null) return toast('Not a number', true);
     p.items.push({ name: r.name.trim(), envelope, amount, spent: 0,
@@ -904,6 +919,7 @@ module.exports = function registerPlan(ctx) {
   }
 
   async function editItem(p, item) {
+    const op = opWriterOf(ctx);   // the state this dialog was opened over (io.js opWriter)
     const r = await askFields(app, item.name, [
       { key: 'name', label: 'Item', type: 'text', value: item.name },
       { key: 'amount', label: 'Planned', type: 'number', value: item.amount.toFixed(2) },
@@ -919,6 +935,7 @@ module.exports = function registerPlan(ctx) {
         options: [{ value: 'yes', label: 'Remove it' }] },
     ]);
     if (!r) return;
+    if (op.replaced()) return toast(op.replaced(), true);
     if ((r.remove || []).includes('yes')) {
       p.items.splice(p.items.indexOf(item), 1);
       mark(); return renderPlan();
@@ -958,12 +975,14 @@ module.exports = function registerPlan(ctx) {
     /* Before the dialog, not after it: asking for a name and then refusing to
        use it would make the reader type it twice. */
     if (refuseWhileDirty()) return;
+    const op = opWriterOf(ctx);   // the state this dialog was opened over (io.js opWriter)
     const r = await askFields(app, 'New plan', [
       { key: 'name', label: 'What is this money for?', type: 'text',
         placeholder: 'Baby & catch-up',
         desc: 'Becomes the filename: Plans/<name>.md' },
     ]);
     if (!r || !r.name.trim()) return;
+    if (op.replaced()) return toast(op.replaced(), true);
     const name = r.name.trim();
     const key = safeSeg(name);
     if (!key) return toast('That name has nothing a filename can keep', true);
@@ -1003,6 +1022,7 @@ module.exports = function registerPlan(ctx) {
     // ISSUE 97 — the path this plan was READ from, not one assembled from its key.
     const file = fileAt((p && p.rel) || `Plans/${key}.md`);
     const n = (arr, word) => `${arr.length} ${word}${arr.length === 1 ? '' : 's'}`;
+    const op = opWriterOf(ctx);   // the state this dialog was opened over (io.js opWriter)
     const go = await confirmModal(app, {
       title: 'Delete plan',
       message: (file
@@ -1014,9 +1034,10 @@ module.exports = function registerPlan(ctx) {
       confirmText: 'Delete plan',
     });
     if (!go) return;
+    if (op.replaced()) return toast(op.replaced(), true);
     if (file) {
       try {
-        await ctx.trashFile(file);
+        await op.trashFile(file);
       } catch (e) {
         return toast(`Could not delete that plan: ${(e && e.message) || e}`, true);
       }

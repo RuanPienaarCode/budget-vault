@@ -13,13 +13,20 @@
    removed) were written over B's month file of the same account and month,
    and the bulk delete appended A's rows to B's delete log.
 
-   Two windows, both pinned through the REAL views over the REAL loader:
+   Two windows, both pinned through the REAL views over the REAL loader. In
+   both, the view's own check after the dialog (io.js opWriter().replaced(),
+   on the load stamp it took before opening it) is what refuses — before any
+   write is attempted:
 
-     (a) switched, reload not landed yet — io.js's write guard (the state in
-         memory was read from another folder than the open one) refuses;
-     (b) switched AND reloaded during the dialog — the state the operation
-         gathered is gone; it is told so by the load stamp it took before the
-         dialog, and refuses before it writes anything.
+     (a) switched, reload not landed yet — the stamp's folder is no longer the
+         open book's. io.js's folder guard would refuse the write too, but it
+         is never reached; it is the backstop for a writer with no stamp;
+     (b) switched AND reloaded during the dialog — the load the stamp names is
+         no longer the one in memory. The folder guard cannot see this case at
+         all (the two folders agree again), which is why the stamp exists.
+
+   A reload committing BETWEEN two writes after the dialog is
+   tests/books-midloop-switch.test.cjs.
 
    In both, every file of BOTH books is byte-identical afterwards and the
    reader is told why. NEGATIVE CONTROL: the identical operation with no

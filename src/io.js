@@ -339,17 +339,115 @@ function makeIo(deps, { view = false } = {}) {
      inside assertFresh's wait must not slip through on the first answer.
      `path`, when given, must also still sit inside the loaded folder: it was
      resolved before the wait. */
-  function assertSameBook(rel, path) {
+  function assertSameBook(rel, path, stamp) {
+    assertStamp(rel, stamp);
     const folder = loadedFolder();
     if (folder === null) return;
     const base = basePath();
     if (folder !== base) throw bookChangedError(rel);
+    /* The write window (below): a write in the same burst as one that began
+       under another book's state is that operation's, not a new one's. */
+    if (win.folder != null && win.folder !== folder) throw bookChangedError(rel);
     if (path != null) {
       const root = collapsePath(base);
       const resolved = collapsePath(path);
       // collapsePath turns a book at the vault root ('/') into ''.
       if (resolved === null || (root !== '' && resolved !== root && !resolved.startsWith(root + '/'))) throw bookChangedError(rel);
     }
+  }
+
+  /* ---- an operation's own load (the 2026-11 re-review) ----
+
+     The check above compares FOLDERS: the folder the state was loaded from
+     against the open one. That holds until the new book's reload commits —
+     from then on the two agree again, and an operation that gathered its
+     month objects BEFORE the switch writes the next of them into the new
+     book. On the re-review's repro the Transactions bulk delete wrote its
+     delete log, a sibling plugin switched books while that write was landing,
+     the client's reload committed, and the loop's next writeFile put the
+     household's month — `HOME Bakery` — into `Clients/Acme/Transactions/
+     Cheque/2026-09.md`, followed by a success toast.
+
+     So an operation that reads the state and then awaits anything before (or
+     between) its writes carries a STAMP: load.js's loadedBook() taken before
+     its first await — a frozen object, one per committed load. opWriter()
+     hands it writers that refuse unless the state in memory is still that very
+     load (identity, not folder: a same-book reload also replaces every object
+     the operation is holding) AND it is still the open book's. Checked when the
+     write is called and again after the stale wait, with nothing awaited
+     between that check and the vault call. A refusal is BOOK_CHANGED when the
+     book moved, RELOADED when the same book was re-read; either way nothing
+     was written by that call, and the caller says how far it got. */
+  function reloadedError(rel) {
+    let message;
+    try {
+      message = require('./i18n').t('io.reloadedWrite.message', { file: rel });
+    } catch (e) { message = null; }
+    if (!message || message === 'io.reloadedWrite.message') {
+      message = `The budget was read again after this began, so ${rel} was not written`;
+    }
+    const err = new Error(message);
+    err.code = 'RELOADED';
+    err.rel = rel;
+    return err;
+  }
+  const currentLoad = () => (typeof deps.loadedBook === 'function' ? deps.loadedBook() : null);
+  function assertStamp(rel, stamp) {
+    if (stamp === undefined) return;
+    if (stamp && stamp.folder !== basePath()) throw bookChangedError(rel);
+    if (currentLoad() !== stamp) {
+      const now = currentLoad();
+      throw (now && stamp && now.folder !== stamp.folder) ? bookChangedError(rel) : reloadedError(rel);
+    }
+  }
+  /* opWriter(stamp = the load in memory now) → the writers, bound to it, plus
+     replaced(): null while the stamp still holds, else the sentence to show
+     for an operation that has not written anything yet (after a dialog). */
+  const via = (name, own) => (typeof deps[name] === 'function' ? deps[name] : own);
+  function opWriter(stamp = currentLoad()) {
+    const opt = { stamp };
+    return {
+      stamp,
+      replaced() {
+        if (currentLoad() === stamp && (!stamp || stamp.folder === basePath())) return null;
+        let m = null;
+        try { m = require('./i18n').t('io.reloaded.message'); } catch (e) { m = null; }
+        return m && m !== 'io.reloaded.message' ? m : 'The budget was read again while this was waiting, so nothing was changed.';
+      },
+      /* Through the ctx's published writer when there is one (it is this io's
+         own unless something replaced it — a test's spy, say), so an operation
+         that moved to opWriter is still seen by whatever watches ctx.writeFile. */
+      writeFile: (rel, content) => via('writeFile', writeFile)(rel, content, opt),
+      writeBinary: (rel, data) => via('writeBinary', writeBinary)(rel, data, opt),
+      patchFile: (rel, raw, body, updates) => via('patchFile', patchFile)(rel, raw, body, updates, opt),
+      trashFile: file => via('trashFile', trashFile)(file, opt),
+    };
+  }
+
+  /* ---- the write window: the backstop for a writer that carries no stamp ----
+
+     Every writer in a view that awaits between reading the state and writing
+     is meant to carry a stamp (opWriter, above). This is for the one that does
+     not yet: a burst of writes — each started before the previous one's
+     macrotask is over — is treated as one operation, and the folder the state
+     was loaded from when the burst BEGAN is the folder every write in it must
+     still match. A book's reload that commits between two writes of a loop
+     (the re-review's shape, by any trigger: a sibling's setActiveBook, a
+     second view or popout, onExternalSettingsChange) then refuses the rest of
+     the loop rather than writing it into the new book. Folder, not load: a
+     same-book reload mid-burst is the stamp's business. The window closes one
+     macrotask after the last write settles, so the next thing the reader does
+     — always a new event — opens a new one. */
+  const win = { folder: null, active: 0, timer: null };
+  function winEnter() {
+    if (win.active === 0 && win.timer === null) win.folder = loadedFolder();
+    if (win.timer !== null) { clearTimeout(win.timer); win.timer = null; }
+    win.active++;
+  }
+  function winLeave() {
+    win.active--;
+    if (win.active > 0) return;
+    win.timer = setTimeout(() => { win.timer = null; if (win.active === 0) win.folder = null; }, 0);
   }
 
   /* Throws STALE when somebody else changed, moved or deleted this path since
@@ -539,39 +637,48 @@ function makeIo(deps, { view = false } = {}) {
      file being GONE: a writer addressing a path the page loaded must not bring
      a moved file back as a second copy (L3-06). A path no event ever named is
      simply new, and is created. */
-  async function writeFile(rel, content) {
-    assertSameBook(rel);
-    const path = guardedPath(rel);
-    await assertFresh(path, rel);
-    assertSameBook(rel, path);
-    const undo = ownRemember(path, hashText(content));
+  /* `opts.stamp`: the load the calling operation began from (opWriter). */
+  async function writeFile(rel, content, opts) {
+    const stamp = opts ? opts.stamp : undefined;
+    winEnter();
     try {
-      const f = vault.getFileByPath(path);
-      if (f) { await vault.modify(f, content); }
-      else {
-        await ensureFolder(path.split('/').slice(0, -1).join('/'));
-        await vault.create(path, content);
-      }
-    } catch (e) { undo(); throw e; }
-    stampWrite();
+      assertSameBook(rel, null, stamp);
+      const path = guardedPath(rel);
+      await assertFresh(path, rel);
+      assertSameBook(rel, path, stamp);
+      const undo = ownRemember(path, hashText(content));
+      try {
+        const f = vault.getFileByPath(path);
+        if (f) { await vault.modify(f, content); }
+        else {
+          await ensureFolder(path.split('/').slice(0, -1).join('/'));
+          await vault.create(path, content);
+        }
+      } catch (e) { undo(); throw e; }
+      stampWrite();
+    } finally { winLeave(); }
   }
   /* Binary sibling of writeFile — same containment guard. Used for uploaded
      tax documents (PDFs, images). */
-  async function writeBinary(rel, data) {
-    assertSameBook(rel);
-    const path = guardedPath(rel);
-    await assertFresh(path, rel);
-    assertSameBook(rel, path);
-    const undo = ownRemember(path, BIN);
+  async function writeBinary(rel, data, opts) {
+    const stamp = opts ? opts.stamp : undefined;
+    winEnter();
     try {
-      const f = vault.getFileByPath(path);
-      if (f) { await vault.modifyBinary(f, data); }
-      else {
-        await ensureFolder(path.split('/').slice(0, -1).join('/'));
-        await vault.createBinary(path, data);
-      }
-    } catch (e) { undo(); throw e; }
-    stampWrite();
+      assertSameBook(rel, null, stamp);
+      const path = guardedPath(rel);
+      await assertFresh(path, rel);
+      assertSameBook(rel, path, stamp);
+      const undo = ownRemember(path, BIN);
+      try {
+        const f = vault.getFileByPath(path);
+        if (f) { await vault.modifyBinary(f, data); }
+        else {
+          await ensureFolder(path.split('/').slice(0, -1).join('/'));
+          await vault.createBinary(path, data);
+        }
+      } catch (e) { undo(); throw e; }
+      stampWrite();
+    } finally { winLeave(); }
   }
   /* THE body-preserving write, as a named operation. note-file.js calls this
      invariant "THE ONE INVARIANT THAT MATTERS" — patch the frontmatter, never
@@ -592,11 +699,11 @@ function makeIo(deps, { view = false } = {}) {
      body under an LF frontmatter — mixed endings, a whole-file diff under sync
      (2026-10-14 audit, L3-11). The captured block is read as LF first so
      patchFrontmatter sees the same lines whatever the file's ending. */
-  async function patchFile(rel, raw, body, updates) {
+  async function patchFile(rel, raw, body, updates, opts) {
     const eol = lineEndingOf(body) || lineEndingOf(raw) || '\n';
     const lf = patchFrontmatter(String(raw == null ? '' : raw).replace(/\r\n/g, '\n'), updates);
     const fm = eol === '\n' ? lf : lf.replace(/\n/g, eol);
-    await writeFile(rel, `---${eol}${fm}${eol}---${body}`);
+    await writeFile(rel, `---${eol}${fm}${eol}---${body}`, opts);
     return fm;
   }
   /* Delete, as the only deletion this plugin performs.
@@ -619,37 +726,41 @@ function makeIo(deps, { view = false } = {}) {
      change as ours and does not schedule a reload on top of the caller's own
      in-memory cleanup. Returns false for nothing-to-delete so a caller can say
      so rather than claim a success. */
-  async function trashFile(file) {
+  async function trashFile(file, opts) {
     if (!file) return false;
-    /* A TFile taken before a dialog is a file of the book that was open THEN;
-       the same refusal as a write (assertSameBook, above), before and after
-       the wait. */
-    assertSameBook(relOf(file.path));
-    /* Re-asked here, after whatever dialog the caller put the reader through
-       (2026-10-14 audit, L3-13). A TFile follows its file through a rename, so
-       a path that no longer resolves to THIS file means it is gone (nothing to
-       delete — said as false, not as a success) or was deleted and replaced by
-       a different file (a sync, another pane), which this would otherwise trash
-       at the old path. categories.js carried the check for itself; plans, tax
-       years, accounts and notes did not.
+    const stamp = opts ? opts.stamp : undefined;
+    winEnter();
+    try {
+      /* A TFile taken before a dialog is a file of the book that was open THEN;
+         the same refusal as a write (assertSameBook, above), before and after
+         the wait. */
+      assertSameBook(relOf(file.path), null, stamp);
+      /* Re-asked here, after whatever dialog the caller put the reader through
+         (2026-10-14 audit, L3-13). A TFile follows its file through a rename, so
+         a path that no longer resolves to THIS file means it is gone (nothing to
+         delete — said as false, not as a success) or was deleted and replaced by
+         a different file (a sync, another pane), which this would otherwise trash
+         at the old path. categories.js carried the check for itself; plans, tax
+         years, accounts and notes did not.
 
-       "This file" is the same object, or — because a vault may rebuild its
-       index and hand back a fresh object for an unchanged file — the same path
-       with the same creation time (both without stat only in the bare-node
-       harness). A FOLDER has no content of its own to be mistaken for another,
-       so it only has to still exist. */
-    const isFolder = Array.isArray(file.children);
-    const now = isFolder ? vault.getFolderByPath(file.path) : vault.getFileByPath(file.path);
-    if (!now) return false;
-    const same = isFolder || now === file || (now.path === file.path
-      && (now.stat && file.stat ? now.stat.ctime === file.stat.ctime : !now.stat && !file.stat));
-    if (!same) throw staleError(relOf(file.path));
-    await assertFresh(file.path, relOf(file.path));
-    assertSameBook(relOf(file.path), file.path);
-    const undo = ownRemember(file.path, GONE);
-    try { await vault.trash(file, false); } catch (e) { undo(); throw e; }
-    stampWrite();
-    return true;
+         "This file" is the same object, or — because a vault may rebuild its
+         index and hand back a fresh object for an unchanged file — the same path
+         with the same creation time (both without stat only in the bare-node
+         harness). A FOLDER has no content of its own to be mistaken for another,
+         so it only has to still exist. */
+      const isFolder = Array.isArray(file.children);
+      const now = isFolder ? vault.getFolderByPath(file.path) : vault.getFileByPath(file.path);
+      if (!now) return false;
+      const same = isFolder || now === file || (now.path === file.path
+        && (now.stat && file.stat ? now.stat.ctime === file.stat.ctime : !now.stat && !file.stat));
+      if (!same) throw staleError(relOf(file.path));
+      await assertFresh(file.path, relOf(file.path));
+      assertSameBook(relOf(file.path), file.path, stamp);
+      const undo = ownRemember(file.path, GONE);
+      try { await vault.trash(file, false); } catch (e) { undo(); throw e; }
+      stampWrite();
+      return true;
+    } finally { winLeave(); }
   }
   function fileAt(rel) {
     return vault.getFileByPath(relPath(rel));
@@ -882,6 +993,8 @@ function makeIo(deps, { view = false } = {}) {
     basePath, relPath, readFile, writeFile, writeVaultFile, writeVaultBinary, writeBinary, patchFile, trashFile, fileAt, pathTaken, folderAt, mdFilesIn, mdFilesUnder, subfoldersIn, subfoldersUnder, ensureFolder,
     /* A load's own root (see readersAt above): the read half, pinned. */
     readersAt: folder => readersAt(() => normalizePath(folder)),
+    /* An operation's writers, bound to the load it began from (see above). */
+    opWriter,
     createVaultFileIfAbsent, ensureVaultFolder, fileAtVaultPath, readVaultFile, folderAtVaultPath, vaultPathTaken,
     /* The change ledger (see the block above makeIo): the watcher reports what
        it saw, a full reload brackets itself, the controller hears refusals. */
@@ -900,6 +1013,20 @@ function makeIo(deps, { view = false } = {}) {
   };
 }
 
+/* An operation's writer for a ctx, whoever built it. The plugin's ctx always
+   has io.js's opWriter (registerIo, below), and that is what this returns. A
+   ctx assembled WITHOUT io.js — the bare-node harnesses that publish a
+   writeFile spy of their own and register one view on it — has no load to
+   stamp, so it gets that ctx's own writers, never refusing: there is no
+   second book in such a ctx for a write to land in. Views call this rather
+   than ctx.opWriter() so those harnesses keep driving the real view code. */
+function opWriterOf(ctx) {
+  if (ctx && typeof ctx.opWriter === 'function') return ctx.opWriter();
+  const call = name => (...a) => ctx[name](...a);
+  return { stamp: undefined, replaced: () => null,
+    writeFile: call('writeFile'), writeBinary: call('writeBinary'), patchFile: call('patchFile'), trashFile: call('trashFile') };
+}
+
 function registerIo(ctx) {
   ctx.provide(makeIo(ctx, { view: true }));
 }
@@ -907,3 +1034,4 @@ function registerIo(ctx) {
 module.exports = registerIo;
 module.exports.makeIo = makeIo;
 module.exports.destinationProblem = destinationProblem;
+module.exports.opWriterOf = opWriterOf;

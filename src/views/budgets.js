@@ -2,6 +2,7 @@
 /* Budget page — per-period category amounts, edited as a draft and saved to
    Budgets/<period>.md. */
 
+const { opWriterOf } = require('../io');
 const { el, icoEl, tableCells, longFig, caveatChip } = require('../dom');
 const { parseFrontmatter } = require('../markdown');
 /* The Budgets/<period>.md format lives in one pure module, shared with the
@@ -283,6 +284,18 @@ module.exports = function registerBudgets(ctx) {
      land in the draft and the Save button lights up, so a re-slice is still one
      more deliberate act away from the vault — and is discarded by simply
      navigating away, like any other unsaved edit. */
+  /* After a dialog opened over this load's rows: true (and said) when the
+     state was replaced while it was open — another book opened, or the vault
+     re-read — so the caller stops before changing a draft of a book that is
+     no longer on screen (io.js opWriter). */
+  function afterDialog(op) {
+    const gone = op.replaced();
+    if (!gone) return false;
+    renderBudgets();
+    toast(gone, true);
+    return true;
+  }
+
   async function resliceFrom(key) {
     const src = S.budgets[key] || [];
     if (!src.length) return toast(i18n.t('bud.shape.empty'), true);
@@ -299,8 +312,9 @@ module.exports = function registerBudgets(ctx) {
       dstDays,
       existingByCategory,
     });
+    const op = opWriterOf(ctx);   // `draft` and `src` are this load's — see afterDialog
     const accepted = await askBudgetReslice(app, plan, { money, sourceLabel: key });
-    if (!accepted || !accepted.length) return;
+    if (!accepted || !accepted.length || afterDialog(op)) return;
     for (const a of accepted) {
       let d = draft.find(x => x.category === a.category);
       if (!d) {
@@ -1086,6 +1100,10 @@ module.exports = function registerBudgets(ctx) {
     const cat = S.categories.find(c => c.name === name);
     if (!cat) return toast(i18n.t('bud.assumed.missing', { category: name }), true);
     if (!cat.rel) return toast(i18n.t('bud.assumed.noFile', { category: name }), true);
+    /* `cat` is this load's; the read below is an await, so the patch is bound
+       to the load (io.js opWriter) and cannot land in another book's file of
+       the same name. */
+    const op = opWriterOf(ctx);
     const text = await readFile(cat.rel);
     if (text == null) return toast(i18n.t('bud.assumed.noFile', { category: name }), true);
     const { raw, body } = parseFrontmatter(text);
@@ -1099,7 +1117,7 @@ module.exports = function registerBudgets(ctx) {
        flag is only flipped after the write lands, so a failure leaves the page
        showing what the file says. */
     try {
-      await ctx.patchFile(cat.rel, raw, body, { assume_spent: on ? 'true' : null });
+      await op.patchFile(cat.rel, raw, body, { assume_spent: on ? 'true' : null });
     } catch (e) {
       return toast(i18n.t('bud.err.toggle', { category: name, error: e.message || e }), true);
     }
@@ -1126,11 +1144,15 @@ module.exports = function registerBudgets(ctx) {
     const cat = S.categories.find(c => c.name === name);
     if (!cat) return toast(i18n.t('bud.fixed.missing', { category: name }), true);
     if (!cat.rel) return toast(i18n.t('bud.fixed.noFile', { category: name }), true);
+    /* `cat` is this load's; the read below is an await, so the patch is bound
+       to the load (io.js opWriter) and cannot land in another book's file of
+       the same name. */
+    const op = opWriterOf(ctx);
     const text = await readFile(cat.rel);
     if (text == null) return toast(i18n.t('bud.fixed.noFile', { category: name }), true);
     const { raw, body } = parseFrontmatter(text);
     try {
-      await ctx.patchFile(cat.rel, raw, body, { fixed: on ? 'true' : null });
+      await op.patchFile(cat.rel, raw, body, { fixed: on ? 'true' : null });
     } catch (e) {
       // See toggleAssumeSpent: the page keeps showing what the file says.
       return toast(i18n.t('bud.err.toggle', { category: name, error: e.message || e }), true);
@@ -1161,6 +1183,7 @@ module.exports = function registerBudgets(ctx) {
       return toast(i18n.t('bud.pull.none', { period: label, amount: money(-deficit) }), true);
     }
     const rounded = Math.round(deficit * 100) / 100;
+    const op = opWriterOf(ctx);
     const ok = await confirmModal(app, {
       title: i18n.t('bud.pull.confirmTitle'),
       message: i18n.t('bud.pull.confirmBody', {
@@ -1169,7 +1192,7 @@ module.exports = function registerBudgets(ctx) {
       confirmText: i18n.t('bud.pull.confirmOk'),
       cancelText: i18n.t('bud.pull.confirmCancel'),
     });
-    if (!ok) return;
+    if (!ok || afterDialog(op)) return;
     d.amount = rounded;
     // Same reason resliceFrom clears it: the "could not parse, write back
     // verbatim" flag belongs to the figure it was read with, and this is a

@@ -15,6 +15,7 @@
 /* ISSUE 62. The one translated string this otherwise English-only view
    prints — the date-reading banner — reached through the namespace import
    because `t` is already a local in several files. */
+const { opWriterOf } = require('../io');
 const i18n = require('../i18n');
 const { el, tableCells } = require('../dom');
 const { normalizeAmount, inferGrouping } = require('../amount');
@@ -1078,6 +1079,11 @@ module.exports = function registerImport(ctx) {
     if (!label) return toast('Invalid account name for import', true);
     const toAdd = p.items.filter(i => i.include && !i.dup);
     if (!toAdd.length) return toast('Nothing selected to import', true);
+    /* The review was built over this load's months, and the months below are
+       written from them: every write is bound to it (io.js opWriter). A
+       pending import counts as unsaved work, so switchBook() refuses over it
+       — but another device removing this book from the list does not ask. */
+    const op = opWriterOf(ctx);
 
     /* The identity gate, re-asked here rather than trusted from the render:
        the account select is live, so the pick can change after the banner was
@@ -1116,6 +1122,8 @@ module.exports = function registerImport(ctx) {
         confirmText: 'Record it',
         cancelText: 'Not now',
       });
+      const gone = op.replaced();
+      if (gone) return toast(gone, true);
       if (go) {
         ident.acct.account_number = ident.ours;
         // saveAccount no longer throws on a disk error — it toasts its own
@@ -1125,7 +1133,7 @@ module.exports = function registerImport(ctx) {
         // account_number stays set in memory regardless of whether the write
         // landed, so a failed save is worth its own word on top of
         // saveAccount's toast rather than being silently swallowed.
-        if (!(await ctx.saveAccount(ident.acct, ['account_number']))) {
+        if (!(await ctx.saveAccount(ident.acct, ['account_number'], op))) {
           toast('Could not record the account number — importing anyway', true);
         }
       }
@@ -1182,7 +1190,12 @@ module.exports = function registerImport(ctx) {
            model: a month that reached disk some other way since the last load
            is not one this import made, and must never be trashed by its Undo. */
         const created = !existing && !pathTaken(txFileRel(label, month));
-        await writeFile(txFileRel(label, month), serializeTxFile(fileModel));
+        await op.writeFile(txFileRel(label, month), serializeTxFile(fileModel));
+        /* Landed — in the book this import was reviewed in. If another load
+           replaced the state while that write was in flight, the model below
+           is not this book's any more: counted, said, and nothing of it is
+           pushed into the state that won. */
+        if (op.replaced()) { done += rows.length; throw new Error(op.replaced()); }
         if (!S.txFiles[key]) S.txFiles[key] = { label, month, rows: [], dirty: false, fmRaw: TX_FM };
         S.txFiles[key].rows.push(...rows);
         // Neutralise the committed items and record them in the dedup snapshot so
@@ -1200,7 +1213,7 @@ module.exports = function registerImport(ctx) {
       // The rows that DID land are still undoable — the receipt is written on
       // this path too, or a partial import would be the one nobody can take
       // back. Left of the toast so it exists before the early return.
-      if (landed.length) S.lastImport = receipt(p, label, landed, done);
+      if (landed.length && !op.replaced()) S.lastImport = receipt(p, label, landed, done);
       renderImportReview();   // reflect what already landed; the rest stays selectable
       return toast(`Import stopped after ${done} row${done === 1 ? '' : 's'} (${err.message || err}). Saved rows kept — click Import rows again to retry the rest, or Undo it on the Transactions page.`, true);
     }
@@ -1208,7 +1221,7 @@ module.exports = function registerImport(ctx) {
     const touched = additions;
     let newRules = 0;
     if ($('#impRemember').checked) {
-      newRules = await learnRules(toAdd.filter(it => it.manual && it.cat).map(it => ({ desc: it.desc, cat: it.cat })));
+      newRules = await learnRules(toAdd.filter(it => it.manual && it.cat).map(it => ({ desc: it.desc, cat: it.cat })), op);
     }
     S.pendingImport = null;
     $('#importReview').classList.add('hidden');
@@ -1254,9 +1267,9 @@ module.exports = function registerImport(ctx) {
   async function undoImport() {
     const r = S.lastImport;
     if (!r || !r.files.length) return;
-    /* The load this receipt's row objects belong to, taken before the dialog
-       below and tested after it (load.js stateReplaced). See the test there. */
-    const stamp = typeof ctx.loadedBook === 'function' ? ctx.loadedBook() : null;
+    /* The load this receipt's row objects belong to. Every write below is
+       bound to it (io.js opWriter), and it is asked again after the dialog. */
+    const op = opWriterOf(ctx);
 
     /* Resolved against the CURRENT model, not the receipt's own count: a row
        may already have been deleted by hand from the Transactions table since
@@ -1321,8 +1334,14 @@ module.exports = function registerImport(ctx) {
        receipt's rows are objects nothing holds any more (S.lastImport is
        cleared by every load). So: if the state the targets were gathered from
        is gone, nothing is written, and the reader is told why. io.js refuses
-       the write too, for the window before the reload lands. */
-    const replaced = typeof ctx.stateReplaced === 'function' ? ctx.stateReplaced(stamp) : null;
+       the write too, for the window before the reload lands.
+
+       The loop below awaits between files as well, and a switch whose reload
+       commits there made the next write land in the new book (the 2026-11
+       re-review). So each write goes through `op`, which refuses once the load
+       in memory is not this one, and the toast says how many files it took
+       back before it stopped. */
+    const replaced = op.replaced();
     if (replaced || S.lastImport !== r) {
       ctx.renderTransactions();
       return toast(replaced || i18n.t('io.reloaded.message'), true);
@@ -1336,15 +1355,17 @@ module.exports = function registerImport(ctx) {
              Obsidian — never the system trash. A file already gone by now is
              simply no longer there to take back (trashFile says false), and
              memory follows the disk either way. */
-          await trashFile(t.tfile);
-          delete S.txFiles[t.key];
+          await op.trashFile(t.tfile);
+          /* Only the object this undo held: if another load has replaced the
+             state meanwhile, the key may name the new book's month. */
+          if (S.txFiles[t.key] === t.file) delete S.txFiles[t.key];
         } else {
           const keep = t.file.rows.filter(row => !t.doomed.has(row));
           /* Written from a MODEL rather than by mutating first: a write that
              fails must leave the row in memory as well as on disk, or the app
              starts reporting a total the file does not hold. Same lockstep rule
              commitImport follows in the other direction. */
-          await writeFile(txFileRel(t.file.label, t.file.month), serializeTxFile({ ...t.file, rows: keep }));
+          await op.writeFile(txFileRel(t.file.label, t.file.month), serializeTxFile({ ...t.file, rows: keep }));
           t.file.rows = keep;
           // Disk now matches memory for this file, including whatever unsaved
           // edits it carried — so it is genuinely clean, not merely written.

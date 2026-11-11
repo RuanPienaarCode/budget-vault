@@ -1596,6 +1596,8 @@ module.exports = {
   'io.stale.notice': "Anggaran: {file} diubah di luar halaman ini (perangkat lain atau tampilan markdown) setelah dimuat, jadi simpanan Anda tidak ditulis. Halaman sudah memuat ulang isi yang kini ada di disk — silakan ulangi perubahannya.",
   'io.bookChanged.message': "Buku lain dibuka di perangkat ini setelah halaman ini dibaca, jadi {file} tidak ditulis — file itu akan masuk ke buku yang salah. Lakukan perubahan lagi di buku yang kini tampil di layar",
   'io.reloaded.message': "Anggaran: anggaran dibaca ulang saat menunggu jawaban Anda (buku lain dibuka, atau file-filenya berubah), jadi tidak ada yang diubah. Lihat halaman lagi dan ulangi jika memang masih itu yang Anda inginkan.",
+  'io.reloadedWrite.message': "Anggaran dibaca ulang setelah ini dimulai (file-filenya berubah, atau buku lain dibuka), jadi {file} tidak ditulis",
+  'tx.bulk.logKept': "{path} sudah mencantumkan baris-baris ini, meskipun yang masih ada di file-nya tidak dihapus.",
   'load.unreadable.head': "Beberapa berkas tidak dapat dibaca: {list}.",
   'load.unreadable.item': "{file} ({why})",
   'load.unreadable.why.missing': "tidak ada",

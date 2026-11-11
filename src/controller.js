@@ -120,6 +120,20 @@ function formatMoney(symbol, v, decimals, loc) {
    its NEW path and the path it left, so a file moved OUT of the folder counts
    by its old path (2026-10-07 audit; api.js's watcher had the same blind
    spot). modify/create/delete hand over the file alone. */
+/* After a load that THREW: must the page leave the screen it is showing for
+   the connect screen? Yes when the state still in memory is not the open
+   book's — no load committed yet (`loaded` null), or the last one was of
+   another folder (a book switch whose new book could not be read). The figures
+   on screen are then another book's under this book's name in the switcher,
+   and writes are already refused (io.js); the honest screen is the failure,
+   said. No when the state is the open book's own (a same-book reload that
+   failed): load.js commits whole, so that state is intact and stays, as it
+   always has. Pure, so the decision runs in bare node — mountApp cannot.
+   `loaded` is load.js loadedBook(); `openFolder` is io.js basePath(). */
+function failedLoadShowsConnect(loaded, openFolder) {
+  return !loaded || loaded.folder !== openFolder;
+}
+
 function fsChangeInBudget(basePath, file, oldPath) {
   const under = p => typeof p === 'string' && p !== '' && (p === basePath || p.startsWith(basePath + '/'));
   return under(file && file.path) || under(oldPath);
@@ -987,6 +1001,16 @@ function mountApp(view) {
   const doReloadFromDisk = () => reloadFromDisk(ctx, S, $, disableSaveButtons);
   ctx.reloadFromDisk = doReloadFromDisk;
 
+  /* The connect screen in place of every page: the pill and the two topbar
+     shortcuts go with them, since each acts on a loaded budget. */
+  function showConnectScreen() {
+    for (const sec of $$('main > section')) sec.classList.add('hidden');
+    $('#view-connect').classList.remove('hidden');
+    $('#periodPill').classList.add('hidden');
+    $('#topbarImport').classList.add('hidden');
+    $('#topbarReport').classList.add('hidden');
+  }
+
   async function connectVault() {
     applyBooks().catch(() => {});
     try {
@@ -995,16 +1019,20 @@ function mountApp(view) {
       S.loaded = false;
       syncDock();
       $('#connectErr').textContent = e.message || String(e);
+      /* #connectErr lives inside #view-connect, which a loaded page keeps
+         hidden — so a switch to a book that could not be read left the last
+         book's figures on screen under the new book's name, with the error
+         written somewhere nobody could see it (2026-11 re-review). */
+      if (failedLoadShowsConnect(typeof ctx.loadedBook === 'function' ? ctx.loadedBook() : null, ctx.basePath())) {
+        showConnectScreen();
+        $('#connectPathNote').empty();
+      }
       return;
     }
     if (!S.categories.length && !Object.keys(S.txFiles).length) {
       S.loaded = false;
       syncDock();
-      for (const sec of $$('main > section')) sec.classList.add('hidden');
-      $('#view-connect').classList.remove('hidden');
-      $('#periodPill').classList.add('hidden');
-      $('#topbarImport').classList.add('hidden');
-      $('#topbarReport').classList.add('hidden');
+      showConnectScreen();
       $('#connectPathNote').empty();
       $('#connectPathNote').append(
         'Looked in ', el('code', {}, ctx.basePath()),
@@ -1504,4 +1532,4 @@ function mountApp(view) {
   };
 }
 
-module.exports = { mountApp, formatMoney, classifyRename, fsChangeInBudget, reloadFromDisk, applyInputMode, wireDropZone, makeReloadScheduler, makeRefusalHandler, unreadableSummary, visibleUnreadable, unreadableBannerText };
+module.exports = { mountApp, formatMoney, classifyRename, fsChangeInBudget, failedLoadShowsConnect, reloadFromDisk, applyInputMode, wireDropZone, makeReloadScheduler, makeRefusalHandler, unreadableSummary, visibleUnreadable, unreadableBannerText };

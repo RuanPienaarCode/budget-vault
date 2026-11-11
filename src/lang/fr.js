@@ -1662,6 +1662,8 @@ module.exports = {
   'io.stale.notice': "Budget : {file} a été modifié en dehors de cette page (autre appareil ou vue markdown) après son chargement, donc votre enregistrement n'a pas été écrit. La page a rechargé ce qui est maintenant sur le disque — veuillez refaire la modification.",
   'io.bookChanged.message': "Un autre livre a été ouvert sur cet appareil après la lecture de cette page, donc {file} n'a pas été écrit — il aurait atterri dans le mauvais livre. Refaites la modification dans le livre maintenant affiché",
   'io.reloaded.message': "Budget : le budget a été relu pendant qu'il attendait votre réponse (un autre livre a été ouvert, ou ses fichiers ont changé), donc rien n'a été modifié. Regardez de nouveau la page et recommencez si c'est toujours ce que vous voulez.",
+  'io.reloadedWrite.message': "Le budget a été relu après le début de cette opération (ses fichiers ont changé, ou un autre livre a été ouvert), donc {file} n'a pas été écrit",
+  'tx.bulk.logKept': "{path} liste déjà ces lignes, bien que celles encore présentes dans leurs fichiers n'aient pas été supprimées.",
   'load.unreadable.head': "Certains fichiers n'ont pas pu être lus : {list}.",
   'load.unreadable.item': "{file} ({why})",
   'load.unreadable.why.missing': "manquant",

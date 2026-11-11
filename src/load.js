@@ -211,6 +211,13 @@ module.exports = function registerLoad(ctx) {
            already running for the new folder is joined, not doubled. */
         if (!committed || committed.folder !== openFolder()) return loadVault();
         return undefined;
+      }, err => {
+        /* A superseded load's FAILURE is followed the same way: it was a read
+           of a book nobody is looking at, and handing it to its caller marked
+           the open book's screen as failed (connectVault: S.loaded = false)
+           under a state that had loaded fine. */
+        if (folder !== openFolder()) return loadVault();
+        throw err;
       });
     inFlight = entry;
     return entry.promise;
@@ -218,15 +225,14 @@ module.exports = function registerLoad(ctx) {
 
   /* The book the state in memory was read from, or null before the first load:
      { folder, seq }, one frozen object per committed load, so a caller holding
-     one across an await can tell "still the same load" by identity. */
+     one across an await can tell "still the same load" by identity.
+     ADR-0007 · A confirmation dialog takes a load stamp. io.js opWriter() takes
+     this before the operation's first await and binds every write to it. */
   function loadedBook() { return committed; }
 
-  /* ADR-0007 · A confirmation dialog takes a load stamp. Take loadedBook()
-     before the dialog, pass it here after: null while the state is still the
-     one the stamp was taken on, else the sentence to show — the state the
-     operation gathered was replaced under the dialog (another book opened, or
-     the vault re-read), so acting on it would write from a state nobody is
-     looking at any more. */
+  /* The same question as opWriter().replaced(), for a caller holding only a
+     stamp: null while the state is still the load the stamp was taken on (and
+     the open book's), else the sentence to show. */
   function stateReplaced(stamp) {
     if (committed === stamp && (!committed || committed.folder === openFolder())) return null;
     return i18n.t('io.reloaded.message');
@@ -421,7 +427,7 @@ module.exports = function registerLoad(ctx) {
         settle_monthly: /^(true|yes|on|1)$/i.test(String(fm.settle_monthly ?? '').trim()),
         settle_day: fmNum(fm.settle_day),
         /* ADR-0007 · Account numbers go through fmNum, never parseFloat. Every one is
-           written back by saveAccount's FM_WRITERT. */
+           written back by saveAccount's FM_WRITERS. */
         credit_limit: fmNum(fm.credit_limit),
         /* ADR-0007 · emergency_fund is tri-state. true (whole balance), a number (that slice),
            null (never asked, or unreadable). */

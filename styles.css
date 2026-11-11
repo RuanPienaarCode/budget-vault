@@ -682,8 +682,9 @@ body.is-tablet .budget-app-root button:where(.fs-hide) { padding: 4px; }   /* fi
    only when the vault holds more than one book (the `hidden` class —
    `.hidden.hidden` above outranks this display:flex). It has two copies: this
    one in the top bar's right-hand cluster, beside the avatar, and one as the
-   first row of the drawer, which takes over on a phone (the visibility rules
-   are after the 600px block below). Both are drawn by these same rules.
+   first row of the drawer, which takes over at 900px and under and on a phone
+   (the visibility rules are after the 600px block below). Both are drawn by
+   these same rules.
 
    THE SELECT IS THE WHOLE PILL. The book icon and the chevron are laid over it
    (absolute, pointer-events: none) and the select's own padding makes room for
@@ -754,7 +755,7 @@ body.is-tablet .budget-app-root button:where(.fs-hide) { padding: 4px; }   /* fi
 
 /* The drawer copy: a full-width row under its own section label, as tall as a
    touch target, with the drawer's width for the name instead of the topbar's
-   13rem. Hidden here; shown by the phone rules after the 600px block. */
+   13rem. Hidden here; shown by the 900px / phone rules after the 600px block. */
 .budget-app-root .drawer-book { display: none; }
 .budget-app-root .drawer-book .book-switch { height: 44px; margin: 0 2px 4px; }
 .budget-app-root .book-switch-drawer select { max-width: none; font-size: 14px; }
@@ -792,15 +793,15 @@ body.is-tablet .budget-app-root button:where(.fs-hide) { padding: 4px; }   /* fi
      inside its own slot, so it is never clipped and the buttons never leave
      the row. */
   .budget-app-root .topbar .topbar-icon-btn { display: none; }
-  /* The book switcher leaves the row too, for the drawer (the pair of rules
-     after this block). It was kept here once, held to 6.5rem with its icon
-     dropped, and the arithmetic still did not close: at 375px the row is
-     8 + 44 + 4 + pill + 4 + switcher + 4 + 44 + 8, the pill's own chrome is
-     3 x 44px buttons + 10px, and the ~120px of switcher left the label about
-     0px — "Oct 22 – Nov 21, 2026" one word per line, out of the 60px bar.
-     Without it the label gets 121px at 375, 139 at 393, 176 at 430
-     (tests/phone-375.test.cjs section 15 redoes this sum from the rules). */
-  .budget-app-root .topbar .book-switch { display: none; }
+  /* The book switcher is not in this row either: it moves to the drawer at
+     900px and under (the pair of rules after this block). It was kept here
+     once, held to 6.5rem with its icon dropped, and the arithmetic still did
+     not close: at 375px the row is 8 + 44 + 4 + pill + 4 + switcher + 4 + 44
+     + 8, the pill's own chrome is 3 x 44px buttons + 10px, and the ~120px of
+     switcher left the label about 0px — "Oct 22 – Nov 21, 2026" one word per
+     line, out of the 60px bar. Without it the label gets 121px at 375, 139 at
+     393, 176 at 430 (tests/phone-375.test.cjs section 15 redoes this sum from
+     the rules). */
   .budget-app-root .header-period-pill {
     flex: 1 1 auto;
     min-width: 0;
@@ -822,14 +823,26 @@ body.is-tablet .budget-app-root button:where(.fs-hide) { padding: 4px; }   /* fi
   .budget-app-root .header-period-pill .pnav-btn { width: 32px; height: 28px; flex: none; }
 }
 
-/* Where the book switcher lives: the drawer at 600px and under, and on a phone
-   in EITHER orientation. Keyed on .is-phone as well as the width so a phone
-   turned sideways (667px+, past the breakpoint) does not move the control
-   from the drawer back into the top bar — the reader would look for it where
-   it was a moment ago — and so the landscape top bar, which shows the brand
-   again, is not asked to fit it as well. `:not(.hidden)` keeps single-book
-   mode (and the privacy splash, which renders with no model) hiding both. */
-@media (max-width: 600px) {
+/* Where the book switcher lives: the drawer at 900px and under, and on a phone
+   in EITHER orientation; the top bar only above 900px on a non-phone.
+
+   900, not the 600 the rest of the phone row uses. Between 601 and ~860px the
+   brand comes back into the row, and a long client name at the switcher's
+   13rem crushed the brand text into the period pill; under ~740px it pushed
+   the avatar off the right edge (2026-11 static review, tablet portrait and
+   a narrow desktop pane). The drawer copy has the drawer's whole width for
+   the name, so the switcher gives way rather than the brand or the avatar.
+
+   ONE PREDICATE, TWO HALVES. Each pair below hides the top bar copy and shows
+   the drawer copy under the SAME condition, so the two copies can never both
+   be hidden (no way to switch) or both shown — tests/phone-375.test.cjs
+   section 15 holds the pairs together. Keyed on .is-phone as well as the
+   width so a phone turned sideways does not move the control back into the
+   top bar, where the reader was not looking for it. `:not(.hidden)` keeps
+   single-book mode (and the privacy splash, which renders with no model)
+   hiding both. */
+@media (max-width: 900px) {
+  .budget-app-root .topbar .book-switch { display: none; }
   .budget-app-root .drawer-book:not(.hidden) { display: block; }
 }
 body.is-phone .budget-app-root .topbar .book-switch { display: none; }

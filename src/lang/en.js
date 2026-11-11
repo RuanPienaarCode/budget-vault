@@ -1884,6 +1884,8 @@ module.exports = {
   'io.stale.notice': "Budget: {file} was changed outside this page (another device, or the markdown view) after it loaded, so your save was not written. The page has reloaded what is on disk now — please make the edit again.",
   'io.bookChanged.message': "Another book was opened on this device after this page was read, so {file} was not written — it would have gone into the wrong book. Make the change again in the book now on screen",
   'io.reloaded.message': "Budget: the budget was read again while this was waiting for your answer (another book was opened, or its files changed), so nothing was changed. Look at the page again and repeat it if it is still what you want.",
+  'io.reloadedWrite.message': "The budget was read again after this began (its files changed, or another book was opened), so {file} was not written",
+  'tx.bulk.logKept': "{path} already lists these rows, although the ones still in their files were not deleted.",
   'load.unreadable.head': "Some files could not be read: {list}.",
   'load.unreadable.item': "{file} ({why})",
   'load.unreadable.why.missing': "missing",

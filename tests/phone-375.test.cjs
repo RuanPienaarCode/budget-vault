@@ -351,16 +351,26 @@ want(`${R} .bud-total-left`, 'grid-column', [PORTRAIT], v => v === '1 / -1', 'gi
    So the sum is done here, from the rules, the way the 13 Oct audit did it by
    hand: the row is menu | pill | right-hand cluster (the brand is hidden), and
    the label gets whatever the fixed parts leave. The cluster's children are
-   read from src/shell.js and each counts unless a 600px rule hides it — the
+   read from src/shell.js and each counts unless a rule covering 600px and
+   under (the 600px block, or the 900px switcher pair) hides it — the
    `hidden` class is ignored, because the multi-book case is exactly the one
    where the switcher's comes off. The assertion is that the label's width
    with every book visible EQUALS its single-book width: nothing in the phone
    row depends on how many books there are.
 
    Negative control, run by hand: delete
-   `.budget-app-root .topbar .book-switch { display: none; }` from the 600px
+   `.budget-app-root .topbar .book-switch { display: none; }` from the 900px
    block in src/styles.css. The switcher then counts at its 13rem max-width
-   and the label goes negative; this section fails. */
+   and the label goes negative; this section fails.
+
+   THE TABLET SQUEEZE (2026-11 static review). Between 601 and ~860px the
+   brand is back in the row, and a long book name crushed it into the period
+   pill (and pushed the avatar off under ~740px). So the switcher moves to the
+   drawer at 900px and under, and the two copies' visibility is ONE predicate:
+   every condition that hides the top bar copy shows the drawer copy and vice
+   versa, checked pair by pair below. */
+const SWITCH_AT = '@media (max-width: 900px)';
+const eq2 = (a, b, m) => ok(JSON.stringify(a) === JSON.stringify(b), `${m} — ${JSON.stringify(a)} vs ${JSON.stringify(b)}`);
 {
   const shell = fs.readFileSync(path.join(ROOT, 'src/shell.js'), 'utf8');
   const cluster = /<div class="ml-auto">([\s\S]*?)\n    <\/div>\n  <\/header>/.exec(shell);
@@ -375,7 +385,7 @@ want(`${R} .bud-total-left`, 'grid-column', [PORTRAIT], v => v === '1 / -1', 'gi
 
   /* A child is out of the phone row if a 600px rule scoped to the top bar
      sets display:none on a class it carries. */
-  const hiddenOnPhone = k => rules.some(r => JSON.stringify(r.context) === JSON.stringify([PORTRAIT])
+  const hiddenOnPhone = k => rules.some(r => [JSON.stringify([PORTRAIT]), JSON.stringify([SWITCH_AT])].includes(JSON.stringify(r.context))
     && r.decls.some(d => d.prop === 'display' && d.value === 'none')
     && r.selectors.some(s => {
       const m = /^\.budget-app-root \.topbar \.([\w-]+)$/.exec(s);
@@ -422,7 +432,20 @@ want(`${R} .bud-total-left`, 'grid-column', [PORTRAIT], v => v === '1 / -1', 'gi
      alone would bring it back. */
   ok(rules.some(r => r.context.length === 0 && r.selectors.includes(`${R} .drawer-book`) && r.decls.some(d => d.prop === 'display' && d.value === 'none')),
     'the drawer copy is hidden on a desktop window (base .drawer-book display: none)');
-  want(`${R} .drawer-book:not(.hidden)`, 'display', [PORTRAIT], v => v === 'block', 'show the drawer copy at 600px and under, unless .hidden');
+  want(`${R} .topbar .book-switch`, 'display', [SWITCH_AT], v => v === 'none', 'hide the top bar copy at 900px and under (the tablet squeeze)');
+  want(`${R} .drawer-book:not(.hidden)`, 'display', [SWITCH_AT], v => v === 'block', 'show the drawer copy at 900px and under, unless .hidden');
+  /* One predicate: the set of contexts hiding the top bar copy is exactly the
+     set showing the drawer copy, in each selector family (bare and .is-phone). */
+  {
+    const ctxs = (sel, prop, value) => rules.filter(r => r.selectors.includes(sel) && r.decls.some(d => d.prop === prop && d.value === value))
+      .map(r => JSON.stringify(r.context)).sort();
+    eq2(ctxs(`${R} .topbar .book-switch`, 'display', 'none'), ctxs(`${R} .drawer-book:not(.hidden)`, 'display', 'block'),
+      'the top bar copy is hidden under exactly the conditions the drawer copy is shown (never both hidden, never both shown)');
+    eq2(ctxs(`body.is-phone ${R} .topbar .book-switch`, 'display', 'none'), ctxs(`body.is-phone ${R} .drawer-book:not(.hidden)`, 'display', 'block'),
+      '… and the same for the .is-phone twins');
+    ok(!rules.some(r => r.selectors.some(s => /\.topbar \.book-switch$/.test(s)) && r.decls.some(d => d.prop === 'display' && d.value !== 'none')),
+      'no rule shows the top bar copy back under any condition (it is shown only by its base display:flex)');
+  }
   want(`body.is-phone ${R} .drawer-book:not(.hidden)`, 'display', [], v => v === 'block', 'show the drawer copy on a phone in either orientation, unless .hidden');
   want(`body.is-phone ${R} .topbar .book-switch`, 'display', [], v => v === 'none', 'hide the top bar copy on a phone held sideways too');
   ok(!rules.some(r => r.selectors.some(s => /\.drawer-book$/.test(s)) && r.decls.some(d => d.prop === 'display' && d.value !== 'none')),

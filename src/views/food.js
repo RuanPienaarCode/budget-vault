@@ -21,6 +21,7 @@
    happens in the same interaction, so there is no draft to protect and no
    registerDirty, the same choice views/notes.js records. */
 
+const { opWriterOf } = require('../io');
 const { el, kpiTiles, icoEl, caveatChip, tableCells } = require('../dom');
 const { isSplitPart } = require('../tx-role');
 const { splitAroundTable } = require('../markdown');
@@ -403,23 +404,27 @@ module.exports = function registerFood(ctx) {
   /* Remember how a product is filed. Written only when it changes, and from
      the file's current bytes (readFile clears io.js's staleness latch), so a
      line the reader added to Food Items.md by hand survives. */
-  async function rememberItems(items) {
+  async function rememberItems(items, op = opWriterOf(ctx)) {
     const text = await readFile(FOOD_ITEMS_FILE);
     const map = text ? parseFoodItems(text) : new Map();
     if (!mergeFoodItems(map, items)) return;
     let lead = null, trail = null;
     if (text) ({ before: lead, after: trail } = splitAroundTable(text, SCHEMAS.foodItems.columns[0].header));
-    await writeFile(FOOD_ITEMS_FILE, serializeFoodItems(map, { lead, trail }));
+    await op.writeFile(FOOD_ITEMS_FILE, serializeFoodItems(map, { lead, trail }));
   }
 
   async function addReceipt() {
+    /* The slip is typed for the book on screen: the dialog, the receipt write
+       and the Food Items write are bound to this load (io.js opWriter). */
+    const op = opWriterOf(ctx);
     const got = await askReceipt(app, { money, foodItems: S.foodItems, categories: categoryChoices() });
     if (!got) return;
+    if (op.replaced()) return toast(op.replaced(), true);
     let rel = receiptPath(got);
     for (let n = 2; pathTaken(rel); n++) rel = receiptPath(got).replace(/\.md$/, ` ${n}.md`);
     try {
-      await writeFile(rel, serializeReceipt(got));
-      await rememberItems(got.items);
+      await op.writeFile(rel, serializeReceipt(got));
+      await rememberItems(got.items, op);
     } catch (e) {
       return toast(`Could not save the receipt: ${e.message || e}`, true);
     }
@@ -438,8 +443,13 @@ module.exports = function registerFood(ctx) {
   async function refile(it, change) {
     const category = change.category ?? it.category;
     const healthy = change.healthy ?? it.healthy;
+    /* `it` and S.receipts are this load's, and the loop below reads and writes
+       one receipt at a time: one load for all of it (io.js opWriter), so a
+       reload committing mid-loop stops it instead of re-filing the next book's
+       receipts of the same name. */
+    const op = opWriterOf(ctx);
     try {
-      await rememberItems(it.members.map(m => ({ ...m, category, healthy })));
+      await rememberItems(it.members.map(m => ({ ...m, category, healthy })), op);
       const keys = new Set(it.members.map(itemKey));
       for (const r of S.receipts) {
         if (!r.items.some(x => keys.has(itemKey(x)))) continue;
@@ -450,7 +460,7 @@ module.exports = function registerFood(ctx) {
           const out = refileReceiptText(text, key, change);
           if (out != null) { text = out; changed = true; }
         }
-        if (changed) await writeFile(r.rel, text);
+        if (changed) await op.writeFile(r.rel, text);
       }
     } catch (e) {
       toast(`Could not re-file ${it.name}: ${e.message || e}`, true);

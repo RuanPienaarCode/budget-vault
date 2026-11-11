@@ -2,6 +2,7 @@
 /* Services — recurring subscriptions grouped by budget category, saved to
    Services.md. */
 
+const { opWriterOf } = require('../io');
 const { el, kpiTiles, dateInput, keepScroll, icoEl, tableCells } = require('../dom');
 const { normalizeAmount } = require('../amount');
 const { SCHEMAS, mdTableFile, CYCLES } = require('../table-schema');
@@ -503,6 +504,7 @@ module.exports = function registerServices(ctx) {
   }
 
   async function addService() {
+    const op = opWriterOf(ctx);   // the state this dialog was opened over (io.js opWriter)
     const r = await askFields(app, 'New service', [
       { key: 'name', label: 'Service name', type: 'text' },
       { key: 'provider', label: 'Provider', type: 'text' },
@@ -520,6 +522,7 @@ module.exports = function registerServices(ctx) {
         desc: 'Leave blank if it is in your own currency. Set it if this one is not — the figure is then shown in its own currency and stated separately rather than added in.' },
     ]);
     if (!r || !r.name.trim()) return;
+    if (op.replaced()) return toast(op.replaced(), true);
     const amount = normalizeAmount(r.amount);
     if (amount === null) return toast('Not a number', true);
     const next = ISO_DATE.test((r.next || '').trim()) ? r.next.trim() : '';
