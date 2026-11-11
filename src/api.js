@@ -16,7 +16,13 @@
    periodFigures; tests/api-no-budget.test.cjs holds the no-budget test to the
    rendered hero, so a hero that moves without this file goes red there.
 
-   THE CONTRACT (apiVersion 1)
+   THE CONTRACT (apiVersion 2)
+     Version 2 is ADDITIVE over version 1 (ADR 0009 rule 6, issue #169): every
+     name, shape and guarantee below that is not marked "v2" is what a version 1
+     consumer — Vista's card — was written against, and reads exactly as
+     before. A consumer that wants the books surface tests `apiVersion >= 2`;
+     one that does not care never needs to.
+
      currentPeriod() resolves to exactly one of:
        null              the budget folder is not set up (no Settings.md and no
                          Categories/ — main.js's hasBudgetData()). Decided by
@@ -29,7 +35,7 @@
                          reading the budget files itself, or the lock hides
                          nothing.
        the figure        { start, end, asOf, label, budgeted, spent, left,
-                           noBudget, over, currency, notes }
+                           noBudget, over, currency, notes, book }
                          noBudget is true when the period has no budget rows —
                          the hero then reads "New period — nothing budgeted
                          yet" over what was spent — and `left` is null (there
@@ -41,11 +47,83 @@
                          this figure — strings, one per printed line, in the
                          hero's order, in the household's language (HERO
                          NOTES, below).
+                         book (v2) is { folder, label } — the BOOK the figure
+                         is for, named as books() names it (BOOKS, below). A
+                         vault can hold several books with one open per
+                         device, so "R 1 200 left" with no name on it is
+                         ambiguous the moment a bookkeeper has switched
+                         client: a card that printed it under the wrong
+                         heading would quote one client's budget as another's.
+                         The null and { locked: true } shapes carry no book
+                         and are unchanged.
      onChange(cb) → unsubscribe. cb() takes no arguments; re-read with
        currentPeriod(). Called after a change under the budget folder has been
        reloaded, and whenever the lock opens or closes. Never for a read the
        consumer made itself, never for a file change while locked (there is
        nothing it could be shown), never after this plugin has unloaded.
+       (v2) Also once after a successful setActiveBook(): a switch is not a
+       vault event, so the watcher that normally says "something changed"
+       would never fire, and a card left showing the previous book's figure is
+       the exact failure the switch exists to avoid. main.js switchBook() tells
+       the subscribers itself, after the views have reloaded, so the figure a
+       callback re-reads is the new book's. Once per switch, and not at all for
+       a switch to the book that is already open.
+
+     books() (v2) resolves to exactly one of:
+       { locked: true }  the privacy splash is on and not opened this session.
+                         Nothing is read to produce it — it is decided BEFORE
+                         any file is looked at, as currentPeriod()'s is: a
+                         book's label is usually a client's name, and the
+                         splash promises that nothing is on show.
+       [ { folder, label, active } ]
+                         every book, the home book first, then the listed ones
+                         in list order; exactly one has active: true — the book
+                         currentPeriod() answers for. Single-book mode (no
+                         list, the state every vault was in before 1.59) is ONE
+                         entry, the home book, active: true, so a consumer need
+                         not special-case "no books", only "one book".
+                         `folder` is the vault-relative path in the form
+                         setActiveBook() takes back ('' for a book at the vault
+                         root): treat it as an opaque key and hand it back
+                         unchanged. `label` is the string the in-app switcher
+                         shows (BOOKS, below).
+       A Promise, as currentPeriod() is: the home book's name is a file read
+       (its Settings.md), so it could not honestly be synchronous.
+
+     setActiveBook(folder) (v2) resolves to exactly one of:
+       { ok: true }
+       { ok: false, reason: 'unknown' | 'dirty' | 'locked' }
+       main.js switchBook()'s own return, verbatim — the refusals live there
+       once, this file adds none, and it is the same function the top-bar
+       switcher calls. 'unknown': not a book (or a listed book whose folder has
+       gone); 'dirty': a Budget view holds unsaved edits, which a switch would
+       carry into another client's files; 'locked': the splash is up. It never
+       throws for any of the three, and a refusal leaves the open book, the
+       stored choice and the unsaved edits as they were. Take folders from
+       books() rather than guessing them: an unlisted folder is 'unknown'
+       however much it looks like a book. The switch is per DEVICE
+       (vault-scoped local storage) and never rewrites the home book, so it
+       does not follow the user to another device — the difference from what a
+       sibling plugin used to do, writing settings.budgetFolder and calling
+       reload() on the view (discussion #154).
+       On a plugin that has UNLOADED it resolves { ok: false, reason: 'unknown' }
+       and does nothing: a stale reference to an instance Obsidian has let go
+       of must not write a device key or reload views that are gone. 'unknown'
+       is the closest of the three truths — "there is no such book here" — the
+       same choice switchBook() makes when it cannot store the key, and it
+       keeps a consumer's refusal handling to the three reasons it already has.
+
+   BOOKS (v2)
+     The labels are NOT derived here. src/books.js bookChoices() is what the
+     top-bar switcher renders from, and books(), the figure's `book` and the
+     switcher all call it with the same inputs — the settings' list, the home
+     folder, the home book's household name (plugin.homeBookName(), asked only
+     when the list does not already name the home book, as controller.js's
+     applyBooks asks it) and the open folder — so a book is called one thing
+     everywhere. A second labelling rule here would be "two figures, two rules"
+     under a new name, and it would show: bookChoices suffixes a repeated label
+     with its folder ("Acme (Clients/Acme)"), so a re-derivation that left the
+     suffix out would print a card heading the switcher disagrees with.
 
    THE PRIVACY LOCK
      settings.privacy.desc promises "Nothing is read from the vault until you
@@ -117,6 +195,8 @@ const registerFigures = require('./figures');
 const { heroQualifiers } = require('./views/dashboard');
 const { formatAmount } = require('./currency');
 const { localeFor } = require('./locale');
+const books = require('./books');
+const i18n = require('./i18n');
 
 /* The S.settings defaults doLoadVault() relies on already being there before
    it starts patching individual keys off Settings.md's frontmatter — most
@@ -241,7 +321,15 @@ function buildApi(plugin) {
   let generation = 0;
   let fresh = null;
   function outOfDate() { generation++; fresh = null; }
-  const reusable = () => !!fresh && fresh.generation === generation && elapsedMs() - fresh.at <= FRESH_MS;
+  /* …and only while the state that read left behind is still the OPEN book's
+     (ADR 0009). A switch retires `fresh` through syncLock(), but a read that
+     was already in flight when the switch landed belongs to the book it began
+     in; serving it as fresh afterwards would answer for the wrong book. */
+  const holdsOpenBook = () => {
+    const lb = ctx && typeof ctx.loadedBook === 'function' ? ctx.loadedBook() : null;
+    return !!lb && lb.folder === ctx.basePath();
+  };
+  const reusable = () => !!fresh && fresh.generation === generation && elapsedMs() - fresh.at <= FRESH_MS && holdsOpenBook();
 
   /* ---- the privacy lock (the header has the contract) ---- */
   const lockSetting = () => !!(plugin.settings && plugin.settings.privacyLock);
@@ -400,16 +488,89 @@ function buildApi(plugin) {
     });
   }
 
+  /* The switcher's own model (BOOKS, in the header): books.bookChoices over the
+     same inputs controller.js's applyBooks() hands it. The home book's
+     household name is a file read, so it is asked only when the list does not
+     name the home book (a listed label is the reader's own and wins — no file
+     to read), and a host with no homeBookName (a bare-node plugin) is "no
+     name", as the controller treats it. Callers have already answered the
+     lock: this may read a file. */
+  async function bookModel() {
+    const s = plugin.settings || {};
+    const home = plugin.allBookFolders()[0];
+    const homeListed = books.bookFolders(s.books).includes(books.normalizeFolder(home));
+    const homeName = homeListed || typeof plugin.homeBookName !== 'function' ? '' : await plugin.homeBookName();
+    return books.bookChoices({
+      books: s.books,
+      homeFolder: home,
+      homeName,
+      openFolder: plugin.activeFolder(),
+      homeFallback: i18n.t('books.homeFallback'),
+    });
+  }
+
+  async function booksList() {
+    if (isLocked()) return { locked: true };
+    const model = await bookModel();
+    /* Locked while the home book's name was being read: what a consumer is
+       handed is decided at hand-over, as currentPeriod()'s is. */
+    if (isLocked()) return { locked: true };
+    return model.items.map(it => ({ folder: it.folder, label: it.label, active: it.active }));
+  }
+
+  /* An unloaded instance switches nothing (the header says why), by the same
+     flag onChange() and every deferred path read. A plugin with no switchBook
+     (a bare-node host) cannot switch either: the same answer. */
+  async function setActiveBook(folder) {
+    if (unloaded || typeof plugin.switchBook !== 'function') return { ok: false, reason: 'unknown' };
+    return plugin.switchBook(folder);
+  }
+
+  /* The book a figure is computed from, named from the model: the item whose
+     folder is the folder the state in memory was READ from (load.js
+     loadedBook), not the folder that happens to be open now. null when the
+     model does not list that folder — it was built for another list or
+     another open book, and is asked again. */
+  function bookOfState(c, model) {
+    const lb = typeof c.loadedBook === 'function' ? c.loadedBook() : null;
+    if (!lb) return null;
+    const folder = books.normalizeFolder(lb.folder);
+    const it = model.items.find(i => i.folder === folder);
+    return it ? { folder: it.folder, label: it.label } : null;
+  }
+
   async function currentPeriod() {
     const c = ensureCtx();
     if (!configured(c)) return null;
     if (isLocked()) return { locked: true };
-    if (!reusable()) await c.loadVault();
-    /* Locked while reading: the splash closed (Obsidian went to the
-       background, a gate closed) after this read began. What a consumer is
-       handed is decided at hand-over, not at request — the figure computed
-       for a reader who is no longer there stays here. */
-    if (isLocked()) return { locked: true };
+    /* THE FIGURE AND ITS LABEL MUST NAME ONE BOOK (ADR 0009, 2026-11 review).
+       The label used to be taken from the model BEFORE the read, on the
+       reasoning that the read was about to be made under that folder. But a
+       switch can land during the read, and the loader then follows it
+       (load.js rule 3) — so the numbers were the new book's under the old
+       book's name, or, before load.js followed switches at all, the old
+       book's numbers marked fresh and served under the new one's. Now the
+       label is looked up for the folder the state was actually read from,
+       after the read; a model that does not know that folder (the list or
+       the open book changed while the home book's name was being read) is
+       built again. Three rounds: a reader flipping books faster than a read
+       completes is answered for whichever book the last read was of, with
+       the folder named and no label rather than a label that could be wrong. */
+    let book = null;
+    for (let round = 0; round < 3 && !book; round++) {
+      const model = await bookModel();
+      if (!reusable()) await c.loadVault();
+      /* Locked while reading: the splash closed (Obsidian went to the
+         background, a gate closed) after this read began. What a consumer is
+         handed is decided at hand-over, not at request — the figure computed
+         for a reader who is no longer there stays here. */
+      if (isLocked()) return { locked: true };
+      book = bookOfState(c, model);
+    }
+    if (!book) {
+      const lb = typeof c.loadedBook === 'function' ? c.loadedBook() : null;
+      book = { folder: books.normalizeFolder(lb ? lb.folder : plugin.activeFolder()), label: '' };
+    }
     const p = c.currentPeriod();
     const F = c.periodFigures(p);
     /* views/dashboard.js's renderHero, verbatim: bud = F.budget (budgetTotals,
@@ -433,12 +594,15 @@ function buildApi(plugin) {
       over: overCategories(F.rows),
       currency: code ? { symbol, code } : { symbol },
       notes: heroNotes(F, moneyFor(c)),
+      book,
     };
   }
 
   return {
-    apiVersion: 1,
+    apiVersion: 2,
     currentPeriod,
+    books: booksList,
+    setActiveBook,
     onChange(cb) {
       // An unloaded instance will never notify again; registering a watcher
       // on it would only leak handlers onto a plugin Obsidian has let go of.
@@ -450,11 +614,11 @@ function buildApi(plugin) {
     /* Internal: the exact function the vault watcher above calls. Exposed so
        a host with no live `vault.on` (bare-node tests, and any future
        non-Obsidian embedding) can still exercise "a reload happened" without
-       faking a filesystem event bus. Not part of the apiVersion 1 contract. */
+       faking a filesystem event bus. Not part of the apiVersion 2 contract. */
     _reload: reloadAndNotify,
     /* Internal, for main.js only: the session flag's writer (the gate, through
        setBudgetUnlocked) and data.json's (saveData, where a toggled
-       privacyLock arrives). Not part of the apiVersion 1 contract. */
+       privacyLock arrives). Not part of the apiVersion 2 contract. */
     _setUnlocked: setUnlocked,
     _syncLock: syncLock,
   };

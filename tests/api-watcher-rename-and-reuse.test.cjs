@@ -26,7 +26,7 @@
      node tests/api-watcher-rename-and-reuse.test.cjs */
 
 const assert = require('assert');
-const { stubObsidian, makeVault } = require('./helpers/harness.cjs');
+const { stubObsidian, makeVault, bookSeam } = require('./helpers/harness.cjs');
 stubObsidian();
 const { pinClock } = require('./helpers/figures.cjs');
 const { SEED, B, TODAY, PERIOD } = require('./figures/household.cjs');
@@ -47,12 +47,12 @@ function makeHost({ privacyLock = false, unlocked = false } = {}) {
   vault.offref = ref => { handlers[ref.name] = (handlers[ref.name] || []).filter(f => f !== ref.fn); };
   const emit = (name, p, oldPath) => (handlers[name] || []).slice().forEach(fn => fn({ path: p }, oldPath));
   const events = [];
-  const plugin = {
+  const plugin = bookSeam({
     settings: { budgetFolder: B, privacyLock }, budgetUnlocked: unlocked,
     app: { vault, workspace: { onLayoutReady: cb => cb() } }, _lastWrite: 0,
     register(cb) { events.push(cb); },
     registerEvent(ref) { this.register(() => ref.e.offref(ref)); },
-  };
+  });
   const api = buildApi(plugin);
   const unload = () => { while (events.length) events.pop()(); };
   return { plugin, api, vault, counts, emit, unload };

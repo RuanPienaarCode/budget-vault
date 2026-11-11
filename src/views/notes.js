@@ -18,6 +18,7 @@
    patchFrontmatter (in repointNotes below), and why the body is never
    serialized from state. See the header of src/notes.js. */
 
+const { opWriterOf } = require('../io');
 const { el, kpiTiles, icoEl } = require('../dom');
 const { askFields, confirmModal } = require('../modal');
 const { yamlStr, parseFrontmatter } = require('../markdown');
@@ -292,6 +293,7 @@ module.exports = function registerNotes(ctx) {
   async function addNote(about = '') {
     const options = aboutOptions();
     const preset = options.some(o => o.value === about) ? about : `general${SEP}`;
+    const op = opWriterOf(ctx, { book: true });   // bound to the BOOK, not the exact load: this only creates from what is typed (io.js opWriter({ book: true }))
     const r = await askFields(app, 'New note', [
       { key: 'title', label: 'Title', type: 'text', placeholder: 'What is this about?' },
       { key: 'about', label: 'About', type: 'select', options, value: preset,
@@ -300,6 +302,7 @@ module.exports = function registerNotes(ctx) {
         placeholder: 'Write as much or as little as you like — you can carry on in Obsidian.' },
     ]);
     if (!r) return;
+    if (op.replaced()) return toast(op.replaced(), true);
     const title = (r.title || '').trim();
     if (!title) return toast('A note needs a title', true);
 
@@ -317,7 +320,7 @@ module.exports = function registerNotes(ctx) {
        sync lock — closed the dialog, discarded what they wrote and said
        nothing at all. */
     try {
-      await writeFile(rel, serializeNote({ title, kind, subject, created, body: r.body || '' }));
+      await op.writeFile(rel, serializeNote({ title, kind, subject, created, body: r.body || '' }));
     } catch (e) {
       return toast(`Could not write that note: ${e.message || e}`, true);
     }
@@ -344,7 +347,9 @@ module.exports = function registerNotes(ctx) {
      other account". Writes ONLY the frontmatter keys — patchFrontmatter
      re-emits every line it does not model verbatim, so the body, the tags and
      anything the user added by hand come through untouched. */
-  async function writeSubject(note, kind, subject) {
+  /* `op`: the writer of the operation that read `note` (io.js opWriter) — the
+     read below is an await, and a repoint loop holds every note across them. */
+  async function writeSubject(note, kind, subject, op = opWriterOf(ctx)) {
     const text = await readFile(note.rel);
     if (text == null) return false;
     const { raw, body } = splitFm(text);
@@ -363,7 +368,7 @@ module.exports = function registerNotes(ctx) {
          old link goes, and nothing phantom takes its place. */
       note_for: link ? yamlStr(link) : null,
     };
-    await ctx.patchFile(note.rel, raw, body, updates);
+    await op.patchFile(note.rel, raw, body, updates);
     return true;
   }
 
@@ -382,14 +387,16 @@ module.exports = function registerNotes(ctx) {
   async function repointOne(n) {
     const options = aboutOptions();
     const cur = n.kind + SEP + n.subject;
+    const op = opWriterOf(ctx);   // the state this dialog was opened over (io.js opWriter)
     const r = await askFields(app, `What is "${n.title}" about?`, [
       { key: 'about', label: 'About', type: 'select', options,
         value: options.some(o => o.value === cur) ? cur : `general${SEP}` },
     ]);
     if (!r) return;
+    if (op.replaced()) return toast(op.replaced(), true);
     const { kind, subject } = splitAbout(r.about);
     if (kind === n.kind && subject === n.subject) return;
-    if (!(await writeSubject(n, kind, subject))) return toast('That note is no longer in the vault', true);
+    if (!(await writeSubject(n, kind, subject, op))) return toast('That note is no longer in the vault', true);
     await ctx.loadNotes();
     renderNotes();
     toast('Note re-pointed');
@@ -409,7 +416,11 @@ module.exports = function registerNotes(ctx) {
     if (!oldSubject || oldSubject === newSubject) return 0;
     const hits = notesFor(S.notes, kind, oldSubject);
     if (!hits.length) return 0;
-    for (const n of hits) await writeSubject(n, kind, newSubject);
+    /* One load for the whole loop: a reload committing between two notes
+       refuses the rest (io.js opWriter) rather than repointing a note of the
+       next book that happens to share a path. The caller toasts the refusal. */
+    const op = opWriterOf(ctx);
+    for (const n of hits) await writeSubject(n, kind, newSubject, op);
     await ctx.loadNotes();
     return hits.length;
   }
@@ -423,12 +434,14 @@ module.exports = function registerNotes(ctx) {
        would then trash. A TFile survives a rename; a path does not. */
     const f = fileAt(n.rel);
     if (!f) { await ctx.loadNotes(); renderNotes(); return toast('That note is no longer in the vault', true); }
+    const op = opWriterOf(ctx);   // the state this dialog was opened over (io.js opWriter)
     const go = await confirmModal(app, {
       title: 'Delete note',
       message: `Move "${n.title}" to your vault trash? The note file goes with it — this does not touch the account or debt it is about.`,
       confirmText: 'Delete note',
     });
     if (!go) return;
+    if (op.replaced()) return toast(op.replaced(), true);
     /* ctx.trashFile (io.js), not vault.trash: the file was resolved BEFORE the
        dialog and the reader spent seconds inside it. trashFile asks again
        afterwards — false when the note is gone, a STALE refusal when a
@@ -442,7 +455,7 @@ module.exports = function registerNotes(ctx) {
        call time, as views/accounts.js does. */
     let trashed;
     try {
-      trashed = await ctx.trashFile(f);
+      trashed = await op.trashFile(f);
     } catch (e) {
       return toast(`Could not delete that note: ${(e && e.message) || e}`, true);
     }

@@ -2,6 +2,7 @@
 /* Category <select> builders + the create-category flow, shared by the
    Transactions table, Budget page and CSV import review. */
 
+const { opWriterOf } = require('./io');
 const { el } = require('./dom');
 const { parseFrontmatter, yamlStr } = require('./markdown');
 const { csvCell } = require('./csv');
@@ -42,6 +43,9 @@ module.exports = function registerCategories(ctx) {
 
   /* Create a category on disk + in memory and return it (or null). */
   async function promptCreateCategory() {
+    /* The category is typed for the book on screen; a switch while the dialog
+       is open must not create it in the next one (io.js opWriter). */
+    const op = opWriterOf(ctx, { book: true });   // bound to the BOOK, not the exact load: this only creates from what is typed (io.js opWriter({ book: true }))
     const r = await askFields(app, 'New category', [
       { key: 'name', label: 'Name', type: 'text', placeholder: 'e.g. Coffee budget' },
       { key: 'type', label: 'Type', type: 'select', options: typeOrder(S.settings.groups), value: 'expense' },
@@ -55,6 +59,8 @@ module.exports = function registerCategories(ctx) {
         options: [{ value: 'yes', label: 'Money you are committed to pay every period — rent, debt repayments, insurance' }] },
     ]);
     if (!r) return null;
+    const gone = op.replaced();
+    if (gone) { toast(gone, true); return null; }
     /* A blank name used to close the dialog with no word said, so Create
        looked like it had done nothing at all. The Add-transaction form toasts
        for its blank field (tx.err.desc); this does the same. Cancel returns
@@ -86,7 +92,7 @@ module.exports = function registerCategories(ctx) {
     // at all when it's true — mirrors toggleAssumeSpent's null-removes-the-key
     // trick, just on the write-once path instead of the patch path.
     const fixedLine = fixed ? 'fixed: true\n' : '';
-    await writeFile(`Categories/${safe}.md`,
+    await op.writeFile(`Categories/${safe}.md`,
       `---\n${nameLine}type: ${type}\ncolor: "#888888"\n${fixedLine}tags: [finance, finance/budget, finance/budget/categories]\n---\n\n# ${realName}\n\nBudget category of type **${type}**.\n`);
     /* `rel` is budget-folder-relative, the same shape load.js's own read
        builds (see its comment there) — without it here, a category created
@@ -230,6 +236,7 @@ module.exports = function registerCategories(ctx) {
         if ((fm.name || f.basename) === name) { file = f; break; }
       }
     }
+    const op = opWriterOf(ctx);   // `known`, `file` and S.categories below are this load's
     const ok = await confirmModal(app, {
       title: 'Delete category',
       message: `Delete "${name}"? ` +
@@ -238,6 +245,8 @@ module.exports = function registerCategories(ctx) {
       confirmText: 'Delete',
     });
     if (!ok) return false;
+    const gone = op.replaced();
+    if (gone) { toast(gone, true); return false; }
     if (file) {
       /* Still the file the vault holds? A TFile follows its file through a
          rename, so a category renamed while the dialog was open is still
@@ -250,7 +259,7 @@ module.exports = function registerCategories(ctx) {
         return false;
       }
       try {
-        await trashFile(file);
+        await op.trashFile(file);
       } catch (e) {
         toast(`Could not delete that category: ${(e && e.message) || e}`, true);
         return false;
@@ -277,7 +286,14 @@ module.exports = function registerCategories(ctx) {
      1,342-rule vault: 832 of them (62%) were already answered by a shorter
      rule pointing at the same category, so this is the difference between a
      file that stabilises and one that grows with the history forever. */
-  async function learnRules(pairs) {
+  /* `op`, when given, is the calling operation's writer (io.js opWriter): the
+     pairs were read from ITS load, so if another load has replaced it since —
+     another book opened while the save or import was writing — nothing is
+     learned into the state that won, and the answer is null rather than 0, so
+     the caller can say the rules were NOT learned instead of reporting a save
+     with none to learn (2026-11 final review). */
+  async function learnRules(pairs, op) {
+    if (op && op.replaced()) return null;
     if (!rulesWritable()) return 0;
     // ruleText: the matcher's own normalisation, so "already have it" means
     // exactly what prepareRules will make of the pattern.
@@ -308,7 +324,7 @@ module.exports = function registerCategories(ctx) {
        and a description holding both moved to Liquor. The file's own order
        is the household's, and a learned rule goes at the end, where it
        outranks nothing it ties with. */
-    if (added) await writeRulesCsv();
+    if (added) await writeRulesCsv(op);
     return added;
   }
 
@@ -348,11 +364,12 @@ module.exports = function registerCategories(ctx) {
      changes a rule the caller already has in hand (governingRule's return),
      never searches for one and never adds one, so it can't be reached by
      anything automatic. */
-  async function correctRule(rule, newCat) {
+  async function correctRule(rule, newCat, op) {
     if (!rule || !newCat || rule.category === newCat) return false;
+    if (op && op.replaced()) return false;
     if (!rulesWritable()) return false;
     rule.category = newCat;
-    await writeRulesCsv();
+    await writeRulesCsv(op);
     return true;
   }
 
@@ -416,9 +433,9 @@ module.exports = function registerCategories(ctx) {
     return false;
   }
 
-  async function writeRulesCsv() {
+  async function writeRulesCsv(op) {
     if (!rulesWritable()) return;
-    return writeFile('Data/Categorisation Rules.csv', rulesCsv(S.rules));
+    return (op ? op.writeFile : writeFile)('Data/Categorisation Rules.csv', rulesCsv(S.rules));
   }
 
   /* Remove the rules that have stopped earning their place — see
@@ -455,7 +472,14 @@ module.exports = function registerCategories(ctx) {
       return 0;
     }
     const report = analyseRules(S.rules, descs);
+    /* `report.remove` is a list of INDICES into this load's S.rules. Applied to
+       another load's — a book switched while the preview was open — it would
+       delete that book's rules by position. So the preview is bound to this
+       load, and every write after it too. */
+    const op = opWriterOf(ctx);
     if (!await askRulesCleanup(app, report)) return 0;
+    const gone = op.replaced();
+    if (gone) { toast(gone, true); return 0; }
 
     /* LOCAL calendar date, not toISOString(): that is UTC, and at 01:00 in
        Johannesburg it names the backup after yesterday — which reads as an
@@ -468,7 +492,7 @@ module.exports = function registerCategories(ctx) {
        one. First backup of the day wins; later runs keep it. */
     if (!fileAt(backup)) {
       try {
-        await writeFile(backup, rulesCsv(S.rules));
+        await op.writeFile(backup, rulesCsv(S.rules));
       } catch (err) {
         toast(`Could not write the backup — nothing was deleted. ${err && err.message ? err.message : err}`, true);
         return 0;
@@ -476,8 +500,11 @@ module.exports = function registerCategories(ctx) {
     }
 
     const drop = new Set(report.remove.map(r => r.index));
+    /* The backup write was an await: asked again before the indices are used. */
+    const goneNow = op.replaced();
+    if (goneNow) { toast(goneNow, true); return 0; }
     S.rules = S.rules.filter((_, i) => !drop.has(i));
-    await writeRulesCsv();
+    await writeRulesCsv(op);
     toast(`Removed ${drop.size} categorisation ${drop.size === 1 ? 'rule' : 'rules'} — ${S.rules.length} left. Previous set saved to ${backup.split('/').pop()}`);
     return drop.size;
   }

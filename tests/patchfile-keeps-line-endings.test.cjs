@@ -13,7 +13,7 @@
      node tests/patchfile-keeps-line-endings.test.cjs */
 
 const assert = require('assert');
-const { stubObsidian, makeVault } = require('./helpers/harness.cjs');
+const { stubObsidian, makeVault, bookSeam } = require('./helpers/harness.cjs');
 stubObsidian();
 const { makeIo } = require('../src/io');
 const { parseFrontmatter } = require('../src/markdown');
@@ -34,7 +34,7 @@ const crlf = s => s.replace(/\n/g, '\r\n');
   };
   for (const [label, text] of Object.entries(cases)) {
     const vault = makeVault({ [`${B}/Accounts/Cheque.md`]: text });
-    const io = makeIo({ vault, plugin: { settings: { budgetFolder: B } } });
+    const io = makeIo({ vault, plugin: bookSeam({ settings: { budgetFolder: B } }) });
     const { raw, body } = parseFrontmatter(await io.readFile('Accounts/Cheque.md'));
     const fm = await io.patchFile('Accounts/Cheque.md', raw, body, { balance: '250.00' });
     const out = vault._store.get(`${B}/Accounts/Cheque.md`);
@@ -51,7 +51,7 @@ const crlf = s => s.replace(/\n/g, '\r\n');
   {
     const text = '---\ntype: checking\nbalance: 100.00\n---\n\n# Cheque\n\nNotes.\n';
     const vault = makeVault({ [`${B}/Accounts/Cheque.md`]: text });
-    const io = makeIo({ vault, plugin: { settings: { budgetFolder: B } } });
+    const io = makeIo({ vault, plugin: bookSeam({ settings: { budgetFolder: B } }) });
     const { raw, body } = parseFrontmatter(text);
     await io.patchFile('Accounts/Cheque.md', raw, body, { balance: '250.00' });
     eq(vault._store.get(`${B}/Accounts/Cheque.md`), '---\ntype: checking\nbalance: 250.00\n---\n\n# Cheque\n\nNotes.\n', 'an LF file is byte-identical to what it always wrote');
@@ -61,7 +61,7 @@ const crlf = s => s.replace(/\n/g, '\r\n');
   {
     const text = '---\r\ntype: cash\r\nbalance: 1.00\r\n---';
     const vault = makeVault({ [`${B}/Accounts/Cash.md`]: text });
-    const io = makeIo({ vault, plugin: { settings: { budgetFolder: B } } });
+    const io = makeIo({ vault, plugin: bookSeam({ settings: { budgetFolder: B } }) });
     const { raw, body } = parseFrontmatter(text);
     await io.patchFile('Accounts/Cash.md', raw, body, { balance: '2.00' });
     eq(style(vault._store.get(`${B}/Accounts/Cash.md`)), 'crlf', 'an empty body takes the frontmatter\'s ending');

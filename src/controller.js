@@ -15,6 +15,8 @@ const { applyDom } = require('./i18n');
 const i18n = require('./i18n');
 const { PALETTE_PRESETS, DEFAULT_PALETTE } = require('./constants');
 
+const books = require('./books');
+const { renderBookSwitchers, pickBook } = require('./book-switcher');
 const registerIo = require('./io');
 const registerFxLive = require('./fx-live');
 const registerPeriod = require('./period');
@@ -118,6 +120,28 @@ function formatMoney(symbol, v, decimals, loc) {
    its NEW path and the path it left, so a file moved OUT of the folder counts
    by its old path (2026-10-07 audit; api.js's watcher had the same blind
    spot). modify/create/delete hand over the file alone. */
+/* After a load that THREW: must the page leave the screen it is showing for
+   the connect screen? Yes when the state still in memory is not the open
+   book's — no load committed yet (`loaded` null), or the last one was of
+   another folder (a book switch whose new book could not be read). The figures
+   on screen are then another book's under this book's name in the switcher,
+   and writes are already refused (io.js); the honest screen is the failure,
+   said. No when the state is the open book's own (a same-book reload that
+   failed): load.js commits whole, so that state is intact and stays, as it
+   always has. Pure, so the decision runs in bare node — mountApp cannot.
+   `loaded` is load.js loadedBook(); `openFolder` is io.js basePath(). */
+function failedLoadShowsConnect(loaded, openFolder) {
+  return !loaded || loaded.folder !== openFolder;
+}
+
+/* Is an Obsidian modal open in any of these documents? Obsidian mounts each
+   Modal as a `.modal-container` on the body and removes it on close. Several
+   documents because a Budget view can live in a popout window, whose dialogs
+   open in that window's document. Pure over its argument, for bare node. */
+function modalOpenIn(docs) {
+  return docs.some(d => !!d && typeof d.querySelector === 'function' && !!d.querySelector('.modal-container'));
+}
+
 function fsChangeInBudget(basePath, file, oldPath) {
   const under = p => typeof p === 'string' && p !== '' && (p === basePath || p.startsWith(basePath + '/'));
   return under(file && file.path) || under(oldPath);
@@ -891,6 +915,52 @@ function mountApp(view) {
     av.setAttribute('title', name ? `${name} · budget settings` : 'Budget settings');
   }
 
+  /* The top-bar book switcher (ADR 0009, src/book-switcher.js). Redrawn from
+     the plugin's own answers every time — the open book, the list, the home
+     book's name — never from state kept here, so there is no copy to go stale:
+     connectVault() calls it (which covers a switch, whose reload ends there),
+     and main.js's saveData() calls it through the controller when the LIST
+     changes, which produces no reload at all.
+
+     Left hidden and empty until the privacy splash has been opened. The gate
+     promises no budget content is in the DOM before the tap, and a book's
+     label is usually a client's name; connectVault only runs after the tap, so
+     the first real draw is after it. The sequence number drops a slow answer
+     (the home book's name is a file read) that a newer call has overtaken.
+
+     Two copies — the top bar's, and the drawer's that replaces it on a phone
+     (see src/book-switcher.js) — always drawn together from one model. The
+     ids are spelled out rather than built from a list so that
+     tests/shell-contract.test.cjs, which follows every literal id query in
+     src/, holds both of them to the shell. */
+  let booksSeq = 0;
+  const bookSwitchers = () => [
+    [$('#bookSwitch'), $('#bookSelect')],
+    [$('#drawerBookSwitch'), $('#drawerBookSelect')],
+  ].filter(([wrap, select]) => wrap && select);
+  async function applyBooks() {
+    const seq = ++booksSeq;
+    const pairs = bookSwitchers();
+    if (!pairs.length) return;
+    const s = plugin.settings || {};
+    if (typeof plugin.activeFolder !== 'function' || (s.privacyLock && !plugin.budgetUnlocked)) {
+      return renderBookSwitchers(pairs, null);
+    }
+    const home = plugin.allBookFolders()[0];
+    /* Only asked when the home book is not named by the list: a listed label
+       is the reader's own and wins, so there is no file to read. */
+    const homeListed = books.bookFolders(s.books).includes(books.normalizeFolder(home));
+    const homeName = homeListed || typeof plugin.homeBookName !== 'function' ? '' : await plugin.homeBookName();
+    if (seq !== booksSeq) return;
+    renderBookSwitchers(pairs, books.bookChoices({
+      books: s.books,
+      homeFolder: home,
+      homeName,
+      openFolder: plugin.activeFolder(),
+      homeFallback: i18n.t('books.homeFallback'),
+    }));
+  }
+
   function applyTheme() {
     const pref = plugin.settings.theme;
     const dark = pref === 'dark' || (pref === 'auto' && document.body.classList.contains('theme-dark'));
@@ -939,23 +1009,38 @@ function mountApp(view) {
   const doReloadFromDisk = () => reloadFromDisk(ctx, S, $, disableSaveButtons);
   ctx.reloadFromDisk = doReloadFromDisk;
 
+  /* The connect screen in place of every page: the pill and the two topbar
+     shortcuts go with them, since each acts on a loaded budget. */
+  function showConnectScreen() {
+    for (const sec of $$('main > section')) sec.classList.add('hidden');
+    $('#view-connect').classList.remove('hidden');
+    $('#periodPill').classList.add('hidden');
+    $('#topbarImport').classList.add('hidden');
+    $('#topbarReport').classList.add('hidden');
+  }
+
   async function connectVault() {
+    applyBooks().catch(() => {});
     try {
       await doReloadFromDisk();
     } catch (e) {
       S.loaded = false;
       syncDock();
       $('#connectErr').textContent = e.message || String(e);
+      /* #connectErr lives inside #view-connect, which a loaded page keeps
+         hidden — so a switch to a book that could not be read left the last
+         book's figures on screen under the new book's name, with the error
+         written somewhere nobody could see it (2026-11 re-review). */
+      if (failedLoadShowsConnect(typeof ctx.loadedBook === 'function' ? ctx.loadedBook() : null, ctx.basePath())) {
+        showConnectScreen();
+        $('#connectPathNote').empty();
+      }
       return;
     }
     if (!S.categories.length && !Object.keys(S.txFiles).length) {
       S.loaded = false;
       syncDock();
-      for (const sec of $$('main > section')) sec.classList.add('hidden');
-      $('#view-connect').classList.remove('hidden');
-      $('#periodPill').classList.add('hidden');
-      $('#topbarImport').classList.add('hidden');
-      $('#topbarReport').classList.add('hidden');
+      showConnectScreen();
       $('#connectPathNote').empty();
       $('#connectPathNote').append(
         'Looked in ', el('code', {}, ctx.basePath()),
@@ -1058,6 +1143,14 @@ function mountApp(view) {
     // indefinitely after a value is picked, so treating it as "mid-edit" would
     // suppress reloads forever for anyone who touched a filter and walked away.
     if (a && root.contains(a) && /^(INPUT|TEXTAREA)$/.test(a.tagName)) return true;
+    /* A dialog is up. Every dialog this app opens (modal.js, receipt-modal.js,
+       the export and books dialogs) is an Obsidian Modal, which mounts on the
+       document body — outside `root`, so the focus test above never saw a
+       reader typing a note or a receipt slip into one. A sync of an unrelated
+       month then reloaded the vault under the open dialog (2026-11 final
+       review). Waiting for it to close costs a 1.5s retry; any modal counts,
+       ours or not, because telling them apart buys nothing worth the guess. */
+    if (modalOpenIn([document, root.ownerDocument])) return true;
     return Date.now() - lastInputAt < 3000;
   }
 
@@ -1179,6 +1272,23 @@ function mountApp(view) {
   $('#prevPeriod').addEventListener('click', () => changePeriod(ctx.shiftPeriod(S.period, -1)));
   $('#nextPeriod').addEventListener('click', () => changePeriod(ctx.shiftPeriod(S.period, 1)));
   $('#currentPeriod').addEventListener('click', () => changePeriod(ctx.currentPeriod()));
+  /* A refusal is said by pickBook; either way BOTH copies are redrawn from the
+     plugin, so after a refusal the one that was used goes back to the book that
+     is still open rather than showing the one that was asked for, and after a
+     switch the other copy follows. A switch made from the drawer closes it, as
+     a drawer link does: the reader asked for another book, and the drawer
+     staying over it would hide the answer. A refusal leaves it open, beside
+     the notice saying why. */
+  const onBookPicked = async e => {
+    const r = await pickBook(plugin, e.target.value, {
+      notify: msg => new Notice(msg, 7000),
+      t: i18n.t,
+    });
+    if (r.ok && e.target.id === 'drawerBookSelect') closeDrawer();
+    applyBooks().catch(() => {});
+  };
+  $('#bookSelect').addEventListener('change', onBookPicked);
+  $('#drawerBookSelect').addEventListener('change', onBookPicked);
   $('#menuBtn').addEventListener('click', () => $('#appDrawer').classList.contains('open') ? closeDrawer() : openDrawer());
   $('#drawerClose').addEventListener('click', closeDrawer);
   $('#drawerOverlay').addEventListener('click', closeDrawer);
@@ -1434,7 +1544,8 @@ function mountApp(view) {
       else S.view = v;
     },
     hasDirty,
+    applyBooks,
   };
 }
 
-module.exports = { mountApp, formatMoney, classifyRename, fsChangeInBudget, reloadFromDisk, applyInputMode, wireDropZone, makeReloadScheduler, makeRefusalHandler, unreadableSummary, visibleUnreadable, unreadableBannerText };
+module.exports = { mountApp, formatMoney, classifyRename, fsChangeInBudget, failedLoadShowsConnect, modalOpenIn, reloadFromDisk, applyInputMode, wireDropZone, makeReloadScheduler, makeRefusalHandler, unreadableSummary, visibleUnreadable, unreadableBannerText };

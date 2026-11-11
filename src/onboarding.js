@@ -191,9 +191,33 @@ function currentPeriodForCycle(days, anchor) {
 const safeFileName = safeSeg;
 
 class OnboardingWizard extends Modal {
-  constructor(app, plugin) {
+  /* `opts.book` = { folder, label } puts the wizard in ADD-A-BOOK mode
+     (ADR 0009 §5): Settings → Books → Add, after validating the folder, opens
+     it here. Without it the wizard is what it always was — the setup of the
+     HOME book, assigning settings.budgetFolder.
+
+     Add-a-book differs in exactly three places, each said where it happens:
+       - the folder is fixed (render_finish): it was validated before the
+         wizard opened, and a field that could be edited here would need the
+         same validation again and could flip the mode under the reader;
+       - a folder that already holds a budget is REGISTERED, not rewritten
+         (steps(), apply()): the wizard asks nothing and writes nothing;
+       - apply() appends to settings.books and opens the new book on this
+         device through plugin.switchBook() — it never assigns budgetFolder,
+         and it leaves `onboarded` and the first-steps card alone, because
+         someone adding their second book is not starting out.
+     Cancelled at any point, nothing is added and nothing is written. */
+  constructor(app, plugin, opts = {}) {
     super(app);
     this.plugin = plugin;
+    const book = opts && opts.book;
+    this.adding = book && typeof book.folder === 'string'
+      ? { folder: normalizePath(book.folder.trim()), label: typeof book.label === 'string' ? book.label.trim() : '' }
+      : null;
+    /* Told once the book is in the list, so the Settings → Books rows behind
+       this modal can redraw — a list change produces no vault event for the
+       tab to hear. Cosmetic, so a throw from it is swallowed in registerBook. */
+    this.onAdded = opts && typeof opts.onAdded === 'function' ? opts.onAdded : null;
     this.finished = false;
     this.stepIdx = 0;
     this.motion = null;             // the welcome animation while it is on screen
@@ -255,6 +279,15 @@ class OnboardingWizard extends Modal {
       firstBudget: Object.fromEntries(FIRST_BUDGET_LINES.map(line =>
         [line.key, { category: firstBudgetDefault(line), amount: '' }])),
     };
+    /* The prefill above names the HOME book, which is right for the setup
+       wizard and wrong for an added one: the folder is the one the Add dialog
+       validated, and the household name starts as the label the reader just
+       typed for it — a client's book is usually called by the client's name,
+       and it stays an untouched default they can change on the name screen. */
+    if (this.adding) {
+      this.data.folder = this.adding.folder;
+      this.data.name = this.adding.label;
+    }
   }
 
   /* Manual mode, asked once and read everywhere. A bare
@@ -291,7 +324,20 @@ class OnboardingWizard extends Modal {
     /* Connecting adopts a folder that already holds a budget: there are no
        categories to pick, no first account to add and no first budget to seed,
        because all three exist already and not touching them is the point. */
-    if (this.mode === 'connect') return [...asked, 'finish'];
+    /* ADDING a folder that already holds a budget asks NOTHING. The setup
+       wizard's connect writes its answers into the existing Settings.md, which
+       is defensible there — the reader is re-pointing the app at their own
+       budget and has just answered the questions about it. Adding a book is
+       not that: the folder is somebody's working book, very likely kept by
+       hand or by another device, and its Settings.md already says what its
+       period, currency and household are. Asking the questions again would
+       either write back what the file already says (a pointless diff on a
+       synced file) or write the wizard's defaults over the reader's figures —
+       the app correcting a file it was only asked to open. So the questions
+       are not asked, and apply() writes nothing; if the book's settings are
+       wrong, the reader changes them in Settings with that book open, where
+       they can see what they are changing. */
+    if (this.mode === 'connect') return this.adding ? ['finish'] : [...asked, 'finish'];
     /* The manual path swaps the CSV path's two scaffolding screens for one
        that produces something. Categories are not asked because the whole
        starter pack is created — the honest answer to "which of these thirty"
@@ -310,7 +356,18 @@ class OnboardingWizard extends Modal {
        showed the user's actual language selected. Cheap, and it keeps the
        picker and the text it governs from ever disagreeing. */
     setLanguage(this.data.language);
-    this.titleEl.setText(i18n.t('wiz.title'));
+    this.titleEl.setText(i18n.t(this.adding ? 'wiz.book.title' : 'wiz.title'));
+    /* Add-a-book decides its mode BEFORE the first render, synchronously, and
+       never prefills from the folder. The mode decides the whole step list —
+       one screen for a folder that already holds a budget, the full walk for
+       one that does not — so it cannot be settled after a screen is already
+       showing. And there is nothing to prefill: on connect no question is
+       asked, and on create the folder holds no Settings.md to read. */
+    if (this.adding) {
+      this.mode = this.detectExisting(this.data.folder) ? 'connect' : 'create';
+      this.renderStep();
+      return;
+    }
     this.renderStep();
     /* Detection runs BEFORE the questions, because the questions come first.
        The three of them carry the household name, the period, the country and
@@ -338,6 +395,11 @@ class OnboardingWizard extends Modal {
     this.dropMotion();
     this.contentEl.empty();
     if (this.finished) return;
+    /* An add-a-book wizard closed before its button: nothing was written
+       (nothing ever is before apply()), nothing is added to the list, and
+       `onboarded` — the HOME book's first-run flag — is not this wizard's to
+       touch. The reader simply has not added the book. */
+    if (this.adding) return;
     // Closing on the welcome screen is not a decision — it's a tap outside the
     // modal, or an Escape from someone who hasn't read it yet. Retiring the
     // wizard there strands a brand-new user with no visible way back in, so
@@ -391,10 +453,19 @@ class OnboardingWizard extends Modal {
     const pane = c.createDiv({ cls: 'budget-onb-pane' + dir });
     // The welcome screen isn't a "step" in the user's mind — no counter there.
     if (step !== 'welcome') {
-      pane.createDiv({ cls: 'budget-onb-step', text: i18n.t('wiz.stepOf', { n: this.stepIdx, total: steps.length - 1 }) });
-      const said = this.echo(steps[this.stepIdx - 1]);
-      if (said) pane.createDiv({ cls: 'budget-onb-echo', text: said });
-      pane.createEl('h3', { cls: 'budget-onb-title', text: stepTitle(step) });
+      /* Counted only on a list that opens with the welcome screen, which is
+         every list but one: adding a folder that already holds a budget is a
+         single screen, and "Step 0 of 0" over it would be a counter for a walk
+         that is not there. */
+      if (steps[0] === 'welcome') {
+        pane.createDiv({ cls: 'budget-onb-step', text: i18n.t('wiz.stepOf', { n: this.stepIdx, total: steps.length - 1 }) });
+        const said = this.echo(steps[this.stepIdx - 1]);
+        if (said) pane.createDiv({ cls: 'budget-onb-echo', text: said });
+      }
+      pane.createEl('h3', {
+        cls: 'budget-onb-title',
+        text: this.registersOnly() ? i18n.t('wiz.book.connectTitle') : stepTitle(step),
+      });
     }
     this['render_' + step](pane);
     if (err) pane.createDiv({ cls: 'budget-onb-error', text: err });
@@ -407,7 +478,8 @@ class OnboardingWizard extends Modal {
     nav.addButton(b => b.setButtonText(i18n.t('wiz.cancel')).onClick(() => this.close()));
     if (this.stepIdx > 0) nav.addButton(b => b.setButtonText(i18n.t('wiz.back')).onClick(() => { this.stepIdx--; this.renderStep(); }));
     nav.addButton(b => b
-      .setButtonText(step === 'finish' ? i18n.t(this.mode === 'connect' ? 'wiz.connectBtn' : 'wiz.createBtn')
+      .setButtonText(step === 'finish'
+        ? i18n.t(this.registersOnly() ? 'wiz.book.addBtn' : this.mode === 'connect' ? 'wiz.connectBtn' : 'wiz.createBtn')
         : step === 'welcome' ? i18n.t('wiz.letsGo') : i18n.t('wiz.next'))
       .setCta()
       .onClick(() => this.next()));
@@ -486,7 +558,11 @@ class OnboardingWizard extends Modal {
     const folder = normalizePath(String(raw == null ? '' : raw).trim());
     this.data.folder = folder;
     this.mode = folder && this.detectExisting(folder) ? 'connect' : 'create';
-    if (this.mode === 'connect' && this._prefilledFrom !== folder) {
+    /* Never in add-a-book mode: a folder that turned out to hold a budget is
+       registered without a question asked (steps()), so there is no answer to
+       prefill — and prefilling would still switch the modal's language to the
+       other book's, mid-wizard, for nothing. */
+    if (this.mode === 'connect' && !this.adding && this._prefilledFrom !== folder) {
       this._prefilledFrom = folder;
       await this.prefillFromSettingsMd();
     }
@@ -563,6 +639,14 @@ class OnboardingWizard extends Modal {
     }
     this.stepIdx++;
     this.renderStep();
+  }
+
+  /* Adding a folder that already holds a budget: the one path on which this
+     wizard asks nothing and writes nothing, only registers. Asked in one
+     place so the step list, the screen, the button and apply() cannot each
+     decide it differently. */
+  registersOnly() {
+    return !!this.adding && this.mode === 'connect';
   }
 
   detectExisting(folder) {
@@ -1167,6 +1251,18 @@ class OnboardingWizard extends Modal {
       else if (this.app.vault.getFolderByPath(f)) hint.textContent = i18n.t('wiz.folder.exists', { folder: f });
       else hint.textContent = i18n.t('wiz.folder.willCreate', { folder: f });
     };
+    /* Add-a-book: shown, not editable. The folder passed the overlap checks
+       in the Add dialog (src/books.js validateNewBook); a field here could
+       move it onto another book, or onto a budget that flips the walk to a
+       single screen after every question has been answered. To add a
+       different folder, cancel and add that one — apply() re-checks either
+       way. */
+    if (this.adding) {
+      new Setting(c).setName(i18n.t('wiz.folder.name')).setDesc(this.data.folder);
+      c.appendChild(hint);
+      paint();
+      return;
+    }
     new Setting(c)
       .setName(i18n.t('wiz.folder.name'))
       /* ISSUE 38. Said HERE because this is the one screen where the reader is
@@ -1197,6 +1293,17 @@ class OnboardingWizard extends Modal {
 
   render_finish(c) {
     this.finishFolder(c);
+    /* Registering an existing budget writes nothing, so there is no summary
+       of answers to show — none were asked — and no "what next" for a book
+       the reader is already keeping. One sentence says what Add will and will
+       not do, which is the only thing this screen has to get across. */
+    if (this.registersOnly()) {
+      c.createDiv({
+        cls: 'budget-onb-callout',
+        text: i18n.t('wiz.book.connected', { folder: this.data.folder }),
+      });
+      return;
+    }
     /* The callout, not the hint above it, is where connecting is EXPLAINED —
        what it rewrites and, more importantly, what it leaves alone. It lives
        on this screen now because this is the screen the folder is chosen on;
@@ -1452,34 +1559,61 @@ class OnboardingWizard extends Modal {
     const day = this.monthStartDay();
     const cur = this.currencySymbol();
     const name = this.data.name.trim();
+    /* EVERY WRITE BELOW IS ADDRESSED FROM `folder`, the one this wizard was
+       given — the scaffold builds `${folder}/…` paths, and the Settings.md
+       patches pass it to updateBudgetSettingsMd() explicitly. Nothing here
+       may resolve through the OPEN book: with a client's book open on this
+       device that would be a different folder from the one on this screen,
+       and the household's answers would land in the client's Settings.md
+       (the #166 trap, closed in #168; tests/books-settings.test.cjs). */
     try {
-      p.settings.budgetFolder = folder;
-      if (this.mode === 'connect') {
+      if (this.adding) {
+        /* Asked again at the write, not only in the Add dialog: the list
+           syncs, and another device may have added an overlapping book while
+           this one was answering questions. Refused before a single file is
+           created, so a refused folder is never half-scaffolded. */
+        const problem = p.bookProblem(folder);
+        if (problem) { this.fail(i18n.t(`books.problem.${problem.reason}`, { folder: problem.folder || '/' })); return; }
+      } else {
+        /* The home book obeys the overlap rule too (2026-11 review): the setup
+           wizard pointed at a folder holding a listed book, or inside one,
+           would make two books share files. Refused before a single file is
+           written, with the Add dialog's own sentence, and budgetFolder left
+           where it was. */
+        const problem = typeof p.homeFolderProblem === 'function' ? p.homeFolderProblem(folder) : null;
+        if (problem) { this.fail(i18n.t(`books.problem.${problem.reason}`, { folder: problem.folder || '/' })); return; }
+        p.settings.budgetFolder = folder;
+      }
+      if (this.registersOnly()) {
+        /* Nothing to write. See steps(): the folder's own Settings.md already
+           says what this book is, and adding it to the list is not an
+           invitation to rewrite it. */
+      } else if (this.mode === 'connect') {
         await p.saveSettings();
-        await p.updateBudgetSettingsMd('month_start_day', String(day));
+        await p.updateBudgetSettingsMd('month_start_day', String(day), folder);
         // Written even when 0/'' so that connecting a fortnightly vault and
         // choosing a monthly period actually clears the cycle, rather than
         // leaving the old keys behind to win over the answer just given.
-        await p.updateBudgetSettingsMd('period_days', String(this.cycleDays()));
-        await p.updateBudgetSettingsMd('period_anchor', this.cycleAnchor());
-        await p.updateBudgetSettingsMd('currency', yamlStr(cur));
-        await p.updateBudgetSettingsMd('country', this.data.country);
-        await p.updateBudgetSettingsMd('language', i18n.resolveLanguage(this.data.language));
+        await p.updateBudgetSettingsMd('period_days', String(this.cycleDays()), folder);
+        await p.updateBudgetSettingsMd('period_anchor', this.cycleAnchor(), folder);
+        await p.updateBudgetSettingsMd('currency', yamlStr(cur), folder);
+        await p.updateBudgetSettingsMd('country', this.data.country, folder);
+        await p.updateBudgetSettingsMd('language', i18n.resolveLanguage(this.data.language), folder);
         /* Written on connect too, and unconditionally: the how screen asked,
            so the answer belongs in the file. An existing CSV vault whose owner
            answers "CSV" gets the key stated rather than left absent — same
            value, but now visible to anyone reading Settings.md. */
-        await p.updateBudgetSettingsMd('input_mode', inputMode(this.data.inputMode));
+        await p.updateBudgetSettingsMd('input_mode', inputMode(this.data.inputMode), folder);
         /* Only when the reader turned it ON. An adopted vault that has been
            running happily with no `exchange_rates` key must not have one
            written just because the wizard walked past the screen — an absent
            key is the off state, and writing "off" into somebody else's
            Settings.md is a change where none was asked for. */
         if (this.fxOn()) {
-          await p.updateBudgetSettingsMd('exchange_rates', 'on');
-          await p.updateBudgetSettingsMd('currency_code', yamlStr(normalizeCode(this.data.currencyCode)));
+          await p.updateBudgetSettingsMd('exchange_rates', 'on', folder);
+          await p.updateBudgetSettingsMd('currency_code', yamlStr(normalizeCode(this.data.currencyCode)), folder);
         }
-        if (name) await p.updateBudgetSettingsMd('household', yamlStr(name));
+        if (name) await p.updateBudgetSettingsMd('household', yamlStr(name), folder);
       } else {
         for (const sub of ['Categories', 'Accounts', 'Budgets', 'Transactions', 'Tax', 'Data']) {
           await this.ensureFolder(normalizePath(`${folder}/${sub}`));
@@ -1581,6 +1715,7 @@ class OnboardingWizard extends Modal {
           `| Name | Provider | Amount | Cycle | Next billing | Category | Active | Notes |\n|------|----------|-------:|-------|--------------|----------|--------|-------|\n`);
         await this.writeIfAbsent(normalizePath(`${folder}/Data/Categorisation Rules.csv`), 'pattern,category\n');
       }
+      if (this.adding) { await this.registerBook(); return; }
       p.settings.onboarded = true;
       /* A vault this wizard just made gets the first-steps card; one it merely
          connected to does not — that household is not starting out, and a
@@ -1600,22 +1735,77 @@ class OnboardingWizard extends Modal {
          skipping setup — setup is done — and toasting that it had been skipped
          would be the wizard's last word to a household that just finished it. */
       this.finished = true;
+      const reloaded = await this.openHomeBook(folder);
       /* A created vault stays open on the finish screen instead of closing
          onto a dashboard the reader has to work out for themselves.
          reloadViews() still runs here so the new files are read; activateView()
          moves to the button, which is the reader's own "I'm ready". */
       if (this.celebrates()) {
-        p.reloadViews();
+        if (!reloaded) p.reloadViews();
         this.renderCelebrate();
         return;
       }
       this.close();
       new Notice(i18n.t('wiz.done.connected'));
-      p.reloadViews();
+      if (!reloaded) p.reloadViews();
       await p.activateView();
     } catch (e) {
       new Notice(i18n.t('wiz.failed', { error: e.message || e }), 8000);
     }
+  }
+
+  /* The setup wizard has just made `folder` the HOME book. In single-book mode
+     that is also the open book and there is nothing to do. With books listed
+     and a client's open on this device, the views would go on showing the
+     client while the toast says "connected to your budget folder" — so this
+     device is switched to the home book, through switchBook(), which refuses
+     (and is said to refuse) while a page holds unsaved edits rather than let
+     them be saved into the wrong book. Returns whether the views were
+     reloaded by the switch, so apply() does not reload them a second time.
+     Feature-detected because the wizard's own guard tests drive it with
+     plain-object plugins that predate books. */
+  async openHomeBook(folder) {
+    const p = this.plugin;
+    if (typeof p.switchBook !== 'function' || typeof p.activeFolder !== 'function') return false;
+    if (p.activeFolder() === normalizePath(folder)) return false;
+    const sw = await p.switchBook(folder);
+    if (!sw.ok) new Notice(i18n.t(`books.switch.${sw.reason}`), 8000);
+    return !!sw.ok;
+  }
+
+  /* The end of add-a-book: the folder is scaffolded (create) or left exactly
+     as it was (registersOnly), and now it joins the list and opens.
+
+     Appended through plugin.addBook(), which validates once more and seeds
+     the home book on a first add, and saved there; never budgetFolder. Then
+     OPENED through plugin.switchBook(), the same path the top-bar switcher
+     takes, so a page with unsaved edits refuses the switch instead of having
+     its row saved into the new book. A refused switch does not undo the add —
+     the book is real and listed, and the reader is told it is there and why
+     it is not open yet, then can switch to it from the top bar. */
+  async registerBook() {
+    const p = this.plugin;
+    const added = await p.addBook({ folder: this.data.folder, label: this.adding.label });
+    if (!added.ok) {
+      this.fail(i18n.t(`books.problem.${added.reason}`, { folder: added.folder || '/' }));
+      return;
+    }
+    this.finished = true;
+    if (this.onAdded) { try { this.onAdded(added); } catch (e) { /* a redraw must not fail an add */ } }
+    const sw = await p.switchBook(added.folder);
+    if (!sw.ok) {
+      this.close();
+      new Notice(i18n.t('books.added', { label: added.label }), 8000);
+      new Notice(i18n.t(`books.switch.${sw.reason}`), 10000);
+      return;
+    }
+    /* switchBook() has already reloaded every view onto the new book, so the
+       celebration's CTA lands on it; a registered book closes with a toast,
+       as connecting always has. */
+    if (this.celebrates()) { this.renderCelebrate(); return; }
+    this.close();
+    new Notice(i18n.t('books.added', { label: added.label }));
+    await p.activateView();
   }
 }
 

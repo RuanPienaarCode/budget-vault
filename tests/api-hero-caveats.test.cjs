@@ -28,7 +28,7 @@
      node tests/api-hero-caveats.test.cjs */
 
 const assert = require('assert');
-const { stubObsidian, makeVault } = require('./helpers/harness.cjs');
+const { stubObsidian, makeVault, bookSeam } = require('./helpers/harness.cjs');
 stubObsidian();
 const { mountFor, pinClock, readable } = require('./helpers/figures.cjs');
 const { find, textOf } = require('./helpers/dash-audit.cjs');
@@ -86,7 +86,7 @@ async function heroAndApi(files, today, budgetFolder) {
     M.ctx.renderDashboard();
     const lines = heroLines(M.nodes);
     const { buildApi } = require('../src/api');
-    const api = buildApi({ settings: { budgetFolder }, app: { vault: makeVault(files) }, _lastWrite: 0 });
+    const api = buildApi(bookSeam({ settings: { budgetFolder }, app: { vault: makeVault(files) }, _lastWrite: 0 }));
     const got = await api.currentPeriod();
     return { lines, got, viewPeriod: M.S.period, current: M.ctx.currentPeriod(), title: M.ctx.periodTitle(M.S.period) };
   } finally { restore(); unpin(); }

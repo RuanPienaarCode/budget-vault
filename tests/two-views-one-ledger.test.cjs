@@ -28,7 +28,7 @@
      node tests/two-views-one-ledger.test.cjs */
 
 const assert = require('assert');
-const { stubObsidian, makeVault } = require('./helpers/harness.cjs');
+const { stubObsidian, makeVault, bookSeam } = require('./helpers/harness.cjs');
 stubObsidian();
 const { makeIo } = require('../src/io');
 
@@ -53,7 +53,7 @@ function rig() {
     [`${B}/Settings.md`]: '---\nmonth_start_day: 1\n---\n',
     [`${B}/${PLAN}`]: planText('0.00'),
   });
-  const plugin = { settings: { budgetFolder: B }, _lastWrite: 0 };
+  const plugin = bookSeam({ settings: { budgetFolder: B }, _lastWrite: 0 });
   const watching = [];
   const inflight = [];
   const tell = (kind, f) => { for (const io of watching) inflight.push(io.observeChange(f, undefined, kind)); };

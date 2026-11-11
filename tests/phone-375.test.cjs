@@ -340,6 +340,135 @@ want(`${R} .bud-total-left`, 'grid-column', [PORTRAIT], v => v === '1 / -1', 'gi
   ok(!/column-gap/.test(t) && !/clip-path/.test(t), 'no column-gap and no clip-path (the scorecard lints both)');
 }
 
+/* ---- 15. THE PERIOD LABEL'S WIDTH, WITH THE BOOK SWITCHER SHOWING ---------------------
+   The multi-book switcher (ADR 0009) shipped in the top bar's right-hand
+   cluster, and the 6.5rem it was held to on a phone came out of the period
+   label: the pill is the row's only flex:1 item, its three 44px buttons do not
+   shrink, so the label absorbed it — ~0px at 375, ~18px at 393, ~55px at 430
+   with a long book name, and "Oct 22 – Nov 21, 2026" broke one word per line
+   and spilled out of the 60px bar. No section above mentioned the switcher.
+
+   So the sum is done here, from the rules, the way the 13 Oct audit did it by
+   hand: the row is menu | pill | right-hand cluster (the brand is hidden), and
+   the label gets whatever the fixed parts leave. The cluster's children are
+   read from src/shell.js and each counts unless a rule covering 600px and
+   under (the 600px block, or the 900px switcher pair) hides it — the
+   `hidden` class is ignored, because the multi-book case is exactly the one
+   where the switcher's comes off. The assertion is that the label's width
+   with every book visible EQUALS its single-book width: nothing in the phone
+   row depends on how many books there are.
+
+   Negative control, run by hand: delete
+   `.budget-app-root .topbar .book-switch { display: none; }` from the 900px
+   block in src/styles.css. The switcher then counts at its 13rem max-width
+   and the label goes negative; this section fails.
+
+   THE TABLET SQUEEZE (2026-11 static review). Between 601 and ~860px the
+   brand is back in the row, and a long book name crushed it into the period
+   pill (and pushed the avatar off under ~740px). So the switcher moves to the
+   drawer at 900px and under, and the two copies' visibility is ONE predicate:
+   every condition that hides the top bar copy shows the drawer copy and vice
+   versa, checked pair by pair below. */
+const SWITCH_AT = '@media (max-width: 900px)';
+const eq2 = (a, b, m) => ok(JSON.stringify(a) === JSON.stringify(b), `${m} — ${JSON.stringify(a)} vs ${JSON.stringify(b)}`);
+{
+  const shell = fs.readFileSync(path.join(ROOT, 'src/shell.js'), 'utf8');
+  const cluster = /<div class="ml-auto">([\s\S]*?)\n    <\/div>\n  <\/header>/.exec(shell);
+  ok(cluster, 'src/shell.js still has the top bar\'s right-hand cluster (div.ml-auto, last in the header)');
+  /* Direct children only: the cluster's own children sit at 6 spaces. */
+  const kids = cluster ? [...cluster[1].matchAll(/\n {6}<(\w+) ([^>]*)>/g)].map(m => {
+    const cls = (/class="([^"]*)"/.exec(m[2]) || [, ''])[1].split(/\s+/).filter(c => c && c !== 'hidden');
+    return { tag: m[1], cls, id: (/id="([^"]*)"/.exec(m[2]) || [, ''])[1] };
+  }) : [];
+  ok(kids.some(k => k.id === 'bookSwitch') && kids.some(k => k.id === 'topbarAvatar'),
+    `the cluster holds the book switcher and the avatar, found ${kids.map(k => '#' + k.id).join(' ')}`);
+
+  /* A child is out of the phone row if a 600px rule scoped to the top bar
+     sets display:none on a class it carries. */
+  const hiddenOnPhone = k => rules.some(r => [JSON.stringify([PORTRAIT]), JSON.stringify([SWITCH_AT])].includes(JSON.stringify(r.context))
+    && r.decls.some(d => d.prop === 'display' && d.value === 'none')
+    && r.selectors.some(s => {
+      const m = /^\.budget-app-root \.topbar \.([\w-]+)$/.exec(s);
+      return m && k.cls.includes(m[1]);
+    }));
+  const inRow = kids.filter(k => !hiddenOnPhone(k));
+  ok(JSON.stringify(inRow.map(k => k.id)) === '["topbarAvatar"]', `found ${inRow.map(k => '#' + k.id).join(' ')} in the row — ` +'at 600px and under the only thing left in the right-hand cluster is the avatar — the book switcher went to the drawer, Import and Report were already in it');
+
+  const val = (sel, prop) => { const d = last(sel, prop, [PORTRAIT]); return d ? d.value : null; };
+  const lenOf = v => { const parts = String(v || '').trim().split(/\s+/); return px(parts.length > 1 ? parts[1] : parts[0]); };
+  const padX = lenOf(val(`${R} .topbar`, 'padding'));           // phone.css: 0 0.5rem
+  const gap = px(val(`${R} .topbar`, 'gap'));                    // phone.css: 0.25rem
+  const menu = px(val(`${R} .menu-btn`, 'width'));
+  const avatar = px(val(`${R} .topbar-avatar`, 'width'));
+  const pillPadX = lenOf(val(`${R} .header-period-pill`, 'padding')); // 0.2rem 0.25rem
+  const btn = px(val(`${R} .header-period-pill .pnav-btn`, 'width'));
+  ok([padX, gap, menu, avatar, pillPadX, btn].every(n => typeof n === 'number' && n >= 0),
+    `every term of the row sum resolves from the 600px rules: pad ${padX}, gap ${gap}, menu ${menu}, avatar ${avatar}, pill pad ${pillPadX}, button ${btn}`);
+  ok(val(`${R} .topbar .brand`, 'display') === 'none' && val(`${R} .header-period-pill .pnav-dot`, 'display') === 'none',
+    'the brand and the pill\'s dot are out of the phone row (the sum below leaves them out)');
+  const PILL_BORDER = 1; // the base pill's `1px solid`; the 600px block does not change it
+
+  /* The cluster's width from the children still in the row. Anything other
+     than the avatar would have failed the assertion above, and is counted at
+     its declared width so the arithmetic stays honest if that one is ignored. */
+  const widthOf = k => k.id === 'topbarAvatar' ? avatar
+    : k.cls.includes('book-switch') ? px(String(last(`${R} .book-switch select`, 'max-width', []).value)) : 44;
+  const clusterW = ks => ks.reduce((a, k) => a + widthOf(k), 0) + gap * Math.max(0, ks.length - 1);
+  const label = (vw, ks) => vw - 2 * padX - menu - clusterW(ks) - 2 * gap - 2 * pillPadX - 2 * PILL_BORDER - 3 * btn;
+
+  const single = inRow.filter(k => k.id !== 'bookSwitch');
+  for (const vw of [375, 393, 430]) {
+    const withBooks = label(vw, inRow), oneBook = label(vw, single);
+    notes.push(`period label at ${vw}px: ${withBooks}px with the switcher showing, ${oneBook}px in a single-book vault`);
+    ok(withBooks === oneBook, `at ${vw}px the period label keeps its single-book width (${oneBook}px) with books showing; it got ${withBooks}px`);
+    ok(withBooks >= 110, `at ${vw}px the period label has at least 110px (two short lines of "Oct 22 – Nov 21, 2026"); it got ${withBooks}px`);
+  }
+  ok(label(375, inRow) === 121, `the 375px sum is the audited 121px; got ${label(375, inRow)}px — a rule in the row changed, recheck the label`);
+
+  /* The other half: where it went. The drawer copy is hidden on a desktop
+     window, shown at 600px and under and on any phone — but only when not
+     .hidden, so single-book mode and the privacy splash still hide it. And
+     the top bar copy is hidden on a phone held sideways, where the width rule
+     alone would bring it back. */
+  ok(rules.some(r => r.context.length === 0 && r.selectors.includes(`${R} .drawer-book`) && r.decls.some(d => d.prop === 'display' && d.value === 'none')),
+    'the drawer copy is hidden on a desktop window (base .drawer-book display: none)');
+  want(`${R} .topbar .book-switch`, 'display', [SWITCH_AT], v => v === 'none', 'hide the top bar copy at 900px and under (the tablet squeeze)');
+  want(`${R} .drawer-book:not(.hidden)`, 'display', [SWITCH_AT], v => v === 'block', 'show the drawer copy at 900px and under, unless .hidden');
+  /* One predicate: the set of contexts hiding the top bar copy is exactly the
+     set showing the drawer copy, in each selector family (bare and .is-phone). */
+  {
+    const ctxs = (sel, prop, value) => rules.filter(r => r.selectors.includes(sel) && r.decls.some(d => d.prop === prop && d.value === value))
+      .map(r => JSON.stringify(r.context)).sort();
+    eq2(ctxs(`${R} .topbar .book-switch`, 'display', 'none'), ctxs(`${R} .drawer-book:not(.hidden)`, 'display', 'block'),
+      'the top bar copy is hidden under exactly the conditions the drawer copy is shown (never both hidden, never both shown)');
+    eq2(ctxs(`body.is-phone ${R} .topbar .book-switch`, 'display', 'none'), ctxs(`body.is-phone ${R} .drawer-book:not(.hidden)`, 'display', 'block'),
+      '… and the same for the .is-phone twins');
+    ok(!rules.some(r => r.selectors.some(s => /\.topbar \.book-switch$/.test(s)) && r.decls.some(d => d.prop === 'display' && d.value !== 'none')),
+      'no rule shows the top bar copy back under any condition (it is shown only by its base display:flex)');
+  }
+  want(`body.is-phone ${R} .drawer-book:not(.hidden)`, 'display', [], v => v === 'block', 'show the drawer copy on a phone in either orientation, unless .hidden');
+  want(`body.is-phone ${R} .topbar .book-switch`, 'display', [], v => v === 'none', 'hide the top bar copy on a phone held sideways too');
+  ok(!rules.some(r => r.selectors.some(s => /\.drawer-book$/.test(s)) && r.decls.some(d => d.prop === 'display' && d.value !== 'none')),
+    'no rule shows the bare .drawer-book — only .drawer-book:not(.hidden), or it would show through .hidden in single-book mode');
+
+  /* Notes 1-4 of the same review, so they do not come back. */
+  want(`${R} .book-switch select`, 'font-size', COARSE, v => /^max\(16px,/.test(v) || px(v) >= 16, 'be at least 16px on a touch screen — the (0,2,1) switcher rule otherwise beats phone.css\'s 16px anti-zoom select rule');
+  {
+    const c = last(`${R} .book-switch select`, 'font-size', COARSE), d = last(`${R} .book-switch-drawer select`, 'font-size', []);
+    ok(c && d && c.line > d.line, 'the coarse switcher size comes after the drawer copy\'s 14px (equal specificity, order decides)');
+  }
+  want(`${R} .book-switch select`, 'min-height', [], v => /^0(px)?$/.test(v), 'not inherit the coarse 44px min-height: the select fills its pill, it does not overflow it');
+  want(`${R} .book-switch select`, 'appearance', [], v => v === 'none', 'draw no native arrow (iOS can paint none with the border stripped) — the plugin draws a chevron');
+  ok(/data-ico="chevron-down"/.test(cluster ? cluster[1] : '') && (shell.match(/class="ico book-switch-chev" data-ico="chevron-down" aria-hidden="true"/g) || []).length === 2,
+    'both switcher copies carry the aria-hidden chevron-down slot');
+  ok(!rules.some(r => r.selectors.some(s => /\.book-switch:focus-within/.test(s))),
+    'no :focus-within ring on the switcher (it rang on every tap and stayed while iOS kept the select focused)');
+  ok(rules.some(r => r.selectors.includes(`${R} .book-switch select:focus-visible`)), 'the switcher rings on :focus-visible instead');
+  for (const dead of [`${R} .book-switch .ico`, `${R} .book-switch select`, `${R} .book-switch`]) {
+    ok(!last(dead, 'display', [PORTRAIT]) && !last(dead, 'max-width', [PORTRAIT]), `the old 600px squeeze rule on "${dead.replace(R + ' ', '')}" is gone (dead now that the copy is hidden there)`);
+  }
+}
+
 for (const n of notes) console.log(n);
 if (failures.length) {
   console.log(`FAIL — phone-375: ${failures.length} of ${checks} checks\n  - ${failures.join('\n  - ')}`);

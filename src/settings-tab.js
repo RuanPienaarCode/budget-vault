@@ -6,6 +6,7 @@
 const { PluginSettingTab, Setting, TFile, Notice, normalizePath } = require('obsidian');
 const { DEFAULT_SETTINGS, TYPE_ORDER, FEEDBACK_URL, SUPPORT_URL, PALETTE_PRESETS, periodLengthOptions, overspendLag, OVERSPEND_LAG_DEFAULT, OVERSPEND_LAG_MAX, emergencyTarget, EMERGENCY_TARGET_DEFAULT, EMERGENCY_TARGET_MAX, INPUT_MODE_DEFAULT, inputMode } = require('./constants');
 const { OnboardingWizard, appendRatesAttribution } = require('./onboarding');
+const { AddBookModal, BookLabelModal } = require('./book-settings');
 const { PROFILES, COUNTRY_ORDER } = require('./locale');
 /* Namespace import, not `const { t }`: this codebase already binds `t` as a
    parameter name in 22 places (`.addText(t => …)`, `el('tr', …)` neighbours in
@@ -22,6 +23,7 @@ const { normalizeCode, normalizeCadence } = require('./fx');
 const { ISO_DATE, isoDayNumber, isRealIsoDate, todayIso } = require('./dates');
 const { firstStepsOn } = require('./first-steps');
 const { milesRate, MILES_RATE_MAX, MILES_RATE_DEFAULT } = require('./miles');
+const { bookFolders, bookChoices, normalizeFolder } = require('./books');
 
 /* Date-SHAPED, used only to recognise budget filenames. An anchor the user
    types or a file stores must be a real calendar date, so those go through
@@ -135,14 +137,32 @@ class BudgetSettingTab extends PluginSettingTab {
     const { containerEl } = this;
     containerEl.empty();
 
-    new Setting(containerEl)
+    /* The one control that edits the HOME book (ADR 0009) — so it, alone in
+       this file, reads and writes settings.budgetFolder rather than the open
+       book; tests/books-one-seam.test.cjs names it as an allowed site.
+
+       A folder that would make the home book share files with a listed book
+       (inside one, or holding one) is REFUSED, not taken (homeFolderProblem,
+       src/books.js validateHomeFolder). This field saves on every keystroke,
+       so the refusal is said in place of the setting's description rather
+       than as a notice per key: typing "Clients/Acme2" past a listed
+       "Clients/Acme" passes through "Clients", and a toast for each letter
+       would bury the one that matters. Nothing is saved and nothing reloads
+       while the field holds a refused folder; the description comes back the
+       moment it does not. */
+    const folderSetting = new Setting(containerEl)
       .setName(i18n.t('settings.folder.name'))
-      .setDesc(i18n.t('settings.folder.desc'))
+      .setDesc(i18n.t('settings.folder.desc'));
+    folderSetting
       .addText(t => t
         .setPlaceholder(DEFAULT_SETTINGS.budgetFolder)
         .setValue(this.plugin.settings.budgetFolder)
         .onChange(async v => {
-          this.plugin.settings.budgetFolder = normalizePath(v.trim() || DEFAULT_SETTINGS.budgetFolder);
+          const next = normalizePath(v.trim() || DEFAULT_SETTINGS.budgetFolder);
+          const problem = this.homeFolderRefusal(next);
+          if (problem) { folderSetting.setDesc(problem); return; }
+          folderSetting.setDesc(i18n.t('settings.folder.desc'));
+          this.plugin.settings.budgetFolder = next;
           // Guarded like every other write in this tab: a rejected
           // saveSettings() used to be an unhandled rejection. reloadViews()
           // still runs either way — the folder picked is real in memory even
@@ -244,6 +264,17 @@ class BudgetSettingTab extends PluginSettingTab {
       .addButton(b => b
         .setButtonText(i18n.t('settings.support.button'))
         .onClick(() => window.open(SUPPORT_URL, '_blank')));
+
+    /* Books (ADR 0009 §5). The heading and the Add row are spelled out here
+       AND in getSettingDefinitions(), so tests/settings-parity.test.cjs sees
+       the same names on both sides; the rows between them are one per book,
+       named by the book's own label, built by bookRows() for both. */
+    new Setting(containerEl).setName(i18n.t('settings.books.name')).setHeading()
+      .setDesc(i18n.t('settings.books.desc'));
+    for (const row of this.bookRows()) row.render(new Setting(containerEl).setName(row.name).setDesc(row.desc));
+    this.addBookButton(new Setting(containerEl)
+      .setName(i18n.t('settings.books.add.name'))
+      .setDesc(i18n.t('settings.books.add.desc')));
 
     new Setting(containerEl).setName(i18n.t('settings.data.name')).setHeading()
       .setDesc(i18n.t('settings.data.desc'));
@@ -660,9 +691,15 @@ class BudgetSettingTab extends PluginSettingTab {
   /* Budget files named by date — the ones an anchor move can strand. Counted
      off getMarkdownFiles rather than walking the folder so no TFolder import
      is needed, and so a Budgets/ folder that doesn't exist yet reads as zero
-     instead of throwing. */
+     instead of throwing.
+
+     The OPEN book's Budgets/, as offPhaseBudgetCount and monthBudgetCount
+     below count too: the period keys these warnings are about live in the open
+     book's Settings.md (settingsMdPath), so counting the home book's files
+     would warn about a different book's budgets than the one whose period is
+     being changed. */
   datedBudgetCount() {
-    const base = `${this.plugin.settings.budgetFolder}/Budgets/`;
+    const base = `${this.plugin.activeFolder()}/Budgets/`;
     return this.app.vault.getMarkdownFiles()
       .filter(f => f.path.startsWith(base) && ISO_DATE.test(f.basename)).length;
   }
@@ -677,7 +714,7 @@ class BudgetSettingTab extends PluginSettingTab {
     const anchor = (this.mdSettings().period_anchor ?? '').toString().trim();
     if (!days || !isRealIsoDate(anchor)) return 0;
     const a = isoDayNumber(anchor);
-    const base = `${this.plugin.settings.budgetFolder}/Budgets/`;
+    const base = `${this.plugin.activeFolder()}/Budgets/`;
     return this.app.vault.getMarkdownFiles().filter(f =>
       f.path.startsWith(base) && ISO_DATE.test(f.basename) &&
       (isoDayNumber(f.basename) - a) % days !== 0).length;
@@ -704,7 +741,7 @@ class BudgetSettingTab extends PluginSettingTab {
     new Notice(i18n.t('settings.budgetsKept', { count: n }), 10000);
   }
   monthBudgetCount() {
-    const base = `${this.plugin.settings.budgetFolder}/Budgets/`;
+    const base = `${this.plugin.activeFolder()}/Budgets/`;
     return this.app.vault.getMarkdownFiles()
       .filter(f => f.path.startsWith(base) && /^\d{4}-\d{2}$/.test(f.basename)).length;
   }
@@ -828,11 +865,26 @@ class BudgetSettingTab extends PluginSettingTab {
     return setting;
   }
 
+  /* The sentence that refuses `folder` as the home book's, or null when it
+     may be. One wording for both halves of the tab — display()'s text field
+     and the 1.13 declarative control's validate() — taken from the Add
+     dialog's own books.problem.* keys, since the rule is the same one. A
+     plugin without the seam (a bare test double) refuses nothing. */
+  homeFolderRefusal(folder) {
+    if (typeof this.plugin.homeFolderProblem !== 'function') return null;
+    const problem = this.plugin.homeFolderProblem(folder);
+    return problem ? i18n.t(`books.problem.${problem.reason}`, { folder: problem.folder || '/' }) : null;
+  }
+
   async setControlValue(key, value) {
     if (!MD_KEYS.has(key)) {
       // validate() rejects a bad value but never rewrites a good one, so the
       // folder path is normalised on the way to disk here.
       if (key === 'budgetFolder') value = normalizePath(String(value).trim() || DEFAULT_SETTINGS.budgetFolder);
+      /* validate() below refuses an overlapping home folder before the host
+         calls this; asked again in case a host reaches here without it — a
+         refused folder must never be written by the back door. */
+      if (key === 'budgetFolder' && this.homeFolderRefusal(value)) return;
       await super.setControlValue(key, value);
       // Both axes of the look are applied by the same call: applyTheme() sets
       // the dark class and the palette class together.
@@ -887,6 +939,125 @@ class BudgetSettingTab extends PluginSettingTab {
     this.plugin.reloadViews();
   }
 
+  /* ---- Books (ADR 0009 §5, issue #168) ------------------------------------
+
+     bookRows() → [{ name, desc, render(setting) }], one per book, for BOTH
+     halves of this tab — display() builds a Setting per row and calls
+     render on it; getSettingDefinitions() hands the same three fields to
+     1.13. One builder, so the rows cannot differ between versions.
+
+     The list is src/books.js bookChoices(), the same model the top-bar
+     switcher draws: home book first, then the list in its order, each under
+     the label the reader gave it (a repeated label told apart by its folder).
+     So a book is called the same thing in the top bar and here.
+
+     What each row offers follows from the rules, not from taste:
+       - Relabel only once there IS a list. In single-book mode the label is
+         shown nowhere (there is no switcher), and relabelling would have to
+         write a one-book list into data.json for a name nobody sees —
+         src/books.js bookListRemove explains why the list collapses to empty
+         when it gets back to one book, for the same reason.
+       - Remove on every book but the home book, which is
+         settings.budgetFolder and changes with the folder setting above.
+
+     Read-only and cheap — settings, the seam, and one metadataCache lookup —
+     because getSettingDefinitions() calls it on every update(). A plugin
+     without the book seam (only ever a guard test's plain-object stand-in)
+     gets no rows rather than a tab that throws. */
+  bookRows() {
+    const p = this.plugin;
+    if (!p || !p.settings || typeof p.allBookFolders !== 'function' || typeof p.activeFolder !== 'function') return [];
+    const listed = bookFolders(p.settings.books).length > 0;
+    const model = bookChoices({
+      books: p.settings.books,
+      homeFolder: p.allBookFolders()[0],
+      homeName: this.homeNameSync(),
+      openFolder: p.activeFolder(),
+      homeFallback: i18n.t('books.homeFallback'),
+    });
+    return model.items.map(it => ({
+      name: it.label,
+      desc: [it.folder || '/', it.home ? i18n.t('settings.books.home') : '', it.active ? i18n.t('settings.books.open') : '']
+        .filter(Boolean).join(' · '),
+      render: setting => {
+        if (listed) {
+          setting.addButton(b => b
+            .setButtonText(i18n.t('settings.books.relabel'))
+            .onClick(() => this.openRelabel(it)));
+        }
+        if (!it.home) {
+          setting.addButton(b => b
+            .setButtonText(i18n.t('settings.books.remove'))
+            .setWarning()
+            .onClick(() => this.removeBookRow(it)));
+        }
+        return setting;
+      },
+    }));
+  }
+  /* The home book's household name, for its label when the list does not
+     name it — main.js homeBookName()'s synchronous twin, read from
+     metadataCache because getSettingDefinitions() may not await or read the
+     vault. Any failure is "no name": a label must never take the tab down. */
+  homeNameSync() {
+    try {
+      const f = this.app.vault.getAbstractFileByPath(normalizePath(this.plugin.allBookFolders()[0] + '/Settings.md'));
+      if (!(f instanceof TFile)) return '';
+      const fm = (this.app.metadataCache.getFileCache(f) || {}).frontmatter || {};
+      return typeof fm.household === 'string' ? fm.household.trim() : '';
+    } catch (e) { return ''; }
+  }
+  addBookButton(setting) {
+    return setting.addButton(b => b
+      .setButtonText(i18n.t('settings.books.add.button'))
+      .onClick(() => new AddBookModal(this.app, this.plugin, () => this.refreshTab()).open()));
+  }
+  openRelabel(item) {
+    /* The label as STORED, not as shown: bookChoices suffixes a repeated
+       label with its folder, and pre-filling that suffix would save it into
+       the label on the first OK. */
+    const entry = (Array.isArray(this.plugin.settings.books) ? this.plugin.settings.books : [])
+      .find(b => b && typeof b.folder === 'string' && normalizeFolder(b.folder) === normalizeFolder(item.folder));
+    const label = entry && typeof entry.label === 'string' ? entry.label : item.label;
+    new BookLabelModal(this.app, this.plugin, { folder: item.folder, label }, () => this.refreshTab()).open();
+  }
+  /* No confirmation dialog, on purpose: removing forgets a list entry and
+     touches no file, so it is undone by adding the folder again — which,
+     the folder already holding a budget, is one screen and one button. The
+     toast after it says exactly that, so the reader is never left wondering
+     whether their client's files went with it. */
+  async removeBookRow(item) {
+    let r;
+    try {
+      r = await this.plugin.removeBook(item.folder);
+    } catch (e) {
+      new Notice(i18n.t('settings.err.save', { error: e.message || e }), 6000);
+      return r;
+    }
+    if (!r.ok) {
+      /* Two of the refusals need their own sentence ("…then remove it"; the
+         home book's way out); locked and unknown read the same as for a
+         switch, which is what removing the open book first is. */
+      new Notice(r.reason === 'dirty' || r.reason === 'home'
+        ? i18n.t(`books.remove.${r.reason}`)
+        : i18n.t(`books.switch.${r.reason}`), 8000);
+      return r;
+    }
+    new Notice(i18n.t('books.removed', { label: item.label, folder: item.folder || '/' }), 8000);
+    this.refreshTab();
+    return r;
+  }
+  /* Redraw whichever half is on screen. 1.13's SettingTab has update(),
+     which rebuilds from getSettingDefinitions() (read in the 1.15 app.js:
+     `update(){this.settingItems=this.getSettingDefinitions(),…}`); older
+     hosts have no such method and render display(). */
+  refreshTab() {
+    try {
+      if (typeof this.update === 'function') this.update();
+      else this.display();
+    } catch (e) { /* cosmetic: the list itself is already saved */ }
+  }
+
   /* One row per group this household could plausibly stop paying for, in the
      order the Budget page shows them. Built-in types are labelled with the
      same words the wizard and the Type column use (wiz.type.*), so the toggle
@@ -933,7 +1104,10 @@ class BudgetSettingTab extends PluginSettingTab {
       {
         name: i18n.t('settings.folder.name'),
         desc: i18n.t('settings.folder.desc'),
-        control: { type: 'folder', key: 'budgetFolder', placeholder: DEFAULT_SETTINGS.budgetFolder },
+        control: {
+          type: 'folder', key: 'budgetFolder', placeholder: DEFAULT_SETTINGS.budgetFolder,
+          validate: v => this.homeFolderRefusal(normalizePath(String(v ?? '').trim() || DEFAULT_SETTINGS.budgetFolder)) || undefined,
+        },
       },
       {
         name: i18n.t('settings.theme.name'),
@@ -992,6 +1166,22 @@ class BudgetSettingTab extends PluginSettingTab {
             .setButtonText(i18n.t('settings.support.button'))
             .onClick(() => window.open(SUPPORT_URL, '_blank')));
         },
+      },
+      /* The declarative twin of display()'s Books section. Rebuilt on every
+         update(), and refreshTab() calls update() after each change to the
+         list, so these rows are never a stale snapshot. bookRows() reads only
+         settings and metadataCache, synchronously and without touching the
+         vault — which is what this method is held to. */
+      {
+        name: i18n.t('settings.books.name'),
+        desc: i18n.t('settings.books.desc'),
+        render: setting => { setting.setHeading(); },
+      },
+      ...this.bookRows().map(row => ({ name: row.name, desc: row.desc, render: row.render })),
+      {
+        name: i18n.t('settings.books.add.name'),
+        desc: i18n.t('settings.books.add.desc'),
+        render: setting => this.addBookButton(setting),
       },
       {
         name: i18n.t('settings.data.name'),

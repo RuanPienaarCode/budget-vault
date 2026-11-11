@@ -3,6 +3,7 @@
    hand-typed balance can be checked against what has actually moved since it
    was entered. Clicking a balance updates the account's markdown file in place. */
 
+const { opWriterOf } = require('../io');
 const { el, icoEl, keepScroll, caveatChip, tableCells } = require('../dom');
 /* The ring reuses the Dashboard's own chart primitives rather than a second
    donut implementation — same arc maths, same tooltip, same theme lookup, so
@@ -518,6 +519,18 @@ module.exports = function registerAccounts(ctx) {
     await app.workspace.getLeaf('tab').openFile(f);
   }
 
+  /* After a dialog opened over this load's account: true (and said) when the
+     state was replaced while it was open — another book opened, or the vault
+     re-read — so the caller stops before changing an object nothing on screen
+     holds any more (io.js opWriter). */
+  function afterDialog(op) {
+    const gone = op.replaced();
+    if (!gone) return false;
+    ctx.render();
+    toast(gone, true);
+    return true;
+  }
+
   async function editBalance(a) {
     /* The implied figure, worked out BEFORE the dialog opens, so the reader is
        comparing against it while they type rather than after they commit.
@@ -544,6 +557,7 @@ module.exports = function registerAccounts(ctx) {
        zero. Blank is the honest starting point: the reader types the real
        figure, same as they would for a brand-new account. */
     const balancePrefill = unreadableBalance(a) ? '' : a.balance.toFixed(2);
+    let op = opWriterOf(ctx);   // `a` is this load's account — see below
     const r = await askFields(app, i18n.t('acct.balance.title', { name: a.name }), [
       { key: 'balance', label: i18n.t('acct.balance.field'), type: 'number', value: balancePrefill,
         // Which currency the figure being typed is IN. Nothing converts it, so
@@ -563,6 +577,21 @@ module.exports = function registerAccounts(ctx) {
         desc: i18n.t('acct.balance.asAtDesc') },
     ]);
     if (!r) return;
+    /* What is written is the dialog's own two answers — the figure and its
+       date — patched onto the account's frontmatter. So a SAME-book reload
+       while the dialog was open (a phone's sync of an unrelated month, the
+       ordinary case on a single-book vault) is no reason to throw the typed
+       figure away: the account is looked up again in the state now in memory,
+       by the path it was read from, and the figure lands on that — on its
+       current frontmatter, not the snapshot the dialog was opened over (2026-11
+       final review). Another book is still refused (afterDialog). */
+    if (op.reason() === 'book') { afterDialog(op); return; }
+    if (op.reason() === 'reload') {
+      const cur = S.accounts.find(x => x.rel === a.rel) || S.accounts.find(x => x.name === a.name);
+      if (!cur) { ctx.render(); return toast(i18n.t('acct.delete.gone', { name: a.name }), true); }
+      a = cur;
+      op = opWriterOf(ctx);
+    }
     const num = parseAmount(r.balance);
     /* TODO(i18n): reword acct.err.nan from "Not a number" to "{field} isn't a
        number — try a plain figure like {example}." Both params are passed at
@@ -582,7 +611,7 @@ module.exports = function registerAccounts(ctx) {
     a.balance_updated = asAt;
     // saveAccount already toasted the failure — stop here rather than telling
     // the reader it updated when the file never changed.
-    if (!(await saveAccount(a))) return;
+    if (!(await saveAccount(a, [], op))) return;
     /* ctx.render, not renderAccounts: this dialog is opened from the Savings &
        Investments page too, and renderAccounts() would rebuild the page the
        reader is NOT looking at — leaving the figure they just typed absent from
@@ -710,6 +739,7 @@ module.exports = function registerAccounts(ctx) {
     };
     const shown = fieldsForType(a.type, a);
 
+    const op = opWriterOf(ctx);
     const r = await askFields(app, i18n.t('acct.edit.title', { name: a.name }), [
       { key: 'type', label: i18n.t('acct.field.type'), type: 'select', options: acctTypeOptions(), value: a.type },
       { key: 'institution', label: i18n.t('acct.field.institution'), type: 'text', value: a.institution },
@@ -729,7 +759,7 @@ module.exports = function registerAccounts(ctx) {
         value: [...mutedWarnings(a)],
         options: WARNINGS.map(w => ({ value: w, label: i18n.t('acct.mute.' + w) })) },
     ]);
-    if (!r) return;
+    if (!r || afterDialog(op)) return;
 
     /* TODO(i18n): reword acct.err.type from "Invalid type" to "{field} isn't
        valid — pick one from the list, e.g. {example}." — the type control is
@@ -812,7 +842,7 @@ module.exports = function registerAccounts(ctx) {
        by a dialog that left it alone. The budget flag needs no entry here —
        saveAccount checks it against the file on every save. */
     const changed = EDITABLE_KEYS.filter(k => FM_WRITERS[k](a) !== FM_WRITERS[k](before));
-    if (!(await saveAccount(a, changed))) {
+    if (!(await saveAccount(a, changed, op))) {
       /* Back out, as acceptImplied does. Handing over only what changed makes
          this load-bearing: a model left holding the failed edit would read as
          unchanged on the retry, which would then write nothing and toast a
@@ -2709,7 +2739,12 @@ module.exports = function registerAccounts(ctx) {
   // model left holding the failed figure still differs from it. The old text
   // said what failed and stopped there — it never told the reader the retry
   // exists at all.
-  async function saveAccount(a, keys = []) {
+  /* `op` (io.js opWriter): the writer of the operation that read `a` — a
+     dialog's caller passes the one it took before opening it, so a switch
+     while the dialog was open refuses the write rather than patching this
+     book's account file over the next book's of the same name. Absent, the
+     load in memory now. */
+  async function saveAccount(a, keys = [], op = opWriterOf(ctx)) {
     // Everything NOT patched — block-style tags, aliases, any hand-added key —
     // is left byte for byte. The body was already preserved via a.body.
     if (a.fmRaw) {
@@ -2729,7 +2764,7 @@ module.exports = function registerAccounts(ctx) {
          opened. Our own writes are deliberately not re-read by the file
          watcher, so nothing else would put this back in step. */
       try {
-        a.fmRaw = await ctx.patchFile(acctPath(a), a.fmRaw, a.body || `\n\n# ${a.name}\n`, updates);
+        a.fmRaw = await op.patchFile(acctPath(a), a.fmRaw, a.body || `\n\n# ${a.name}\n`, updates);
       } catch (e) {
         toast(i18n.t('acct.err.save', { name: a.name, error: e.message || e }), true);
         return false;
@@ -2779,7 +2814,7 @@ module.exports = function registerAccounts(ctx) {
     // (there is no raw block to patch), but the trailing `a.body ||` still
     // preserves the body, same invariant as the patch branch above.
     try {
-      await writeFile(acctPath(a), lines.join('\n') + (a.body || `\n\n# ${a.name}\n`));
+      await op.writeFile(acctPath(a), lines.join('\n') + (a.body || `\n\n# ${a.name}\n`));
     } catch (e) {
       toast(i18n.t('acct.err.save', { name: a.name, error: e.message || e }), true);
       return false;
@@ -2823,6 +2858,7 @@ module.exports = function registerAccounts(ctx) {
        set lives; a create form that asked eleven questions would be a worse
        trade than a second click. */
     const opt = fieldsForType(preType, null);
+    const op = opWriterOf(ctx, { book: true });   // bound to the BOOK, not the exact load: this only creates from what is typed (io.js opWriter({ book: true }))
     const r = await askFields(app, i18n.t('acct.new.title'), [
       { key: 'name', label: i18n.t('acct.field.name'), type: 'text', placeholder: i18n.t('acct.new.namePlaceholder'), value: pre('name') },
       { key: 'type', label: i18n.t('acct.field.type'), type: 'select', options: acctTypeOptions(), value: preType },
@@ -2841,7 +2877,7 @@ module.exports = function registerAccounts(ctx) {
           { value: 'no', label: i18n.t('acct.counts.no') }],
         desc: i18n.t('acct.field.countsDesc') },
     ]);
-    if (!r) return null;
+    if (!r || afterDialog(op)) return null;
 
     // The loader takes an account's name from its FILENAME, and saveAccount
     // writes back to `Accounts/<name>.md` — so the name held in memory has to be
@@ -2909,7 +2945,17 @@ module.exports = function registerAccounts(ctx) {
     // every validation failure above — matters more than usual: the account
     // below is never pushed into S.accounts, so a failed write never leaves
     // the app showing an account with no file behind it.
-    if (!(await saveAccount(acct))) return null;
+    if (!(await saveAccount(acct, [], op))) return null;
+    /* The file landed, in the book the form was filled in for. If another load
+       replaced the state while it was writing, nothing below may touch the
+       state (or create a folder in) the book that is open now: the toast says
+       only what is true — the file was created — and the page shows the book
+       that won. */
+    if (op.replaced()) {
+      ctx.render();
+      toast(i18n.t('acct.toast.created', { path: `Accounts/${name}.md` }));
+      return null;
+    }
     restampConflict(acct);
     // Match the setup wizard: pre-create the account's transactions folder so
     // it's importable and visible in the file explorer right away.
@@ -2982,6 +3028,9 @@ module.exports = function registerAccounts(ctx) {
     const rows = files.reduce((n, f) => n + f.rows.filter(row => !isSplitPart(row)).length, 0);
 
     let dropFolder = false;
+    /* `file`, `folders`, `labels` and the model cleanup below are this load's:
+       bound to it across both dialogs and the trash loop (io.js opWriter). */
+    const op = opWriterOf(ctx);
     if (folders.length) {
       const ask = await askFields(app, i18n.t('acct.delete.title', { name: a.name }), [{
         key: 'folder',
@@ -3010,11 +3059,11 @@ module.exports = function registerAccounts(ctx) {
         + ' ' + i18n.t('acct.delete.notes'),
       confirmText: i18n.t('acct.delete.confirm'),
     });
-    if (!go) return;
+    if (!go || afterDialog(op)) return;
 
     try {
-      await ctx.trashFile(file);
-      if (dropFolder) for (const f of folders) await ctx.trashFile(f);
+      await op.trashFile(file);
+      if (dropFolder) for (const f of folders) await op.trashFile(f);
     } catch (e) {
       /* Re-read rather than guess which half landed. A delete that threw
          part-way is exactly the case where the in-memory model and the disk

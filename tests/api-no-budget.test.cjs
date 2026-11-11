@@ -26,7 +26,7 @@
      node tests/api-no-budget.test.cjs
 */
 const assert = require('assert');
-const { stubObsidian, makeVault, makeCtx, loadInto } = require('./helpers/harness.cjs');
+const { stubObsidian, makeVault, makeCtx, loadInto, bookSeam } = require('./helpers/harness.cjs');
 stubObsidian();
 const { pinClock, mountFor } = require('./helpers/figures.cjs');
 const { SEED, B, TODAY, PERIOD } = require('./figures/household.cjs');
@@ -37,7 +37,7 @@ let checks = 0;
 const ok = (c, m) => { assert.ok(c, m); checks++; };
 const eq = (a, b, m) => { assert.deepStrictEqual(a, b, m); checks++; };
 
-const plugin = files => ({ settings: { budgetFolder: B }, app: { vault: makeVault(files) }, _lastWrite: 0 });
+const plugin = files => bookSeam({ settings: { budgetFolder: B }, app: { vault: makeVault(files) }, _lastWrite: 0 });
 const BUDGET = `${B}/Budgets/${PERIOD}.md`;
 const withoutBudget = () => { const f = { ...SEED }; delete f[BUDGET]; return f; };
 /* The same file with its table emptied: frontmatter and header row kept. */

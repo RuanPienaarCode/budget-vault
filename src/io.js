@@ -1,7 +1,9 @@
 'use strict';
-/* Vault file access, rooted at the configured budget folder. All paths given
-   to these helpers are relative to that folder. Tracks the time of our own
-   writes so the change-watcher can tell them apart from external edits.
+/* Vault file access, rooted at the open book's folder (plugin.activeFolder(),
+   ADR 0009 — the home book unless this device has another book open). All
+   paths given to these helpers are relative to that folder. Tracks the time
+   of our own writes so the change-watcher can tell them apart from external
+   edits.
 
    A FACTORY plus a thin registrar, not a closure over a view ctx. The guards
    here only protect writers who can reach them, and two writers cannot go
@@ -27,7 +29,7 @@ const { lineEndingOf } = require('./table-schema');
    to every segment of a vault-root path. */
 const foldSeg = s => String(s ?? '').normalize('NFC').toLowerCase();
 
-/* destinationProblem(folder, { configDir, budgetFolder }) — may an export
+/* destinationProblem(folder, { configDir, budgetFolder, budgetFolders }) — may an export
    write into the folder the reader TYPED? The one answer for every export
    that takes a destination: the Report uses it; the Transactions export and
    the budget export are to adopt it rather than keep their partial copies.
@@ -51,7 +53,7 @@ const foldSeg = s => String(s ?? '').normalize('NFC').toLowerCase();
                                              file explorer will ever show
      { kind: 'managed', folder: 'Categories' | 'Accounts' | 'Budgets' |
                                 'Plans' | 'Tax' | 'Transactions' | 'Notes' }
-                                             inside the budget folder, at or
+                                             inside a book's folder, at or
                                              below a folder load.js reads, so
                                              the next load parses the export
                                              back in as data (src/report.js
@@ -69,15 +71,18 @@ const foldSeg = s => String(s ?? '').normalize('NFC').toLowerCase();
    them onto the real folder, and ".obsidian-notes" or
    "Budget/CategoriesOfSpending" are ordinary folders. An empty folder is
    null — the caller applies its own default. `configDir` defaults to
-   ".obsidian" and `budgetFolder` to the vault root; makeIo() below publishes
-   a copy bound to the live vault's config folder and the configured budget
-   folder, which is the one a view should call.
+   ".obsidian" and `budgetFolder` to the vault root; `budgetFolders`, when
+   given, adds more roots whose managed folders are refused just the same —
+   every book in the vault (ADR 0009), since an export in client B's
+   Transactions/ is B's data the next time B opens. makeIo() below publishes a
+   copy bound to the live vault's config folder, the open book and every other
+   book, which is the one a view should call.
 
    Pure apart from reading src/report.js's managed-folder list — required
    lazily, because io.js is the first module every boot path loads and the
    report's module graph (twelve language tables among it) has no business
    loading with it. */
-function destinationProblem(folder, { configDir, budgetFolder } = {}) {
+function destinationProblem(folder, { configDir, budgetFolder, budgetFolders } = {}) {
   const segs = String(folder ?? '').replace(/\\/g, '/').split('/')
     .map(s => s.trim()).filter(s => s && s !== '.');
   if (!segs.length) return null;
@@ -88,8 +93,16 @@ function destinationProblem(folder, { configDir, budgetFolder } = {}) {
     return { kind: 'configDir', folder: cfg };
   }
   const { managedFolderMatch } = require('./report');
-  const managed = managedFolderMatch(segs.join('/'), budgetFolder || '');
-  if (managed) return { kind: 'managed', folder: managed };
+  /* Every book's managed folders, not only one: `budgetFolders` lists the
+     vault's books (ADR 0009). With neither option given the root stands in,
+     as it always has; with only the list, the list alone is checked. */
+  const roots = [];
+  if (budgetFolder != null || !Array.isArray(budgetFolders)) roots.push(budgetFolder || '');
+  if (Array.isArray(budgetFolders)) for (const b of budgetFolders) roots.push(b || '');
+  for (const root of roots) {
+    const managed = managedFolderMatch(segs.join('/'), root);
+    if (managed) return { kind: 'managed', folder: managed };
+  }
   // Any other dot-segment: Obsidian indexes nothing under it (vault-path.js).
   const hidden = hiddenSegment(segs.join('/'));
   return hidden ? { kind: 'hidden', folder: hidden } : null;
@@ -183,7 +196,8 @@ const isTextPath = p => /\.(md|csv|txt|json)$/i.test(p);
 /* `view: true` is the io a Budget view watches the vault through (registerIo
    below); main.js and the wizard build theirs without it. See the ledger's
    `by` above for what the difference decides. */
-function makeIo({ vault, plugin }, { view = false } = {}) {
+function makeIo(deps, { view = false } = {}) {
+  const { vault, plugin } = deps;
   // Write-guard timestamp lives on the plugin (not this closure) so writes made
   // outside the view — the Settings.md updater in main.js — can stamp it too and
   // be recognised as our own, suppressing a redundant watcher reload.
@@ -200,7 +214,12 @@ function makeIo({ vault, plugin }, { view = false } = {}) {
   // An own-record entry is this io's echo if this io wrote it, or no view did.
   const mine = e => e.by === me || !(e.by && e.by.view);
 
-  const basePath = () => normalizePath(plugin.settings.budgetFolder);
+  /* The OPEN book's folder (ADR 0009), resolved afresh on every call so a
+     switch is seen by the next path built — the same freshness reading
+     settings.budgetFolder here always had. Never the home book directly: in a
+     vault with several books that would read and write the wrong client's
+     files while the screen showed the right one's. */
+  const basePath = () => normalizePath(plugin.activeFolder());
   const relPath = p => normalizePath(basePath() + '/' + p);
   const keyOf = p => foldSeg(p);
   /* The budget-relative form of a vault path, for a message a person reads. */
@@ -276,6 +295,199 @@ function makeIo({ vault, plugin }, { view = false } = {}) {
     for (const fn of Array.from(rec.listeners)) { try { fn({ rel, path: relPath(rel) }); } catch (e) { /* a listener must not mask the refusal */ } }
     return err;
   }
+  /* ---- the book a state was read from (ADR 0009) ----
+
+     Every whole-file writer serialises from the state its ctx's load built,
+     and addresses the file through basePath() — the OPEN book, resolved afresh
+     per call. Those two can disagree: a book switch writes the per-device key
+     first and reloads after, a reload can fail or be declined over unsaved
+     edits, and a load that was reading when the switch landed belongs to the
+     book it started in (load.js). In that window book A's rows sat in memory
+     while every path pointed into book B, and the next Save wrote A's rows
+     over B's files — on the 2026-11 review's repro, `Clients/Acme/
+     Transactions/Cheque/2026-01.md` ended up holding the household's row.
+
+     So a write is refused when the folder the ctx's state was LOADED from
+     (load.js publishes it as loadedBook(); absent for the boot-time writers
+     main.js and the wizard build, which serialise nothing from a load) is not
+     the folder the write would land in. Refused, never redirected: writing A's
+     rows back into A behind the reader's back, after the screen has moved to
+     B, is a correction nobody asked for. The page says what happened and
+     nothing is written; the reader makes the change again in the book now on
+     screen. Not a STALE refusal and does not tell the stale listeners — the
+     controller's handler for those forces a reload, which over unsaved edits
+     is exactly what this refusal is protecting. */
+  function loadedFolder() {
+    const lb = typeof deps.loadedBook === 'function' ? deps.loadedBook() : null;
+    return lb && typeof lb.folder === 'string' ? lb.folder : null;
+  }
+  function bookChangedError(rel) {
+    let message;
+    try {
+      message = require('./i18n').t('io.bookChanged.message', { file: rel });
+    } catch (e) { message = null; }
+    if (!message || message === 'io.bookChanged.message') {
+      message = `Another book was opened after this page was read, so ${rel} was not written`;
+    }
+    const err = new Error(message);
+    err.code = 'BOOK_CHANGED';
+    err.rel = rel;
+    return err;
+  }
+  /* Asked twice per write: before anything is awaited, and again straight
+     before the vault call, with nothing awaited in between — a switch landing
+     inside assertFresh's wait must not slip through on the first answer.
+     `path`, when given, must also still sit inside the loaded folder: it was
+     resolved before the wait. */
+  function assertSameBook(rel, path, stamp) {
+    assertStamp(rel, stamp);
+    const folder = loadedFolder();
+    if (folder === null) return;
+    const base = basePath();
+    if (folder !== base) throw bookChangedError(rel);
+    /* The write window (below): a write in the same burst as one that began
+       under another book's state is that operation's, not a new one's. */
+    if (win.folder != null && win.folder !== folder) throw bookChangedError(rel);
+    if (path != null) {
+      const root = collapsePath(base);
+      const resolved = collapsePath(path);
+      // collapsePath turns a book at the vault root ('/') into ''.
+      if (resolved === null || (root !== '' && resolved !== root && !resolved.startsWith(root + '/'))) throw bookChangedError(rel);
+    }
+  }
+
+  /* ---- an operation's own load (the 2026-11 re-review) ----
+
+     The check above compares FOLDERS: the folder the state was loaded from
+     against the open one. That holds until the new book's reload commits —
+     from then on the two agree again, and an operation that gathered its
+     month objects BEFORE the switch writes the next of them into the new
+     book. On the re-review's repro the Transactions bulk delete wrote its
+     delete log, a sibling plugin switched books while that write was landing,
+     the client's reload committed, and the loop's next writeFile put the
+     household's month — `HOME Bakery` — into `Clients/Acme/Transactions/
+     Cheque/2026-09.md`, followed by a success toast.
+
+     So an operation that reads the state and then awaits anything before (or
+     between) its writes carries a STAMP: load.js's loadedBook() taken before
+     its first await — a frozen object, one per committed load. opWriter()
+     hands it writers that refuse unless the state in memory is still that very
+     load (identity, not folder: a same-book reload also replaces every object
+     the operation is holding) AND it is still the open book's. Checked when the
+     write is called and again after the stale wait, with nothing awaited
+     between that check and the vault call. A refusal is BOOK_CHANGED when the
+     book moved, RELOADED when the same book was re-read; either way nothing
+     was written by that call, and the caller says how far it got. */
+  function reloadedError(rel) {
+    let message;
+    try {
+      message = require('./i18n').t('io.reloadedWrite.message', { file: rel });
+    } catch (e) { message = null; }
+    if (!message || message === 'io.reloadedWrite.message') {
+      message = `The budget was read again after this began, so ${rel} was not written`;
+    }
+    const err = new Error(message);
+    err.code = 'RELOADED';
+    err.rel = rel;
+    return err;
+  }
+  const currentLoad = () => (typeof deps.loadedBook === 'function' ? deps.loadedBook() : null);
+  function assertStamp(rel, stamp) {
+    if (stamp === undefined) return;
+    /* A BOOK stamp (opWriter({ book: true }), below): only the book matters. */
+    if (stamp && typeof stamp.book === 'string') {
+      const lf = loadedFolder();
+      if (stamp.book !== basePath() || (lf !== null && lf !== stamp.book)) throw bookChangedError(rel);
+      return;
+    }
+    if (stamp && stamp.folder !== basePath()) throw bookChangedError(rel);
+    if (currentLoad() !== stamp) {
+      const now = currentLoad();
+      throw (now && stamp && now.folder !== stamp.folder) ? bookChangedError(rel) : reloadedError(rel);
+    }
+  }
+  /* opWriter(stamp = the load in memory now) → the writers, bound to it, plus
+     replaced(): null while the stamp still holds, else the sentence to show
+     for an operation that has not written anything yet (after a dialog). */
+  const via = (name, own) => (typeof deps[name] === 'function' ? deps[name] : own);
+  /* opWriter({ book: true }) — bound to the BOOK, not the exact load (the
+     2026-11 final review). For a flow that only CREATES from what the reader
+     typed — a note, a receipt slip, a category, an account, a row added to a
+     list — and reads whatever state it needs AFTER its dialog closes, from the
+     state in memory then. A same-book reload under the dialog (a phone's sync
+     of an unrelated month, which the watcher reloads for while a plugin modal
+     is up) replaced nothing that flow holds, and refusing it threw away what
+     the reader had just typed: on a single-book vault — every vault today —
+     that was the only way the stamp could fire. A switch to another book is
+     still refused (BOOK_CHANGED): the typing was for the book on screen.
+
+     reason(): null, 'book' (another book is open, or its state is), or
+     'reload' (the same book was re-read — never for a book-bound writer). */
+  function opWriter(mode) {
+    if (mode && mode.book === true) {
+      const book = loadedFolder();
+      const opt = { stamp: book === null ? undefined : { book } };
+      const reason = () => {
+        if (book === null) return null;
+        const lf = loadedFolder();
+        return book !== basePath() || (lf !== null && lf !== book) ? 'book' : null;
+      };
+      return writersFor(opt, reason, opt.stamp);
+    }
+    const stamp = mode === undefined ? currentLoad() : mode;
+    const reason = () => {
+      const now = currentLoad();
+      if (now === stamp && (!stamp || stamp.folder === basePath())) return null;
+      return (stamp && stamp.folder !== basePath()) || (now && stamp && now.folder !== stamp.folder) ? 'book' : 'reload';
+    };
+    return writersFor({ stamp }, reason, stamp);
+  }
+  function writersFor(opt, reason, stamp) {
+    return {
+      stamp,
+      reason,
+      replaced() {
+        if (!reason()) return null;
+        let m = null;
+        try { m = require('./i18n').t('io.reloaded.message'); } catch (e) { m = null; }
+        return m && m !== 'io.reloaded.message' ? m : 'The budget was read again while this was waiting, so nothing was changed.';
+      },
+      /* Through the ctx's published writer when there is one (it is this io's
+         own unless something replaced it — a test's spy, say), so an operation
+         that moved to opWriter is still seen by whatever watches ctx.writeFile. */
+      writeFile: (rel, content) => via('writeFile', writeFile)(rel, content, opt),
+      writeBinary: (rel, data) => via('writeBinary', writeBinary)(rel, data, opt),
+      patchFile: (rel, raw, body, updates) => via('patchFile', patchFile)(rel, raw, body, updates, opt),
+      trashFile: file => via('trashFile', trashFile)(file, opt),
+    };
+  }
+
+  /* ---- the write window: the backstop for a writer that carries no stamp ----
+
+     Every writer in a view that awaits between reading the state and writing
+     is meant to carry a stamp (opWriter, above). This is for the one that does
+     not yet: a burst of writes — each started before the previous one's
+     macrotask is over — is treated as one operation, and the folder the state
+     was loaded from when the burst BEGAN is the folder every write in it must
+     still match. A book's reload that commits between two writes of a loop
+     (the re-review's shape, by any trigger: a sibling's setActiveBook, a
+     second view or popout, onExternalSettingsChange) then refuses the rest of
+     the loop rather than writing it into the new book. Folder, not load: a
+     same-book reload mid-burst is the stamp's business. The window closes one
+     macrotask after the last write settles, so the next thing the reader does
+     — always a new event — opens a new one. */
+  const win = { folder: null, active: 0, timer: null };
+  function winEnter() {
+    if (win.active === 0 && win.timer === null) win.folder = loadedFolder();
+    if (win.timer !== null) { clearTimeout(win.timer); win.timer = null; }
+    win.active++;
+  }
+  function winLeave() {
+    win.active--;
+    if (win.active > 0) return;
+    win.timer = setTimeout(() => { win.timer = null; if (win.active === 0) win.folder = null; }, 0);
+  }
+
   /* Throws STALE when somebody else changed, moved or deleted this path since
      the page last read it. Waits first for any change event still being
      judged, so a Save clicked in the instant between an edit arriving and the
@@ -357,18 +569,8 @@ function makeIo({ vault, plugin }, { view = false } = {}) {
     const undo = ownRemember(path, DIR);
     try { await vault.createFolder(path); } catch (e) { undo(); /* raced into existence */ }
   }
-  async function readFile(rel) {
-    const path = relPath(rel);
-    const f = vault.getFileByPath(path);
-    const text = f ? await vault.cachedRead(f) : null;
-    /* The caller now holds this file's CURRENT bytes, so whatever it writes
-       back is built on them: whatever made the path stale is no longer a
-       reason to refuse. (Writers that read first — the rules file, the deleted
-       log, the Settings updater — rely on this; load-time writers never call
-       it between the load and the Save.) */
-    rec.stale.delete(keyOf(path));
-    return text;
-  }
+  const live = readersAt(basePath);
+  const readFile = live.readFile;
   // Defence in depth: refuse any write that resolves outside the budget
   // folder. normalizePath does NOT strip "../", so a label like
   // "../../evil" pulled from a synced Accounts file could otherwise escape;
@@ -473,35 +675,48 @@ function makeIo({ vault, plugin }, { view = false } = {}) {
      file being GONE: a writer addressing a path the page loaded must not bring
      a moved file back as a second copy (L3-06). A path no event ever named is
      simply new, and is created. */
-  async function writeFile(rel, content) {
-    const path = guardedPath(rel);
-    await assertFresh(path, rel);
-    const undo = ownRemember(path, hashText(content));
+  /* `opts.stamp`: the load the calling operation began from (opWriter). */
+  async function writeFile(rel, content, opts) {
+    const stamp = opts ? opts.stamp : undefined;
+    winEnter();
     try {
-      const f = vault.getFileByPath(path);
-      if (f) { await vault.modify(f, content); }
-      else {
-        await ensureFolder(path.split('/').slice(0, -1).join('/'));
-        await vault.create(path, content);
-      }
-    } catch (e) { undo(); throw e; }
-    stampWrite();
+      assertSameBook(rel, null, stamp);
+      const path = guardedPath(rel);
+      await assertFresh(path, rel);
+      assertSameBook(rel, path, stamp);
+      const undo = ownRemember(path, hashText(content));
+      try {
+        const f = vault.getFileByPath(path);
+        if (f) { await vault.modify(f, content); }
+        else {
+          await ensureFolder(path.split('/').slice(0, -1).join('/'));
+          await vault.create(path, content);
+        }
+      } catch (e) { undo(); throw e; }
+      stampWrite();
+    } finally { winLeave(); }
   }
   /* Binary sibling of writeFile — same containment guard. Used for uploaded
      tax documents (PDFs, images). */
-  async function writeBinary(rel, data) {
-    const path = guardedPath(rel);
-    await assertFresh(path, rel);
-    const undo = ownRemember(path, BIN);
+  async function writeBinary(rel, data, opts) {
+    const stamp = opts ? opts.stamp : undefined;
+    winEnter();
     try {
-      const f = vault.getFileByPath(path);
-      if (f) { await vault.modifyBinary(f, data); }
-      else {
-        await ensureFolder(path.split('/').slice(0, -1).join('/'));
-        await vault.createBinary(path, data);
-      }
-    } catch (e) { undo(); throw e; }
-    stampWrite();
+      assertSameBook(rel, null, stamp);
+      const path = guardedPath(rel);
+      await assertFresh(path, rel);
+      assertSameBook(rel, path, stamp);
+      const undo = ownRemember(path, BIN);
+      try {
+        const f = vault.getFileByPath(path);
+        if (f) { await vault.modifyBinary(f, data); }
+        else {
+          await ensureFolder(path.split('/').slice(0, -1).join('/'));
+          await vault.createBinary(path, data);
+        }
+      } catch (e) { undo(); throw e; }
+      stampWrite();
+    } finally { winLeave(); }
   }
   /* THE body-preserving write, as a named operation. note-file.js calls this
      invariant "THE ONE INVARIANT THAT MATTERS" — patch the frontmatter, never
@@ -522,11 +737,11 @@ function makeIo({ vault, plugin }, { view = false } = {}) {
      body under an LF frontmatter — mixed endings, a whole-file diff under sync
      (2026-10-14 audit, L3-11). The captured block is read as LF first so
      patchFrontmatter sees the same lines whatever the file's ending. */
-  async function patchFile(rel, raw, body, updates) {
+  async function patchFile(rel, raw, body, updates, opts) {
     const eol = lineEndingOf(body) || lineEndingOf(raw) || '\n';
     const lf = patchFrontmatter(String(raw == null ? '' : raw).replace(/\r\n/g, '\n'), updates);
     const fm = eol === '\n' ? lf : lf.replace(/\n/g, eol);
-    await writeFile(rel, `---${eol}${fm}${eol}---${body}`);
+    await writeFile(rel, `---${eol}${fm}${eol}---${body}`, opts);
     return fm;
   }
   /* Delete, as the only deletion this plugin performs.
@@ -549,32 +764,41 @@ function makeIo({ vault, plugin }, { view = false } = {}) {
      change as ours and does not schedule a reload on top of the caller's own
      in-memory cleanup. Returns false for nothing-to-delete so a caller can say
      so rather than claim a success. */
-  async function trashFile(file) {
+  async function trashFile(file, opts) {
     if (!file) return false;
-    /* Re-asked here, after whatever dialog the caller put the reader through
-       (2026-10-14 audit, L3-13). A TFile follows its file through a rename, so
-       a path that no longer resolves to THIS file means it is gone (nothing to
-       delete — said as false, not as a success) or was deleted and replaced by
-       a different file (a sync, another pane), which this would otherwise trash
-       at the old path. categories.js carried the check for itself; plans, tax
-       years, accounts and notes did not.
+    const stamp = opts ? opts.stamp : undefined;
+    winEnter();
+    try {
+      /* A TFile taken before a dialog is a file of the book that was open THEN;
+         the same refusal as a write (assertSameBook, above), before and after
+         the wait. */
+      assertSameBook(relOf(file.path), null, stamp);
+      /* Re-asked here, after whatever dialog the caller put the reader through
+         (2026-10-14 audit, L3-13). A TFile follows its file through a rename, so
+         a path that no longer resolves to THIS file means it is gone (nothing to
+         delete — said as false, not as a success) or was deleted and replaced by
+         a different file (a sync, another pane), which this would otherwise trash
+         at the old path. categories.js carried the check for itself; plans, tax
+         years, accounts and notes did not.
 
-       "This file" is the same object, or — because a vault may rebuild its
-       index and hand back a fresh object for an unchanged file — the same path
-       with the same creation time (both without stat only in the bare-node
-       harness). A FOLDER has no content of its own to be mistaken for another,
-       so it only has to still exist. */
-    const isFolder = Array.isArray(file.children);
-    const now = isFolder ? vault.getFolderByPath(file.path) : vault.getFileByPath(file.path);
-    if (!now) return false;
-    const same = isFolder || now === file || (now.path === file.path
-      && (now.stat && file.stat ? now.stat.ctime === file.stat.ctime : !now.stat && !file.stat));
-    if (!same) throw staleError(relOf(file.path));
-    await assertFresh(file.path, relOf(file.path));
-    const undo = ownRemember(file.path, GONE);
-    try { await vault.trash(file, false); } catch (e) { undo(); throw e; }
-    stampWrite();
-    return true;
+         "This file" is the same object, or — because a vault may rebuild its
+         index and hand back a fresh object for an unchanged file — the same path
+         with the same creation time (both without stat only in the bare-node
+         harness). A FOLDER has no content of its own to be mistaken for another,
+         so it only has to still exist. */
+      const isFolder = Array.isArray(file.children);
+      const now = isFolder ? vault.getFolderByPath(file.path) : vault.getFileByPath(file.path);
+      if (!now) return false;
+      const same = isFolder || now === file || (now.path === file.path
+        && (now.stat && file.stat ? now.stat.ctime === file.stat.ctime : !now.stat && !file.stat));
+      if (!same) throw staleError(relOf(file.path));
+      await assertFresh(file.path, relOf(file.path));
+      assertSameBook(relOf(file.path), file.path, stamp);
+      const undo = ownRemember(file.path, GONE);
+      try { await vault.trash(file, false); } catch (e) { undo(); throw e; }
+      stampWrite();
+      return true;
+    } finally { winLeave(); }
   }
   function fileAt(rel) {
     return vault.getFileByPath(relPath(rel));
@@ -701,87 +925,144 @@ function makeIo({ vault, plugin }, { view = false } = {}) {
     }
     return false;
   }
-  function mdFilesIn(rel) {
-    const f = vault.getFolderByPath(relPath(rel));
-    if (!f) return [];
-    return f.children.filter(c => c instanceof TFile && c.extension === 'md');
-  }
-  /* Every .md at or below `rel`, depth-first.
+  const { mdFilesIn, mdFilesUnder, subfoldersIn, subfoldersUnder } = live;
 
-     mdFilesIn reads one level, and the reason is the WRITERS, not the folder.
-     No folder in this vault is flat by construction — it is user-writable
-     markdown, and filing dormant accounts into Accounts/Closed/ or a year of
-     notes into Notes/2026/ is an ordinary tidy-up. Notes/ is read with this
-     function because every note writer addresses `n.rel`, the path the note
-     was read from. Accounts/ joined it once its writers learned `a.rel` too
-     (ISSUE 60) — before that, a recursing loader plus one balance edit left
-     R88 000 nested and R90 000 flat, one account in two files. Categories/,
-     Budgets/, Plans/ and Tax/ are still read one level, because their writers
-     ASSEMBLE `<Folder>/<name>.md` and would fork a nested file the same way.
-     Switching a folder to this function means teaching its writers the path
-     FIRST; tests/account-file-paths.test.cjs holds that order.
+  /* readersAt(base) — the READ half of this io (readFile and the four folder
+     walkers), rooted at `base()` instead of the open book. The functions above
+     are readersAt(basePath): rooted at the open book, resolved per call, as
+     they always were.
 
-     Walks the tree rather than filtering vault.getMarkdownFiles(), so the cost
-     stays proportional to the folder rather than to the vault. */
-  function mdFilesUnder(rel) {
-    const root = vault.getFolderByPath(relPath(rel));
-    if (!root) return [];
-    const out = [];
-    const walk = folder => {
-      for (const c of folder.children) {
-        if (c instanceof TFile) { if (c.extension === 'md') out.push(c); }
-        else if (c instanceof TFolder) walk(c);
-      }
-    };
-    walk(root);
-    return out;
-  }
-  function subfoldersIn(rel) {
-    const f = vault.getFolderByPath(relPath(rel));
-    if (!f) return [];
-    return f.children.filter(c => c instanceof TFolder);
-  }
-  /* Every folder at or below `rel`, shallowest first. ISSUE 97.
+     WHY A LOAD NEEDS ITS OWN ROOT (ADR 0009, 2026-11 review). A full load is
+     dozens of awaited reads, and each one used to resolve its path through
+     activeFolder() at the moment it ran. A book switch landing mid-load
+     therefore split the load across two books — the household's categories
+     and Settings.md, the client's transaction rows — and that mixture was
+     handed to every caller as "the state". load.js now captures the folder
+     ONCE when a load starts and reads every file through readersAt() pinned
+     to it, so a load reads one book whatever happens to the open book while
+     it runs; whether its result is still wanted is load.js's decision.
 
-     subfoldersIn reads one level, and for Transactions/ that costs ROWS: an
-     account filed under Transactions/Closed/<name>/ loads its balance (since
-     ISSUE 60 taught Accounts/ to recurse) while its money silently is not
-     there. There is no disclosure list for transactions, so nothing says so.
-
-     Breadth-first is load-bearing, not tidiness. Two folders can present the
-     same leaf name — Transactions/<name>/ and Transactions/Closed/<name>/ —
-     and the label is the leaf. Shallowest-first makes "the first one wins"
-     mean the obvious one, deterministically, rather than depending on the
-     order the vault hands back its children; the losers are disclosed rather
-     than dropped. */
-  function subfoldersUnder(rel) {
-    const root = vault.getFolderByPath(relPath(rel));
-    if (!root) return [];
-    const out = [];
-    let level = root.children.filter(c => c instanceof TFolder);
-    while (level.length) {
-      const next = [];
-      for (const f of level) { out.push(f); for (const c of f.children) if (c instanceof TFolder) next.push(c); }
-      level = next;
+     Same per-io stale record as the live readers: a file read here is held
+     current by this io, exactly as before. Published on the view ctx as
+     `readersAt(folder)`, folder in basePath()'s form. */
+  function readersAt(base) {
+    const rp = p => normalizePath(base() + '/' + p);
+    async function readFile(rel) {
+      const path = rp(rel);
+      const f = vault.getFileByPath(path);
+      const text = f ? await vault.cachedRead(f) : null;
+      /* The caller now holds this file's CURRENT bytes, so whatever it writes
+         back is built on them: whatever made the path stale is no longer a
+         reason to refuse. (Writers that read first — the rules file, the deleted
+         log, the Settings updater — rely on this; load-time writers never call
+         it between the load and the Save.) */
+      rec.stale.delete(keyOf(path));
+      return text;
     }
-    return out;
+    function mdFilesIn(rel) {
+      const f = vault.getFolderByPath(rp(rel));
+      if (!f) return [];
+      return f.children.filter(c => c instanceof TFile && c.extension === 'md');
+    }
+    /* Every .md at or below `rel`, depth-first.
+
+       mdFilesIn reads one level, and the reason is the WRITERS, not the folder.
+       No folder in this vault is flat by construction — it is user-writable
+       markdown, and filing dormant accounts into Accounts/Closed/ or a year of
+       notes into Notes/2026/ is an ordinary tidy-up. Notes/ is read with this
+       function because every note writer addresses `n.rel`, the path the note
+       was read from. Accounts/ joined it once its writers learned `a.rel` too
+       (ISSUE 60) — before that, a recursing loader plus one balance edit left
+       R88 000 nested and R90 000 flat, one account in two files. Categories/,
+       Budgets/, Plans/ and Tax/ are still read one level, because their writers
+       ASSEMBLE `<Folder>/<name>.md` and would fork a nested file the same way.
+       Switching a folder to this function means teaching its writers the path
+       FIRST; tests/account-file-paths.test.cjs holds that order.
+
+       Walks the tree rather than filtering vault.getMarkdownFiles(), so the cost
+       stays proportional to the folder rather than to the vault. */
+    function mdFilesUnder(rel) {
+      const root = vault.getFolderByPath(rp(rel));
+      if (!root) return [];
+      const out = [];
+      const walk = folder => {
+        for (const c of folder.children) {
+          if (c instanceof TFile) { if (c.extension === 'md') out.push(c); }
+          else if (c instanceof TFolder) walk(c);
+        }
+      };
+      walk(root);
+      return out;
+    }
+    function subfoldersIn(rel) {
+      const f = vault.getFolderByPath(rp(rel));
+      if (!f) return [];
+      return f.children.filter(c => c instanceof TFolder);
+    }
+    /* Every folder at or below `rel`, shallowest first. ISSUE 97.
+
+       subfoldersIn reads one level, and for Transactions/ that costs ROWS: an
+       account filed under Transactions/Closed/<name>/ loads its balance (since
+       ISSUE 60 taught Accounts/ to recurse) while its money silently is not
+       there. There is no disclosure list for transactions, so nothing says so.
+
+       Breadth-first is load-bearing, not tidiness. Two folders can present the
+       same leaf name — Transactions/<name>/ and Transactions/Closed/<name>/ —
+       and the label is the leaf. Shallowest-first makes "the first one wins"
+       mean the obvious one, deterministically, rather than depending on the
+       order the vault hands back its children; the losers are disclosed rather
+       than dropped. */
+    function subfoldersUnder(rel) {
+      const root = vault.getFolderByPath(rp(rel));
+      if (!root) return [];
+      const out = [];
+      let level = root.children.filter(c => c instanceof TFolder);
+      while (level.length) {
+        const next = [];
+        for (const f of level) { out.push(f); for (const c of f.children) if (c instanceof TFolder) next.push(c); }
+        level = next;
+      }
+      return out;
+    }
+    return { basePath: base, relPath: rp, readFile, mdFilesIn, mdFilesUnder, subfoldersIn, subfoldersUnder };
   }
 
   return {
     basePath, relPath, readFile, writeFile, writeVaultFile, writeVaultBinary, writeBinary, patchFile, trashFile, fileAt, pathTaken, folderAt, mdFilesIn, mdFilesUnder, subfoldersIn, subfoldersUnder, ensureFolder,
+    /* A load's own root (see readersAt above): the read half, pinned. */
+    readersAt: folder => readersAt(() => normalizePath(folder)),
+    /* An operation's writers, bound to the load it began from (see above). */
+    opWriter,
     createVaultFileIfAbsent, ensureVaultFolder, fileAtVaultPath, readVaultFile, folderAtVaultPath, vaultPathTaken,
     /* The change ledger (see the block above makeIo): the watcher reports what
        it saw, a full reload brackets itself, the controller hears refusals. */
     observeChange, staleMark, staleClear, isStaleFile, onStaleWrite,
     /* destinationProblem (module level, above) bound to THIS vault: its own
-       config folder (vault.configDir, read at call time) and the configured
-       budget folder. `opts` still overrides either, for a caller that knows
-       better. Same contract and return as the unbound function. */
+       config folder (vault.configDir, read at call time), the open book, and
+       every other book the vault holds — an export written into client B's
+       Transactions/ while A is open is parsed back in as B's data the next
+       time B opens (ADR 0009 §4). `opts` still overrides any of them, for a
+       caller that knows better. Same contract and return as the unbound
+       function. */
     destinationProblem: (folder, opts) => destinationProblem(folder, {
-      configDir: vault.configDir, budgetFolder: plugin.settings.budgetFolder, ...(opts || {}),
+      configDir: vault.configDir, budgetFolder: plugin.activeFolder(), budgetFolders: plugin.allBookFolders(), ...(opts || {}),
     }),
     lastWriteAt: () => plugin._lastWrite || 0,
   };
+}
+
+/* An operation's writer for a ctx, whoever built it. The plugin's ctx always
+   has io.js's opWriter (registerIo, below), and that is what this returns. A
+   ctx assembled WITHOUT io.js — the bare-node harnesses that publish a
+   writeFile spy of their own and register one view on it — has no load to
+   stamp, so it gets that ctx's own writers, never refusing: there is no
+   second book in such a ctx for a write to land in. Views call this rather
+   than ctx.opWriter() so those harnesses keep driving the real view code. */
+function opWriterOf(ctx, mode) {
+  if (ctx && typeof ctx.opWriter === 'function') return ctx.opWriter(mode);
+  const call = name => (...a) => ctx[name](...a);
+  return { stamp: undefined, reason: () => null, replaced: () => null,
+    writeFile: call('writeFile'), writeBinary: call('writeBinary'), patchFile: call('patchFile'), trashFile: call('trashFile') };
 }
 
 function registerIo(ctx) {
@@ -791,3 +1072,4 @@ function registerIo(ctx) {
 module.exports = registerIo;
 module.exports.makeIo = makeIo;
 module.exports.destinationProblem = destinationProblem;
+module.exports.opWriterOf = opWriterOf;

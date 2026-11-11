@@ -2,6 +2,7 @@
 /* Transactions — filterable table with inline category / exclude / note
    editing, saved back to Transactions/<account>/<month>.md files. */
 
+const { opWriterOf } = require('../io');
 const { el, icoEl, tableCells, caveatChip } = require('../dom');
 const { normalizeAmount } = require('../amount');
 const { patchFrontmatter, yamlStr, parseMdTableWithSeparator } = require('../markdown');
@@ -261,6 +262,7 @@ module.exports = function registerTransactions(ctx) {
     const old = rule.category;
     const n = ruleReach(rule);
     const reach = n === 0 ? i18n.t('tx.ruleFix.reachNone') : i18n.t('tx.ruleFix.reach', { count: n });
+    const op = opWriterOf(ctx);   // `rule` is this load's object — see afterDialog
     const go = await confirmModal(app, {
       title: i18n.t('tx.ruleFix.title'),
       message: i18n.t('tx.ruleFix.msg', { pattern: rule.pattern, old, reach, cat: newCat }),
@@ -268,8 +270,8 @@ module.exports = function registerTransactions(ctx) {
       confirmText: i18n.t('tx.ruleFix.confirm'),
       primary: 'cancel',
     });
-    if (!go) return;
-    if (await correctRule(rule, newCat)) toast(i18n.t('tx.ruleFix.done', { pattern: rule.pattern, cat: newCat, old }));
+    if (!go || afterDialog(op)) return;
+    if (await correctRule(rule, newCat, op)) toast(i18n.t('tx.ruleFix.done', { pattern: rule.pattern, cat: newCat, old }));
   }
 
   /* Not ctx.dirtyFlag: dirtiness here is per transaction FILE (f.dirty), and
@@ -278,6 +280,19 @@ module.exports = function registerTransactions(ctx) {
      missing when the reload list was written out by hand, which left Save lit
      after a reload had already discarded the edits it was offering to save. */
   const clearSaveButton = ctx.registerSaveButton('#txSave');
+
+  /* After any dialog that was opened over this load's rows: true (and said)
+     when the state was replaced while it was open — another book opened, or
+     the vault re-read — so the caller stops before touching objects nothing
+     on screen holds any more (io.js opWriter, ADR-0007 "A confirmation dialog
+     takes a load stamp"). Re-renders, so the page shows the state that won. */
+  function afterDialog(op) {
+    const gone = op.replaced();
+    if (!gone) return false;
+    renderTransactions();
+    toast(gone, true);
+    return true;
+  }
 
   /* Windowing state. `renderToken` changes whenever the FILTERS change, which
      is what resets the window — a plain re-render (a category edit, a reload)
@@ -735,12 +750,13 @@ module.exports = function registerTransactions(ctx) {
        off the item, which carries the account label the raw row does not: it
        was handed the household's money(), so a €900 line was offered for
        splitting as "R -900,00". */
+    const op = opWriterOf(ctx);
     const parts = await askSplit(app, {
       tx: { date: r.date, desc: r.desc, label: item.label, amount: r.amount, cat: r.cat },
       categories: S.categories.map(c => c.name),
       money: v => rowFlow(v, item),
     });
-    if (!parts) return;
+    if (!parts || afterDialog(op)) return;
 
     /* Both roles are assigned in applySplit, and deliberately not here: the
        parent must come out excluded AND marked. `excluded` keeps it out of the
@@ -891,12 +907,13 @@ module.exports = function registerTransactions(ctx) {
   async function unsplitTransaction(item) {
     const r = item._row, f = item._file;
     const parts = splitPartsOf(f, r);
+    const op = opWriterOf(ctx);
     const go = await confirmModal(app, {
       title: i18n.t('tx.unsplit.title'),
       message: i18n.t('tx.unsplit.msg', { count: parts.length, desc: r.desc, amount: rowFlow(r.amount, item) }),
       confirmText: i18n.t('tx.unsplit.action'),
     });
-    if (!go) return;
+    if (!go || afterDialog(op)) return;
     const doomed = new Set(parts);
     f.rows = f.rows.filter(x => !doomed.has(x));
     /* Both columns, together — the same pairing applySplit sets and for the
@@ -981,6 +998,7 @@ module.exports = function registerTransactions(ctx) {
     const detail = role === 'parent' && parts.length ? i18n.t('tx.delete.parent', { count: parts.length })
       : role === 'part' ? i18n.t('tx.delete.part')
         : i18n.t('tx.delete.reimport');
+    const op = opWriterOf(ctx);
     const go = await confirmModal(app, {
       title: i18n.t('tx.delete.title'),
       message: i18n.t('tx.delete.msg', {
@@ -988,7 +1006,7 @@ module.exports = function registerTransactions(ctx) {
       }) + ' ' + detail,
       confirmText: i18n.t('tx.delete.confirm'),
     });
-    if (!go) return;
+    if (!go || afterDialog(op)) return;
     /* Removed from the in-memory rows and marked dirty rather than written
        straight to disk, unlike Add transaction. serializeTxFile writes the
        WHOLE file, so a delete that wrote immediately would also flush every
@@ -1057,6 +1075,7 @@ module.exports = function registerTransactions(ctx) {
     if (!filters.length) return toast(i18n.t('tx.bulkCat.needFilter'), true);
     if (!rows.length) return toast(i18n.t('tx.bulk.none'), true);
 
+    const op = opWriterOf(ctx);
     const values = await askFields(app, i18n.t('tx.bulkCat.title'), [
       {
         key: 'cat', type: 'select',
@@ -1075,7 +1094,7 @@ module.exports = function registerTransactions(ctx) {
       message: i18n.t('tx.bulkCat.msg', { count: rows.length, cat: cat || i18n.t('tx.uncategorised') }),
       confirmText: i18n.t('tx.bulkCat.confirm', { count: rows.length }),
     });
-    if (!go) return;
+    if (!go || afterDialog(op)) return;
 
     for (const item of rows) {
       item._row.cat = cat;
@@ -1122,6 +1141,9 @@ module.exports = function registerTransactions(ctx) {
     // select a parent need not select its parts (they carry finer categories),
     // and parts left behind describe a line that no longer exists.
     const splits = rows.filter(t => splitRole(t._row.split)).length;
+    /* The load these row objects belong to: every write below is bound to it
+       (io.js opWriter), and it is asked again straight after the dialog. */
+    const op = opWriterOf(ctx);
     const go = await confirmModal(app, {
       title: i18n.t('tx.bulk.title'),
       message: i18n.t('tx.bulk.msg', { count: rows.length, range, filters: labels.join(', ') })
@@ -1130,6 +1152,22 @@ module.exports = function registerTransactions(ctx) {
       confirmText: i18n.t('tx.bulk.confirm', { count: rows.length }),
     });
     if (!go) return;
+    /* A book switch (the headless API, a second view, a popout) can land while
+       the dialog is open, and this page is clean, so switchBook's dirty
+       refusal does not stop it (ADR 0009, 2026-11 review). With the reload
+       landed, `rows` are the previous book's objects and txFileRel() resolves
+       into the new book: confirming appended the household's rows to the
+       client's delete log and wrote the household's month over the client's.
+       A same-book reload under the dialog is the same shape — the objects are
+       no longer the ones in memory. Refused, said, nothing written.
+
+       And not only at the dialog. The log read, the log write and each month
+       write are awaits too, and a switch whose reload commits between two of
+       them made the NEXT write land in the new book (the 2026-11 re-review:
+       `HOME Bakery` in Acme's month, then a success toast). Every write here
+       goes through `op`, which refuses unless the load in memory is still the
+       one these rows came from; the toast then says how far it got. */
+    if (afterDialog(op)) return;
 
     /* The backup, before anything is touched. Appended rather than through a
        writer that could overwrite: read what is there, keep it, and add
@@ -1141,7 +1179,7 @@ module.exports = function registerTransactions(ctx) {
        imported straight back in, which matches columns by name too. */
     try {
       const existing = await readFile(DELETED_LOG);
-      await writeFile(DELETED_LOG, appendTransactionsLog(existing, rows, rowSymbol));
+      await op.writeFile(DELETED_LOG, appendTransactionsLog(existing, rows, rowSymbol));
     } catch (e) {
       return toast(i18n.t('tx.bulk.backupFailed', { error: (e && e.message) || e }), true);
     }
@@ -1158,7 +1196,7 @@ module.exports = function registerTransactions(ctx) {
     try {
       for (const [f, doomed] of perFile) {
         const keep = f.rows.filter(x => !doomed.has(x));
-        await writeFile(txFileRel(f.label, f.month), serializeTxFile({ ...f, rows: keep }));
+        await op.writeFile(txFileRel(f.label, f.month), serializeTxFile({ ...f, rows: keep }));
         f.rows = keep;
         removed += doomed.size;
         files++;
@@ -1170,7 +1208,11 @@ module.exports = function registerTransactions(ctx) {
          {count} files" at 0 printed a hard-coded "1" (2026-10-14 audit,
          L8-08). */
       const error = (e && e.message) || e;
-      return toast(files === 0 ? i18n.t('tx.bulk.failedNone', { error }) : i18n.t('tx.bulk.failed', { count: files, error }), true);
+      /* The log was written before the loop, so it now lists rows that are
+         still in their files — said, rather than left for the reader to find
+         when they next open the log to bring something back. */
+      const stopped = files === 0 ? i18n.t('tx.bulk.failedNone', { error }) : i18n.t('tx.bulk.failed', { count: files, error });
+      return toast(stopped + (/[.!?。]$/.test(stopped) ? ' ' : '. ') + i18n.t('tx.bulk.logKept', { path: DELETED_LOG }), true);
     }
     /* The receipt describes rows this may just have removed, and it holds them
        by object identity — an undo run afterwards would find fewer than it
@@ -1383,6 +1425,9 @@ module.exports = function registerTransactions(ctx) {
     const draft = addDraft;
     addDraft = null;
     const kept = (key, fallback) => (draft && draft[key] != null ? draft[key] : fallback);
+    /* The row is typed against the book on screen; a switch while the form is
+       open must not file it in the next one (afterDialog). */
+    const op = opWriterOf(ctx, { book: true });   // bound to the BOOK, not the exact load: this only creates from what is typed (io.js opWriter({ book: true }))
     const r = await askFields(app, i18n.t('tx.add.title'), [
       { key: 'date', label: i18n.t('tx.field.date'), type: 'date', value: kept('date', todayIso()) },
       { key: 'desc', label: i18n.t('tx.field.desc'), type: 'text', placeholder: i18n.t('tx.field.descPlaceholder'), value: kept('desc', undefined) },
@@ -1396,6 +1441,7 @@ module.exports = function registerTransactions(ctx) {
       { key: 'note', label: i18n.t('tx.field.note'), type: 'text', placeholder: i18n.t('tx.field.notePlaceholder'), value: kept('note', undefined) },
     ]);
     if (!r) return;
+    if (afterDialog(op)) { addDraft = r; return; }
     const date = r.date.trim();
     if (!ISO_DATE.test(date)) return toast(i18n.t('tx.err.date'), true);
     const desc = r.desc.trim();
@@ -1424,7 +1470,7 @@ module.exports = function registerTransactions(ctx) {
       ? { ...existing, rows: existing.rows.concat([row]) }
       : { label, month, rows: [row], dirty: false, fmRaw: TX_FM };
     try {
-      await writeFile(txFileRel(label, month), serializeTxFile(fileModel));
+      await op.writeFile(txFileRel(label, month), serializeTxFile(fileModel));
     } catch (err) {
       return toast(i18n.t('tx.err.save', { error: err.message || err }), true);
     }
@@ -1463,10 +1509,14 @@ module.exports = function registerTransactions(ctx) {
      the button must stay lit while any file is still unsaved. */
   async function saveTransactions() {
     let n = 0;
+    /* One load for the whole save: the files are this load's objects, and a
+       reload committing between two writes must not send the next one into
+       the book that is open by then. */
+    const op = opWriterOf(ctx);
     try {
       for (const f of Object.values(S.txFiles)) {
         if (!f.dirty) continue;
-        await writeFile(txFileRel(f.label, f.month), serializeTxFile(f));
+        await op.writeFile(txFileRel(f.label, f.month), serializeTxFile(f));
         f.dirty = false; n++;
       }
     } catch (err) {
@@ -1481,11 +1531,17 @@ module.exports = function registerTransactions(ctx) {
     }
     let learned = 0;
     if (pendingLearns.size) {
-      learned = await learnRules([...pendingLearns].map(([desc, cat]) => ({ desc, cat })));
+      learned = await learnRules([...pendingLearns].map(([desc, cat]) => ({ desc, cat })), op);
+      /* Cleared either way: null means the state was replaced while this save
+         was writing (another book, or the same one re-read), and these pairs
+         were read off rows of a load nobody is looking at — keeping them for
+         the next Save could teach them to another book. Said, not dropped. */
       pendingLearns.clear();
     }
     clearSaveButton();
-    toast(i18n.t('tx.saved', { count: n }) + (learned ? i18n.t('tx.savedLearned', { count: learned }) : ''));
+    toast(i18n.t('tx.saved', { count: n })
+      + (learned ? i18n.t('tx.savedLearned', { count: learned }) : '')
+      + (learned === null ? '. ' + i18n.t('tx.savedNotLearned') : ''));
   }
 
   /* Write the current selection out as four files: CSV for a spreadsheet,

@@ -656,6 +656,97 @@ body.is-tablet .budget-app-root button:where(.fs-hide) { padding: 4px; }   /* fi
 .budget-app-root .topbar-icon-btn:hover { background: var(--color-primary-light); color: var(--color-primary); }
 .budget-app-root .topbar-icon-btn:focus-visible { outline: 2px solid var(--color-primary); outline-offset: 2px; }
 
+/* The book switcher (ADR 0009, src/book-switcher.js): a native <select>, shown
+   only when the vault holds more than one book (the `hidden` class —
+   `.hidden.hidden` above outranks this display:flex). It has two copies: this
+   one in the top bar's right-hand cluster, beside the avatar, and one as the
+   first row of the drawer, which takes over at 900px and under and on a phone
+   (the visibility rules are after the 600px block below). Both are drawn by
+   these same rules.
+
+   THE SELECT IS THE WHOLE PILL. The book icon and the chevron are laid over it
+   (absolute, pointer-events: none) and the select's own padding makes room for
+   them, so a tap anywhere on the pill lands on the select and opens the
+   picker. They used to sit beside it as flex items inside the label, and on
+   iOS a tap on a label does not open its select — the icon's 26px was dead.
+
+   ITS OWN CHEVRON. `.budget-app-root select` forces appearance: menulist, and
+   this control then strips the border and background back to the pill's; on
+   iOS that combination can paint no arrow at all, leaving a book name that
+   reads as a caption rather than a control. So appearance is none and the
+   chevron is a lucide `chevron-down` slot (verified in Obsidian's bundled
+   set), counted inside the select's padding and therefore inside the 13rem it
+   may grow to — the topbar's width budget includes it. `background:
+   transparent` also clears the arrow image Obsidian's own select styling
+   paints, so there is never a second one.
+
+   HEIGHT. The pill decides it and the select fills it (align-self: stretch,
+   min-height: 0). The coarse-pointer field rule in phone.css gives every
+   select min-height 44px, which inside a 36px pill overflowed it by 8px; the
+   topbar copy matches its 36px neighbours instead (on a phone it is not in the
+   top bar at all), and the drawer copy is 44px tall in its own right.
+
+   The text is ellipsised, not wrapped: a client's name is the one thing here
+   with no length limit. */
+.budget-app-root .book-switch {
+  position: relative;
+  display: flex; align-items: center;
+  height: 36px; padding: 0; flex: 0 1 auto; min-width: 0;
+  border-radius: 12px;
+  border: 1px solid var(--border-color);
+  background: var(--surface-glass, transparent);
+  color: var(--text-muted);
+  cursor: pointer;
+  transition: background 0.15s, border-color 0.15s, color 0.15s;
+}
+.budget-app-root .book-switch:hover { background: var(--color-primary-light); color: var(--color-primary); }
+.budget-app-root .book-switch .ico {
+  position: absolute; top: 50%; transform: translateY(-50%);
+  display: grid; place-items: center;
+  pointer-events: none;
+}
+.budget-app-root .book-switch .book-switch-ico { left: 0.65rem; }
+.budget-app-root .book-switch .book-switch-chev { right: 0.45rem; }
+.budget-app-root .book-switch .ico svg { width: 16px; height: 16px; }
+.budget-app-root .book-switch .book-switch-chev svg { width: 14px; height: 14px; }
+.budget-app-root .book-switch select {
+  -webkit-appearance: none; appearance: none;
+  box-sizing: border-box;
+  flex: 1 1 auto; align-self: stretch;
+  min-width: 0; max-width: 13rem; height: auto; min-height: 0;
+  /* left: 0.65rem inset + 16px icon + ~6px; right: 0.45rem inset + 14px chevron + ~4px */
+  padding: 0 1.6rem 0 2.05rem; margin: 0;
+  border: 0; border-radius: 11px;
+  background: transparent; box-shadow: none; outline: none;
+  color: var(--text-primary);
+  font: inherit; font-size: 0.8rem; font-weight: 600;
+  text-overflow: ellipsis; white-space: nowrap;
+  cursor: pointer;
+}
+/* The ring is on the select, which fills the pill, and only on :focus-visible.
+   It used to be the label's :focus-within, which rang on every tap — and iOS
+   keeps a select focused after its picker closes, so the ring stayed on until
+   the reader tapped somewhere else. The 2px offset from the select lands 1px
+   outside the pill's own border, as the neighbouring buttons' rings do. Its
+   :focus twin for iOS 15.0-15.3 is in the fallback block near the end. */
+.budget-app-root .book-switch select:focus-visible { outline: 2px solid var(--color-primary); outline-offset: 2px; }
+
+/* The drawer copy: a full-width row under its own section label, as tall as a
+   touch target, with the drawer's width for the name instead of the topbar's
+   13rem. Hidden here; shown by the 900px / phone rules after the 600px block. */
+.budget-app-root .drawer-book { display: none; }
+.budget-app-root .drawer-book .book-switch { height: 44px; margin: 0 2px 4px; }
+.budget-app-root .book-switch-drawer select { max-width: none; font-size: 14px; }
+
+/* After the drawer rule, so it wins for both copies on a touch screen: 16px
+   is the size under which iOS zooms the page when the picker opens. The
+   (0,2,1) select rule above would otherwise beat phone.css's coarse
+   `.budget-app-root select { font-size: 16px }` (0,1,1) and put the topbar
+   copy back at 12.8px on an iPad. */
+@media (pointer: coarse) {
+  .budget-app-root .book-switch select { font-size: max(16px, 0.8rem); }
+}
+
 /* Narrow panes / phones: menu + brand + period pill + avatar can't fit on one
    line, so the pill used to overlap the brand text and push the avatar off the
    edge. Drop the brand block — it's decoration, and Obsidian's own mobile
@@ -680,6 +771,15 @@ body.is-tablet .budget-app-root button:where(.fs-hide) { padding: 4px; }   /* fi
      inside its own slot, so it is never clipped and the buttons never leave
      the row. */
   .budget-app-root .topbar .topbar-icon-btn { display: none; }
+  /* The book switcher is not in this row either: it moves to the drawer at
+     900px and under (the pair of rules after this block). It was kept here
+     once, held to 6.5rem with its icon dropped, and the arithmetic still did
+     not close: at 375px the row is 8 + 44 + 4 + pill + 4 + switcher + 4 + 44
+     + 8, the pill's own chrome is 3 x 44px buttons + 10px, and the ~120px of
+     switcher left the label about 0px — "Oct 22 – Nov 21, 2026" one word per
+     line, out of the 60px bar. Without it the label gets 121px at 375, 139 at
+     393, 176 at 430 (tests/phone-375.test.cjs section 15 redoes this sum from
+     the rules). */
   .budget-app-root .header-period-pill {
     flex: 1 1 auto;
     min-width: 0;
@@ -700,6 +800,31 @@ body.is-tablet .budget-app-root button:where(.fs-hide) { padding: 4px; }   /* fi
   }
   .budget-app-root .header-period-pill .pnav-btn { width: 32px; height: 28px; flex: none; }
 }
+
+/* Where the book switcher lives: the drawer at 900px and under, and on a phone
+   in EITHER orientation; the top bar only above 900px on a non-phone.
+
+   900, not the 600 the rest of the phone row uses. Between 601 and ~860px the
+   brand comes back into the row, and a long client name at the switcher's
+   13rem crushed the brand text into the period pill; under ~740px it pushed
+   the avatar off the right edge (2026-11 static review, tablet portrait and
+   a narrow desktop pane). The drawer copy has the drawer's whole width for
+   the name, so the switcher gives way rather than the brand or the avatar.
+
+   ONE PREDICATE, TWO HALVES. Each pair below hides the top bar copy and shows
+   the drawer copy under the SAME condition, so the two copies can never both
+   be hidden (no way to switch) or both shown — tests/phone-375.test.cjs
+   section 15 holds the pairs together. Keyed on .is-phone as well as the
+   width so a phone turned sideways does not move the control back into the
+   top bar, where the reader was not looking for it. `:not(.hidden)` keeps
+   single-book mode (and the privacy splash, which renders with no model)
+   hiding both. */
+@media (max-width: 900px) {
+  .budget-app-root .topbar .book-switch { display: none; }
+  .budget-app-root .drawer-book:not(.hidden) { display: block; }
+}
+body.is-phone .budget-app-root .topbar .book-switch { display: none; }
+body.is-phone .budget-app-root .drawer-book:not(.hidden) { display: block; }
 
 .budget-app-root .drawer-overlay {
   position: absolute; inset: 0; z-index: 250;
@@ -3952,6 +4077,7 @@ body.is-tablet .budget-app-root button:where(.fs-hide) { padding: 4px; }   /* fi
   .budget-app-root .drawer-link:focus,
   .budget-app-root .topbar-icon-btn:focus,
   .budget-app-root .dock-btn:focus,
+  .budget-app-root .book-switch select:focus,
   .budget-app-root .btn-ghost:focus,
   .budget-app-root .btn-gradient:focus { outline: 2px solid var(--color-primary); outline-offset: 2px; }
 

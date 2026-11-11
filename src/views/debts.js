@@ -5,6 +5,7 @@
    The arithmetic lives in ../debt-math (pure, separately tested); this file is
    presentation and editing only. */
 
+const { opWriterOf } = require('../io');
 const { el, kpiTiles, keepScroll, icoEl, caveatChip, tableCells } = require('../dom');
 const { debtMonthly } = require('../committed');
 const { normalizeAmount } = require('../amount');
@@ -948,6 +949,7 @@ module.exports = function registerDebts(ctx) {
   }
 
   async function addDebt() {
+    const op = opWriterOf(ctx, { book: true });   // bound to the BOOK, not the exact load: this only creates from what is typed (io.js opWriter({ book: true }))
     const r = await askFields(app, 'New debt', [
       { key: 'name', label: 'What is it?', type: 'text' },
       { key: 'lender', label: 'Lender', type: 'text' },
@@ -981,6 +983,7 @@ module.exports = function registerDebts(ctx) {
         desc: 'Leave blank if it is in your own currency. Set it if this one is not — the figure is then shown in its own currency and stated separately rather than added into your totals.' },
     ]);
     if (!r || !r.name.trim()) return;
+    if (op.replaced()) return toast(op.replaced(), true);
     /* Deliberately NOT unique. Two debts called "Credit card", one per bank, is
        the normal case — debt-math keys its payoff months by a positional `key`
        and focus restores by row index, so nothing downstream needs the name to
