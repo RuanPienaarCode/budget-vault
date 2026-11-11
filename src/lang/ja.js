@@ -62,6 +62,11 @@ module.exports = {
   'topbar.importTitle': '銀行明細の CSV を取り込む',
   'topbar.settings': '予算の設定を開く',
 
+  /* Accessible names (audit of 11 Nov 2026, task 19) — machine-assisted, not native-reviewed. */
+  'topbar.settingsFor': '予算の設定 — {name}',
+  'topbar.settingsTitle': '予算の設定',
+  'topbar.settingsTitleFor': '{name} · 予算の設定',
+
   /* ------------------------------- settings -------------------------------- */
   'settings.folder.name': '予算フォルダ',
   'settings.folder.desc': 'Categories/、Accounts/、Budgets/、Transactions/、Settings.md などを格納しているフォルダの保管庫内パス。',
@@ -559,6 +564,13 @@ module.exports = {
   'tx.split.chip': '{count} 件に分割',
   'tx.split.chipGap': '{amount} が未計上',
   'tx.aria.splitChip': '{date} の {desc} の分割オプション',
+
+  /* Accessible names (audit of 11 Nov 2026, task 19) — machine-assisted, not native-reviewed. */
+  'tx.split.aria.amount': '{n} 件目の金額',
+  'tx.split.aria.category': '{n} 件目のカテゴリ',
+  'tx.split.aria.note': '{n} 件目のメモ',
+  'tx.split.aria.remove': '{n} 件目を削除',
+
   'tx.unsplit.action': '分割を解除',
   'tx.unsplit.title': 'この取引の分割を解除しますか？',
   'tx.unsplit.msg': {
@@ -761,6 +773,11 @@ module.exports = {
   'acct.err.notNumber': '{field} が数値ではありません',
   'acct.err.nameRequired': '口座名は必須です',
   'cat.err.nameRequired': 'カテゴリ名は必須です',
+
+  /* Accessible names (audit of 11 Nov 2026, task 19) — machine-assisted, not native-reviewed. */
+  'cat.aria.current': '{label} — 現在は {value}',
+  'cat.aria.currentNone': '{label} — 現在はカテゴリなし',
+
   'acct.err.exists': 'その口座はすでに存在します',
   'acct.err.save': '{name} を保存できませんでした（{error}）— ファイルには何も書き込まれていません。もう一度お試しください。',
 
@@ -871,6 +888,17 @@ module.exports = {
   'acct.hero.elsewhere': ' それぞれのページに記録された資産と負債はここには含まれません。',
   'imp.dateReading.dayFirst': 'このファイルの日付は日/月として読み取りました。逆に読むと順序が崩れるためです。',
   'imp.dateReading.monthFirst': 'このファイルの日付は月/日として読み取りました。逆に読むと順序が崩れるためです。',
+
+  /* Accessible names (audit of 11 Nov 2026, task 19) — machine-assisted, not native-reviewed. */
+  'imp.aria.importRow': '{date} {desc}（{amount}）を取り込む',
+  'imp.aria.importRowWhy': '{date} {desc}（{amount}）を取り込む。{why}',
+  'imp.aria.category': '{desc} のカテゴリ',
+  'imp.near.why': '取り込み済みの「{desc}」（{date}）と同じものに見えます — 銀行は請求が確定すると日付や文言を書き換えます。それでも取り込む場合はチェックを入れてください。',
+  'imp.pending.why': '銀行側ではまだ保留中のため、確定時に日付も金額も変わる可能性があります — 金額が変わって確定した行は、別の取引として取り込まれてしまいます。次回の明細に確定した金額で載ります。それでも今取り込む場合はチェックを入れてください。',
+  'imp.aria.cancelTip': 'この明細を何も取り込まずに破棄します',
+  'imp.aria.remapTip': 'どの列が日付・内容・金額かを指定します',
+  'imp.aria.newAccountTip': 'これらの行を入れる口座を作成します',
+
   'acct.duplicateFolders': {
     other: '{count} 件の取引フォルダが2つの口座に割り当てられています（{names}）。最初の口座のみ読み込まれます。各口座に固有のフォルダ名を付けてください。',
   },
@@ -1389,6 +1417,19 @@ module.exports = {
   /* --- Debt page: "Interest this month" says what it covers, because a debt
      with a blank rate is unknown rather than zero (the why is in en.js) --- */
   'owed.repaid.chip': '{amount} 返済済み',
+
+  /* Accessible names (audit of 11 Nov 2026, task 19) — machine-assisted, not native-reviewed. */
+  'owed.aria.statusPaid': '{person}：返済済み — クリックして変更',
+  'owed.aria.statusLeft': '{person}：残り {amount} — クリックして変更',
+  'owed.aria.statusOutstanding': '{person}：未回収 — クリックして変更',
+  'owed.aria.description': '{person} の内容',
+  'owed.aria.amount': '{person} の金額',
+  'owed.aria.lent': '{person} に貸した日',
+  'owed.aria.due': '{person} の返済期日',
+  'owed.aria.repay': '{person} からの返済を記録',
+  'owed.aria.repayTip': '戻ってきたお金を記録',
+  'owed.aria.remove': '{person} を削除',
+
   'debt.interest.noRates': 'いずれかの負債に金利を記録すると表示されます',
   'debt.interest.partial': {
     other: '{total} 件中 {shown} 件が対象 · {missing} 件に金利の記録なし',
@@ -1396,6 +1437,102 @@ module.exports = {
   'debt.curve.aria': '各返済プランでの負債総額（{from}〜{to}、開始時 {start}）。{plans}',
   'debt.curve.aria.cleared': '{plan}：{month}までに完済。',
   'debt.curve.aria.owed': '{plan}：{month}時点で残り {amount}。',
+
+  /* Accessible names (audit of 11 Nov 2026, task 19) — machine-assisted, not native-reviewed. */
+  'debt.aria.reviewCards': '口座ページでクレジットカード口座を確認',
+  'debt.aria.statusSettled': '{name}：完済 — クリックして変更',
+  'debt.aria.statusActive': '{name}：有効 — クリックして変更',
+  'debt.aria.balance': '{name} の残高',
+  'debt.aria.rate': '{name} の年利',
+  'debt.aria.payment': '{name} の毎月の返済額',
+  'debt.aria.extra': '{name} の毎月の追加返済額',
+  'debt.aria.category': '{name} の予算カテゴリ',
+  'debt.aria.remove': '{name} を削除',
+  'debt.aria.strategy': '返済方法',
+  'debt.aria.range': '返済グラフの期間',
+
+  /* Accessible names on the pages still written in English (audit of 11 Nov 2026, task 19) — machine-assisted, not native-reviewed. */
+  'sav.aria.reviewAssets': '資産ページで資産の評価額を確認',
+  'sav.aria.goalAccounts': '口座ページで貯蓄目標を設定',
+  'sav.aria.addAccounts': '口座ページで貯蓄口座または投資口座を追加',
+  'sav.aria.row': '{name}、{amount}。口座の操作を表示。',
+  'sav.aria.balance': '{name} の残高を更新（現在 {amount}）',
+  'sav.aria.addStart': '{name} の開始時の金額と開設日を追加',
+  'sav.aria.barGrowth': '投入額 {putIn} · 増加分 {earned}',
+  'sav.aria.barLoss': '投入額 {putIn} のうち残り {left}',
+  'sav.aria.growth.capital': 'この残高 {closing} の内訳：投入額 {capital}。{from} から {to} まで。',
+  'sav.aria.growth.posted': 'この残高 {closing} の内訳：投入額 {capital}、記録された増加分 {posted}。{from} から {to} まで。',
+  'sav.aria.growth.undated': 'この残高 {closing} の内訳：投入額 {capital}、日付のない増加分 {undated}。{from} から {to} まで。',
+  'sav.aria.growth.both': 'この残高 {closing} の内訳：投入額 {capital}、記録された増加分 {posted}、日付のない増加分 {undated}。{from} から {to} まで。',
+  'sav.aria.worth': '純資産 {net}：資産 {assets} に対し負債 {debts}',
+  'sav.aria.worth.owned': '純資産 {net}：資産 {assets} に対し負債 {debts}。資産の内訳：{owned}',
+  'sav.aria.worth.owed': '純資産 {net}：資産 {assets} に対し負債 {debts}。負債の内訳：{owed}',
+  'sav.aria.worth.both': '純資産 {net}：資産 {assets} に対し負債 {debts}。資産の内訳：{owned}。負債の内訳：{owed}',
+  'sav.aria.share.own': '{label}、{amount}、資産の {share}%。{page}を開きます。',
+  'sav.aria.share.owe': '{label}、{amount}、負債の {share}%。{page}を開きます。',
+
+  'svc.aria.amount': '{name} の金額',
+  'svc.aria.cycle': '{name} の請求サイクル',
+  'svc.aria.next': '{name} の次回請求日',
+  'svc.aria.active': '{name} は有効',
+  'svc.aria.remove': '{name} を削除',
+  'svc.aria.setNext': '{name} の次回請求日を {date} に設定',
+  'svc.aria.hint.weekly': '前回の請求は {last}、毎週の請求のため、次回の請求は {date} の予定です。',
+  'svc.aria.hint.fortnightly': '前回の請求は {last}、2 週間ごとの請求のため、次回の請求は {date} の予定です。',
+  'svc.aria.hint.monthly': '前回の請求は {last}、毎月の請求のため、次回の請求は {date} の予定です。',
+  'svc.aria.hint.annual': '前回の請求は {last}、毎年の請求のため、次回の請求は {date} の予定です。',
+  'svc.aria.gap.import': '{first} は過ぎましたが、{account} はそこまで取り込まれていません（最後の取り込みは {through}）。そのため、今日より後の次の日付を示しています。',
+  'svc.aria.gap.confirmed': '{first} は過ぎましたが、{account} はそこまで取り込まれていません（残高の確認は {through}）。そのため、今日より後の次の日付を示しています。',
+  'svc.aria.gap.noCharge': '{first} は過ぎましたが、取引にまだ請求がありません。そのため、今日より後の次の日付を示しています。',
+
+  'tax.aria.year': '税年度',
+  'tax.aria.createYear': 'すでに書類がある {year} の税金ページを作成',
+  'tax.aria.figDescription': '項目 {code} の説明',
+  'tax.aria.figSource': '項目 {code} の出所',
+  'tax.aria.codeFor': '{description} の{label}',
+  'tax.aria.codeForThis': 'この項目の{label}',
+  'tax.aria.amountFor': '{code} の金額',
+  'tax.aria.amountForThis': 'この項目の金額',
+  'tax.aria.figRemove': '項目 {code} を削除',
+  'tax.aria.step.todo': 'ステータス：未着手 — クリックして変更',
+  'tax.aria.step.busy': 'ステータス：進行中 — クリックして変更',
+  'tax.aria.step.done': 'ステータス：完了 — クリックして変更',
+  'tax.aria.step.na': 'ステータス：対象外 — クリックして変更',
+  'tax.aria.stepDue': '{step} の期日',
+  'tax.aria.stepNotes': '{step} のメモ',
+  'tax.aria.stepRemove': 'ステップ {step} を削除',
+  'tax.aria.doc.needed': 'ステータス：必要 — クリックして変更',
+  'tax.aria.doc.uploaded': 'ステータス：アップロード済み — クリックして変更',
+  'tax.aria.doc.na': 'ステータス：対象外 — クリックして変更',
+  'tax.aria.openFile': '{name} を開く',
+  'tax.aria.addFile': '{name} にファイルを追加',
+  'tax.aria.uploadFile': '{name} のファイルをアップロード',
+  'tax.aria.docNotes': '{name} のメモ',
+  'tax.aria.docRemove': '書類 {name} を削除',
+
+  'food.aria.range': 'グラフの期間',
+  'food.aria.trend': {
+    other: 'カテゴリ別の食費（{count} 期間）：{categories}',
+  },
+  'food.aria.price': '{name}：購入ごとの価格、{first} から {last}',
+  'food.aria.category': '{name} のカテゴリ',
+  'food.aria.healthy': '{name} はヘルシー',
+  'rc.aria.text': 'レシートのテキスト',
+  'rc.aria.item': '{n} 行目の品名',
+  'rc.aria.price': '{n} 行目の価格',
+  'rc.aria.discount': '{n} 行目の割引',
+  'rc.aria.category': '{n} 行目のカテゴリ',
+  'rc.aria.healthy': '{n} 行目はヘルシー',
+  'rc.aria.remove': '{n} 行目を削除',
+
+  'notes.aria.delete': '{title} を削除',
+  'notes.aria.count': {
+    other: '{subject} のメモ {count} 件',
+  },
+  'notes.aria.write': '{subject} についてメモを書く',
+  'loans.aria.tabs': '計算機を選択',
+  'loans.aria.deposit': '頭金の額',
+  'loans.aria.depositPct': '価格に対する頭金の割合',
 
   /* --- report.* / nav.report / shell.tx.report — machine-assisted, added
      alongside the Report feature (views/report.js, src/report.js). --- */
@@ -1544,6 +1681,13 @@ module.exports = {
   'assets.hero.heldAbroad': "ほかに海外保有の {list}（換算なし）",
   'assets.hero.largestAbroad': "海外での最大 {list}（換算なし）",
 
+  /* Accessible names (audit of 11 Nov 2026, task 19) — machine-assisted, not native-reviewed. */
+  'assets.aria.kind': '{name} の種類',
+  'assets.aria.value': '{name} の評価額',
+  'assets.aria.valued': '{name} の評価日',
+  'assets.aria.notes': '{name} のメモ',
+  'assets.aria.remove': '{name} を削除',
+
   /* ------------------------- plan view (mobile redesign) ------------------------- */
   'plan.hero.leftToPlace': "未割り当て",
   'plan.hero.overPlaced': "このプランが持つ額より多く割り当てられています",
@@ -1583,6 +1727,22 @@ module.exports = {
   'plan.env.collapseAria': "{name} を折りたたむ",
   'plan.env.deleteAria': "支出バケット {name} を削除",
   'plan.actions.deleteAria': "プランを削除",
+
+  /* Accessible names (audit of 11 Nov 2026, task 19) — machine-assisted, not native-reviewed. */
+  'plan.pickerAria': 'プランを選択',
+  'plan.split.aria.free': '{pot} のうち：使用済み {spent}、割り当て済み {committed}、未割り当て {free}。',
+  'plan.split.aria.overPlaced': '{pot} のうち：使用済み {spent}、割り当て済み {committed}。このプランが持つ額より {over} 多く割り当てられています。',
+  'plan.split.aria.left': 'まだ使える残りは {left}、そのうち未割り当ては {placeable}。',
+  'plan.split.aria.overSpent': 'このプランが持つ額より {over} 多く使われています。',
+  'plan.split.aria.pastBucket': 'バケットの額を超えて {amount} 使われました。',
+  'plan.env.overBy': '{amount} 超過',
+  'plan.env.sliderAria': '{name} に割り当てた金額',
+  'plan.env.typeAria': '{name} の金額を入力して設定',
+  'plan.env.renameAria': '支出バケット {name} の名前を変更',
+  'plan.item.aria.planned': '{name}：予定 — クリックして進める',
+  'plan.item.aria.part': '{name}：一部購入済み — クリックして進める',
+  'plan.item.aria.done': '{name}：完了 — クリックして進める',
+  'plan.item.cycleTip': '予定 → 一部購入済み → 完了',
 
   'io.stale.message': "{file} は読み込み後にこのページの外で変更されたため、何も書き込まれませんでした",
   'io.stale.notice': "予算: {file} は読み込み後にこのページの外（別の端末またはマークダウン表示）で変更されたため、保存は書き込まれませんでした。ページはディスク上の現在の内容を読み込み直しました。もう一度変更してください。",

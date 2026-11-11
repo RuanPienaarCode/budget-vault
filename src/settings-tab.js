@@ -136,6 +136,11 @@ class BudgetSettingTab extends PluginSettingTab {
   display() {
     const { containerEl } = this;
     containerEl.empty();
+    /* Obsidian's settings pane, not the plugin root: this tab's own sections
+       are written in the budget's language, so the container says so. Followed,
+       because the language dropdown further down changes it while this is
+       open — and display() running again on a re-open is harmless (a Set). */
+    i18n.followLanguage(containerEl);
 
     /* The one control that edits the HOME book (ADR 0009) — so it, alone in
        this file, reads and writes settings.budgetFolder rather than the open

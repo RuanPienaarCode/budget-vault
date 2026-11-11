@@ -208,6 +208,38 @@ for (const v of EXPECTED_ENGLISH_ONLY) {
   ok(!TRANSLATED_VIEWS.has(v), `'${v}' cannot be in both TRANSLATED_VIEWS and EXPECTED_ENGLISH_ONLY`);
 }
 
+/* ---- "ENGLISH-ONLY" IS A CLAIM ABOUT WHAT THE PAGE PRINTS, NOT WHAT IT SAYS
+   ALOUD (audit of 11 Nov 2026, task 19). Until then this file compared a
+   view's whole render — text nodes AND aria-label / title / alt — between
+   English and German, so "not yet translated" also meant "every accessible
+   name is English", and keying one name on a backlog page failed the build
+   with "it has been translated". The two are different claims, and the audit
+   wanted the second one false: a name that is only ever spoken has no page
+   around it to show which half is the translated half, so it is keyed on
+   every page without waiting for that page's pass.
+
+   So the ratchet above is now read on the VISIBLE runs alone — text nodes and
+   placeholders, which is what "the page is still English" has always meant to
+   the person looking at it — and the spoken ones get a ratchet of their own:
+
+     EXPECTED_NAMES_KEYED  the backlog views whose accessible names DO change
+                           with the language under this fixture. A view leaves
+                           the list only by leaving EXPECTED_ENGLISH_ONLY.
+
+   The two backlog views not in it render no keyed name here: Notes has no
+   note to list, and Import has no statement loaded. Their names are keyed in
+   the source all the same — tests/accessible-names-keyed.test.cjs reads the
+   source, and is what holds every page to it; this list only proves, on a
+   real render, that the keys reach the attribute and the language reaches
+   the keys. */
+const VISIBLE_SRC = new Set(['text', 'attr:placeholder']);
+const visibleOf = runs => runs.filter(r => VISIBLE_SRC.has(r.src)).map(r => r.text).join('␟');
+const spokenOf = runs => runs.filter(r => !VISIBLE_SRC.has(r.src)).map(r => r.text).join('␟');
+const EXPECTED_NAMES_KEYED = ['food', 'savings', 'owed', 'services', 'tax', 'loans'];
+for (const v of EXPECTED_NAMES_KEYED) {
+  ok(EXPECTED_ENGLISH_ONLY.includes(v), `'${v}' is in EXPECTED_NAMES_KEYED, which only lists views still in EXPECTED_ENGLISH_ONLY — a translated view's names are covered by the switch ratchet itself`);
+}
+
 /* ---- KNOWN_LITERAL_S_KEYS — a live bug (see file header, assertion 4),
    reported not fixed: this file may not edit src/lang/*.js. Declared as a
    shrink-only ratchet the same shape as EXPECTED_ENGLISH_ONLY, so fixing the
@@ -456,6 +488,8 @@ const unpinClock = pinClock('2026-07-20');
   const sLiteralHits = [];
   const enumLeakHits = [];
   const enTextByView = {};
+  const enSpokenByView = {};
+  const namesSwitched = [];
 
   for (const { view, fn } of DISPATCH) {
     const { ctx, nodes } = await mountView();
@@ -501,21 +535,24 @@ const unpinClock = pinClock('2026-07-20');
         // Concatenated in a stable order (Map iteration order is insertion
         // order, and `nodes` is only ever appended to) so the same view's
         // 'en' and 'de' snapshots are comparing the same layout of runs.
-        enTextByView[view] = runs.map(r => r.text).join('␟');
+        enTextByView[view] = EXPECTED_ENGLISH_ONLY.includes(view) ? visibleOf(runs) : runs.map(r => r.text).join('␟');
+        enSpokenByView[view] = spokenOf(runs);
       }
     }
 
     /* ---- 3. language switch ratchet, per view ---- */
     i18n.setLanguage('de');
     assert.doesNotThrow(() => ctx[fn](), `the ${view} view must re-render once more under 'de' for the switch check`);
-    const deText = runsForNodes(nodes).map(r => r.text).join('␟');
+    const deRuns = runsForNodes(nodes);
+    const deText = EXPECTED_ENGLISH_ONLY.includes(view) ? visibleOf(deRuns) : deRuns.map(r => r.text).join('␟');
     i18n.setLanguage('en');
 
     const switches = deText !== enTextByView[view];
     if (EXPECTED_ENGLISH_ONLY.includes(view)) {
       ok(!switches,
-        `'${view}' is declared in EXPECTED_ENGLISH_ONLY but its German render now differs from English — ` +
+        `'${view}' is declared in EXPECTED_ENGLISH_ONLY but the text it PRINTS under German now differs from English — ` +
         `it has been translated. Remove it from the list (shrink EXPECTED_ENGLISH_ONLY and its asserted count).`);
+      if (spokenOf(deRuns) !== enSpokenByView[view]) namesSwitched.push(view);
     } else {
       ok(switches,
         `'${view}' is not in EXPECTED_ENGLISH_ONLY, so it is assumed translated, but its German render is ` +
@@ -540,6 +577,12 @@ const unpinClock = pinClock('2026-07-20');
     }
   }
   i18n.setLanguage('en');
+
+  /* ---- assertion 3b report: the backlog pages SPEAK the reader's language ---- */
+  eq(namesSwitched.sort(), [...EXPECTED_NAMES_KEYED].sort(),
+    'the English-only views whose aria-label / title / alt change with the language are exactly EXPECTED_NAMES_KEYED — ' +
+    'one missing means its accessible names went back to English (or stopped reading the language); one extra means ' +
+    'the fixture now reaches a keyed name on that page, so add it');
 
   /* ---- ISSUE 79 report: the feature strings were actually rendered ---- */
   eq(REQUIRED_KEYS.filter(k => !reachedKeys.has(k)), [],
@@ -573,7 +616,7 @@ const unpinClock = pinClock('2026-07-20');
 
   console.log(
     `PASS — i18n render gate: ${DISPATCH.length} views x ${LANGS.length} languages, ` +
-    `${EXPECTED_ENGLISH_ONLY.length} declared English-only, ${KNOWN_LITERAL_S_KEYS.length} known literal-"(s)" ` +
+`${EXPECTED_ENGLISH_ONLY.length} declared English-only (${EXPECTED_NAMES_KEYED.length} of them speaking the reader's language), ${KNOWN_LITERAL_S_KEYS.length} known literal-"(s)" ` +
     `key(s), ${KNOWN_ENUM_LEAK_VIEWS.length} known enum-leak view(s), ${REQUIRED_KEYS.length} required feature ` +
     `key(s) reached (${checks} checks).`);
   unpinClock();

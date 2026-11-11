@@ -62,6 +62,11 @@ module.exports = {
   'topbar.importTitle': '导入银行对账单 CSV',
   'topbar.settings': '打开预算设置',
 
+  /* Accessible names (audit of 11 Nov 2026, task 19) — machine-assisted, not native-reviewed. */
+  'topbar.settingsFor': '预算设置 — {name}',
+  'topbar.settingsTitle': '预算设置',
+  'topbar.settingsTitleFor': '{name} · 预算设置',
+
   /* ------------------------------- settings -------------------------------- */
   'settings.folder.name': '预算文件夹',
   'settings.folder.desc': '存放 Categories/、Accounts/、Budgets/、Transactions/、Settings.md 等内容的文件夹在仓库中的路径。',
@@ -559,6 +564,13 @@ module.exports = {
   'tx.split.chip': '拆分为 {count} 笔',
   'tx.split.chipGap': '{amount} 未分配',
   'tx.aria.splitChip': '{date} {desc} 的拆分选项',
+
+  /* Accessible names (audit of 11 Nov 2026, task 19) — machine-assisted, not native-reviewed. */
+  'tx.split.aria.amount': '第 {n} 部分的金额',
+  'tx.split.aria.category': '第 {n} 部分的分类',
+  'tx.split.aria.note': '第 {n} 部分的备注',
+  'tx.split.aria.remove': '移除第 {n} 部分',
+
   'tx.unsplit.action': '取消拆分',
   'tx.unsplit.title': '要取消这笔交易的拆分吗？',
   'tx.unsplit.msg': {
@@ -761,6 +773,11 @@ module.exports = {
   'acct.err.notNumber': '{field} 不是数字',
   'acct.err.nameRequired': '账户名称为必填项',
   'cat.err.nameRequired': '类别名称为必填项',
+
+  /* Accessible names (audit of 11 Nov 2026, task 19) — machine-assisted, not native-reviewed. */
+  'cat.aria.current': '{label} — 当前为 {value}',
+  'cat.aria.currentNone': '{label} — 当前未分类',
+
   'acct.err.exists': '该账户已存在',
   'acct.err.save': '无法保存 {name}（{error}）— 文件未写入任何内容；请重试同一操作。',
 
@@ -871,6 +888,17 @@ module.exports = {
   'acct.hero.elsewhere': ' 记录在各自页面上的资产与债务不计入此处。',
   'imp.dateReading.dayFirst': '此文件中的日期按日/月读取，因为按另一种方式读取会使其顺序错乱。',
   'imp.dateReading.monthFirst': '此文件中的日期按月/日读取，因为按另一种方式读取会使其顺序错乱。',
+
+  /* Accessible names (audit of 11 Nov 2026, task 19) — machine-assisted, not native-reviewed. */
+  'imp.aria.importRow': '导入 {date} {desc}，{amount}',
+  'imp.aria.importRowWhy': '导入 {date} {desc}，{amount}。{why}',
+  'imp.aria.category': '{desc} 的分类',
+  'imp.near.why': '看起来与已导入的“{desc}”（{date}）是同一笔 — 银行在款项入账时会改写日期和说明。仍要导入请勾选。',
+  'imp.pending.why': '银行仍将这笔列为待入账，入账时日期和金额都可能变化 — 而金额不同的已入账记录会被当作第二笔交易导入。它会以最终金额出现在下一份对账单上。仍要现在导入请勾选。',
+  'imp.aria.cancelTip': '放弃这份对账单，不导入任何内容',
+  'imp.aria.remapTip': '指定哪一列是日期、说明和金额',
+  'imp.aria.newAccountTip': '新建一个账户来存放这些记录',
+
   'acct.duplicateFolders': {
     other: '{count} 个交易文件夹被两个账户同时使用（{names}）；仅读取第一个。请为每个账户设置独立的文件夹名。',
   },
@@ -1389,6 +1417,19 @@ module.exports = {
   /* --- Debt page: "Interest this month" says what it covers, because a debt
      with a blank rate is unknown rather than zero (the why is in en.js) --- */
   'owed.repaid.chip': '已还 {amount}',
+
+  /* Accessible names (audit of 11 Nov 2026, task 19) — machine-assisted, not native-reviewed. */
+  'owed.aria.statusPaid': '{person}：已还清 — 点击可更改',
+  'owed.aria.statusLeft': '{person}：还剩 {amount} — 点击可更改',
+  'owed.aria.statusOutstanding': '{person}：未收回 — 点击可更改',
+  'owed.aria.description': '{person} 的说明',
+  'owed.aria.amount': '{person} 的金额',
+  'owed.aria.lent': '借给 {person} 的日期',
+  'owed.aria.due': '{person} 的到期日',
+  'owed.aria.repay': '记录 {person} 的还款',
+  'owed.aria.repayTip': '记录收回的钱',
+  'owed.aria.remove': '移除 {person}',
+
   'debt.interest.noRates': '为任一债务记录利率后才会显示',
   'debt.interest.partial': {
     other: '涵盖 {total} 笔债务中的 {shown} 笔 · {missing} 笔没有利率',
@@ -1396,6 +1437,102 @@ module.exports = {
   'debt.curve.aria': '各还款方案下的欠款总额，{from} 至 {to}，起始为 {start}。{plans}',
   'debt.curve.aria.cleared': '{plan}：{month} 前还清。',
   'debt.curve.aria.owed': '{plan}：到 {month} 仍欠 {amount}。',
+
+  /* Accessible names (audit of 11 Nov 2026, task 19) — machine-assisted, not native-reviewed. */
+  'debt.aria.reviewCards': '在账户页面查看信用卡账户',
+  'debt.aria.statusSettled': '{name}：已结清 — 点击可更改',
+  'debt.aria.statusActive': '{name}：在还 — 点击可更改',
+  'debt.aria.balance': '{name} 的欠款余额',
+  'debt.aria.rate': '{name} 的年利率',
+  'debt.aria.payment': '{name} 的每月还款额',
+  'debt.aria.extra': '{name} 每月额外还款',
+  'debt.aria.category': '{name} 的预算分类',
+  'debt.aria.remove': '移除 {name}',
+  'debt.aria.strategy': '还款方式',
+  'debt.aria.range': '还款图表的时间范围',
+
+  /* Accessible names on the pages still written in English (audit of 11 Nov 2026, task 19) — machine-assisted, not native-reviewed. */
+  'sav.aria.reviewAssets': '在资产页面查看资产估值',
+  'sav.aria.goalAccounts': '前往账户页面设定储蓄目标',
+  'sav.aria.addAccounts': '前往账户页面添加储蓄或投资账户',
+  'sav.aria.row': '{name}，{amount}。显示账户操作。',
+  'sav.aria.balance': '更新 {name} 的余额，当前为 {amount}',
+  'sav.aria.addStart': '为 {name} 添加起始金额和开户日期',
+  'sav.aria.barGrowth': '投入 {putIn} · 收益 {earned}',
+  'sav.aria.barLoss': '投入 {putIn}，还剩 {left}',
+  'sav.aria.growth.capital': '这笔 {closing} 余额的构成：投入 {capital}。从 {from} 到 {to}。',
+  'sav.aria.growth.posted': '这笔 {closing} 余额的构成：投入 {capital}，已记录的增长 {posted}。从 {from} 到 {to}。',
+  'sav.aria.growth.undated': '这笔 {closing} 余额的构成：投入 {capital}，以及没有日期的增长 {undated}。从 {from} 到 {to}。',
+  'sav.aria.growth.both': '这笔 {closing} 余额的构成：投入 {capital}，已记录的增长 {posted}，以及没有日期的增长 {undated}。从 {from} 到 {to}。',
+  'sav.aria.worth': '净资产 {net}：资产 {assets}，负债 {debts}',
+  'sav.aria.worth.owned': '净资产 {net}：资产 {assets}，负债 {debts}。拥有：{owned}',
+  'sav.aria.worth.owed': '净资产 {net}：资产 {assets}，负债 {debts}。欠款：{owed}',
+  'sav.aria.worth.both': '净资产 {net}：资产 {assets}，负债 {debts}。拥有：{owned}。欠款：{owed}',
+  'sav.aria.share.own': '{label}，{amount}，占你所拥有的 {share}%。打开{page}。',
+  'sav.aria.share.owe': '{label}，{amount}，占你所欠的 {share}%。打开{page}。',
+
+  'svc.aria.amount': '{name} 的金额',
+  'svc.aria.cycle': '{name} 的计费周期',
+  'svc.aria.next': '{name} 的下次扣款日期',
+  'svc.aria.active': '{name} 已启用',
+  'svc.aria.remove': '移除 {name}',
+  'svc.aria.setNext': '把 {name} 的下次扣款日期设为 {date}',
+  'svc.aria.hint.weekly': '上次扣款是 {last}，每周扣款一次，所以下次扣款应在 {date}。',
+  'svc.aria.hint.fortnightly': '上次扣款是 {last}，每两周扣款一次，所以下次扣款应在 {date}。',
+  'svc.aria.hint.monthly': '上次扣款是 {last}，每月扣款一次，所以下次扣款应在 {date}。',
+  'svc.aria.hint.annual': '上次扣款是 {last}，每年扣款一次，所以下次扣款应在 {date}。',
+  'svc.aria.gap.import': '{first} 已过，但 {account} 还没有导入到那一天（最近一次导入是 {through}），所以这里给出的是今天之后的下一个日期。',
+  'svc.aria.gap.confirmed': '{first} 已过，但 {account} 还没有导入到那一天（余额确认于 {through}），所以这里给出的是今天之后的下一个日期。',
+  'svc.aria.gap.noCharge': '{first} 已过，而你的交易中还没有这笔扣款，所以这里给出的是今天之后的下一个日期。',
+
+  'tax.aria.year': '纳税年度',
+  'tax.aria.createYear': '为已有文件的 {year} 创建税务页面',
+  'tax.aria.figDescription': '项目 {code} 的说明',
+  'tax.aria.figSource': '项目 {code} 的来源',
+  'tax.aria.codeFor': '{description} 的{label}',
+  'tax.aria.codeForThis': '此项目的{label}',
+  'tax.aria.amountFor': '{code} 的金额',
+  'tax.aria.amountForThis': '此项目的金额',
+  'tax.aria.figRemove': '移除项目 {code}',
+  'tax.aria.step.todo': '状态：待办 — 点击可更改',
+  'tax.aria.step.busy': '状态：进行中 — 点击可更改',
+  'tax.aria.step.done': '状态：已完成 — 点击可更改',
+  'tax.aria.step.na': '状态：不适用 — 点击可更改',
+  'tax.aria.stepDue': '{step} 的截止日期',
+  'tax.aria.stepNotes': '{step} 的备注',
+  'tax.aria.stepRemove': '移除步骤 {step}',
+  'tax.aria.doc.needed': '状态：需要 — 点击可更改',
+  'tax.aria.doc.uploaded': '状态：已上传 — 点击可更改',
+  'tax.aria.doc.na': '状态：不适用 — 点击可更改',
+  'tax.aria.openFile': '打开 {name}',
+  'tax.aria.addFile': '为 {name} 再添加一个文件',
+  'tax.aria.uploadFile': '为 {name} 上传文件',
+  'tax.aria.docNotes': '{name} 的备注',
+  'tax.aria.docRemove': '移除文件 {name}',
+
+  'food.aria.range': '图表的时间范围',
+  'food.aria.trend': {
+    other: '{count} 个周期内按分类的餐食支出：{categories}',
+  },
+  'food.aria.price': '{name}：每次购买的价格，从 {first} 到 {last}',
+  'food.aria.category': '{name} 的分类',
+  'food.aria.healthy': '{name} 属于健康食品',
+  'rc.aria.text': '小票文字',
+  'rc.aria.item': '第 {n} 行的品名',
+  'rc.aria.price': '第 {n} 行的价格',
+  'rc.aria.discount': '第 {n} 行的折扣',
+  'rc.aria.category': '第 {n} 行的分类',
+  'rc.aria.healthy': '第 {n} 行属于健康食品',
+  'rc.aria.remove': '移除第 {n} 行',
+
+  'notes.aria.delete': '删除 {title}',
+  'notes.aria.count': {
+    other: '关于 {subject} 的 {count} 条笔记',
+  },
+  'notes.aria.write': '写一条关于 {subject} 的笔记',
+  'loans.aria.tabs': '选择计算器',
+  'loans.aria.deposit': '首付金额',
+  'loans.aria.depositPct': '首付占价格的百分比',
 
   /* --- report.* / nav.report / shell.tx.report — machine-assisted, added
      alongside the Report feature (views/report.js, src/report.js). --- */
@@ -1544,6 +1681,13 @@ module.exports = {
   'assets.hero.heldAbroad': "另有 {list} 持有于海外，未换算",
   'assets.hero.largestAbroad': "海外最大 {list}，未换算",
 
+  /* Accessible names (audit of 11 Nov 2026, task 19) — machine-assisted, not native-reviewed. */
+  'assets.aria.kind': '{name} 的类型',
+  'assets.aria.value': '{name} 的价值',
+  'assets.aria.valued': '{name} 的估值日期',
+  'assets.aria.notes': '{name} 的备注',
+  'assets.aria.remove': '移除 {name}',
+
   /* ------------------------- plan view (mobile redesign) ------------------------- */
   'plan.hero.leftToPlace': "待分配",
   'plan.hero.overPlaced': "分配的金额超过了该计划持有的金额",
@@ -1583,6 +1727,22 @@ module.exports = {
   'plan.env.collapseAria': "收起 {name}",
   'plan.env.deleteAria': "移除支出信封 {name}",
   'plan.actions.deleteAria': "删除计划",
+
+  /* Accessible names (audit of 11 Nov 2026, task 19) — machine-assisted, not native-reviewed. */
+  'plan.pickerAria': '选择计划',
+  'plan.split.aria.free': '在 {pot} 中：已花费 {spent}，已分配 {committed}，未分配 {free}。',
+  'plan.split.aria.overPlaced': '在 {pot} 中：已花费 {spent}，已分配 {committed}，分配的金额比该计划持有的多 {over}。',
+  'plan.split.aria.left': '仍可支出 {left}，其中 {placeable} 待分配。',
+  'plan.split.aria.overSpent': '支出比该计划持有的多 {over}。',
+  'plan.split.aria.pastBucket': '有 {amount} 的支出超出了信封里的金额。',
+  'plan.env.overBy': '超出 {amount}',
+  'plan.env.sliderAria': '分配给 {name} 的金额',
+  'plan.env.typeAria': '手动输入 {name} 的金额',
+  'plan.env.renameAria': '重命名支出信封 {name}',
+  'plan.item.aria.planned': '{name}：计划中 — 点击可推进',
+  'plan.item.aria.part': '{name}：已买一部分 — 点击可推进',
+  'plan.item.aria.done': '{name}：已完成 — 点击可推进',
+  'plan.item.cycleTip': '计划中 → 已买一部分 → 已完成',
 
   'io.stale.message': "{file} 在加载后被页面之外修改，因此没有写入任何内容",
   'io.stale.notice': "预算：{file} 在加载后被此页面之外（其他设备或 Markdown 视图）修改，因此你的保存没有写入。页面已重新加载磁盘上的当前内容——请重新进行修改。",

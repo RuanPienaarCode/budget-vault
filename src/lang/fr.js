@@ -62,6 +62,11 @@ module.exports = {
   'topbar.importTitle': 'Importer un relevé bancaire au format CSV',
   'topbar.settings': 'Ouvrir les paramètres du budget',
 
+  /* Accessible names (audit of 11 Nov 2026, task 19) — machine-assisted, not native-reviewed. */
+  'topbar.settingsFor': 'Paramètres du budget — {name}',
+  'topbar.settingsTitle': 'Paramètres du budget',
+  'topbar.settingsTitleFor': '{name} · paramètres du budget',
+
   /* ------------------------------- settings -------------------------------- */
   'settings.folder.name': 'Dossier du budget',
   'settings.folder.desc': 'Chemin dans le coffre du dossier contenant Categories/, Accounts/, Budgets/, Transactions/, Settings.md, etc.',
@@ -591,6 +596,13 @@ module.exports = {
   'tx.split.chip': 'répartie en {count}',
   'tx.split.chipGap': '{amount} non affecté',
   'tx.aria.splitChip': 'Options de ventilation pour {desc} du {date}',
+
+  /* Accessible names (audit of 11 Nov 2026, task 19) — machine-assisted, not native-reviewed. */
+  'tx.split.aria.amount': 'Montant de la part {n}',
+  'tx.split.aria.category': 'Catégorie de la part {n}',
+  'tx.split.aria.note': 'Note de la part {n}',
+  'tx.split.aria.remove': 'Retirer la part {n}',
+
   'tx.unsplit.action': 'Annuler la ventilation',
   'tx.unsplit.title': 'Annuler la ventilation de cette transaction ?',
   'tx.unsplit.msg': {
@@ -810,6 +822,11 @@ module.exports = {
   'acct.err.notNumber': '{field} n\'est pas un nombre',
   'acct.err.nameRequired': 'Le nom du compte est obligatoire',
   'cat.err.nameRequired': 'Le nom de la catégorie est obligatoire',
+
+  /* Accessible names (audit of 11 Nov 2026, task 19) — machine-assisted, not native-reviewed. */
+  'cat.aria.current': '{label} — actuellement {value}',
+  'cat.aria.currentNone': '{label} — actuellement sans catégorie',
+
   'acct.err.exists': 'Ce compte existe déjà',
   'acct.err.save': 'Impossible d\'enregistrer {name} ({error}) — rien n\'a été écrit dans le fichier ; réessayez la même action.',
 
@@ -927,6 +944,17 @@ module.exports = {
   'acct.hero.elsewhere': ' Les biens et les dettes enregistrés sur leurs propres pages ne sont pas comptés ici.',
   'imp.dateReading.dayFirst': 'Les dates de ce fichier ont été lues jour/mois, car l’autre lecture les mettait dans le désordre.',
   'imp.dateReading.monthFirst': 'Les dates de ce fichier ont été lues mois/jour, car l’autre lecture les mettait dans le désordre.',
+
+  /* Accessible names (audit of 11 Nov 2026, task 19) — machine-assisted, not native-reviewed. */
+  'imp.aria.importRow': 'Importer {date} {desc}, {amount}',
+  'imp.aria.importRowWhy': 'Importer {date} {desc}, {amount}. {why}',
+  'imp.aria.category': 'Catégorie pour {desc}',
+  'imp.near.why': "Ressemble à « {desc} », déjà importée le {date} — la banque change la date et le libellé d'une opération lorsqu'elle est comptabilisée. Cochez pour l'importer quand même.",
+  'imp.pending.why': "La banque l'indique encore comme en attente : sa date et son montant peuvent donc tous deux changer lorsqu'elle sera comptabilisée — et une ligne comptabilisée pour un autre montant serait importée comme une seconde transaction. Elle arrivera sur le prochain relevé avec son montant définitif. Cochez pour l'importer dès maintenant quand même.",
+  'imp.aria.cancelTip': 'Abandonner ce relevé sans rien importer',
+  'imp.aria.remapTip': 'Indiquer quelle colonne contient la date, le libellé et le montant',
+  'imp.aria.newAccountTip': 'Créer un compte où ces lignes seront enregistrées',
+
   'acct.duplicateFolders': {
     one: '{count} dossier d’opérations est revendiqué par deux comptes ({names}) ; seul le premier est lu. Donnez à chaque compte son propre nom de dossier.',
     other: '{count} dossiers d’opérations sont revendiqués par deux comptes chacun ({names}) ; seul le premier est lu. Donnez à chaque compte son propre nom de dossier.',
@@ -1474,6 +1502,19 @@ module.exports = {
   /* --- Debt page: "Interest this month" says what it covers, because a debt
      with a blank rate is unknown rather than zero (the why is in en.js) --- */
   'owed.repaid.chip': '{amount} remboursé',
+
+  /* Accessible names (audit of 11 Nov 2026, task 19) — machine-assisted, not native-reviewed. */
+  'owed.aria.statusPaid': '{person} : Payé — cliquez pour modifier',
+  'owed.aria.statusLeft': '{person} : reste {amount} — cliquez pour modifier',
+  'owed.aria.statusOutstanding': '{person} : En attente — cliquez pour modifier',
+  'owed.aria.description': 'Description pour {person}',
+  'owed.aria.amount': 'Montant pour {person}',
+  'owed.aria.lent': 'Date du prêt à {person}',
+  'owed.aria.due': "Date d'échéance pour {person}",
+  'owed.aria.repay': 'Enregistrer un remboursement de {person}',
+  'owed.aria.repayTip': "Enregistrer de l'argent qui est revenu",
+  'owed.aria.remove': 'Retirer {person}',
+
   'debt.interest.noRates': 'ajoutez un taux à une dette pour voir ce chiffre',
   'debt.interest.partial': {
     one: 'couvre {shown} dettes sur {total} · {missing} n\'a pas de taux',
@@ -1482,6 +1523,104 @@ module.exports = {
   'debt.curve.aria': 'Total dû selon chaque plan de remboursement, de {from} à {to}, à partir de {start}. {plans}',
   'debt.curve.aria.cleared': '{plan} : soldé en {month}.',
   'debt.curve.aria.owed': '{plan} : {amount} encore dus en {month}.',
+
+  /* Accessible names (audit of 11 Nov 2026, task 19) — machine-assisted, not native-reviewed. */
+  'debt.aria.reviewCards': 'Vérifier les comptes de carte de crédit sur la page Comptes',
+  'debt.aria.statusSettled': '{name} : Soldée — cliquez pour modifier',
+  'debt.aria.statusActive': '{name} : Active — cliquez pour modifier',
+  'debt.aria.balance': 'Solde dû pour {name}',
+  'debt.aria.rate': "Taux d'intérêt annuel de {name}",
+  'debt.aria.payment': 'Mensualité de {name}',
+  'debt.aria.extra': 'Supplément versé chaque mois pour {name}',
+  'debt.aria.category': 'Catégorie budgétaire pour {name}',
+  'debt.aria.remove': 'Retirer {name}',
+  'debt.aria.strategy': 'Méthode de remboursement',
+  'debt.aria.range': 'Plage du graphique de remboursement',
+
+  /* Accessible names on the pages still written in English (audit of 11 Nov 2026, task 19) — machine-assisted, not native-reviewed. */
+  'sav.aria.reviewAssets': 'Vérifier les estimations des actifs sur la page Actifs',
+  'sav.aria.goalAccounts': "Aller à la page Comptes pour définir un objectif d'épargne",
+  'sav.aria.addAccounts': "Aller à la page Comptes pour ajouter un compte d'épargne ou de placement",
+  'sav.aria.row': '{name}, {amount}. Afficher les actions du compte.',
+  'sav.aria.balance': 'Mettre à jour le solde de {name}, actuellement {amount}',
+  'sav.aria.addStart': "Ajouter un montant de départ et une date d'ouverture pour {name}",
+  'sav.aria.barGrowth': '{putIn} versé · {earned} gagné',
+  'sav.aria.barLoss': 'reste {left} sur {putIn} versé',
+  'sav.aria.growth.capital': 'Ce qui compose ce solde de {closing} : {capital} versé. De {from} à {to}.',
+  'sav.aria.growth.posted': 'Ce qui compose ce solde de {closing} : {capital} versé, {posted} de croissance enregistrée. De {from} à {to}.',
+  'sav.aria.growth.undated': 'Ce qui compose ce solde de {closing} : {capital} versé et {undated} de croissance sans date. De {from} à {to}.',
+  'sav.aria.growth.both': 'Ce qui compose ce solde de {closing} : {capital} versé, {posted} de croissance enregistrée et {undated} de croissance sans date. De {from} à {to}.',
+  'sav.aria.worth': 'Valeur nette {net} : actifs {assets} face à des dettes de {debts}',
+  'sav.aria.worth.owned': 'Valeur nette {net} : actifs {assets} face à des dettes de {debts}. Détenu : {owned}',
+  'sav.aria.worth.owed': 'Valeur nette {net} : actifs {assets} face à des dettes de {debts}. Dû : {owed}',
+  'sav.aria.worth.both': 'Valeur nette {net} : actifs {assets} face à des dettes de {debts}. Détenu : {owned}. Dû : {owed}',
+  'sav.aria.share.own': '{label}, {amount}, {share}% de ce que vous détenez. Ouvrir {page}.',
+  'sav.aria.share.owe': '{label}, {amount}, {share}% de ce que vous devez. Ouvrir {page}.',
+
+  'svc.aria.amount': 'Montant pour {name}',
+  'svc.aria.cycle': 'Cycle de facturation de {name}',
+  'svc.aria.next': 'Prochaine date de facturation de {name}',
+  'svc.aria.active': '{name} est actif',
+  'svc.aria.remove': 'Retirer {name}',
+  'svc.aria.setNext': 'Fixer la prochaine facturation de {name} au {date}',
+  'svc.aria.hint.weekly': 'Dernier prélèvement le {last}, facturé chaque semaine : le prochain est donc attendu le {date}.',
+  'svc.aria.hint.fortnightly': 'Dernier prélèvement le {last}, facturé toutes les deux semaines : le prochain est donc attendu le {date}.',
+  'svc.aria.hint.monthly': 'Dernier prélèvement le {last}, facturé chaque mois : le prochain est donc attendu le {date}.',
+  'svc.aria.hint.annual': 'Dernier prélèvement le {last}, facturé chaque année : le prochain est donc attendu le {date}.',
+  'svc.aria.gap.import': "{first} est passé, mais {account} n'est pas encore importé jusque-là (dernier import {through}) : voici donc la prochaine date après aujourd'hui.",
+  'svc.aria.gap.confirmed': "{first} est passé, mais {account} n'est pas encore importé jusque-là (solde confirmé le {through}) : voici donc la prochaine date après aujourd'hui.",
+  'svc.aria.gap.noCharge': "{first} est passé sans qu'aucun prélèvement n'apparaisse encore dans vos transactions : voici donc la prochaine date après aujourd'hui.",
+
+  'tax.aria.year': 'Année fiscale',
+  'tax.aria.createYear': "Créer une page d'impôts pour {year}, qui contient déjà des documents",
+  'tax.aria.figDescription': 'description de la ligne {code}',
+  'tax.aria.figSource': 'source de la ligne {code}',
+  'tax.aria.codeFor': '{label} pour {description}',
+  'tax.aria.codeForThis': '{label} pour cette ligne',
+  'tax.aria.amountFor': 'Montant pour {code}',
+  'tax.aria.amountForThis': 'Montant pour cette ligne',
+  'tax.aria.figRemove': 'Retirer la ligne {code}',
+  'tax.aria.step.todo': 'Statut : À faire — cliquez pour modifier',
+  'tax.aria.step.busy': 'Statut : En cours — cliquez pour modifier',
+  'tax.aria.step.done': 'Statut : Terminé — cliquez pour modifier',
+  'tax.aria.step.na': 'Statut : Sans objet — cliquez pour modifier',
+  'tax.aria.stepDue': "Date d'échéance pour {step}",
+  'tax.aria.stepNotes': 'Notes pour {step}',
+  'tax.aria.stepRemove': "Retirer l'étape {step}",
+  'tax.aria.doc.needed': 'Statut : Requis — cliquez pour modifier',
+  'tax.aria.doc.uploaded': 'Statut : Téléversé — cliquez pour modifier',
+  'tax.aria.doc.na': 'Statut : Sans objet — cliquez pour modifier',
+  'tax.aria.openFile': 'Ouvrir {name}',
+  'tax.aria.addFile': 'Ajouter un autre fichier à {name}',
+  'tax.aria.uploadFile': 'Téléverser un fichier pour {name}',
+  'tax.aria.docNotes': 'Notes pour {name}',
+  'tax.aria.docRemove': 'Retirer le document {name}',
+
+  'food.aria.range': 'Plage du graphique',
+  'food.aria.trend': {
+    one: 'Dépenses alimentaires par catégorie sur {count} période ; {categories}',
+    other: 'Dépenses alimentaires par catégorie sur {count} périodes ; {categories}',
+  },
+  'food.aria.price': '{name} : prix à chaque achat, de {first} à {last}',
+  'food.aria.category': 'Catégorie pour {name}',
+  'food.aria.healthy': '{name} est sain',
+  'rc.aria.text': 'Texte du ticket',
+  'rc.aria.item': 'Article de la ligne {n}',
+  'rc.aria.price': 'Prix de la ligne {n}',
+  'rc.aria.discount': 'Remise de la ligne {n}',
+  'rc.aria.category': 'Catégorie de la ligne {n}',
+  'rc.aria.healthy': 'Ligne {n} saine',
+  'rc.aria.remove': 'Retirer la ligne {n}',
+
+  'notes.aria.delete': 'Supprimer {title}',
+  'notes.aria.count': {
+    one: '{count} note sur {subject}',
+    other: '{count} notes sur {subject}',
+  },
+  'notes.aria.write': 'Écrire une note sur {subject}',
+  'loans.aria.tabs': 'Choisir un simulateur',
+  'loans.aria.deposit': "Montant de l'apport",
+  'loans.aria.depositPct': 'Apport en pourcentage du prix',
 
   /* --- report.* / nav.report / shell.tx.report — machine-assisted, added
      alongside the Report feature (views/report.js, src/report.js). --- */
@@ -1634,6 +1773,13 @@ module.exports = {
   'assets.hero.heldAbroad': "plus {list} détenus à l'étranger, non convertis",
   'assets.hero.largestAbroad': "le plus important à l'étranger {list}, non converti",
 
+  /* Accessible names (audit of 11 Nov 2026, task 19) — machine-assisted, not native-reviewed. */
+  'assets.aria.kind': 'Type de {name}',
+  'assets.aria.value': 'Valeur de {name}',
+  'assets.aria.valued': "Date d'estimation de {name}",
+  'assets.aria.notes': 'Notes pour {name}',
+  'assets.aria.remove': 'Retirer {name}',
+
   /* ------------------------- plan view (mobile redesign) ------------------------- */
   'plan.hero.leftToPlace': "Reste à répartir",
   'plan.hero.overPlaced': "Plus réparti que ce que ce plan contient",
@@ -1673,6 +1819,22 @@ module.exports = {
   'plan.env.collapseAria': "Replier {name}",
   'plan.env.deleteAria': "Retirer l'enveloppe {name}",
   'plan.actions.deleteAria': "Supprimer le plan",
+
+  /* Accessible names (audit of 11 Nov 2026, task 19) — machine-assisted, not native-reviewed. */
+  'plan.pickerAria': 'Choisir un plan',
+  'plan.split.aria.free': 'Sur {pot} : {spent} déjà dépensé, {committed} affecté, {free} non affecté.',
+  'plan.split.aria.overPlaced': 'Sur {pot} : {spent} déjà dépensé, {committed} affecté, {over} de plus réparti que ce que ce plan contient.',
+  'plan.split.aria.left': '{left} encore à dépenser, dont {placeable} reste à répartir.',
+  'plan.split.aria.overSpent': '{over} dépensé de plus que ce que ce plan contient.',
+  'plan.split.aria.pastBucket': '{amount} dépensé au-delà de ce que contenait son enveloppe.',
+  'plan.env.overBy': '{amount} de trop',
+  'plan.env.sliderAria': 'Montant réparti dans {name}',
+  'plan.env.typeAria': 'Définir le montant de {name} en le saisissant',
+  'plan.env.renameAria': "Renommer l'enveloppe {name}",
+  'plan.item.aria.planned': '{name} : prévu — cliquez pour avancer',
+  'plan.item.aria.part': '{name} : acheté en partie — cliquez pour avancer',
+  'plan.item.aria.done': '{name} : terminé — cliquez pour avancer',
+  'plan.item.cycleTip': 'prévu → acheté en partie → terminé',
 
   'io.stale.message': "{file} a été modifié en dehors de cette page après son chargement, donc rien n'a été écrit",
   'io.stale.notice': "Budget : {file} a été modifié en dehors de cette page (autre appareil ou vue markdown) après son chargement, donc votre enregistrement n'a pas été écrit. La page a rechargé ce qui est maintenant sur le disque — veuillez refaire la modification.",

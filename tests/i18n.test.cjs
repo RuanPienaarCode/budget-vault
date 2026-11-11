@@ -437,7 +437,9 @@ ok(/let current = defaultLanguage\(\)/.test(i18nSrc),
      individual new English literals by regex would drown in false positives
      from class names and data attributes);
    - a view NOT in the set that grows real i18n usage must be promoted, so
-     the inventory cannot silently rot as views migrate. */
+     the inventory cannot silently rot as views migrate. "Real" means visible
+     copy: its accessible names are keyed regardless, and do not count — see
+     NAME_KEY below. */
 {
   const TRANSLATED_VIEWS = new Set(['accounts.js', 'dashboard.js', 'budgets.js', 'transactions.js', 'score.js', 'report.js']);
   TRANSLATED_VIEWS.add('budget-export.js');
@@ -467,6 +469,33 @@ ok(/let current = defaultLanguage\(\)/.test(i18nSrc),
     return (text.match(/\bi18n\.t\(/g) || []).length +
            (text.match(/data-i18n(?:-(?:aria|title|placeholder))?="/g) || []).length;
   };
+  /* AN ACCESSIBLE NAME IS NOT VISIBLE COPY (audit of 11 Nov 2026, task 19).
+     Until then "this view carries i18n calls" and "this view has been
+     translated" were the same statement, and the last branch below could
+     count calls. They came apart on purpose: the words a screen reader
+     speaks — the aria-label on a field with no visible label, a chart's name,
+     an icon button's title — are keyed on EVERY page now, including the ones
+     whose headings and table text are still English (tax.js went from 0 calls
+     to 17 without one visible word changing). A name that is only heard has
+     no page around it to say which half is the translated half, so it does
+     not wait for the page's own pass; tests/accessible-names-keyed.test.cjs
+     is what holds that.
+
+     So an untranslated view is measured on what is LEFT after its names: the
+     calls whose key does not have an `aria` segment (`sav.aria.row`,
+     `acct.aria.edit`, `dash.stale.aria`, the prefix `tax.aria.step.`). That
+     naming is the whole mechanism, which is why lang/en.js says to keep to it.
+     The key is read from the call's first argument, bare or as the first
+     branch of a one-line ternary — the same two shapes invariant 6 reads. */
+  const NAME_KEY = /(?:^|\.)aria(?:\.|$)/;
+  const nameUses = text =>
+    [...text.matchAll(/\bi18n\.t\(\s*(?:[^(),\n]*\?\s*)?'((?:[^'\\]|\\.)*)'/g)].filter(m => NAME_KEY.test(m[1])).length;
+  eq(nameUses("i18n.t('sav.aria.row', { name }); i18n.t('dash.stale.aria'); i18n.t('tax.aria.step.' + s.status); "
+    + "i18n.t(key === 'source' ? 'tax.aria.figSource' : 'tax.aria.figDescription', { code });"), 4,
+    'a name key is recognised bare, as a suffix, as a prefix and inside a ternary');
+  eq(nameUses("i18n.t('owed.repaid.chip', { amount }); i18n.t('nav.' + dest); i18n.t('imp.near.why', { desc, why: i18n.t('x') }); "
+    + "i18n.t('acct.new.title'); i18n.t('report.variant.aria11y');"), 0,
+    'and visible copy is not mistaken for one — an `aria` segment, not the letters');
   for (const f of fs.readdirSync(VIEWS).filter(f => f.endsWith('.js'))) {
     const n = usage(f);
     if (PARTLY_KEYED.has(f)) {
@@ -476,8 +505,9 @@ ok(/let current = defaultLanguage\(\)/.test(i18nSrc),
       ok(n >= (SMALL_VIEW_FLOOR[f] || 30),
         `views/${f} is in TRANSLATED_VIEWS but carries only ${n} i18n uses — translated views must stay translated`);
     } else {
-      ok(n < 10,
-        `views/${f} now carries ${n} i18n uses — promote it into TRANSLATED_VIEWS so "done" stays defined`);
+      const visible = n - nameUses(fs.readFileSync(path.join(VIEWS, f), 'utf8'));
+      ok(visible < 10,
+        `views/${f} now carries ${visible} i18n uses besides its accessible names — promote it into TRANSLATED_VIEWS so "done" stays defined`);
     }
   }
 }

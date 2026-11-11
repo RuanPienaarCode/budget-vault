@@ -113,7 +113,9 @@ module.exports = function registerOwed(ctx) {
         const left = outstandingOf(o);
         const label = settled ? 'Paid' : (o.repaid > 0 ? `${oMoney(o, left, 0)} left` : 'Outstanding');
         const pill = el('button', { class: `status-pill status-${settled ? 'paid' : 'outstanding'}`, 'data-focus-key': `pill:${i}`,
-          'aria-label': `${o.person}: ${label} — click to change` },
+          'aria-label': settled ? i18n.t('owed.aria.statusPaid', { person: o.person })
+            : o.repaid > 0 ? i18n.t('owed.aria.statusLeft', { person: o.person, amount: oMoney(o, left, 0) })
+              : i18n.t('owed.aria.statusOutstanding', { person: o.person }) },
           icoEl(settled ? ['circle-check', 'check-circle'] : ['hourglass']), label);
         /* What has come back, and the sum it belongs to. This was the pill's
            `title`: lent · back · outstanding, on a button whose one press
@@ -154,13 +156,13 @@ module.exports = function registerOwed(ctx) {
             ...(age !== null && !settled
               ? [el('div', { class: 'owed-age' }, `out ${age} day${age === 1 ? '' : 's'}`)] : [])),
           el('td', {}, el('input', { type: 'text', class: 'form-control form-control-sm', value: o.description,
-            'aria-label': `Description for ${o.person}`,
+            'aria-label': i18n.t('owed.aria.description', { person: o.person }),
             onchange: e => { o.description = e.target.value; mark(); } })),
           // Only the KPI tiles read the amount — refresh those, never this table,
           // or the rebuild lands between the tap that leaves this field and the
           // tap that arrives at the next one.
           el('td', { class: 'num' }, el('input', { type: 'number', step: '0.01', min: '0', class: 'form-control form-control-sm', value: shownFigure(o, 'amount'),
-            'aria-label': `Amount for ${o.person}`,
+            'aria-label': i18n.t('owed.aria.amount', { person: o.person }),
             /* A negative is KEPT as typed, and the row says it counts as 0.
                This used to floor it with Math.max(0, …) — because a negative
                amount once made owedSummary's recovered branch subtract it from
@@ -198,15 +200,15 @@ module.exports = function registerOwed(ctx) {
              unlike the amount field, whose figure is read by the KPI tiles and
              not by the row itself. The landing is the row's status pill,
              matching what the pill's own handler does. */
-          el('td', {}, dateInput(o.lent, { class: 'form-control form-control-sm', 'aria-label': `Date lent to ${o.person}` },
+          el('td', {}, dateInput(o.lent, { class: 'form-control form-control-sm', 'aria-label': i18n.t('owed.aria.lent', { person: o.person }) },
             v => { const row = S.owed.indexOf(o); o.lent = v; mark(); renderOwed(`pill:${row}`); })),
-          el('td', {}, dateInput(o.due, { class: 'form-control form-control-sm', 'aria-label': `Due date for ${o.person}` },
+          el('td', {}, dateInput(o.due, { class: 'form-control form-control-sm', 'aria-label': i18n.t('owed.aria.due', { person: o.person }) },
             v => { o.due = v; mark(); })),
           el('td', {}, pill, ...(repaidChip ? [repaidChip] : [])),
           el('td', {}, el('div', { class: 'owed-acts' },
-            el('button', { class: 'btn-ghost btn-ghost-sm', 'aria-label': `Record a repayment from ${o.person}`,
-              title: 'Record money that came back', onclick: () => recordRepayment(o) }, icoEl(['plus'])),
-            el('button', { class: 'btn-ghost btn-ghost-sm', 'aria-label': `Remove ${o.person}`, 'data-focus-key': `del:${i}`,
+            el('button', { class: 'btn-ghost btn-ghost-sm', 'aria-label': i18n.t('owed.aria.repay', { person: o.person }),
+              title: i18n.t('owed.aria.repayTip'), onclick: () => recordRepayment(o) }, icoEl(['plus'])),
+            el('button', { class: 'btn-ghost btn-ghost-sm', 'aria-label': i18n.t('owed.aria.remove', { person: o.person }), 'data-focus-key': `del:${i}`,
               // The entry that moved up into this one's place, else the one
               // above, else New entry — never the top of the page.
               onclick: () => {

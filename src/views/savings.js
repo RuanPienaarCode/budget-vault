@@ -409,7 +409,7 @@ module.exports = function registerSavings(ctx) {
     const note = el('div', { class: 'kpi-caveat-txt' },
       icoEl(['info', 'alert-circle']), `${line} — ${age}.`);
     const btn = el('button', { type: 'button', class: 'kpi-caveat-btn',
-      'aria-label': 'Review account balances on the Accounts page' }, 'Review balances');
+      'aria-label': i18n.t('dash.stale.aria') }, 'Review balances');
     btn.addEventListener('click', () => ctx.switchView('accounts'));
     /* Redesign mockup B ("Net worth is the hero"): the sentence between the
        tiles and the composition bar becomes a compact bordered banner with
@@ -449,7 +449,7 @@ module.exports = function registerSavings(ctx) {
     const note = el('div', { class: 'kpi-caveat-txt' }, icoEl(['info', 'alert-circle']),
       bits.join(' '));
     const btn = el('button', { type: 'button', class: 'kpi-caveat-btn',
-      'aria-label': 'Review asset valuations on the Assets page' }, 'Review valuations');
+      'aria-label': i18n.t('sav.aria.reviewAssets') }, 'Review valuations');
     btn.addEventListener('click', () => ctx.switchView('assets'));
     // Same compact banner shell as renderStaleNote's own caveat, for the same
     // reason: two paragraphs with a trailing button apiece used to sit one
@@ -477,7 +477,7 @@ module.exports = function registerSavings(ctx) {
         'No goals set yet. Open a savings or investment account on the Accounts page and set its ' +
         'Savings goal field to track progress here.'));
       const btn = el('button', { type: 'button', class: 'kpi-caveat-btn',
-        'aria-label': 'Go to the Accounts page to set a savings goal' }, 'Go to Accounts');
+        'aria-label': i18n.t('sav.aria.goalAccounts') }, 'Go to Accounts');
       btn.addEventListener('click', () => ctx.switchView('accounts'));
       goalsWrap.append(btn);
     } else {
@@ -528,7 +528,7 @@ module.exports = function registerSavings(ctx) {
        before the loop, rather than folded into it. */
     if (!savings.length && !investments.length) {
       const btn = el('button', { type: 'button', class: 'kpi-caveat-btn',
-        'aria-label': 'Go to the Accounts page to add a savings or investment account' }, 'Go to Accounts');
+        'aria-label': i18n.t('sav.aria.addAccounts') }, 'Go to Accounts');
       btn.addEventListener('click', () => ctx.switchView('accounts'));
       wrap.append(el('div', { class: 'card mb-4' },
         el('div', { class: 'body-pad' },
@@ -601,7 +601,7 @@ module.exports = function registerSavings(ctx) {
         }
 
         const row = el('button', { type: 'button', class: 'sav-row', 'aria-expanded': 'false',
-          'aria-label': `${a.name}, ${acctMoney(a, a.balance)}. Show account actions.` },
+          'aria-label': i18n.t('sav.aria.row', { name: a.name, amount: acctMoney(a, a.balance) }) },
           el('div', { class: 'sav-row-main' },
             el('div', { class: 'sav-row-name' }, a.name),
             el('div', { class: 'sav-row-sub' }, ...subParts)),
@@ -653,7 +653,7 @@ module.exports = function registerSavings(ctx) {
            headline. The row above already SHOWS the balance; this is where
            editing it now lives, one tap after the row that shows it. */
         const balBtn = el('button', { type: 'button', class: 'v num',
-          'aria-label': `Update the balance of ${a.name}, currently ${acctMoney(a, a.balance)}` },
+          'aria-label': i18n.t('sav.aria.balance', { name: a.name, amount: acctMoney(a, a.balance) }) },
         acctMoney(a, a.balance));
         balBtn.addEventListener('click', () => ctx.editBalance(a));
         card.append(balBtn);
@@ -780,7 +780,7 @@ module.exports = function registerSavings(ctx) {
               `${rec.count} since · they add up to `, el('b', { class: 'num' }, acctMoney(a, rec.implied)),
               rec.ahead ? ` · ${rec.ahead} dated ahead` : ''));
           const btn = el('button', { type: 'button', class: 'acct-recon-btn',
-            'aria-label': `Set ${a.name} balance to ${acctMoney(a, rec.implied)}` }, icoEl(['check']), 'Use this');
+            'aria-label': i18n.t('acct.aria.useThis', { name: a.name, amount: acctMoney(a, rec.implied) }) }, icoEl(['check']), 'Use this');
           btn.addEventListener('click', () => ctx.acceptImplied(a, rec.implied, rec));
           line.append(btn);
           card.append(line);
@@ -824,7 +824,7 @@ module.exports = function registerSavings(ctx) {
            sheet to reach it. */
         if (empty) {
           const btn = el('button', { type: 'button', class: 'acct-drawer-act sav-row-solo-act',
-            'aria-label': `Add a starting amount and opening date for ${a.name}` }, 'Add starting amount');
+            'aria-label': i18n.t('sav.aria.addStart', { name: a.name }) }, 'Add starting amount');
           btn.addEventListener('click', () => ctx.editAccount(a));
           const item = el('div', { class: 'sav-item' }, row, btn);
           listEl.append(item);
@@ -999,13 +999,13 @@ module.exports = function registerSavings(ctx) {
     if (r.growth >= 0) {
       const inPct = (r.capitalIn / (r.capitalIn + r.growth)) * 100;
       bar.setAttribute('title',
-        `${acctMoney(a, r.capitalIn, 0)} put in · ${acctMoney(a, r.growth, 0)} earned`);
+        i18n.t('sav.aria.barGrowth', { putIn: acctMoney(a, r.capitalIn, 0), earned: acctMoney(a, r.growth, 0) }));
       bar.append(el('i', { class: 'seg-in', style: `width:${inPct.toFixed(1)}%` }),
         el('i', { class: 'seg-growth', style: `width:${(100 - inPct).toFixed(1)}%` }));
     } else {
       const leftPct = Math.max(0, Math.min(100, (r.balance / r.capitalIn) * 100));
       bar.setAttribute('title',
-        `${acctMoney(a, r.balance, 0)} left of ${acctMoney(a, r.capitalIn, 0)} put in`);
+        i18n.t('sav.aria.barLoss', { left: acctMoney(a, r.balance, 0), putIn: acctMoney(a, r.capitalIn, 0) }));
       bar.append(el('i', { class: 'seg-in', style: `width:${leftPct.toFixed(1)}%` }),
         el('i', { class: 'seg-growth neg', style: `width:${(100 - leftPct).toFixed(1)}%` }));
     }
@@ -1030,21 +1030,21 @@ module.exports = function registerSavings(ctx) {
        figure — an account that cannot be measured should lead with the fix,
        not bury it behind a generic Edit. */
     if (r.basis === 'none') {
-      act('Add starting amount', `Add a starting amount and opening date for ${a.name}`,
+      act('Add starting amount', i18n.t('sav.aria.addStart', { name: a.name }),
         () => ctx.editAccount(a));
     }
-    act('Edit', `Edit ${a.name}`, () => ctx.editAccount(a));
+    act('Edit', i18n.t('acct.aria.edit', { name: a.name }), () => ctx.editAccount(a));
     const primary = labels && [...labels][0];
-    if (primary) act('Transactions', `Show transactions for ${a.name}`,
+    if (primary) act('Transactions', i18n.t('acct.aria.showTx', { name: a.name }),
       () => ctx.openAccountTransactions(primary));
-    act('Open note', `Open the note for ${a.name}`, () => ctx.openAccountFile(a));
+    act('Open note', i18n.t('acct.aria.openNote', { name: a.name }), () => ctx.openAccountFile(a));
     card.append(acts);
     /* Same dialog the Accounts drawer opens — one delete for an account in this
        plugin, not two that drift apart on what they say about the transactions
        folder. Fenced below the rest of the sheet by its own divider, so it is
        never the button a thumb reaches for by accident. */
     const del = el('button', { type: 'button', class: 'acct-drawer-act acct-drawer-del sav-sheet-fence',
-      'aria-label': `Delete the account ${a.name}` }, 'Delete');
+      'aria-label': i18n.t('acct.aria.delete', { name: a.name }) }, 'Delete');
     del.addEventListener('click', () => ctx.deleteAccount(a));
     card.append(del);
   }
@@ -1161,13 +1161,17 @@ module.exports = function registerSavings(ctx) {
     const uid = `bud-growth-${++growthSeq}`;
     /* In cents, as the legend under the chart and the total it adds up to are
        (2026-10-20 audit, D2-03) — a screen reader gets the same figures. */
-    const listFor = `${money(last.capital)} put in`
-      + (last.posted ? `, ${money(last.posted)} of recorded growth` : '')
-      + (undated ? `, and ${money(undated)} of growth carrying no date` : '');
+    /* One whole sentence per combination, not a list assembled clause by
+       clause: where "and" goes, and whether the dates lead or trail, is the
+       translator's to decide. */
+    const built = { closing: money(s.closing), capital: money(last.capital), posted: money(last.posted || 0),
+      undated: money(undated || 0), from: s.points[0].month, to: last.month };
     const { svg, add } = createChart({
       w: W, h: H, cls: 'growth-svg',
-      label: `What built this balance of ${money(s.closing)}: ${listFor}.`
-        + ` From ${s.points[0].month} to ${last.month}.`,
+      label: last.posted && undated ? i18n.t('sav.aria.growth.both', built)
+        : last.posted ? i18n.t('sav.aria.growth.posted', built)
+          : undated ? i18n.t('sav.aria.growth.undated', built)
+            : i18n.t('sav.aria.growth.capital', built),
     });
     const defs = add('defs', {});
 
@@ -1599,11 +1603,13 @@ module.exports = function registerSavings(ctx) {
        dropped in favour of the tooltip, nothing at all. In cents, as the
        totals it follows are (2026-10-20 audit, D2-03). */
     const listFor = segs => segs.map(s => `${s.label} ${money(s.amount)}`).join(', ');
+    const worthSays = { net: money(net), assets: money(totalAssets), debts: money(totalDebts), owned: listFor(assets), owed: listFor(debts) };
     const { svg, add } = createChart({
       w: W, h: H, cls: 'worth-svg',
-      label: `Net worth ${money(net)}: assets ${money(totalAssets)} against debts ${money(totalDebts)}`
-        + (assets.length ? `. Owned: ${listFor(assets)}` : '')
-        + (debts.length ? `. Owed: ${listFor(debts)}` : ''),
+      label: assets.length && debts.length ? i18n.t('sav.aria.worth.both', worthSays)
+        : assets.length ? i18n.t('sav.aria.worth.owned', worthSays)
+          : debts.length ? i18n.t('sav.aria.worth.owed', worthSays)
+            : i18n.t('sav.aria.worth', worthSays),
     });
     const defs = add('defs', {});
 
@@ -1818,7 +1824,10 @@ module.exports = function registerSavings(ctx) {
     for (const { seg, share, of } of ranked) {
       const dest = navFor(seg);
       const btn = el('button', { type: 'button', class: 'sav-worth-btn',
-        'aria-label': `${seg.label}, ${money(seg.amount)}, ${share}% of what you ${of}. Open ${dest === 'owed' ? 'Owed Money' : dest[0].toUpperCase() + dest.slice(1)}.` },
+        /* The page is named as the drawer names it (nav.*), in the reader's
+           language — `dest` is one of assets / owed / debts / accounts. */
+        'aria-label': i18n.t(of === 'owe' ? 'sav.aria.share.owe' : 'sav.aria.share.own',
+          { label: seg.label, amount: money(seg.amount), share, page: i18n.t('nav.' + dest) }) },
         /* `i`, not `span` — tests/savings-cards.test.cjs walks the swatch by
            TAG (`e.tagName === 'I'`), the same shape the legend it replaces
            used, so the colour-per-unlisted-type guard keeps pinning the same

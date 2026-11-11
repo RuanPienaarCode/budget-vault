@@ -36,6 +36,10 @@ const {
   trackPoints, themeColors, SLICE_PALETTE, phoneWidth,
 } = require('../chart');
 const { askReceipt } = require('../receipt-modal');
+// For the accessible names only — the page's visible copy is still English
+// (EXPECTED_ENGLISH_ONLY in tests/i18n-render.test.cjs). Namespaced, as
+// everywhere in src/.
+const i18n = require('../i18n');
 
 module.exports = function registerFood(ctx) {
   const { S, $, app, plugin, toast, money, readFile, writeFile, fileAt, pathTaken, periodRange, currentPeriod, catType, dateText,
@@ -170,7 +174,7 @@ module.exports = function registerFood(ctx) {
     const pills = $('#foodTrendRange');
     pills.empty();
     pills.append(rangePills({
-      ranges: FOOD_RANGES, value: win.range.key, label: 'Chart range',
+      ranges: FOOD_RANGES, value: win.range.key, label: i18n.t('food.aria.range'),
       onPick: async key => {
         plugin.settings.chartFoodRange = key;
         try { await plugin.saveSettings(); } catch (e) { toast(`Could not save the chart range: ${e.message || e}`, true); }
@@ -205,7 +209,7 @@ module.exports = function registerFood(ctx) {
     const max = Math.max(1, ...lines.flatMap(l => l.values.filter(v => v != null))) * 1.12;
     const s = scales({ w: W, h: H, count: win.periods.length, max, padL: 24, padR: 24, padB: phoneWidth() ? 52 : 40 });
     const { svg, add } = createChart({ w: W, h: H,
-      label: `Food spend by category over ${win.periods.length} periods; ${lines.map(l => l.name).join(', ')}` });
+      label: i18n.t('food.aria.trend', { count: win.periods.length, categories: lines.map(l => l.name).join(', ') }) });
     gridlines(add, s, W);
     axisLabels(add, s, win.periods.map(p => p.label), H);
 
@@ -282,7 +286,7 @@ module.exports = function registerFood(ctx) {
     const pad = Math.max(1, (hi - lo) * 0.25);
     const s = scales({ w: W, h: H, count: pts.length, max: hi + pad, min: Math.max(0, lo - pad), padL: 20, padR: 20, padT: 18, padB: phoneWidth() ? 48 : 34 });
     const { svg, add } = createChart({ w: W, h: H, cls: 'food-price-svg',
-      label: `${it.name}: price at each purchase, ${money(pc.first)} to ${money(pc.last)}` });
+      label: i18n.t('food.aria.price', { name: it.name, first: money(pc.first), last: money(pc.last) }) });
     const c = themeColors(ctx.root);
     gridlines(add, s, W, 3);
     /* Two purchases on one day share one label — "Oct 3, Oct 3" says less. */
@@ -337,12 +341,12 @@ module.exports = function registerFood(ctx) {
       const after = prefix => [`${prefix}:${it.key}`,
         rows[n + 1] ? `item:${rows[n + 1].key}` : null,
         rows[n - 1] ? `item:${rows[n - 1].key}` : null, sel];
-      const catSel = el('select', { class: 'form-select form-select-sm', 'aria-label': `Category for ${it.name}`,
+      const catSel = el('select', { class: 'form-select form-select-sm', 'aria-label': i18n.t('food.aria.category', { name: it.name }),
         'data-focus-key': `filed:${it.key}` });
       for (const c of new Set([...cats, it.category])) catSel.append(el('option', { value: c }, c));
       catSel.value = it.category;
       catSel.addEventListener('change', async () => { await refile(it, { category: catSel.value }); refocus(body, after('filed')); });
-      const healthyBox = el('input', { type: 'checkbox', 'aria-label': `${it.name} is healthy`,
+      const healthyBox = el('input', { type: 'checkbox', 'aria-label': i18n.t('food.aria.healthy', { name: it.name }),
         'data-focus-key': `healthy:${it.key}` });
       healthyBox.checked = !!it.healthy;
       healthyBox.addEventListener('change', async () => { await refile(it, { healthy: healthyBox.checked }); refocus(body, after('healthy')); });

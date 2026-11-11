@@ -72,6 +72,11 @@ module.exports = {
   'topbar.importTitle': 'Ngenisa i-CSV yesitatimende sebhange',
   'topbar.settings': 'Vula izilungiselelo zesabelomali',
 
+  /* Accessible names (audit of 11 Nov 2026, task 19) — machine-assisted, not native-reviewed. */
+  'topbar.settingsFor': 'Izilungiselelo zesabelomali — {name}',
+  'topbar.settingsTitle': 'Izilungiselelo zesabelomali',
+  'topbar.settingsTitleFor': '{name} · izilungiselelo zesabelomali',
+
   /* ------------------------------- settings -------------------------------- */
   'settings.folder.name': 'Ifolda yesabelomali',
   'settings.folder.desc': 'Indlela yevolti eya efoldeni equkethe i-Categories/, i-Accounts/, i-Budgets/, i-Transactions/, i-Settings.md, njalonjalo.',
@@ -605,6 +610,13 @@ module.exports = {
   'tx.split.chip': 'kuhlukaniswe kwaba ngu-{count}',
   'tx.split.chipGap': '{amount} engabalwanga',
   'tx.aria.splitChip': 'Izinketho zokuhlukanisa {desc} ngomhla {date}',
+
+  /* Accessible names (audit of 11 Nov 2026, task 19) — machine-assisted, not native-reviewed. */
+  'tx.split.aria.amount': 'Inani lengxenye {n}',
+  'tx.split.aria.category': 'Isigaba sengxenye {n}',
+  'tx.split.aria.note': 'Inothi lengxenye {n}',
+  'tx.split.aria.remove': 'Susa ingxenye {n}',
+
   'tx.unsplit.action': 'Khansela ukuhlukanisa',
   'tx.unsplit.title': 'Khansela ukuhlukaniswa kwalo msebenzi wemali?',
   'tx.unsplit.msg': {
@@ -816,6 +828,11 @@ module.exports = {
   'acct.err.notNumber': 'U-{field} akulona inani',
   'acct.err.nameRequired': 'Igama le-akhawunti liyadingeka',
   'cat.err.nameRequired': 'Igama lesigaba liyadingeka',
+
+  /* Accessible names (audit of 11 Nov 2026, task 19) — machine-assisted, not native-reviewed. */
+  'cat.aria.current': '{label} — okwamanje {value}',
+  'cat.aria.currentNone': '{label} — okwamanje akunasigaba',
+
   'acct.err.exists': 'I-akhawunti isivele ikhona',
   'acct.err.save': 'Ayikwazanga ukulondoloza u-{name} ({error})',
 
@@ -934,6 +951,17 @@ module.exports = {
   'acct.hero.elsewhere': ' Amafa nezikweletu ezibhalwe emakhasini awo awabalwa lapha.',
   'imp.dateReading.dayFirst': 'Izinsuku kuleli fayela zifundwe njengosuku/inyanga, ngoba ukuzifunda ngenye indlela kuzibeke ngaphandle kohlelo.',
   'imp.dateReading.monthFirst': 'Izinsuku kuleli fayela zifundwe njengenyanga/usuku, ngoba ukuzifunda ngenye indlela kuzibeke ngaphandle kohlelo.',
+
+  /* Accessible names (audit of 11 Nov 2026, task 19) — machine-assisted, not native-reviewed. */
+  'imp.aria.importRow': 'Ngenisa {date} {desc}, {amount}',
+  'imp.aria.importRowWhy': 'Ngenisa {date} {desc}, {amount}. {why}',
+  'imp.aria.category': 'Isigaba sika-{desc}',
+  'imp.near.why': 'Kubukeka njengo-"{desc}" osungenisiwe ngomhla ka-{date} — ibhange lishintsha usuku namagama enkokhelo uma isiqinisekisiwe. Maka ukuze uyingenise noma kunjalo.',
+  'imp.pending.why': 'Ibhange lisakubala lokhu njengokusalindile, ngakho usuku nenani kungashintsha kokubili uma sekuqinisekisiwe — futhi umugqa oqinisekisiwe onenani elihlukile ubuzongeniswa njengomsebenzi wemali wesibili. Uzofika esitatimendeni esilandelayo unenani lokugcina. Maka ukuze uwungenise manje noma kunjalo.',
+  'imp.aria.cancelTip': 'Lahla lesi sitatimende ngaphandle kokungenisa lutho',
+  'imp.aria.remapTip': 'Khetha ukuthi iyiphi ikholomu ewusuku, incazelo nenani',
+  'imp.aria.newAccountTip': 'Dala i-akhawunti le migqa ezongena kuyo',
+
   'acct.duplicateFolders': {
     one: 'Ifolda yokuthengiselana engu-{count} ifunwa ama-akhawunti amabili ({names}); kufundwa eyokuqala kuphela. Nika i-akhawunti ngayinye igama layo lefolda.',
     other: 'Amafolda okuthengiselana angu-{count} afunwa ama-akhawunti amabili ngalinye ({names}); kufundwa eyokuqala kuphela. Nika i-akhawunti ngayinye igama layo lefolda.',
@@ -1488,6 +1516,19 @@ module.exports = {
   /* --- Debt page: "Interest this month" says what it covers, because a debt
      with a blank rate is unknown rather than zero (the why is in en.js) --- */
   'owed.repaid.chip': '{amount} ibuyile',
+
+  /* Accessible names (audit of 11 Nov 2026, task 19) — machine-assisted, not native-reviewed. */
+  'owed.aria.statusPaid': '{person}: Kukhokhiwe — chofoza ukuze uguqule',
+  'owed.aria.statusLeft': '{person}: kusele {amount} — chofoza ukuze uguqule',
+  'owed.aria.statusOutstanding': '{person}: Kusakweletwa — chofoza ukuze uguqule',
+  'owed.aria.description': 'Incazelo ka-{person}',
+  'owed.aria.amount': 'Inani lika-{person}',
+  'owed.aria.lent': 'Usuku okwabolekwa ngalo u-{person}',
+  'owed.aria.due': 'Usuku lokukhokha luka-{person}',
+  'owed.aria.repay': 'Qopha imali ebuyiswe ngu-{person}',
+  'owed.aria.repayTip': 'Qopha imali ebuyile',
+  'owed.aria.remove': 'Susa u-{person}',
+
   'debt.interest.noRates': 'engeza izinga kunoma yisiphi isikweletu ukuze ubone lokhu',
   'debt.interest.partial': {
     one: 'ihlanganisa {shown} kwezikweletu ezingu-{total} · {missing} asinazinga',
@@ -1496,6 +1537,104 @@ module.exports = {
   'debt.curve.aria': 'Isamba sesikweletu ngaphansi kohlelo ngalunye lokukhokha, kusukela ku-{from} kuya ku-{to}, kuqalwa ku-{start}. {plans}',
   'debt.curve.aria.cleared': '{plan}: sikhokhwe sonke ngo-{month}.',
   'debt.curve.aria.owed': '{plan}: kusakweletwa {amount} ngo-{month}.',
+
+  /* Accessible names (audit of 11 Nov 2026, task 19) — machine-assisted, not native-reviewed. */
+  'debt.aria.reviewCards': 'Buyekeza ama-akhawunti amakhadi esikweletu ekhasini lama-Akhawunti',
+  'debt.aria.statusSettled': '{name}: Sikhokhiwe — chofoza ukuze uguqule',
+  'debt.aria.statusActive': '{name}: Siyasebenza — chofoza ukuze uguqule',
+  'debt.aria.balance': 'Ibhalansi ekweletwayo ku-{name}',
+  'debt.aria.rate': 'Izinga lenzalo lonyaka lika-{name}',
+  'debt.aria.payment': 'Inkokhelo yanyanga zonke ka-{name}',
+  'debt.aria.extra': 'Okwengeziwe okukhokhwa nyanga zonke ku-{name}',
+  'debt.aria.category': 'Isigaba sesabelomali sika-{name}',
+  'debt.aria.remove': 'Susa u-{name}',
+  'debt.aria.strategy': 'Indlela yokukhokha izikweletu',
+  'debt.aria.range': 'Ububanzi beshadi lokukhokha',
+
+  /* Accessible names on the pages still written in English (audit of 11 Nov 2026, task 19) — machine-assisted, not native-reviewed. */
+  'sav.aria.reviewAssets': 'Buyekeza ukuhlolwa kwenani lamafa ekhasini lamaFa',
+  'sav.aria.goalAccounts': 'Iya ekhasini lama-Akhawunti ukuze ubeke umgomo wokonga',
+  'sav.aria.addAccounts': 'Iya ekhasini lama-Akhawunti ukuze wengeze i-akhawunti yokonga noma yotshalomali',
+  'sav.aria.row': '{name}, {amount}. Khombisa izenzo ze-akhawunti.',
+  'sav.aria.balance': 'Buyekeza ibhalansi ka-{name}, okwamanje {amount}',
+  'sav.aria.addStart': 'Engeza inani lokuqala nosuku lokuvula luka-{name}',
+  'sav.aria.barGrowth': '{putIn} okufakiwe · {earned} okuzuziwe',
+  'sav.aria.barLoss': 'kusele {left} ku-{putIn} okufakiwe',
+  'sav.aria.growth.capital': 'Okwakhe le bhalansi ka-{closing}: {capital} okufakiwe. Kusukela ku-{from} kuya ku-{to}.',
+  'sav.aria.growth.posted': 'Okwakhe le bhalansi ka-{closing}: {capital} okufakiwe, {posted} wokukhula okuqoshiwe. Kusukela ku-{from} kuya ku-{to}.',
+  'sav.aria.growth.undated': 'Okwakhe le bhalansi ka-{closing}: {capital} okufakiwe, kanye no-{undated} wokukhula okungenalo usuku. Kusukela ku-{from} kuya ku-{to}.',
+  'sav.aria.growth.both': 'Okwakhe le bhalansi ka-{closing}: {capital} okufakiwe, {posted} wokukhula okuqoshiwe, kanye no-{undated} wokukhula okungenalo usuku. Kusukela ku-{from} kuya ku-{to}.',
+  'sav.aria.worth': 'Ingcebo esele {net}: amafa {assets} ngokumelene nezikweletu {debts}',
+  'sav.aria.worth.owned': 'Ingcebo esele {net}: amafa {assets} ngokumelene nezikweletu {debts}. Onakho: {owned}',
+  'sav.aria.worth.owed': 'Ingcebo esele {net}: amafa {assets} ngokumelene nezikweletu {debts}. Okukweletayo: {owed}',
+  'sav.aria.worth.both': 'Ingcebo esele {net}: amafa {assets} ngokumelene nezikweletu {debts}. Onakho: {owned}. Okukweletayo: {owed}',
+  'sav.aria.share.own': '{label}, {amount}, {share}% walokho onakho. Vula {page}.',
+  'sav.aria.share.owe': '{label}, {amount}, {share}% walokho okukweletayo. Vula {page}.',
+
+  'svc.aria.amount': 'Inani lika-{name}',
+  'svc.aria.cycle': 'Umjikelezo wokukhokhisa ka-{name}',
+  'svc.aria.next': 'Usuku olulandelayo lokukhokhisa luka-{name}',
+  'svc.aria.active': 'U-{name} uyasebenza',
+  'svc.aria.remove': 'Susa u-{name}',
+  'svc.aria.setNext': 'Misa ukukhokhisa okulandelayo kuka-{name} ku-{date}',
+  'svc.aria.hint.weekly': 'Kugcine ukukhokhiswa ngo-{last}, kukhokhiswa masonto onke, ngakho inkokhelo elandelayo ilindeleke ngo-{date}.',
+  'svc.aria.hint.fortnightly': 'Kugcine ukukhokhiswa ngo-{last}, kukhokhiswa njalo emasontweni amabili, ngakho inkokhelo elandelayo ilindeleke ngo-{date}.',
+  'svc.aria.hint.monthly': 'Kugcine ukukhokhiswa ngo-{last}, kukhokhiswa nyanga zonke, ngakho inkokhelo elandelayo ilindeleke ngo-{date}.',
+  'svc.aria.hint.annual': 'Kugcine ukukhokhiswa ngo-{last}, kukhokhiswa minyaka yonke, ngakho inkokhelo elandelayo ilindeleke ngo-{date}.',
+  'svc.aria.gap.import': 'U-{first} usudlulile, kodwa u-{account} akakangeniswa kuze kufike lapho (ukungenisa kokugcina {through}), ngakho lolu wusuku olulandelayo ngemva kwanamuhla.',
+  'svc.aria.gap.confirmed': 'U-{first} usudlulile, kodwa u-{account} akakangeniswa kuze kufike lapho (ibhalansi iqinisekiswe {through}), ngakho lolu wusuku olulandelayo ngemva kwanamuhla.',
+  'svc.aria.gap.noCharge': 'U-{first} usudlulile kungekabi khona inkokhelo emisebenzini yakho yemali, ngakho lolu wusuku olulandelayo ngemva kwanamuhla.',
+
+  'tax.aria.year': 'Unyaka wentela',
+  'tax.aria.createYear': 'Dala ikhasi lentela lika-{year}, osevele unamadokhumenti',
+  'tax.aria.figDescription': 'incazelo yesibalo {code}',
+  'tax.aria.figSource': 'umthombo wesibalo {code}',
+  'tax.aria.codeFor': '{label} ka-{description}',
+  'tax.aria.codeForThis': '{label} yalesi sibalo',
+  'tax.aria.amountFor': 'Inani lika-{code}',
+  'tax.aria.amountForThis': 'Inani lalesi sibalo',
+  'tax.aria.figRemove': 'Susa isibalo {code}',
+  'tax.aria.step.todo': 'Isimo: Okuzokwenziwa — chofoza ukuze uguqule',
+  'tax.aria.step.busy': 'Isimo: Kuyenziwa — chofoza ukuze uguqule',
+  'tax.aria.step.done': 'Isimo: Kuqediwe — chofoza ukuze uguqule',
+  'tax.aria.step.na': 'Isimo: Akusebenzi — chofoza ukuze uguqule',
+  'tax.aria.stepDue': 'Usuku lokugcina luka-{step}',
+  'tax.aria.stepNotes': 'Amanothi ka-{step}',
+  'tax.aria.stepRemove': 'Susa isinyathelo {step}',
+  'tax.aria.doc.needed': 'Isimo: Kuyadingeka — chofoza ukuze uguqule',
+  'tax.aria.doc.uploaded': 'Isimo: Kulayishiwe — chofoza ukuze uguqule',
+  'tax.aria.doc.na': 'Isimo: Akusebenzi — chofoza ukuze uguqule',
+  'tax.aria.openFile': 'Vula u-{name}',
+  'tax.aria.addFile': 'Engeza elinye ifayela ku-{name}',
+  'tax.aria.uploadFile': 'Layisha ifayela lika-{name}',
+  'tax.aria.docNotes': 'Amanothi ka-{name}',
+  'tax.aria.docRemove': 'Susa idokhumenti {name}',
+
+  'food.aria.range': 'Ububanzi beshadi',
+  'food.aria.trend': {
+    one: 'Ukuchitha ekudleni ngesigaba esikhathini esingu-{count}; {categories}',
+    other: 'Ukuchitha ekudleni ngesigaba ezikhathini ezingu-{count}; {categories}',
+  },
+  'food.aria.price': '{name}: intengo ekuthengeni ngakunye, {first} kuya ku-{last}',
+  'food.aria.category': 'Isigaba sika-{name}',
+  'food.aria.healthy': 'U-{name} unempilo',
+  'rc.aria.text': 'Umbhalo werisidi',
+  'rc.aria.item': 'Into yomugqa {n}',
+  'rc.aria.price': 'Intengo yomugqa {n}',
+  'rc.aria.discount': 'Isaphulelo somugqa {n}',
+  'rc.aria.category': 'Isigaba somugqa {n}',
+  'rc.aria.healthy': 'Umugqa {n} unempilo',
+  'rc.aria.remove': 'Susa umugqa {n}',
+
+  'notes.aria.delete': 'Susa u-{title}',
+  'notes.aria.count': {
+    one: 'Inothi elingu-{count} mayelana no-{subject}',
+    other: 'Amanothi angu-{count} mayelana no-{subject}',
+  },
+  'notes.aria.write': 'Bhala inothi mayelana no-{subject}',
+  'loans.aria.tabs': 'Khetha isibali',
+  'loans.aria.deposit': 'Inani lediphozithi',
+  'loans.aria.depositPct': 'Idiphozithi njengephesenti lentengo',
 
   /* --- report.* / nav.report / shell.tx.report — machine-assisted, added
      alongside the Report feature (views/report.js, src/report.js). --- */
@@ -1648,6 +1787,13 @@ module.exports = {
   'assets.hero.heldAbroad': "ngokwengeza, {list} kugcinwe kwelinye izwe, ngaphandle kokuguqulwa",
   'assets.hero.largestAbroad': "enkulu kunazo zonke kwelinye izwe {list}, ngaphandle kokuguqulwa",
 
+  /* Accessible names (audit of 11 Nov 2026, task 19) — machine-assisted, not native-reviewed. */
+  'assets.aria.kind': 'Uhlobo luka-{name}',
+  'assets.aria.value': 'Inani lika-{name}',
+  'assets.aria.valued': 'Usuku u-{name} ahlolwa ngalo inani',
+  'assets.aria.notes': 'Amanothi ka-{name}',
+  'assets.aria.remove': 'Susa u-{name}',
+
   /* ------------------------- plan view (mobile redesign) ------------------------- */
   'plan.hero.leftToPlace': "Okusasele ukubekwa",
   'plan.hero.overPlaced': "Kubekwe okungaphezu kwalokho lolu hlelo olukubambile",
@@ -1687,6 +1833,22 @@ module.exports = {
   'plan.env.collapseAria': "Goqa u-{name}",
   'plan.env.deleteAria': "Susa ibhakede yokuchitha {name}",
   'plan.actions.deleteAria': "Susa uhlelo",
+
+  /* Accessible names (audit of 11 Nov 2026, task 19) — machine-assisted, not native-reviewed. */
+  'plan.pickerAria': 'Khetha uhlelo',
+  'plan.split.aria.free': 'Ku-{pot}: {spent} sekuchithiwe, {committed} sekwabelwe, {free} akukabelwa.',
+  'plan.split.aria.overPlaced': 'Ku-{pot}: {spent} sekuchithiwe, {committed} sekwabelwe, kubekwe {over} ngaphezu kwalokho lolu hlelo olukubambile.',
+  'plan.split.aria.left': 'Kusasele {left} ukuthi kusetshenziswe, {placeable} kwakho kusasele ukubekwa.',
+  'plan.split.aria.overSpent': 'Kusetshenziswe {over} ngaphezu kwalokho lolu hlelo olukubambile.',
+  'plan.split.aria.pastBucket': 'Kusetshenziswe {amount} ngaphezu kwalokho ibhakede ebelikubambile.',
+  'plan.env.overBy': '{amount} ngokweqile',
+  'plan.env.sliderAria': 'Inani elibekwe ku-{name}',
+  'plan.env.typeAria': 'Misa inani lika-{name} ngokulithayipha',
+  'plan.env.renameAria': 'Qamba kabusha ibhakede yokuchitha {name}',
+  'plan.item.aria.planned': '{name}: kuhleliwe — chofoza ukuze uqhubekele phambili',
+  'plan.item.aria.part': '{name}: kuthengwe ingxenye — chofoza ukuze uqhubekele phambili',
+  'plan.item.aria.done': '{name}: kuqediwe — chofoza ukuze uqhubekele phambili',
+  'plan.item.cycleTip': 'kuhleliwe → kuthengwe ingxenye → kuqediwe',
 
   'io.stale.message': "{file} iguquliwe ngaphandle kwaleli khasi ngemuva kokuthi ilayishwe, ngakho akukho okubhaliwe",
   'io.stale.notice': "Ibhajethi: {file} iguquliwe ngaphandle kwaleli khasi (enye idivayisi noma ukubuka kwe-markdown) ngemuva kokuthi ilayishwe, ngakho ukulondoloza kwakho akubhalwanga. Ikhasi selilayishe kabusha okukhona manje kudiski — sicela uphinde wenze ushintsho.",

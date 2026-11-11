@@ -83,6 +83,8 @@ class AddBookModal extends Modal {
     this.errEl = null;
   }
   onOpen() {
+    // Body-mounted, so outside the plugin root and its `lang` (i18n.js followLanguage).
+    i18n.followLanguage(this.modalEl);
     const c = this.contentEl;
     c.empty();
     this.titleEl.setText(i18n.t('books.add.title'));
@@ -146,6 +148,8 @@ class BookLabelModal extends Modal {
     this.onDone = onDone;
   }
   onOpen() {
+    // Body-mounted, so outside the plugin root and its `lang` (i18n.js followLanguage).
+    i18n.followLanguage(this.modalEl);
     const c = this.contentEl;
     c.empty();
     this.titleEl.setText(i18n.t('books.relabel.title'));

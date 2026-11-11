@@ -27,6 +27,8 @@ const {
   NOTES_DIR, KIND_LABELS, NOTE_KINDS, noteForLink, isTracked,
   uniqueNotePath, serializeNote, notesFor, sortNotes, isOrphan, fold,
 } = require('../note-file');
+// For the accessible names only — this page's visible copy is still English.
+const i18n = require('../i18n');
 
 /* Separates kind from subject inside one dropdown value ("account\u001FCash").
 
@@ -218,7 +220,7 @@ module.exports = function registerNotes(ctx) {
         icoEl(['file-pen', 'file-edit', 'pencil']), 'Open'),
       el('button', { class: 'btn-ghost btn-ghost-sm', 'data-focus-key': `note-subject:${n.rel}`, onclick: () => repointOne(n) },
         icoEl(['link', 'link-2']), 'Change subject'),
-      el('button', { class: 'btn-ghost btn-ghost-sm', 'aria-label': `Delete ${n.title}`, 'data-focus-key': `note-del:${i}`, onclick: () => deleteNote(n, i) },
+      el('button', { class: 'btn-ghost btn-ghost-sm', 'aria-label': i18n.t('notes.aria.delete', { title: n.title }), 'data-focus-key': `note-del:${i}`, onclick: () => deleteNote(n, i) },
         icoEl(['trash-2', 'trash']), 'Delete')));
     return card;
   }
@@ -521,7 +523,7 @@ module.exports = function registerNotes(ctx) {
     const b = el('button', { type: 'button', class: 'note-chip' });
     const paint = () => {
       const n = count();
-      const what = n ? `${n} note${n === 1 ? '' : 's'} about ${subject}` : `Write a note about ${subject}`;
+      const what = n ? i18n.t('notes.aria.count', { count: n, subject }) : i18n.t('notes.aria.write', { subject });
       b.classList.toggle('has-notes', n > 0);
       b.setAttribute('aria-label', what);
       b.setAttribute('title', what);

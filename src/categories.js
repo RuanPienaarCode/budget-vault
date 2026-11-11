@@ -167,7 +167,8 @@ module.exports = function registerCategories(ctx) {
     const btn = el('button', {
       type: 'button',
       class: `cat-cell-btn${value ? '' : ' cat-cell-empty'}`,
-      'aria-label': label ? `${label} — currently ${value || 'uncategorised'}` : undefined,
+      'aria-label': !label ? undefined
+        : value ? i18n.t('cat.aria.current', { label, value }) : i18n.t('cat.aria.currentNone', { label }),
     }, value || '— none —');
     let swapped = false;
     const swap = () => {

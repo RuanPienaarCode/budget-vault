@@ -504,6 +504,14 @@ function mountApp(view) {
   const root = view.contentEl;
 
   root.classList.add('budget-app-root');
+  /* The interface language is the plugin's own setting, so the root says which
+     one it is in: without `lang` here a screen reader reads a French or isiZulu
+     budget in whatever voice Obsidian's <html> names (audit of 11 Nov 2026,
+     task 19). Followed rather than set once — Settings.md is only read after
+     this, and every later change of language goes through i18n.setLanguage(),
+     which re-stamps it. view.js lets go of it when the view closes. No `dir`:
+     no right-to-left language ships (i18n.js LANGUAGE_TAGS). */
+  i18n.followLanguage(root);
   // SHELL_HTML is a static developer-authored constant with no interpolation,
   // but assigning it via innerHTML trips Obsidian's plugin-review checks (and
   // any future CSP tightening). Parse it out-of-document instead: DOMParser
@@ -880,15 +888,15 @@ function mountApp(view) {
      avatar initials (first + last word, e.g. "Jane & John Smith" → JS). */
   function applyIdentity() {
     const name = (S.settings.household || '').trim();
-    $('#brandSub').textContent = name ? `${name} · Obsidian` : 'Obsidian vault budget';
+    $('#brandSub').textContent = name ? `${name} · Obsidian` : i18n.t('topbar.brandSub');
     const words = name.split(/\s+/).filter(w => /^[\p{L}\p{N}]/u.test(w));
     const initials = words.length
       ? (words[0][0] + (words.length > 1 ? words[words.length - 1][0] : '')).toUpperCase()
       : 'BV';
     const av = $('#topbarAvatar');
     av.textContent = initials;
-    av.setAttribute('aria-label', name ? `Budget settings — ${name}` : 'Open budget settings');
-    av.setAttribute('title', name ? `${name} · budget settings` : 'Budget settings');
+    av.setAttribute('aria-label', name ? i18n.t('topbar.settingsFor', { name }) : i18n.t('topbar.settings'));
+    av.setAttribute('title', name ? i18n.t('topbar.settingsTitleFor', { name }) : i18n.t('topbar.settingsTitle'));
   }
 
   /* The top-bar book switcher (ADR 0009, src/book-switcher.js). Redrawn from
@@ -1496,7 +1504,15 @@ function mountApp(view) {
        from the vault, and reload() DECLINES when there are unsaved edits —
        which would leave someone who changed the language mid-edit looking at
        the old one with no idea why. */
-    applyLanguage: () => { applyDom(root); render(); },
+    /* applyIdentity between the two: the avatar's name and title are built
+       from the household's name (topbar.settingsFor / settingsTitleFor), so
+       applyDom has just reset the first to its unnamed form and never touches
+       the second — without this they stayed in the old language, or lost the
+       name, until the next reload. Only once a budget is loaded, as at load.
+       (Which is why applyIdentity's unnamed subtitle is read from the table
+       too: as an English literal it would now undo, on every switch, the
+       translation applyDom had just written into #brandSub.) */
+    applyLanguage: () => { applyDom(root); if (S.loaded) applyIdentity(); render(); },
     /* Toggling the setting acts on open views immediately: switching it off
        lifts a gate the user is currently staring at (rather than stranding
        them behind it), switching it on covers the numbers right away. */

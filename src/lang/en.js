@@ -65,6 +65,13 @@ module.exports = {
   'topbar.reportTitle': 'Generate a financial report',
   'topbar.settings': 'Open budget settings',
 
+  /* The avatar button once the household has a name (controller.js
+     applyIdentity): its accessible name, and its hover title with and without
+     the name. Unnamed, the name is topbar.settings above. */
+  'topbar.settingsFor': 'Budget settings — {name}',
+  'topbar.settingsTitle': 'Budget settings',
+  'topbar.settingsTitleFor': '{name} · budget settings',
+
   /* ------------------------------- settings -------------------------------- */
   'settings.folder.name': 'Budget folder',
   'settings.folder.desc': 'Vault path of the folder holding Categories/, Accounts/, Budgets/, Transactions/, Settings.md, etc.',
@@ -639,6 +646,15 @@ module.exports = {
   'tx.split.chip': 'split into {count}',
   'tx.split.chipGap': '{amount} unaccounted',
   'tx.aria.splitChip': 'Split options for {desc} on {date}',
+
+  /* The split dialog (modal.js SplitModal). Its three fields per part carry no
+     visible label — the row is amount, category, note — so these are the only
+     names they have. {n} counts from 1. */
+  'tx.split.aria.amount': 'Amount for part {n}',
+  'tx.split.aria.category': 'Category for part {n}',
+  'tx.split.aria.note': 'Note for part {n}',
+  'tx.split.aria.remove': 'Remove part {n}',
+
   'tx.unsplit.action': 'Un-split',
   'tx.unsplit.title': 'Un-split this transaction?',
   'tx.unsplit.msg': {
@@ -869,6 +885,14 @@ module.exports = {
   'acct.err.notNumber': '{field} is not a number',
   'acct.err.nameRequired': 'Account name required',
   'cat.err.nameRequired': 'Category name required',
+
+  /* The category cell before it becomes a real <select> (categories.js
+     deferredCatSelect): {label} is the name the caller gives the control, then
+     what it is set to. Two keys, because "currently uncategorised" is a
+     sentence, not a category called "uncategorised" dropped into one. */
+  'cat.aria.current': '{label} — currently {value}',
+  'cat.aria.currentNone': '{label} — currently uncategorised',
+
   'acct.err.exists': 'Account already exists',
   'acct.err.save': 'Could not save {name} ({error}) — nothing was written to the file; try the same action again.',
 
@@ -987,6 +1011,25 @@ module.exports = {
   'acct.hero.elsewhere': ' Assets and debts recorded on their own pages are not counted here.',
   'imp.dateReading.dayFirst': 'Dates in this file were read as day/month, because reading them the other way put them out of order.',
   'imp.dateReading.monthFirst': 'Dates in this file were read as month/day, because reading them the other way put them out of order.',
+
+  /* The import review table. The page is otherwise still English (see
+     EXPECTED_ENGLISH_ONLY in tests/i18n-render.test.cjs); these are the names
+     of its controls, and the two reasons a row arrives unticked.
+
+     imp.near.why and imp.pending.why are printed beside the row as well as
+     spoken: each is the hover title of its badge, the line under the
+     description, and — through importRowWhy's {why} — the end of the tick
+     box's name, so the reader hears why the box is empty before deciding.
+     Kept as one string each so the three can never say different things. */
+  'imp.aria.importRow': 'Import {date} {desc}, {amount}',
+  'imp.aria.importRowWhy': 'Import {date} {desc}, {amount}. {why}',
+  'imp.aria.category': 'Category for {desc}',
+  'imp.near.why': 'Looks like the already-imported "{desc}" on {date} — the bank re-dates and re-words a charge when it settles. Tick to import anyway.',
+  'imp.pending.why': 'The bank still lists this as pending, so its date and amount can both change when it settles — and a settled row at a different amount would import as a second transaction. It will arrive on the next statement as a final figure. Tick to import it now anyway.',
+  'imp.aria.cancelTip': 'Discard this statement without importing anything',
+  'imp.aria.remapTip': 'Set which column is the date, description and amount',
+  'imp.aria.newAccountTip': 'Create an account for these rows to land in',
+
   'acct.duplicateFolders': {
     one: '{count} transaction folder is claimed by two accounts ({names}); only the first is read. Give each account its own folder name.',
     other: '{count} transaction folders are claimed by two accounts each ({names}); only the first is read. Give each account its own folder name.',
@@ -1662,6 +1705,20 @@ module.exports = {
      come back. Its tap reveals the whole sum (lent, back, outstanding). */
   'owed.repaid.chip': '{amount} back',
 
+  /* The Owed money table's control names. The status pill is one sentence per
+     state rather than a status word dropped into a frame: "paid", "{amount}
+     left" and "outstanding" do not take the same grammar in most languages. */
+  'owed.aria.statusPaid': '{person}: Paid — click to change',
+  'owed.aria.statusLeft': '{person}: {amount} left — click to change',
+  'owed.aria.statusOutstanding': '{person}: Outstanding — click to change',
+  'owed.aria.description': 'Description for {person}',
+  'owed.aria.amount': 'Amount for {person}',
+  'owed.aria.lent': 'Date lent to {person}',
+  'owed.aria.due': 'Due date for {person}',
+  'owed.aria.repay': 'Record a repayment from {person}',
+  'owed.aria.repayTip': 'Record money that came back',
+  'owed.aria.remove': 'Remove {person}',
+
   /* ------------------------------- Debt page ------------------------------
      "Interest this month" on the Debt page. Both strings exist because a debt
      with a BLANK rate is unknown, not zero: summing only the debts that state
@@ -1691,6 +1748,142 @@ module.exports = {
   'debt.curve.aria': 'Total owed under each payoff plan, {from} to {to}, starting at {start}. {plans}',
   'debt.curve.aria.cleared': '{plan}: cleared by {month}.',
   'debt.curve.aria.owed': '{plan}: {amount} still owed in {month}.',
+
+  /* The Debt table's control names, the two selects above the payoff chart
+     (shell.js, through data-i18n-aria), and the button on the card-overlap
+     caveat. As on Owed money, the status pill is a sentence per state. */
+  'debt.aria.reviewCards': 'Review credit-card accounts on the Accounts page',
+  'debt.aria.statusSettled': '{name}: Settled — click to change',
+  'debt.aria.statusActive': '{name}: Active — click to change',
+  'debt.aria.balance': 'Balance owed on {name}',
+  'debt.aria.rate': 'Annual interest rate on {name}',
+  'debt.aria.payment': 'Monthly payment on {name}',
+  'debt.aria.extra': 'Extra paid each month on {name}',
+  'debt.aria.category': 'Budget category for {name}',
+  'debt.aria.remove': 'Remove {name}',
+  'debt.aria.strategy': 'Payoff method',
+  'debt.aria.range': 'Payoff chart range',
+
+  /* ------------- accessible names on pages still written in English -------------
+     Savings, Services, Tax, Food, Notes and the loan calculators have not had
+     their translation pass: their headings, table text and buttons are English
+     in every language, on purpose, until each page is done as a whole (the
+     ratchets are EXPECTED_ENGLISH_ONLY in tests/i18n-render.test.cjs and
+     invariant 9 of tests/i18n.test.cjs). What follows is NOT that pass. It is
+     the part of those pages that is only ever spoken: the aria-label on a
+     field with no visible label, the name of a chart, the hover title of an
+     icon button. A sighted reader on a half-English page can see which half
+     is which; a name that is only heard arrives with no such context, so it is
+     keyed on every page (audit of 11 Nov 2026, task 19;
+     tests/accessible-names-keyed.test.cjs keeps it that way).
+
+     Every key here has `.aria.` in it. That is how invariant 9 tells a page
+     whose names are keyed from a page that has been translated — keep to it.
+
+     Savings. `sav.aria.growth.*` and `sav.aria.worth*` are the whole of what a
+     screen reader gets from the two charts (both are role="img"), one complete
+     sentence per combination of what there is to say. `{page}` in share.* is
+     the page's name as the drawer prints it (nav.*). */
+  'sav.aria.reviewAssets': 'Review asset valuations on the Assets page',
+  'sav.aria.goalAccounts': 'Go to the Accounts page to set a savings goal',
+  'sav.aria.addAccounts': 'Go to the Accounts page to add a savings or investment account',
+  'sav.aria.row': '{name}, {amount}. Show account actions.',
+  'sav.aria.balance': 'Update the balance of {name}, currently {amount}',
+  'sav.aria.addStart': 'Add a starting amount and opening date for {name}',
+  'sav.aria.barGrowth': '{putIn} put in · {earned} earned',
+  'sav.aria.barLoss': '{left} left of {putIn} put in',
+  'sav.aria.growth.capital': 'What built this balance of {closing}: {capital} put in. From {from} to {to}.',
+  'sav.aria.growth.posted': 'What built this balance of {closing}: {capital} put in, {posted} of recorded growth. From {from} to {to}.',
+  'sav.aria.growth.undated': 'What built this balance of {closing}: {capital} put in, and {undated} of growth carrying no date. From {from} to {to}.',
+  'sav.aria.growth.both': 'What built this balance of {closing}: {capital} put in, {posted} of recorded growth, and {undated} of growth carrying no date. From {from} to {to}.',
+  'sav.aria.worth': 'Net worth {net}: assets {assets} against debts {debts}',
+  'sav.aria.worth.owned': 'Net worth {net}: assets {assets} against debts {debts}. Owned: {owned}',
+  'sav.aria.worth.owed': 'Net worth {net}: assets {assets} against debts {debts}. Owed: {owed}',
+  'sav.aria.worth.both': 'Net worth {net}: assets {assets} against debts {debts}. Owned: {owned}. Owed: {owed}',
+  'sav.aria.share.own': '{label}, {amount}, {share}% of what you own. Open {page}.',
+  'sav.aria.share.owe': '{label}, {amount}, {share}% of what you owe. Open {page}.',
+
+  /* Services. `hint.*` is the hover title of the "use the date the charges
+     imply" button — one sentence per billing cycle, because "every week" and
+     "every fortnight" are not one frame with a noun swapped in. `gap.*` is the
+     sentence that follows it when the expected date has already passed. */
+  'svc.aria.amount': 'Amount for {name}',
+  'svc.aria.cycle': 'Billing cycle for {name}',
+  'svc.aria.next': 'Next billing date for {name}',
+  'svc.aria.active': '{name} is active',
+  'svc.aria.remove': 'Remove {name}',
+  'svc.aria.setNext': 'Set next billing for {name} to {date}',
+  'svc.aria.hint.weekly': 'Last charged {last}, billed every week, so the next charge is due {date}.',
+  'svc.aria.hint.fortnightly': 'Last charged {last}, billed every fortnight, so the next charge is due {date}.',
+  'svc.aria.hint.monthly': 'Last charged {last}, billed every month, so the next charge is due {date}.',
+  'svc.aria.hint.annual': 'Last charged {last}, billed every year, so the next charge is due {date}.',
+  'svc.aria.gap.import': '{first} has passed, but {account} is not imported yet that far (last import {through}), so this is the next date after today.',
+  'svc.aria.gap.confirmed': '{first} has passed, but {account} is not imported yet that far (balance confirmed {through}), so this is the next date after today.',
+  'svc.aria.gap.noCharge': '{first} has passed with no charge in your transactions yet, so this is the next date after today.',
+
+  /* Tax. A status pill is a sentence per status (`step.*`, `doc.*` — the last
+     segment is the stored status, with "n/a" spelled "na"). `{label}` in
+     codeFor* is the country profile's own word for a figure's code (locale.js
+     figureCodeLabel — "Source code" for SARS), which the column header prints
+     too. figDescription / figSource keep the lower-case start they always had:
+     they name a free-text field by the column it sits in. */
+  'tax.aria.year': 'Tax year',
+  'tax.aria.createYear': 'Create a tax page for {year}, which already has documents',
+  'tax.aria.figDescription': 'description for figure {code}',
+  'tax.aria.figSource': 'source for figure {code}',
+  'tax.aria.codeFor': '{label} for {description}',
+  'tax.aria.codeForThis': '{label} for this figure',
+  'tax.aria.amountFor': 'Amount for {code}',
+  'tax.aria.amountForThis': 'Amount for this figure',
+  'tax.aria.figRemove': 'Remove figure {code}',
+  'tax.aria.step.todo': 'Status: To do — click to change',
+  'tax.aria.step.busy': 'Status: Busy — click to change',
+  'tax.aria.step.done': 'Status: Done — click to change',
+  'tax.aria.step.na': 'Status: N/A — click to change',
+  'tax.aria.stepDue': 'Due date for {step}',
+  'tax.aria.stepNotes': 'Notes for {step}',
+  'tax.aria.stepRemove': 'Remove step {step}',
+  'tax.aria.doc.needed': 'Status: Needed — click to change',
+  'tax.aria.doc.uploaded': 'Status: Uploaded — click to change',
+  'tax.aria.doc.na': 'Status: N/A — click to change',
+  'tax.aria.openFile': 'Open {name}',
+  'tax.aria.addFile': 'Add another file to {name}',
+  'tax.aria.uploadFile': 'Upload file for {name}',
+  'tax.aria.docNotes': 'Notes for {name}',
+  'tax.aria.docRemove': 'Remove document {name}',
+
+  /* Food, and the Add receipt dialog it opens (`rc.*`; {n} counts lines from
+     1). `food.aria.trend` is plural on the number of periods charted, and
+     {categories} is the list of lines drawn, already joined. */
+  'food.aria.range': 'Chart range',
+  'food.aria.trend': {
+    one: 'Food spend by category over {count} period; {categories}',
+    other: 'Food spend by category over {count} periods; {categories}',
+  },
+  'food.aria.price': '{name}: price at each purchase, {first} to {last}',
+  'food.aria.category': 'Category for {name}',
+  'food.aria.healthy': '{name} is healthy',
+  'rc.aria.text': 'Receipt text',
+  'rc.aria.item': 'Line {n} item',
+  'rc.aria.price': 'Line {n} price',
+  'rc.aria.discount': 'Line {n} discount',
+  'rc.aria.category': 'Line {n} category',
+  'rc.aria.healthy': 'Line {n} healthy',
+  'rc.aria.remove': 'Remove line {n}',
+
+  /* Notes — including the note chip every other page draws beside an account,
+     a debt, a person or a service (views/notes.js noteButton), which is why
+     these are heard on translated pages too. {subject} is that thing's name.
+     And the loan calculators. */
+  'notes.aria.delete': 'Delete {title}',
+  'notes.aria.count': {
+    one: '{count} note about {subject}',
+    other: '{count} notes about {subject}',
+  },
+  'notes.aria.write': 'Write a note about {subject}',
+  'loans.aria.tabs': 'Choose a calculator',
+  'loans.aria.deposit': 'Deposit amount',
+  'loans.aria.depositPct': 'Deposit as a percentage of the price',
 
   /* --------------------------------- report -------------------------------
      views/report.js (the page) and src/report.js (the generated note's own
@@ -1856,6 +2049,13 @@ module.exports = {
   'assets.hero.heldAbroad': "plus {list} held abroad, not converted",
   'assets.hero.largestAbroad': "largest abroad {list}, not converted",
 
+  /* The Assets table's control names — one per editable cell, and the row's Remove. */
+  'assets.aria.kind': 'Kind of {name}',
+  'assets.aria.value': 'Value of {name}',
+  'assets.aria.valued': 'Date {name} was valued',
+  'assets.aria.notes': 'Notes for {name}',
+  'assets.aria.remove': 'Remove {name}',
+
   /* ------------------------- plan view (mobile redesign) ------------------------- */
   'plan.hero.leftToPlace': "Left to place",
   'plan.hero.overPlaced': "Placed more than this plan holds",
@@ -1903,6 +2103,28 @@ module.exports = {
   'plan.env.collapseAria': "Collapse {name}",
   'plan.env.deleteAria': "Remove spending bucket {name}",
   'plan.actions.deleteAria': "Delete plan",
+
+  /* The Plan page's remaining spoken-only strings (audit of 11 Nov 2026, task
+     19). `plan.split.aria.*` is the split bar's name, read as two or three
+     whole sentences joined by a space: the first is free OR overPlaced, the
+     second left OR overSpent, and pastBucket follows when a bucket was
+     overspent. `plan.env.overBy` is also printed, as an overspent bucket's
+     remainder. An item's tick is a sentence per state, and cycleTip is its
+     hover title — the order a tap moves it through. */
+  'plan.pickerAria': 'Choose a plan',
+  'plan.split.aria.free': 'Of {pot}: {spent} already spent, {committed} spoken for, {free} not spoken for.',
+  'plan.split.aria.overPlaced': 'Of {pot}: {spent} already spent, {committed} spoken for, {over} more is placed than this plan holds.',
+  'plan.split.aria.left': '{left} still left to spend, {placeable} of it left to place.',
+  'plan.split.aria.overSpent': '{over} more spent than this plan holds.',
+  'plan.split.aria.pastBucket': '{amount} was spent past what its bucket held.',
+  'plan.env.overBy': '{amount} over',
+  'plan.env.sliderAria': 'Amount placed in {name}',
+  'plan.env.typeAria': 'Set the amount for {name} by typing it',
+  'plan.env.renameAria': 'Rename spending bucket {name}',
+  'plan.item.aria.planned': '{name}: planned — click to advance',
+  'plan.item.aria.part': '{name}: part — click to advance',
+  'plan.item.aria.done': '{name}: done — click to advance',
+  'plan.item.cycleTip': 'planned → part-bought → done',
 
   'io.stale.message': "{file} was changed outside this page after it loaded, so nothing was written",
   'io.stale.notice': "Budget: {file} was changed outside this page (another device, or the markdown view) after it loaded, so your save was not written. The page has reloaded what is on disk now — please make the edit again.",

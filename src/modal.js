@@ -5,6 +5,8 @@
 const { Modal, Setting } = require('obsidian');
 const { el } = require('./dom');
 const { normalizeAmount } = require('./amount');
+// Namespaced, as everywhere in src/ — `t` is a local in half these files.
+const i18n = require('./i18n');
 
 /* Does Enter, pressed with focus on `target`, mean "I am done with this form"?
 
@@ -132,6 +134,8 @@ class FieldModal extends Modal {
     this.values = {};
   }
   onOpen() {
+    // Body-mounted, so outside the plugin root and its `lang` (i18n.js followLanguage).
+    i18n.followLanguage(this.modalEl);
     this.titleEl.setText(this.modalTitle);
     const firstInputs = [];
     for (const f of this.fieldDefs) {
@@ -261,6 +265,8 @@ class ConfirmModal extends Modal {
     this.answer = false;
   }
   onOpen() {
+    // Body-mounted, so outside the plugin root and its `lang` (i18n.js followLanguage).
+    i18n.followLanguage(this.modalEl);
     const { title, message, confirmText = 'Discard', cancelText = 'Cancel', primary = 'confirm' } = this.opts;
     const safeFirst = primary === 'cancel';
     if (title) this.titleEl.setText(title);
@@ -312,6 +318,8 @@ class SplitModal extends Modal {
   }
 
   onOpen() {
+    // Body-mounted, so outside the plugin root and its `lang` (i18n.js followLanguage).
+    i18n.followLanguage(this.modalEl);
     const { tx, money } = this.opts;
     this.titleEl.setText('Split transaction');
     const c = this.contentEl;
@@ -379,14 +387,14 @@ class SplitModal extends Modal {
         type: 'text', class: 'budget-split-amt', inputmode: 'decimal',
         autocomplete: 'off', autocorrect: 'off', spellcheck: 'false',
         value: p.mag ? p.mag.toFixed(2) : '',
-        placeholder: '0.00', 'aria-label': `Amount for part ${i + 1}`,
+        placeholder: '0.00', 'aria-label': i18n.t('tx.split.aria.amount', { n: i + 1 }),
       });
       amt.addEventListener('input', () => {
         p.mag = Math.abs(normalizeAmount(amt.value) ?? 0);
         this.refresh();
       });
 
-      const cat = el('select', { class: 'budget-split-cat', 'aria-label': `Category for part ${i + 1}` });
+      const cat = el('select', { class: 'budget-split-cat', 'aria-label': i18n.t('tx.split.aria.category', { n: i + 1 }) });
       cat.append(el('option', { value: '' }, '— none —'));
       for (const name of this.opts.categories) cat.append(el('option', { value: name }, name));
       cat.value = p.cat;
@@ -394,7 +402,7 @@ class SplitModal extends Modal {
 
       const note = el('input', {
         type: 'text', class: 'budget-split-note', value: p.note,
-        placeholder: 'Note (optional)', 'aria-label': `Note for part ${i + 1}`,
+        placeholder: 'Note (optional)', 'aria-label': i18n.t('tx.split.aria.note', { n: i + 1 }),
       });
       note.addEventListener('input', () => { p.note = note.value; });
 
@@ -402,7 +410,7 @@ class SplitModal extends Modal {
       // Two parts is the floor — below that it isn't a split.
       if (this.parts.length > 2) {
         const del = el('button', {
-          type: 'button', class: 'budget-split-del', 'aria-label': `Remove part ${i + 1}`,
+          type: 'button', class: 'budget-split-del', 'aria-label': i18n.t('tx.split.aria.remove', { n: i + 1 }),
         }, '✕');
         del.addEventListener('click', () => {
           this.parts.splice(i, 1);
@@ -483,6 +491,8 @@ class RulesCleanupModal extends Modal {
   }
 
   onOpen() {
+    // Body-mounted, so outside the plugin root and its `lang` (i18n.js followLanguage).
+    i18n.followLanguage(this.modalEl);
     const { remove, redundant, blank, dormant, kept, checked, total } = this.report;
     this.titleEl.setText('Tidy categorisation rules');
     const c = this.contentEl;
@@ -567,6 +577,8 @@ class BudgetResliceModal extends Modal {
   }
 
   onOpen() {
+    // Body-mounted, so outside the plugin root and its `lang` (i18n.js followLanguage).
+    i18n.followLanguage(this.modalEl);
     const { rows, oldDays, dstDays, factor } = this.plan;
     this.titleEl.setText('Bring the amounts across');
     const c = this.contentEl;

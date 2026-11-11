@@ -326,7 +326,7 @@ module.exports = function registerAssets(ctx) {
           // Assets.md, or a list trimmed between versions) keeps an option of
           // its own — without it the select silently rewrites the file's own
           // value to whichever preset happens to be first.
-          el('td', {}, el('select', { class: 'form-select form-select-sm', 'aria-label': `Kind of ${a.name}`, 'data-focus-key': `kind:${i}`,
+          el('td', {}, el('select', { class: 'form-select form-select-sm', 'aria-label': i18n.t('assets.aria.kind', { name: a.name }), 'data-focus-key': `kind:${i}`,
             // The landing: rebuilding the table drops focus to <body> otherwise —
             // see the restore below. Same fix as Owed Money and Debt.
             onchange: e => { a.type = e.target.value; mark(); renderAssets(`kind:${S.assets.indexOf(a)}`); } },
@@ -336,7 +336,7 @@ module.exports = function registerAssets(ctx) {
             ...ASSET_TYPES.map(k => el('option', { value: k, ...(k === a.type ? { selected: '' } : {}) }, kindLabel(k))))),
           el('td', { class: 'num' }, el('input', { type: 'number', step: '0.01', min: '0',
             class: 'form-control form-control-sm', value: shownFigure(a, 'value'),
-            'aria-label': `Value of ${a.name}`, 'data-focus-key': `value:${i}`,
+            'aria-label': i18n.t('assets.aria.value', { name: a.name }), 'data-focus-key': `value:${i}`,
             // Routed through normalizeAmount, matching addAsset — an invalid
             // cell (an SA-locale phone's numeric keypad writes "15 000 000,00"
             // into a plain number input, which the browser reports as an
@@ -370,12 +370,12 @@ module.exports = function registerAssets(ctx) {
              keystroke would make the staleness column agree with itself
              forever while meaning nothing. */
           el('td', {}, dateInput(a.valued, { class: 'form-control form-control-sm',
-            'aria-label': `Date ${a.name} was valued` },
+            'aria-label': i18n.t('assets.aria.valued', { name: a.name }) },
             v => { a.valued = v; mark(); renderAssets(`kind:${S.assets.indexOf(a)}`); })),
           el('td', {}, el('input', { type: 'text', class: 'form-control form-control-sm',
-            value: a.notes, 'aria-label': `Notes for ${a.name}`,
+            value: a.notes, 'aria-label': i18n.t('assets.aria.notes', { name: a.name }),
             onchange: e => { a.notes = e.target.value; mark(); } })),
-          el('td', {}, el('button', { class: 'btn-ghost btn-ghost-sm', 'aria-label': `Remove ${a.name}`, 'data-focus-key': `del:${i}`,
+          el('td', {}, el('button', { class: 'btn-ghost btn-ghost-sm', 'aria-label': i18n.t('assets.aria.remove', { name: a.name }), 'data-focus-key': `del:${i}`,
             // The asset that moved up into this one's place, else the one
             // above, else New asset (audit of 11 Nov 2026, task 16).
             onclick: () => {

@@ -75,6 +75,11 @@ module.exports = {
   'topbar.reportTitle': 'वित्तीय रिपोर्ट बनाएँ',
   'topbar.settings': 'बजट सेटिंग्स खोलें',
 
+  /* Accessible names (audit of 11 Nov 2026, task 19) — machine-assisted, not native-reviewed. */
+  'topbar.settingsFor': 'बजट सेटिंग्स — {name}',
+  'topbar.settingsTitle': 'बजट सेटिंग्स',
+  'topbar.settingsTitleFor': '{name} · बजट सेटिंग्स',
+
   /* ------------------------------- settings -------------------------------- */
   'settings.folder.name': 'बजट फ़ोल्डर',
   'settings.folder.desc': 'उस फ़ोल्डर का वॉल्ट-पथ जिसमें Categories/, Accounts/, Budgets/, Transactions/, Settings.md वगैरह रखे हैं।',
@@ -601,6 +606,13 @@ module.exports = {
   'tx.split.chip': '{count} हिस्सों में बँटी',
   'tx.split.chipGap': '{amount} का हिसाब नहीं',
   'tx.aria.splitChip': '{date} के {desc} के लिए बँटवारे के विकल्प',
+
+  /* Accessible names (audit of 11 Nov 2026, task 19) — machine-assisted, not native-reviewed. */
+  'tx.split.aria.amount': 'हिस्सा {n} की रकम',
+  'tx.split.aria.category': 'हिस्सा {n} की श्रेणी',
+  'tx.split.aria.note': 'हिस्सा {n} का नोट',
+  'tx.split.aria.remove': 'हिस्सा {n} हटाएँ',
+
   'tx.unsplit.action': 'बँटवारा हटाएँ',
   'tx.unsplit.title': 'इस लेन-देन का बँटवारा हटाएँ?',
   'tx.unsplit.msg': {
@@ -812,6 +824,11 @@ module.exports = {
   'acct.err.notNumber': '{field} कोई संख्या नहीं है',
   'acct.err.nameRequired': 'खाते का नाम ज़रूरी है',
   'cat.err.nameRequired': 'श्रेणी का नाम ज़रूरी है',
+
+  /* Accessible names (audit of 11 Nov 2026, task 19) — machine-assisted, not native-reviewed. */
+  'cat.aria.current': '{label} — अभी {value}',
+  'cat.aria.currentNone': '{label} — अभी बिना श्रेणी',
+
   'acct.err.exists': 'यह खाता पहले से मौजूद है',
   'acct.err.save': '{name} सहेजा नहीं जा सका ({error}) — फ़ाइल में कुछ भी नहीं लिखा गया; वही क्रिया दोबारा आज़माएँ।',
 
@@ -930,6 +947,17 @@ module.exports = {
   'acct.hero.elsewhere': ' अपने-अपने पेजों पर दर्ज संपत्ति और कर्ज़ यहाँ नहीं गिने जाते।',
   'imp.dateReading.dayFirst': 'इस फ़ाइल की तारीखें दिन/माह के रूप में पढ़ी गईं, क्योंकि दूसरे क्रम में वे बेतरतीब हो जाती थीं।',
   'imp.dateReading.monthFirst': 'इस फ़ाइल की तारीखें माह/दिन के रूप में पढ़ी गईं, क्योंकि दूसरे क्रम में वे बेतरतीब हो जाती थीं।',
+
+  /* Accessible names (audit of 11 Nov 2026, task 19) — machine-assisted, not native-reviewed. */
+  'imp.aria.importRow': '{date} {desc}, {amount} आयात करें',
+  'imp.aria.importRowWhy': '{date} {desc}, {amount} आयात करें। {why}',
+  'imp.aria.category': '{desc} की श्रेणी',
+  'imp.near.why': 'यह {date} के पहले से आयात किए गए "{desc}" जैसा लगता है — बैंक किसी शुल्क के पक्का होने पर उसकी तारीख़ और शब्द बदल देता है। फिर भी आयात करना हो तो निशान लगाएँ।',
+  'imp.pending.why': 'बैंक इसे अब भी लंबित दिखा रहा है, इसलिए पक्का होने पर इसकी तारीख़ और रकम दोनों बदल सकती हैं — और अलग रकम वाली पक्की पंक्ति दूसरे लेन-देन की तरह आयात हो जाएगी। यह अगले स्टेटमेंट में अंतिम रकम के साथ आएगा। फिर भी अभी आयात करना हो तो निशान लगाएँ।',
+  'imp.aria.cancelTip': 'कुछ भी आयात किए बिना यह स्टेटमेंट छोड़ दें',
+  'imp.aria.remapTip': 'बताएँ कि कौन-सा कॉलम तारीख़, विवरण और रकम है',
+  'imp.aria.newAccountTip': 'इन पंक्तियों के लिए एक खाता बनाएँ',
+
   'acct.duplicateFolders': {
     one: '{count} लेनदेन फ़ोल्डर पर दो खातों का दावा है ({names}); केवल पहला पढ़ा जाता है। हर खाते को अपना फ़ोल्डर नाम दें।',
     other: '{count} लेनदेन फ़ोल्डरों पर दो-दो खातों का दावा है ({names}); केवल पहला पढ़ा जाता है। हर खाते को अपना फ़ोल्डर नाम दें।',
@@ -1480,6 +1508,19 @@ module.exports = {
   /* --- Debt page: "Interest this month" says what it covers, because a debt
      with a blank rate is unknown rather than zero (the why is in en.js) --- */
   'owed.repaid.chip': '{amount} वापस',
+
+  /* Accessible names (audit of 11 Nov 2026, task 19) — machine-assisted, not native-reviewed. */
+  'owed.aria.statusPaid': '{person}: चुकता — बदलने के लिए क्लिक करें',
+  'owed.aria.statusLeft': '{person}: {amount} बाकी — बदलने के लिए क्लिक करें',
+  'owed.aria.statusOutstanding': '{person}: बकाया — बदलने के लिए क्लिक करें',
+  'owed.aria.description': '{person} का विवरण',
+  'owed.aria.amount': '{person} की रकम',
+  'owed.aria.lent': '{person} को उधार देने की तारीख़',
+  'owed.aria.due': '{person} की देय तारीख़',
+  'owed.aria.repay': '{person} से मिली वापसी दर्ज करें',
+  'owed.aria.repayTip': 'वापस आया पैसा दर्ज करें',
+  'owed.aria.remove': '{person} हटाएँ',
+
   'debt.interest.noRates': 'यह देखने के लिए किसी कर्ज़ पर दर दर्ज करें',
   'debt.interest.partial': {
     one: '{total} में से {shown} कर्ज़ शामिल · {missing} पर दर नहीं',
@@ -1488,6 +1529,104 @@ module.exports = {
   'debt.curve.aria': 'हर भुगतान योजना के तहत कुल बकाया, {from} से {to} तक, शुरुआत {start} से। {plans}',
   'debt.curve.aria.cleared': '{plan}: {month} तक चुकता।',
   'debt.curve.aria.owed': '{plan}: {month} में अब भी {amount} बकाया।',
+
+  /* Accessible names (audit of 11 Nov 2026, task 19) — machine-assisted, not native-reviewed. */
+  'debt.aria.reviewCards': 'खाते पेज पर क्रेडिट कार्ड खाते देखें',
+  'debt.aria.statusSettled': '{name}: चुकता — बदलने के लिए क्लिक करें',
+  'debt.aria.statusActive': '{name}: चालू — बदलने के लिए क्लिक करें',
+  'debt.aria.balance': '{name} पर बकाया रकम',
+  'debt.aria.rate': '{name} की सालाना ब्याज दर',
+  'debt.aria.payment': '{name} की मासिक क़िस्त',
+  'debt.aria.extra': '{name} पर हर महीने अतिरिक्त भुगतान',
+  'debt.aria.category': '{name} की बजट श्रेणी',
+  'debt.aria.remove': '{name} हटाएँ',
+  'debt.aria.strategy': 'कर्ज़ चुकाने का तरीका',
+  'debt.aria.range': 'चुकौती चार्ट की सीमा',
+
+  /* Accessible names on the pages still written in English (audit of 11 Nov 2026, task 19) — machine-assisted, not native-reviewed. */
+  'sav.aria.reviewAssets': 'संपत्ति पेज पर संपत्ति के मूल्यांकन देखें',
+  'sav.aria.goalAccounts': 'बचत लक्ष्य तय करने के लिए खाते पेज पर जाएँ',
+  'sav.aria.addAccounts': 'बचत या निवेश खाता जोड़ने के लिए खाते पेज पर जाएँ',
+  'sav.aria.row': '{name}, {amount}। खाते के विकल्प दिखाएँ।',
+  'sav.aria.balance': '{name} का बैलेंस अपडेट करें, अभी {amount}',
+  'sav.aria.addStart': '{name} के लिए शुरुआती रकम और खुलने की तारीख़ जोड़ें',
+  'sav.aria.barGrowth': '{putIn} जमा किया · {earned} कमाया',
+  'sav.aria.barLoss': '{putIn} जमा में से {left} बचा',
+  'sav.aria.growth.capital': '{closing} का यह बैलेंस किससे बना: {capital} जमा किया। {from} से {to} तक।',
+  'sav.aria.growth.posted': '{closing} का यह बैलेंस किससे बना: {capital} जमा किया, {posted} दर्ज बढ़त। {from} से {to} तक।',
+  'sav.aria.growth.undated': '{closing} का यह बैलेंस किससे बना: {capital} जमा किया, और {undated} बिना तारीख़ की बढ़त। {from} से {to} तक।',
+  'sav.aria.growth.both': '{closing} का यह बैलेंस किससे बना: {capital} जमा किया, {posted} दर्ज बढ़त, और {undated} बिना तारीख़ की बढ़त। {from} से {to} तक।',
+  'sav.aria.worth': 'कुल संपत्ति {net}: {debts} कर्ज़ के सामने {assets} संपत्ति',
+  'sav.aria.worth.owned': 'कुल संपत्ति {net}: {debts} कर्ज़ के सामने {assets} संपत्ति। अपना: {owned}',
+  'sav.aria.worth.owed': 'कुल संपत्ति {net}: {debts} कर्ज़ के सामने {assets} संपत्ति। देनदारी: {owed}',
+  'sav.aria.worth.both': 'कुल संपत्ति {net}: {debts} कर्ज़ के सामने {assets} संपत्ति। अपना: {owned}। देनदारी: {owed}',
+  'sav.aria.share.own': '{label}, {amount}, आपके पास जो है उसका {share}%। {page} खोलें।',
+  'sav.aria.share.owe': '{label}, {amount}, आप पर जो देनदारी है उसका {share}%। {page} खोलें।',
+
+  'svc.aria.amount': '{name} की रकम',
+  'svc.aria.cycle': '{name} का बिलिंग चक्र',
+  'svc.aria.next': '{name} की अगली बिलिंग तारीख़',
+  'svc.aria.active': '{name} चालू है',
+  'svc.aria.remove': '{name} हटाएँ',
+  'svc.aria.setNext': '{name} की अगली बिलिंग {date} पर तय करें',
+  'svc.aria.hint.weekly': 'पिछला शुल्क {last} को लगा, बिलिंग हर हफ़्ते होती है, इसलिए अगला शुल्क {date} को देय है।',
+  'svc.aria.hint.fortnightly': 'पिछला शुल्क {last} को लगा, बिलिंग हर दो हफ़्ते में होती है, इसलिए अगला शुल्क {date} को देय है।',
+  'svc.aria.hint.monthly': 'पिछला शुल्क {last} को लगा, बिलिंग हर महीने होती है, इसलिए अगला शुल्क {date} को देय है।',
+  'svc.aria.hint.annual': 'पिछला शुल्क {last} को लगा, बिलिंग हर साल होती है, इसलिए अगला शुल्क {date} को देय है।',
+  'svc.aria.gap.import': '{first} निकल चुकी है, पर {account} अभी वहाँ तक आयात नहीं हुआ है (पिछला आयात {through}), इसलिए यह आज के बाद की अगली तारीख़ है।',
+  'svc.aria.gap.confirmed': '{first} निकल चुकी है, पर {account} अभी वहाँ तक आयात नहीं हुआ है (बैलेंस की पुष्टि {through}), इसलिए यह आज के बाद की अगली तारीख़ है।',
+  'svc.aria.gap.noCharge': '{first} निकल चुकी है और आपके लेन-देन में अभी कोई शुल्क नहीं है, इसलिए यह आज के बाद की अगली तारीख़ है।',
+
+  'tax.aria.year': 'कर वर्ष',
+  'tax.aria.createYear': '{year} के लिए कर पेज बनाएँ, जिसके दस्तावेज़ पहले से मौजूद हैं',
+  'tax.aria.figDescription': 'आँकड़ा {code} का विवरण',
+  'tax.aria.figSource': 'आँकड़ा {code} का स्रोत',
+  'tax.aria.codeFor': '{description} का {label}',
+  'tax.aria.codeForThis': 'इस आँकड़े का {label}',
+  'tax.aria.amountFor': '{code} की रकम',
+  'tax.aria.amountForThis': 'इस आँकड़े की रकम',
+  'tax.aria.figRemove': 'आँकड़ा {code} हटाएँ',
+  'tax.aria.step.todo': 'स्थिति: करना बाकी — बदलने के लिए क्लिक करें',
+  'tax.aria.step.busy': 'स्थिति: जारी — बदलने के लिए क्लिक करें',
+  'tax.aria.step.done': 'स्थिति: पूरा — बदलने के लिए क्लिक करें',
+  'tax.aria.step.na': 'स्थिति: लागू नहीं — बदलने के लिए क्लिक करें',
+  'tax.aria.stepDue': '{step} की देय तारीख़',
+  'tax.aria.stepNotes': '{step} के नोट्स',
+  'tax.aria.stepRemove': 'चरण {step} हटाएँ',
+  'tax.aria.doc.needed': 'स्थिति: चाहिए — बदलने के लिए क्लिक करें',
+  'tax.aria.doc.uploaded': 'स्थिति: अपलोड हो गया — बदलने के लिए क्लिक करें',
+  'tax.aria.doc.na': 'स्थिति: लागू नहीं — बदलने के लिए क्लिक करें',
+  'tax.aria.openFile': '{name} खोलें',
+  'tax.aria.addFile': '{name} में एक और फ़ाइल जोड़ें',
+  'tax.aria.uploadFile': '{name} के लिए फ़ाइल अपलोड करें',
+  'tax.aria.docNotes': '{name} के नोट्स',
+  'tax.aria.docRemove': 'दस्तावेज़ {name} हटाएँ',
+
+  'food.aria.range': 'चार्ट की सीमा',
+  'food.aria.trend': {
+    one: '{count} अवधि में श्रेणी के अनुसार खाने का ख़र्च; {categories}',
+    other: '{count} अवधियों में श्रेणी के अनुसार खाने का ख़र्च; {categories}',
+  },
+  'food.aria.price': '{name}: हर ख़रीद पर कीमत, {first} से {last}',
+  'food.aria.category': '{name} की श्रेणी',
+  'food.aria.healthy': '{name} सेहतमंद है',
+  'rc.aria.text': 'रसीद का टेक्स्ट',
+  'rc.aria.item': 'पंक्ति {n} का सामान',
+  'rc.aria.price': 'पंक्ति {n} की कीमत',
+  'rc.aria.discount': 'पंक्ति {n} की छूट',
+  'rc.aria.category': 'पंक्ति {n} की श्रेणी',
+  'rc.aria.healthy': 'पंक्ति {n} सेहतमंद',
+  'rc.aria.remove': 'पंक्ति {n} हटाएँ',
+
+  'notes.aria.delete': '{title} मिटाएँ',
+  'notes.aria.count': {
+    one: '{subject} के बारे में {count} नोट',
+    other: '{subject} के बारे में {count} नोट्स',
+  },
+  'notes.aria.write': '{subject} के बारे में नोट लिखें',
+  'loans.aria.tabs': 'कैलकुलेटर चुनें',
+  'loans.aria.deposit': 'डाउन पेमेंट की रकम',
+  'loans.aria.depositPct': 'कीमत के प्रतिशत के रूप में डाउन पेमेंट',
 
   /* --------------------------------- report ------------------------------- */
   'report.pageSub': 'एक Markdown नोट · इसे Obsidian में पढ़ें, साझा करें, या किसी AI चैट में चिपका दें',
@@ -1635,6 +1774,13 @@ module.exports = {
   'assets.hero.heldAbroad': "साथ ही {list} विदेश में रखी गई, जो बदली नहीं गई",
   'assets.hero.largestAbroad': "विदेश में सबसे बड़ी {list}, जो बदली नहीं गई",
 
+  /* Accessible names (audit of 11 Nov 2026, task 19) — machine-assisted, not native-reviewed. */
+  'assets.aria.kind': '{name} का प्रकार',
+  'assets.aria.value': '{name} का मूल्य',
+  'assets.aria.valued': '{name} के मूल्यांकन की तारीख़',
+  'assets.aria.notes': '{name} के नोट्स',
+  'assets.aria.remove': '{name} हटाएँ',
+
   /* ------------------------- plan view (mobile redesign) ------------------------- */
   'plan.hero.leftToPlace': "रखना बाक़ी",
   'plan.hero.overPlaced': "इस प्लान में मौजूद राशि से ज़्यादा रखा गया",
@@ -1674,6 +1820,22 @@ module.exports = {
   'plan.env.collapseAria': "{name} समेटें",
   'plan.env.deleteAria': "ख़र्च बकेट {name} हटाएँ",
   'plan.actions.deleteAria': "प्लान हटाएँ",
+
+  /* Accessible names (audit of 11 Nov 2026, task 19) — machine-assisted, not native-reviewed. */
+  'plan.pickerAria': 'प्लान चुनें',
+  'plan.split.aria.free': '{pot} में से: {spent} पहले ही ख़र्च हुआ, {committed} आवंटित, {free} अभी आवंटित नहीं।',
+  'plan.split.aria.overPlaced': '{pot} में से: {spent} पहले ही ख़र्च हुआ, {committed} आवंटित, इस प्लान में मौजूद राशि से {over} ज़्यादा रखा गया।',
+  'plan.split.aria.left': 'खर्च करने के लिए अब भी {left} बचा, उसमें से {placeable} रखना बाक़ी।',
+  'plan.split.aria.overSpent': 'इस प्लान में मौजूद राशि से {over} ज़्यादा खर्च हुआ।',
+  'plan.split.aria.pastBucket': 'बकेट में मौजूद राशि से {amount} ज़्यादा खर्च हुआ।',
+  'plan.env.overBy': '{amount} ज़्यादा',
+  'plan.env.sliderAria': '{name} में रखी रकम',
+  'plan.env.typeAria': '{name} की रकम टाइप करके तय करें',
+  'plan.env.renameAria': 'ख़र्च बकेट {name} का नाम बदलें',
+  'plan.item.aria.planned': '{name}: नियोजित — आगे बढ़ाने के लिए क्लिक करें',
+  'plan.item.aria.part': '{name}: कुछ ख़रीदा गया — आगे बढ़ाने के लिए क्लिक करें',
+  'plan.item.aria.done': '{name}: पूरा — आगे बढ़ाने के लिए क्लिक करें',
+  'plan.item.cycleTip': 'नियोजित → कुछ ख़रीदा गया → पूरा',
 
   'io.stale.message': "{file} लोड होने के बाद इस पेज के बाहर बदली गई, इसलिए कुछ भी नहीं लिखा गया",
   'io.stale.notice': "बजट: {file} लोड होने के बाद इस पेज के बाहर (दूसरे डिवाइस या मार्कडाउन व्यू में) बदली गई, इसलिए आपका सेव नहीं लिखा गया। पेज ने अब डिस्क पर जो है उसे फिर से लोड कर लिया है — कृपया बदलाव दोबारा करें।",

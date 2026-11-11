@@ -295,15 +295,17 @@ module.exports = function registerPlan(ctx) {
          to place (placeable), and the over-placed case in the loud card's own
          words. */
       el('div', { class: 'plan-split', role: 'img',
-        'aria-label': `Of ${money(sum.pot)}: ${money(sum.spent)} already spent, ` +
-          `${money(sum.committed)} spoken for, ` +
-          (sum.free < -0.005
-            ? `${money(-sum.free)} more is placed than this plan holds. `
-            : `${money(Math.max(0, sum.free))} not spoken for. `) +
-          (sum.left < -0.005
-            ? `${money(-sum.left)} more spent than this plan holds.`
-            : `${money(Math.max(0, sum.left))} still left to spend, ${money(Math.max(0, sum.placeable))} of it left to place.`) +
-          (sum.overspend > 0.005 ? ` ${money(sum.overspend)} was spent past what its bucket held.` : '') },
+        /* Whole sentences per key, joined by a space — never a clause built
+           around a figure, which no translator can reorder. */
+        'aria-label': [
+          sum.free < -0.005
+            ? i18n.t('plan.split.aria.overPlaced', { pot: money(sum.pot), spent: money(sum.spent), committed: money(sum.committed), over: money(-sum.free) })
+            : i18n.t('plan.split.aria.free', { pot: money(sum.pot), spent: money(sum.spent), committed: money(sum.committed), free: money(Math.max(0, sum.free)) }),
+          sum.left < -0.005
+            ? i18n.t('plan.split.aria.overSpent', { over: money(-sum.left) })
+            : i18n.t('plan.split.aria.left', { left: money(Math.max(0, sum.left)), placeable: money(Math.max(0, sum.placeable)) }),
+          ...(sum.overspend > 0.005 ? [i18n.t('plan.split.aria.pastBucket', { amount: money(sum.overspend) })] : []),
+        ].join(' ') },
         el('i', { class: 's-spent', style: `width:${pct(seg.spent)}%` }),
         el('i', { class: 's-alloc', style: `width:${pct(seg.committed)}%` }),
         el('i', { class: 's-free', style: `width:${pct(seg.free)}%` })),
@@ -489,7 +491,7 @@ module.exports = function registerPlan(ctx) {
      read on a fresh plan. */
   function envelopeRemainder(state, spent) {
     const remaining = round2(-state.overAmt);
-    if (state.isOverspent) return { text: `${fig(-remaining)} over`, cls: 'text-danger' };
+    if (state.isOverspent) return { text: i18n.t('plan.env.overBy', { amount: fig(-remaining) }), cls: 'text-danger' };
     if (spent <= 0.005) return { text: i18n.t('plan.env.nothingSpent'), cls: 'text-muted' };
     if (remaining <= 0.005) return { text: i18n.t('plan.env.allSpent'), cls: 'text-muted' };
     return { text: i18n.t('plan.env.leftInBucket', { amount: money(remaining) }), cls: '' };
@@ -613,7 +615,7 @@ module.exports = function registerPlan(ctx) {
       step: '10', value: String(env.amount),
       /* "placed", the word the page prints for what a bucket holds — this was
          "allocated", a word on no part of the screen (2026-10-20 audit, D2-14). */
-      'aria-label': `Amount placed in ${env.name}`,
+      'aria-label': i18n.t('plan.env.sliderAria', { name: env.name }),
       'data-focus-key': `slider:${at}`,
       ...(initialFill ? { style: initialFill } : {}),
     });
@@ -659,7 +661,7 @@ module.exports = function registerPlan(ctx) {
        also the fiddly part on a phone; without this, a precise amount is
        unreachable by touch and unreachable by keyboard at any sensible step. */
     const amtBtn = el('button', { class: 'env-amt-btn', type: 'button',
-      'aria-label': `Set the amount for ${env.name} by typing it`,
+      'aria-label': i18n.t('plan.env.typeAria', { name: env.name }),
       'data-focus-key': `amt:${at}`,
       onclick: async () => { await editEnvelopeAmount(env); refocus(host, `amt:${at}`); } }, amtEl);
 
@@ -692,7 +694,7 @@ module.exports = function registerPlan(ctx) {
           onclick: () => { expandedEnvelope = NONE_OPEN; renderPlan(); refocus(host, `env:${at}`); } },
           icoEl(['chevron-down', 'chevron-up'])),
         el('button', { class: 'env-name', type: 'button',
-          'aria-label': `Rename spending bucket ${env.name}`,
+          'aria-label': i18n.t('plan.env.renameAria', { name: env.name }),
           'data-focus-key': `rename:${at}`,
           onclick: async () => { await renameEnvelope(p, env); refocus(host, `rename:${at}`); } },
           env.name, icoEl(['pencil', 'square-pen', 'pen-line'], 'env-name-ico')),
@@ -740,8 +742,9 @@ module.exports = function registerPlan(ctx) {
     const host = $('#planEnvelopes');
     const tick = el('button', {
       class: `ei-tick ${done ? 'done' : part ? 'part' : ''}`, type: 'button',
-      'aria-label': `${i.name}: ${i.status} — click to advance`,
-      title: 'planned → part-bought → done',
+      'aria-label': done ? i18n.t('plan.item.aria.done', { name: i.name })
+        : part ? i18n.t('plan.item.aria.part', { name: i.name }) : i18n.t('plan.item.aria.planned', { name: i.name }),
+      title: i18n.t('plan.item.cycleTip'),
       'data-focus-key': `tick:${k}`,
     }, done ? '✓' : part ? '·' : '');
     /* Three states cycled by tapping, the same gesture Owed and Tax use for
@@ -766,7 +769,7 @@ module.exports = function registerPlan(ctx) {
 
     return el('li', { class: 'env-item' }, tick,
       el('button', { class: `ei-name ${done ? 'done' : ''}`, type: 'button',
-        'aria-label': `Edit ${i.name}`, 'data-focus-key': `item:${k}`,
+        'aria-label': i18n.t('acct.aria.edit', { name: i.name }), 'data-focus-key': `item:${k}`,
         /* The sheet can remove the item, or move it to another bucket — which
            takes it off this card just the same. Then: the item that took its
            place, else the one before it, else this bucket's "+ item". An edit

@@ -20,6 +20,8 @@ const { totalsFor, amortise, byYear, loanProfileFor } = require('../loan-math');
 /* A bare decimal in the household's own mark — the deposit share and the
    rate hint (2026-10-20 audit, D2-07). */
 const { decimalText } = require('../locale');
+// For the accessible names only — this page's visible copy is still English.
+const i18n = require('../i18n');
 
 module.exports = function registerLoans(ctx) {
   const { S, $, money } = ctx;
@@ -162,11 +164,11 @@ module.exports = function registerLoans(ctx) {
     const lab = el('span', { class: 'lf-l' });
     const amt = el('input', {
       type: 'number', inputmode: 'decimal', class: 'form-control form-control-sm',
-      min: '0', step: '5000', 'aria-label': 'Deposit amount',
+      min: '0', step: '5000', 'aria-label': i18n.t('loans.aria.deposit'),
     });
     const slider = el('input', {
       type: 'range', class: 'loan-range', min: '0', max: '100', step: '1',
-      'aria-label': 'Deposit as a percentage of the price',
+      'aria-label': i18n.t('loans.aria.depositPct'),
     });
 
     const pct = () => (state.price > 0 ? (state.deposit / state.price) * 100 : state.depositPct);
@@ -194,6 +196,14 @@ module.exports = function registerLoans(ctx) {
 
     show();
     syncs.push(show);
+    /* This form is built once (see renderLoans), so a name written only at
+       build would stay in the language the page was first opened in. Written
+       again on every render, with the other things the form caches — a change
+       of language is a render. */
+    syncs.push(() => {
+      amt.setAttribute('aria-label', i18n.t('loans.aria.deposit'));
+      slider.setAttribute('aria-label', i18n.t('loans.aria.depositPct'));
+    });
     return { wrap: el('label', { class: 'loan-field' }, lab, amt, slider), sync: show };
   }
 

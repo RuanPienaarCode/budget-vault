@@ -74,6 +74,11 @@ module.exports = {
   'topbar.reportTitle': 'Buat laporan keuangan',
   'topbar.settings': 'Buka pengaturan anggaran',
 
+  /* Accessible names (audit of 11 Nov 2026, task 19) — machine-assisted, not native-reviewed. */
+  'topbar.settingsFor': 'Pengaturan anggaran — {name}',
+  'topbar.settingsTitle': 'Pengaturan anggaran',
+  'topbar.settingsTitleFor': '{name} · pengaturan anggaran',
+
   /* ------------------------------- settings -------------------------------- */
   'settings.folder.name': 'Folder anggaran',
   'settings.folder.desc': 'Jalur di dalam vault menuju folder yang memuat Categories/, Accounts/, Budgets/, Transactions/, Settings.md, dan seterusnya.',
@@ -572,6 +577,13 @@ module.exports = {
   'tx.split.chip': 'dipecah menjadi {count}',
   'tx.split.chipGap': '{amount} belum tercatat',
   'tx.aria.splitChip': 'Opsi pecahan untuk {desc} pada {date}',
+
+  /* Accessible names (audit of 11 Nov 2026, task 19) — machine-assisted, not native-reviewed. */
+  'tx.split.aria.amount': 'Jumlah untuk bagian {n}',
+  'tx.split.aria.category': 'Kategori untuk bagian {n}',
+  'tx.split.aria.note': 'Catatan untuk bagian {n}',
+  'tx.split.aria.remove': 'Hapus bagian {n}',
+
   'tx.unsplit.action': 'Batalkan pecahan',
   'tx.unsplit.title': 'Batalkan pecahan transaksi ini?',
   'tx.unsplit.msg': {
@@ -774,6 +786,11 @@ module.exports = {
   'acct.err.notNumber': '{field} bukan bilangan',
   'acct.err.nameRequired': 'Nama rekening wajib diisi',
   'cat.err.nameRequired': 'Nama kategori wajib diisi',
+
+  /* Accessible names (audit of 11 Nov 2026, task 19) — machine-assisted, not native-reviewed. */
+  'cat.aria.current': '{label} — saat ini {value}',
+  'cat.aria.currentNone': '{label} — saat ini tanpa kategori',
+
   'acct.err.exists': 'Rekening itu sudah ada',
   'acct.err.save': '{name} tidak bisa disimpan ({error}) — tidak ada yang tertulis ke berkasnya; coba tindakan yang sama sekali lagi.',
 
@@ -887,6 +904,17 @@ module.exports = {
   'acct.hero.elsewhere': ' Aset dan utang yang dicatat di halamannya masing-masing tidak dihitung di sini.',
   'imp.dateReading.dayFirst': 'Tanggal dalam berkas ini dibaca sebagai hari/bulan, karena cara sebaliknya membuatnya tidak berurutan.',
   'imp.dateReading.monthFirst': 'Tanggal dalam berkas ini dibaca sebagai bulan/hari, karena cara sebaliknya membuatnya tidak berurutan.',
+
+  /* Accessible names (audit of 11 Nov 2026, task 19) — machine-assisted, not native-reviewed. */
+  'imp.aria.importRow': 'Impor {date} {desc}, {amount}',
+  'imp.aria.importRowWhy': 'Impor {date} {desc}, {amount}. {why}',
+  'imp.aria.category': 'Kategori untuk {desc}',
+  'imp.near.why': 'Tampaknya sama dengan "{desc}" pada {date} yang sudah diimpor — bank mengubah tanggal dan keterangan sebuah tagihan saat tagihan itu dibukukan. Centang untuk tetap mengimpornya.',
+  'imp.pending.why': 'Bank masih mencatat ini sebagai tertunda, jadi tanggal dan jumlahnya bisa berubah saat dibukukan — dan baris yang dibukukan dengan jumlah berbeda akan terimpor sebagai transaksi kedua. Baris ini akan muncul di rekening koran berikutnya dengan jumlah final. Centang untuk tetap mengimpornya sekarang.',
+  'imp.aria.cancelTip': 'Buang rekening koran ini tanpa mengimpor apa pun',
+  'imp.aria.remapTip': 'Tentukan kolom mana yang berisi tanggal, keterangan, dan jumlah',
+  'imp.aria.newAccountTip': 'Buat rekening untuk menampung baris-baris ini',
+
   'acct.duplicateFolders': {
     other: '{count} folder transaksi diklaim oleh dua akun ({names}); hanya yang pertama dibaca. Beri setiap akun nama folder sendiri.',
   },
@@ -1415,6 +1443,19 @@ module.exports = {
   /* --- Debt page: "Interest this month" says what it covers, because a debt
      with a blank rate is unknown rather than zero (the why is in en.js) --- */
   'owed.repaid.chip': '{amount} kembali',
+
+  /* Accessible names (audit of 11 Nov 2026, task 19) — machine-assisted, not native-reviewed. */
+  'owed.aria.statusPaid': '{person}: Lunas — klik untuk mengubah',
+  'owed.aria.statusLeft': '{person}: sisa {amount} — klik untuk mengubah',
+  'owed.aria.statusOutstanding': '{person}: Belum lunas — klik untuk mengubah',
+  'owed.aria.description': 'Keterangan untuk {person}',
+  'owed.aria.amount': 'Jumlah untuk {person}',
+  'owed.aria.lent': 'Tanggal meminjamkan kepada {person}',
+  'owed.aria.due': 'Tanggal jatuh tempo untuk {person}',
+  'owed.aria.repay': 'Catat pengembalian dari {person}',
+  'owed.aria.repayTip': 'Catat uang yang sudah kembali',
+  'owed.aria.remove': 'Hapus {person}',
+
   'debt.interest.noRates': 'tambahkan suku bunga pada salah satu utang untuk melihat ini',
   'debt.interest.partial': {
     other: 'mencakup {shown} dari {total} utang · {missing} tanpa suku bunga',
@@ -1422,6 +1463,102 @@ module.exports = {
   'debt.curve.aria': 'Total utang menurut tiap rencana pelunasan, {from} sampai {to}, mulai dari {start}. {plans}',
   'debt.curve.aria.cleared': '{plan}: lunas pada {month}.',
   'debt.curve.aria.owed': '{plan}: masih terutang {amount} pada {month}.',
+
+  /* Accessible names (audit of 11 Nov 2026, task 19) — machine-assisted, not native-reviewed. */
+  'debt.aria.reviewCards': 'Tinjau rekening kartu kredit di halaman Rekening',
+  'debt.aria.statusSettled': '{name}: Lunas — klik untuk mengubah',
+  'debt.aria.statusActive': '{name}: Aktif — klik untuk mengubah',
+  'debt.aria.balance': 'Saldo terutang pada {name}',
+  'debt.aria.rate': 'Suku bunga tahunan {name}',
+  'debt.aria.payment': 'Cicilan bulanan {name}',
+  'debt.aria.extra': 'Tambahan yang dibayar tiap bulan untuk {name}',
+  'debt.aria.category': 'Kategori anggaran untuk {name}',
+  'debt.aria.remove': 'Hapus {name}',
+  'debt.aria.strategy': 'Metode pelunasan',
+  'debt.aria.range': 'Rentang grafik pelunasan',
+
+  /* Accessible names on the pages still written in English (audit of 11 Nov 2026, task 19) — machine-assisted, not native-reviewed. */
+  'sav.aria.reviewAssets': 'Tinjau penilaian aset di halaman Aset',
+  'sav.aria.goalAccounts': 'Buka halaman Rekening untuk menetapkan target tabungan',
+  'sav.aria.addAccounts': 'Buka halaman Rekening untuk menambah rekening tabungan atau investasi',
+  'sav.aria.row': '{name}, {amount}. Tampilkan tindakan rekening.',
+  'sav.aria.balance': 'Perbarui saldo {name}, saat ini {amount}',
+  'sav.aria.addStart': 'Tambahkan jumlah awal dan tanggal pembukaan untuk {name}',
+  'sav.aria.barGrowth': '{putIn} disetor · {earned} hasil',
+  'sav.aria.barLoss': 'sisa {left} dari {putIn} yang disetor',
+  'sav.aria.growth.capital': 'Pembentuk saldo {closing} ini: {capital} disetor. Dari {from} sampai {to}.',
+  'sav.aria.growth.posted': 'Pembentuk saldo {closing} ini: {capital} disetor, {posted} pertumbuhan yang tercatat. Dari {from} sampai {to}.',
+  'sav.aria.growth.undated': 'Pembentuk saldo {closing} ini: {capital} disetor, dan {undated} pertumbuhan tanpa tanggal. Dari {from} sampai {to}.',
+  'sav.aria.growth.both': 'Pembentuk saldo {closing} ini: {capital} disetor, {posted} pertumbuhan yang tercatat, dan {undated} pertumbuhan tanpa tanggal. Dari {from} sampai {to}.',
+  'sav.aria.worth': 'Kekayaan bersih {net}: aset {assets} berbanding utang {debts}',
+  'sav.aria.worth.owned': 'Kekayaan bersih {net}: aset {assets} berbanding utang {debts}. Dimiliki: {owned}',
+  'sav.aria.worth.owed': 'Kekayaan bersih {net}: aset {assets} berbanding utang {debts}. Terutang: {owed}',
+  'sav.aria.worth.both': 'Kekayaan bersih {net}: aset {assets} berbanding utang {debts}. Dimiliki: {owned}. Terutang: {owed}',
+  'sav.aria.share.own': '{label}, {amount}, {share}% dari yang Anda miliki. Buka {page}.',
+  'sav.aria.share.owe': '{label}, {amount}, {share}% dari utang Anda. Buka {page}.',
+
+  'svc.aria.amount': 'Jumlah untuk {name}',
+  'svc.aria.cycle': 'Siklus penagihan untuk {name}',
+  'svc.aria.next': 'Tanggal penagihan berikutnya untuk {name}',
+  'svc.aria.active': '{name} aktif',
+  'svc.aria.remove': 'Hapus {name}',
+  'svc.aria.setNext': 'Atur penagihan berikutnya untuk {name} ke {date}',
+  'svc.aria.hint.weekly': 'Terakhir ditagih {last}, ditagih setiap minggu, jadi tagihan berikutnya jatuh tempo {date}.',
+  'svc.aria.hint.fortnightly': 'Terakhir ditagih {last}, ditagih setiap dua minggu, jadi tagihan berikutnya jatuh tempo {date}.',
+  'svc.aria.hint.monthly': 'Terakhir ditagih {last}, ditagih setiap bulan, jadi tagihan berikutnya jatuh tempo {date}.',
+  'svc.aria.hint.annual': 'Terakhir ditagih {last}, ditagih setiap tahun, jadi tagihan berikutnya jatuh tempo {date}.',
+  'svc.aria.gap.import': '{first} sudah lewat, tetapi {account} belum diimpor sampai tanggal itu (impor terakhir {through}), jadi ini tanggal berikutnya setelah hari ini.',
+  'svc.aria.gap.confirmed': '{first} sudah lewat, tetapi {account} belum diimpor sampai tanggal itu (saldo dikonfirmasi {through}), jadi ini tanggal berikutnya setelah hari ini.',
+  'svc.aria.gap.noCharge': '{first} sudah lewat dan belum ada tagihan di transaksi Anda, jadi ini tanggal berikutnya setelah hari ini.',
+
+  'tax.aria.year': 'Tahun pajak',
+  'tax.aria.createYear': 'Buat halaman pajak untuk {year}, yang sudah memiliki dokumen',
+  'tax.aria.figDescription': 'keterangan untuk angka {code}',
+  'tax.aria.figSource': 'sumber untuk angka {code}',
+  'tax.aria.codeFor': '{label} untuk {description}',
+  'tax.aria.codeForThis': '{label} untuk angka ini',
+  'tax.aria.amountFor': 'Jumlah untuk {code}',
+  'tax.aria.amountForThis': 'Jumlah untuk angka ini',
+  'tax.aria.figRemove': 'Hapus angka {code}',
+  'tax.aria.step.todo': 'Status: Belum dikerjakan — klik untuk mengubah',
+  'tax.aria.step.busy': 'Status: Sedang dikerjakan — klik untuk mengubah',
+  'tax.aria.step.done': 'Status: Selesai — klik untuk mengubah',
+  'tax.aria.step.na': 'Status: Tidak berlaku — klik untuk mengubah',
+  'tax.aria.stepDue': 'Tenggat untuk {step}',
+  'tax.aria.stepNotes': 'Catatan untuk {step}',
+  'tax.aria.stepRemove': 'Hapus langkah {step}',
+  'tax.aria.doc.needed': 'Status: Diperlukan — klik untuk mengubah',
+  'tax.aria.doc.uploaded': 'Status: Sudah diunggah — klik untuk mengubah',
+  'tax.aria.doc.na': 'Status: Tidak berlaku — klik untuk mengubah',
+  'tax.aria.openFile': 'Buka {name}',
+  'tax.aria.addFile': 'Tambahkan berkas lain ke {name}',
+  'tax.aria.uploadFile': 'Unggah berkas untuk {name}',
+  'tax.aria.docNotes': 'Catatan untuk {name}',
+  'tax.aria.docRemove': 'Hapus dokumen {name}',
+
+  'food.aria.range': 'Rentang grafik',
+  'food.aria.trend': {
+    other: 'Belanja makanan per kategori selama {count} periode; {categories}',
+  },
+  'food.aria.price': '{name}: harga pada setiap pembelian, {first} sampai {last}',
+  'food.aria.category': 'Kategori untuk {name}',
+  'food.aria.healthy': '{name} tergolong sehat',
+  'rc.aria.text': 'Teks struk',
+  'rc.aria.item': 'Barang baris {n}',
+  'rc.aria.price': 'Harga baris {n}',
+  'rc.aria.discount': 'Diskon baris {n}',
+  'rc.aria.category': 'Kategori baris {n}',
+  'rc.aria.healthy': 'Baris {n} sehat',
+  'rc.aria.remove': 'Hapus baris {n}',
+
+  'notes.aria.delete': 'Hapus {title}',
+  'notes.aria.count': {
+    other: '{count} catatan tentang {subject}',
+  },
+  'notes.aria.write': 'Tulis catatan tentang {subject}',
+  'loans.aria.tabs': 'Pilih kalkulator',
+  'loans.aria.deposit': 'Jumlah uang muka',
+  'loans.aria.depositPct': 'Uang muka sebagai persentase dari harga',
 
   /* --------------------------------- report ------------------------------- */
   'report.pageSub': 'Satu catatan Markdown · baca di Obsidian, bagikan, atau tempelkan ke obrolan AI',
@@ -1565,6 +1702,13 @@ module.exports = {
   'assets.hero.heldAbroad': "ditambah {list} disimpan di luar negeri, tanpa konversi",
   'assets.hero.largestAbroad': "terbesar di luar negeri {list}, tanpa konversi",
 
+  /* Accessible names (audit of 11 Nov 2026, task 19) — machine-assisted, not native-reviewed. */
+  'assets.aria.kind': 'Jenis {name}',
+  'assets.aria.value': 'Nilai {name}',
+  'assets.aria.valued': 'Tanggal penilaian {name}',
+  'assets.aria.notes': 'Catatan untuk {name}',
+  'assets.aria.remove': 'Hapus {name}',
+
   /* ------------------------- plan view (mobile redesign) ------------------------- */
   'plan.hero.leftToPlace': "Belum dialokasikan",
   'plan.hero.overPlaced': "Dialokasikan lebih dari yang dimiliki rencana ini",
@@ -1604,6 +1748,22 @@ module.exports = {
   'plan.env.collapseAria': "Ciutkan {name}",
   'plan.env.deleteAria': "Hapus kantong belanja {name}",
   'plan.actions.deleteAria': "Hapus rencana",
+
+  /* Accessible names (audit of 11 Nov 2026, task 19) — machine-assisted, not native-reviewed. */
+  'plan.pickerAria': 'Pilih rencana',
+  'plan.split.aria.free': 'Dari {pot}: {spent} sudah dibelanjakan, {committed} sudah dialokasikan, {free} belum dialokasikan.',
+  'plan.split.aria.overPlaced': 'Dari {pot}: {spent} sudah dibelanjakan, {committed} sudah dialokasikan, dialokasikan {over} lebih dari yang dimiliki rencana ini.',
+  'plan.split.aria.left': '{left} masih tersisa untuk dibelanjakan, {placeable} di antaranya belum dialokasikan.',
+  'plan.split.aria.overSpent': 'Dibelanjakan {over} lebih dari yang dimiliki rencana ini.',
+  'plan.split.aria.pastBucket': '{amount} dibelanjakan melebihi isi kantongnya.',
+  'plan.env.overBy': 'lebih {amount}',
+  'plan.env.sliderAria': 'Jumlah yang dialokasikan ke {name}',
+  'plan.env.typeAria': 'Atur jumlah untuk {name} dengan mengetiknya',
+  'plan.env.renameAria': 'Ganti nama kantong belanja {name}',
+  'plan.item.aria.planned': '{name}: direncanakan — klik untuk melanjutkan',
+  'plan.item.aria.part': '{name}: dibeli sebagian — klik untuk melanjutkan',
+  'plan.item.aria.done': '{name}: selesai — klik untuk melanjutkan',
+  'plan.item.cycleTip': 'direncanakan → dibeli sebagian → selesai',
 
   'io.stale.message': "{file} diubah di luar halaman ini setelah dimuat, jadi tidak ada yang ditulis",
   'io.stale.notice': "Anggaran: {file} diubah di luar halaman ini (perangkat lain atau tampilan markdown) setelah dimuat, jadi simpanan Anda tidak ditulis. Halaman sudah memuat ulang isi yang kini ada di disk — silakan ulangi perubahannya.",

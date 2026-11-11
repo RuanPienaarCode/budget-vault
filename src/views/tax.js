@@ -14,6 +14,10 @@ const { TAX_TABLES, plainTableLines } = require('../table-schema');
 const { safeSeg } = require('../vault-path');
 const { askFields, confirmModal } = require('../modal');
 const { todayIso, daysUntil } = require('../dates');
+// For the accessible names only — this page's visible copy is still English
+// (EXPECTED_ENGLISH_ONLY in tests/i18n-render.test.cjs). Namespaced: `t` is
+// the open tax year throughout this file.
+const i18n = require('../i18n');
 
 module.exports = function registerTax(ctx) {
   const { S, $, app, toast, writeFile, writeBinary, fileAt, pathTaken, locale, money } = ctx;
@@ -74,7 +78,7 @@ module.exports = function registerTax(ctx) {
     box.append(' · ');
     for (const y of orphans) {
       const b = el('button', { class: 'btn-ghost', style: 'padding:0.1rem 0.5rem;font-size:0.78rem',
-        'aria-label': `Create a tax page for ${y}, which already has documents` }, `Tax/${y}/ has files — add ${y}`);
+        'aria-label': i18n.t('tax.aria.createYear', { year: y }) }, `Tax/${y}/ has files — add ${y}`);
       b.addEventListener('click', async () => {
         // Through the guarded switch: seeding straight into S.taxYear would
         // save the NEW year, clear S.taxDirty and disable Save while the
@@ -275,19 +279,21 @@ module.exports = function registerTax(ctx) {
       // same as the Steps/Docs notes fields. Code and amount refresh the totals
       // row and the callouts, but never this table's own body.
       const txt = (obj, key) => el('input', { type: 'text', class: 'form-control form-control-sm',
-        value: obj[key], 'aria-label': `${key} for figure ${obj.code || ''}`.trim(),
+        value: obj[key], 'aria-label': i18n.t(key === 'source' ? 'tax.aria.figSource' : 'tax.aria.figDescription', { code: obj.code || '' }).trim(),
         onchange: e => { obj[key] = e.target.value; mark(); } });
       const refresh = () => { mark(); refreshDerived(t); };
       for (const [i, f] of figures.entries()) {
         body.append(el('tr', {},
           el('td', {}, el('input', { type: 'text', class: 'form-control form-control-sm', value: f.code,
-            'aria-label': `${loc.figureCodeLabel} for ${f.description || 'this figure'}`,
+            'aria-label': f.description
+              ? i18n.t('tax.aria.codeFor', { label: loc.figureCodeLabel, description: f.description })
+              : i18n.t('tax.aria.codeForThis', { label: loc.figureCodeLabel }),
             onchange: e => { f.code = e.target.value.trim(); refresh(); } })),
           el('td', {}, txt(f, 'description')),
           el('td', {}, txt(f, 'source')),
           el('td', { class: 'num' }, el('input', { type: 'text', inputmode: 'decimal', class: 'form-control form-control-sm num',
             value: f.amount === 0 ? '' : String(f.amount), placeholder: '0.00',
-            'aria-label': `Amount for ${f.code || 'this figure'}`,
+            'aria-label': f.code ? i18n.t('tax.aria.amountFor', { code: f.code }) : i18n.t('tax.aria.amountForThis'),
             /* normalizeAmount, the reader load.js applies to this very cell, so
                "23 800,50" is 23 800,50 here as it is on the next load — the
                digit-scraper that was here stored 2 380 050 and told the reader
@@ -308,7 +314,7 @@ module.exports = function registerTax(ctx) {
               f.amount = n; f.amountRaw = null; refresh();
             } })),
           el('td', {}, el('button', { class: 'btn-ghost btn-ghost-sm', 'data-focus-key': `del:${i}`,
-            'aria-label': `Remove figure ${f.code}`,
+            'aria-label': i18n.t('tax.aria.figRemove', { code: f.code }),
             onclick: () => {
               const row = figures.indexOf(f);
               figures.splice(row, 1);
@@ -409,7 +415,8 @@ module.exports = function registerTax(ctx) {
       const body = el('tbody', {});
       for (const [i, s] of t.steps.entries()) {
         const pill = el('button', { class: `status-pill tax-${s.status.replace('/', '')}`, 'data-focus-key': `pill:${i}`,
-          'aria-label': `Status: ${STEP_LABEL[s.status]} — click to change` },
+          /* One key per status, spelled as the class beside it is: 'n/a' is 'na'. */
+          'aria-label': i18n.t('tax.aria.step.' + s.status.replace('/', '')) },
           icoEl(STEP_ICO[s.status]), STEP_LABEL[s.status]);
         pill.addEventListener('click', () => { s.status = STEP_CYCLE[s.status]; mark(); renderSteps(t, `pill:${t.steps.indexOf(s)}`); renderTaxKpis(t); });
         body.append(el('tr', { class: s.status === 'n/a' ? 'svc-inactive' : '' },
@@ -418,13 +425,13 @@ module.exports = function registerTax(ctx) {
           // A step's due date is read by nothing but its own overdue styling —
           // the Deadline KPI comes off the season card, not from here.
           el('td', {}, dateInput(s.due, { class: `form-control form-control-sm ${stepOverdue(s) ? 'tax-overdue' : ''}`,
-            'aria-label': `Due date for ${s.step}` },
+            'aria-label': i18n.t('tax.aria.stepDue', { step: s.step }) },
             (v, e) => { s.due = v; mark(); e.target.classList.toggle('tax-overdue', stepOverdue(s)); })),
           el('td', {}, el('input', { type: 'text', class: 'form-control form-control-sm', value: s.notes,
-            'aria-label': `Notes for ${s.step}`,
+            'aria-label': i18n.t('tax.aria.stepNotes', { step: s.step }),
             onchange: e => { s.notes = e.target.value; mark(); } })),
           el('td', {}, el('button', { class: 'btn-ghost btn-ghost-sm', 'data-focus-key': `del:${i}`,
-            'aria-label': `Remove step ${s.step}`,
+            'aria-label': i18n.t('tax.aria.stepRemove', { step: s.step }),
             onclick: () => {
               const row = t.steps.indexOf(s);
               t.steps.splice(row, 1); mark();
@@ -454,7 +461,7 @@ module.exports = function registerTax(ctx) {
       const body = el('tbody', {});
       for (const [i, d] of t.docs.entries()) {
         const pill = el('button', { class: `status-pill tax-${d.status.replace('/', '')}`, 'data-focus-key': `pill:${i}`,
-          'aria-label': `Status: ${DOC_LABEL[d.status]} — click to change` },
+          'aria-label': i18n.t('tax.aria.doc.' + d.status.replace('/', '')) },
           icoEl(DOC_ICO[d.status]), DOC_LABEL[d.status]);
         // Cycling away from "uploaded" only changes the status — the file link
         // (and the file itself) stays.
@@ -464,13 +471,13 @@ module.exports = function registerTax(ctx) {
         // IT3(b), IT3(c) and IT3(s) against what the seed treats as one row.
         const fileCell = el('div', { class: 'tax-doc-files' });
         for (const name of fileList(d)) {
-          const link = el('button', { class: 'btn-ghost tax-doc-link', 'aria-label': `Open ${name}` },
+          const link = el('button', { class: 'btn-ghost tax-doc-link', 'aria-label': i18n.t('tax.aria.openFile', { name }) },
             icoEl(['paperclip']), name);
           link.addEventListener('click', () => openDoc(name));
           fileCell.append(link);
         }
         const addBtn = el('button', { class: 'btn-ghost btn-ghost-sm', 'data-focus-key': `upload:${i}`,
-          'aria-label': `${d.file ? 'Add another file to' : 'Upload file for'} ${d.name}` },
+          'aria-label': d.file ? i18n.t('tax.aria.addFile', { name: d.name }) : i18n.t('tax.aria.uploadFile', { name: d.name }) },
           icoEl(['cloud-upload', 'upload-cloud']), d.file ? ' Add' : ' Upload');
         addBtn.addEventListener('click', () => { pendingDocTarget = d; $('#taxFileInput').click(); });
         fileCell.append(addBtn);
@@ -480,10 +487,10 @@ module.exports = function registerTax(ctx) {
           el('td', {}, pill),
           el('td', {}, fileCell),
           el('td', {}, el('input', { type: 'text', class: 'form-control form-control-sm', value: d.notes,
-            'aria-label': `Notes for ${d.name}`,
+            'aria-label': i18n.t('tax.aria.docNotes', { name: d.name }),
             onchange: e => { d.notes = e.target.value; mark(); } })),
           el('td', {}, el('button', { class: 'btn-ghost btn-ghost-sm', 'data-focus-key': `del:${i}`,
-            'aria-label': `Remove document ${d.name}`,
+            'aria-label': i18n.t('tax.aria.docRemove', { name: d.name }),
             onclick: async () => {
               const kept = fileList(d);
               const op = opWriterOf(ctx);   // the state this dialog was opened over (io.js opWriter)

@@ -58,6 +58,11 @@ module.exports = {
   'topbar.importTitle': 'Voer \'n bankstaat-CSV in',
   'topbar.settings': 'Maak begrotingsinstellings oop',
 
+  /* Accessible names (audit of 11 Nov 2026, task 19) — machine-assisted, not native-reviewed. */
+  'topbar.settingsFor': 'Begrotingsinstellings — {name}',
+  'topbar.settingsTitle': 'Begrotingsinstellings',
+  'topbar.settingsTitleFor': '{name} · begrotingsinstellings',
+
   /* ------------------------------- settings -------------------------------- */
   'settings.folder.name': 'Begrotingsvouer',
   'settings.folder.desc': 'Kluispad van die vouer wat Categories/, Accounts/, Budgets/, Transactions/, Settings.md, ens. hou.',
@@ -585,6 +590,13 @@ module.exports = {
   'tx.split.chip': 'verdeel in {count}',
   'tx.split.chipGap': '{amount} onverklaar',
   'tx.aria.splitChip': 'Verdeelopsies vir {desc} op {date}',
+
+  /* Accessible names (audit of 11 Nov 2026, task 19) — machine-assisted, not native-reviewed. */
+  'tx.split.aria.amount': 'Bedrag vir deel {n}',
+  'tx.split.aria.category': 'Kategorie vir deel {n}',
+  'tx.split.aria.note': 'Nota vir deel {n}',
+  'tx.split.aria.remove': 'Verwyder deel {n}',
+
   'tx.unsplit.action': 'Verdeling ongedaan maak',
   'tx.unsplit.title': 'Maak hierdie transaksie se verdeling ongedaan?',
   'tx.unsplit.msg': {
@@ -796,6 +808,11 @@ module.exports = {
   'acct.err.notNumber': '{field} is nie \'n getal nie',
   'acct.err.nameRequired': 'Rekeningnaam is verpligtend',
   'cat.err.nameRequired': 'Kategoriename is verpligtend',
+
+  /* Accessible names (audit of 11 Nov 2026, task 19) — machine-assisted, not native-reviewed. */
+  'cat.aria.current': '{label} — tans {value}',
+  'cat.aria.currentNone': '{label} — tans ongekategoriseer',
+
   'acct.err.exists': 'Rekening bestaan reeds',
   'acct.err.save': 'Kon nie {name} stoor nie ({error}) — niks is na die lêer geskryf nie; probeer weer.',
 
@@ -913,6 +930,17 @@ module.exports = {
   'acct.hero.elsewhere': ' Bates en skulde wat op hul eie bladsye aangeteken is, tel nie hier nie.',
   'imp.dateReading.dayFirst': 'Datums in hierdie lêer is as dag/maand gelees, omdat die ander volgorde hulle deurmekaar gesit het.',
   'imp.dateReading.monthFirst': 'Datums in hierdie lêer is as maand/dag gelees, omdat die ander volgorde hulle deurmekaar gesit het.',
+
+  /* Accessible names (audit of 11 Nov 2026, task 19) — machine-assisted, not native-reviewed. */
+  'imp.aria.importRow': 'Voer {date} {desc}, {amount} in',
+  'imp.aria.importRowWhy': 'Voer {date} {desc}, {amount} in. {why}',
+  'imp.aria.category': 'Kategorie vir {desc}',
+  'imp.near.why': 'Lyk soos die reeds ingevoerde "{desc}" op {date} — die bank verander die datum en bewoording van \'n heffing wanneer dit vereffen word. Merk om dit tog in te voer.',
+  'imp.pending.why': "Die bank lys dit steeds as hangend, so die datum en die bedrag kan albei verander wanneer dit vereffen word — en 'n vereffende ry met 'n ander bedrag sou as 'n tweede transaksie ingevoer word. Dit sal op die volgende staat as 'n finale syfer verskyn. Merk om dit tog nou in te voer.",
+  'imp.aria.cancelTip': 'Gooi hierdie staat weg sonder om enigiets in te voer',
+  'imp.aria.remapTip': 'Stel watter kolom die datum, beskrywing en bedrag is',
+  'imp.aria.newAccountTip': "Skep 'n rekening waarin hierdie rye kan beland",
+
   'acct.duplicateFolders': {
     one: '{count} transaksiegids word deur twee rekeninge opgeëis ({names}); net die eerste word gelees. Gee elke rekening sy eie gidsnaam.',
     other: '{count} transaksiegidse word elk deur twee rekeninge opgeëis ({names}); net die eerste word gelees. Gee elke rekening sy eie gidsnaam.',
@@ -1460,6 +1488,19 @@ module.exports = {
   /* --- Debt page: "Interest this month" says what it covers, because a debt
      with a blank rate is unknown rather than zero (the why is in en.js) --- */
   'owed.repaid.chip': '{amount} terug',
+
+  /* Accessible names (audit of 11 Nov 2026, task 19) — machine-assisted, not native-reviewed. */
+  'owed.aria.statusPaid': '{person}: Betaal — klik om te verander',
+  'owed.aria.statusLeft': '{person}: {amount} oor — klik om te verander',
+  'owed.aria.statusOutstanding': '{person}: Uitstaande — klik om te verander',
+  'owed.aria.description': 'Beskrywing vir {person}',
+  'owed.aria.amount': 'Bedrag vir {person}',
+  'owed.aria.lent': 'Datum waarop aan {person} geleen is',
+  'owed.aria.due': 'Vervaldatum vir {person}',
+  'owed.aria.repay': "Teken 'n terugbetaling van {person} aan",
+  'owed.aria.repayTip': 'Teken geld aan wat teruggekom het',
+  'owed.aria.remove': 'Verwyder {person}',
+
   'debt.interest.noRates': 'voeg \'n koers by enige skuld om dit te sien',
   'debt.interest.partial': {
     one: 'dek {shown} van {total} skulde · {missing} sonder koers',
@@ -1468,6 +1509,104 @@ module.exports = {
   'debt.curve.aria': 'Totaal verskuldig onder elke afbetalingsplan, {from} tot {to}, met {start} as beginpunt. {plans}',
   'debt.curve.aria.cleared': '{plan}: afbetaal teen {month}.',
   'debt.curve.aria.owed': '{plan}: {amount} steeds verskuldig in {month}.',
+
+  /* Accessible names (audit of 11 Nov 2026, task 19) — machine-assisted, not native-reviewed. */
+  'debt.aria.reviewCards': 'Gaan kredietkaartrekeninge op die Rekeninge-bladsy na',
+  'debt.aria.statusSettled': '{name}: Vereffen — klik om te verander',
+  'debt.aria.statusActive': '{name}: Aktief — klik om te verander',
+  'debt.aria.balance': 'Saldo verskuldig op {name}',
+  'debt.aria.rate': 'Jaarlikse rentekoers op {name}',
+  'debt.aria.payment': 'Maandelikse paaiement op {name}',
+  'debt.aria.extra': 'Ekstra wat elke maand op {name} betaal word',
+  'debt.aria.category': 'Begrotingskategorie vir {name}',
+  'debt.aria.remove': 'Verwyder {name}',
+  'debt.aria.strategy': 'Afbetalingsmetode',
+  'debt.aria.range': 'Reeks vir die afbetalingsgrafiek',
+
+  /* Accessible names on the pages still written in English (audit of 11 Nov 2026, task 19) — machine-assisted, not native-reviewed. */
+  'sav.aria.reviewAssets': 'Gaan batewaardasies op die Bates-bladsy na',
+  'sav.aria.goalAccounts': "Gaan na die Rekeninge-bladsy om 'n spaardoelwit te stel",
+  'sav.aria.addAccounts': "Gaan na die Rekeninge-bladsy om 'n spaar- of beleggingsrekening by te voeg",
+  'sav.aria.row': '{name}, {amount}. Wys rekeningaksies.',
+  'sav.aria.balance': 'Werk die saldo van {name} by, tans {amount}',
+  'sav.aria.addStart': "Voeg 'n beginbedrag en begindatum vir {name} by",
+  'sav.aria.barGrowth': '{putIn} ingesit · {earned} verdien',
+  'sav.aria.barLoss': '{left} oor van {putIn} ingesit',
+  'sav.aria.growth.capital': 'Waaruit hierdie saldo van {closing} bestaan: {capital} ingesit. Van {from} tot {to}.',
+  'sav.aria.growth.posted': 'Waaruit hierdie saldo van {closing} bestaan: {capital} ingesit, {posted} aangetekende groei. Van {from} tot {to}.',
+  'sav.aria.growth.undated': 'Waaruit hierdie saldo van {closing} bestaan: {capital} ingesit, en {undated} groei sonder datum. Van {from} tot {to}.',
+  'sav.aria.growth.both': 'Waaruit hierdie saldo van {closing} bestaan: {capital} ingesit, {posted} aangetekende groei, en {undated} groei sonder datum. Van {from} tot {to}.',
+  'sav.aria.worth': 'Netto waarde {net}: bates {assets} teenoor skuld {debts}',
+  'sav.aria.worth.owned': 'Netto waarde {net}: bates {assets} teenoor skuld {debts}. Besit: {owned}',
+  'sav.aria.worth.owed': 'Netto waarde {net}: bates {assets} teenoor skuld {debts}. Verskuldig: {owed}',
+  'sav.aria.worth.both': 'Netto waarde {net}: bates {assets} teenoor skuld {debts}. Besit: {owned}. Verskuldig: {owed}',
+  'sav.aria.share.own': '{label}, {amount}, {share}% van wat jy besit. Maak {page} oop.',
+  'sav.aria.share.owe': '{label}, {amount}, {share}% van wat jy skuld. Maak {page} oop.',
+
+  'svc.aria.amount': 'Bedrag vir {name}',
+  'svc.aria.cycle': 'Faktureringsiklus vir {name}',
+  'svc.aria.next': 'Volgende faktuurdatum vir {name}',
+  'svc.aria.active': '{name} is aktief',
+  'svc.aria.remove': 'Verwyder {name}',
+  'svc.aria.setNext': 'Stel die volgende fakturering vir {name} op {date}',
+  'svc.aria.hint.weekly': 'Laas gehef op {last}, word elke week gefaktureer, so die volgende heffing is op {date} verskuldig.',
+  'svc.aria.hint.fortnightly': 'Laas gehef op {last}, word elke twee weke gefaktureer, so die volgende heffing is op {date} verskuldig.',
+  'svc.aria.hint.monthly': 'Laas gehef op {last}, word elke maand gefaktureer, so die volgende heffing is op {date} verskuldig.',
+  'svc.aria.hint.annual': 'Laas gehef op {last}, word elke jaar gefaktureer, so die volgende heffing is op {date} verskuldig.',
+  'svc.aria.gap.import': '{first} is verby, maar {account} is nog nie so ver ingevoer nie (laaste invoer {through}), so dit is die volgende datum ná vandag.',
+  'svc.aria.gap.confirmed': '{first} is verby, maar {account} is nog nie so ver ingevoer nie (saldo bevestig {through}), so dit is die volgende datum ná vandag.',
+  'svc.aria.gap.noCharge': "{first} is verby sonder dat daar al 'n heffing in jou transaksies is, so dit is die volgende datum ná vandag.",
+
+  'tax.aria.year': 'Belastingjaar',
+  'tax.aria.createYear': "Skep 'n belastingbladsy vir {year}, wat reeds dokumente het",
+  'tax.aria.figDescription': 'beskrywing vir syfer {code}',
+  'tax.aria.figSource': 'bron vir syfer {code}',
+  'tax.aria.codeFor': '{label} vir {description}',
+  'tax.aria.codeForThis': '{label} vir hierdie syfer',
+  'tax.aria.amountFor': 'Bedrag vir {code}',
+  'tax.aria.amountForThis': 'Bedrag vir hierdie syfer',
+  'tax.aria.figRemove': 'Verwyder syfer {code}',
+  'tax.aria.step.todo': 'Status: Te doen — klik om te verander',
+  'tax.aria.step.busy': 'Status: Besig — klik om te verander',
+  'tax.aria.step.done': 'Status: Klaar — klik om te verander',
+  'tax.aria.step.na': 'Status: N.v.t. — klik om te verander',
+  'tax.aria.stepDue': 'Sperdatum vir {step}',
+  'tax.aria.stepNotes': 'Notas vir {step}',
+  'tax.aria.stepRemove': 'Verwyder stap {step}',
+  'tax.aria.doc.needed': 'Status: Benodig — klik om te verander',
+  'tax.aria.doc.uploaded': 'Status: Opgelaai — klik om te verander',
+  'tax.aria.doc.na': 'Status: N.v.t. — klik om te verander',
+  'tax.aria.openFile': 'Maak {name} oop',
+  'tax.aria.addFile': "Voeg nog 'n lêer by {name}",
+  'tax.aria.uploadFile': "Laai 'n lêer vir {name} op",
+  'tax.aria.docNotes': 'Notas vir {name}',
+  'tax.aria.docRemove': 'Verwyder dokument {name}',
+
+  'food.aria.range': 'Grafiekreeks',
+  'food.aria.trend': {
+    one: 'Kosbesteding per kategorie oor {count} tydperk; {categories}',
+    other: 'Kosbesteding per kategorie oor {count} tydperke; {categories}',
+  },
+  'food.aria.price': '{name}: prys by elke aankoop, {first} tot {last}',
+  'food.aria.category': 'Kategorie vir {name}',
+  'food.aria.healthy': '{name} is gesond',
+  'rc.aria.text': 'Kwitansieteks',
+  'rc.aria.item': 'Reël {n} item',
+  'rc.aria.price': 'Reël {n} prys',
+  'rc.aria.discount': 'Reël {n} afslag',
+  'rc.aria.category': 'Reël {n} kategorie',
+  'rc.aria.healthy': 'Reël {n} gesond',
+  'rc.aria.remove': 'Verwyder reël {n}',
+
+  'notes.aria.delete': 'Skrap {title}',
+  'notes.aria.count': {
+    one: '{count} nota oor {subject}',
+    other: '{count} notas oor {subject}',
+  },
+  'notes.aria.write': "Skryf 'n nota oor {subject}",
+  'loans.aria.tabs': "Kies 'n berekenaar",
+  'loans.aria.deposit': 'Depositobedrag',
+  'loans.aria.depositPct': "Deposito as 'n persentasie van die prys",
 
   /* --- report.* / nav.report / shell.tx.report — machine-assisted, added
      alongside the Report feature (views/report.js, src/report.js). --- */
@@ -1620,6 +1759,13 @@ module.exports = {
   'assets.hero.heldAbroad': "plus {list} in die buiteland gehou, nie omgeskakel nie",
   'assets.hero.largestAbroad': "grootste in die buiteland {list}, nie omgeskakel nie",
 
+  /* Accessible names (audit of 11 Nov 2026, task 19) — machine-assisted, not native-reviewed. */
+  'assets.aria.kind': 'Soort van {name}',
+  'assets.aria.value': 'Waarde van {name}',
+  'assets.aria.valued': 'Datum waarop {name} gewaardeer is',
+  'assets.aria.notes': 'Notas vir {name}',
+  'assets.aria.remove': 'Verwyder {name}',
+
   /* ------------------------- plan view (mobile redesign) ------------------------- */
   'plan.hero.leftToPlace': "Oor om te plaas",
   'plan.hero.overPlaced': "Meer geplaas as wat hierdie plan hou",
@@ -1659,6 +1805,22 @@ module.exports = {
   'plan.env.collapseAria': "Vou {name} toe",
   'plan.env.deleteAria': "Verwyder bestedingsbak {name}",
   'plan.actions.deleteAria': "Verwyder plan",
+
+  /* Accessible names (audit of 11 Nov 2026, task 19) — machine-assisted, not native-reviewed. */
+  'plan.pickerAria': "Kies 'n plan",
+  'plan.split.aria.free': 'Van {pot}: {spent} reeds bestee, {committed} toegewys, {free} nog nie toegewys nie.',
+  'plan.split.aria.overPlaced': 'Van {pot}: {spent} reeds bestee, {committed} toegewys, {over} meer geplaas as wat hierdie plan hou.',
+  'plan.split.aria.left': '{left} nog oor om te bestee, waarvan {placeable} nog geplaas moet word.',
+  'plan.split.aria.overSpent': '{over} meer bestee as wat hierdie plan hou.',
+  'plan.split.aria.pastBucket': '{amount} is bestee bo wat die bak gehou het.',
+  'plan.env.overBy': '{amount} te veel',
+  'plan.env.sliderAria': 'Bedrag geplaas in {name}',
+  'plan.env.typeAria': 'Stel die bedrag vir {name} deur dit in te tik',
+  'plan.env.renameAria': 'Hernoem bestedingsbak {name}',
+  'plan.item.aria.planned': '{name}: beplan — klik om te vorder',
+  'plan.item.aria.part': '{name}: gedeeltelik gekoop — klik om te vorder',
+  'plan.item.aria.done': '{name}: klaar — klik om te vorder',
+  'plan.item.cycleTip': 'beplan → gedeeltelik gekoop → klaar',
 
   'io.stale.message': "{file} is buite hierdie bladsy verander nadat dit gelaai is, so niks is geskryf nie",
   'io.stale.notice': "Begroting: {file} is buite hierdie bladsy verander (ander toestel of die markdown-aansig) nadat dit gelaai is, so jou stoor is nie geskryf nie. Die bladsy het weer gelaai wat nou op skyf is — maak asseblief die wysiging weer.",
