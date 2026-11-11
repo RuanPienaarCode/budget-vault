@@ -1473,6 +1473,9 @@ module.exports = {
     one: '{total} में से {shown} कर्ज़ शामिल · {missing} पर दर नहीं',
     other: '{total} में से {shown} कर्ज़ शामिल · {missing} पर दर नहीं',
   },
+  'debt.curve.aria': 'हर भुगतान योजना के तहत कुल बकाया, {from} से {to} तक, शुरुआत {start} से। {plans}',
+  'debt.curve.aria.cleared': '{plan}: {month} तक चुकता।',
+  'debt.curve.aria.owed': '{plan}: {month} में अब भी {amount} बकाया।',
 
   /* --------------------------------- report ------------------------------- */
   'report.pageSub': 'एक Markdown नोट · इसे Obsidian में पढ़ें, साझा करें, या किसी AI चैट में चिपका दें',

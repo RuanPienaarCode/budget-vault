@@ -464,6 +464,50 @@ function trackPoints({ svg, w, xs, onFocus, onClear }) {
   return true;
 }
 
+/* A chart's figures, one point at a time, for a reader who cannot hover.
+
+   createChart marks every chart role="img", so to a screen reader it is ONE
+   node and to a keyboard it is nothing at all: whatever a per-point <title>
+   says is said to a mouse and to nobody else. The Dashboard's trend chart and
+   the Food chart each answer that with trackPoints and a readout of their own
+   design; the Debt page's payoff curve and the Savings page's growth chart had
+   only the <title>s (audit of 11 Nov 2026, task 18). This is the plain version
+   of the same pattern, for a chart with no readout to reuse:
+
+     - a status line the caller mounts under the chart. It is built here,
+       EMPTY, and goes into the page with the chart — a live region has to be
+       in the accessibility tree before it is written to, or the write is not
+       announced. HTML rather than SVG text, for the reason the trend chart
+       gives: text inside a 1000-unit viewBox is about 4px on a phone.
+     - a hairline in the chart marking the point being read.
+     - trackPoints, which gives the chart a tab stop, arrow keys, Home/End and
+       Escape, and the same readout under a finger or a mouse.
+
+   `text(i)` is the sentence for point i; `xs` the viewBox x of every point.
+   `top`/`bottom` are the plot's own edges, for the hairline.
+
+   Returns the status element — or null where trackPoints could not wire
+   itself (no PointerEvent). The caller keeps its <title> tooltips in that
+   case and mounts nothing: never both, and never an empty line that could not
+   be filled. */
+function pointReadout({ svg, add, w, xs, top, bottom, text }) {
+  const out = el('div', { class: 'chart-readout', role: 'status' });
+  const guide = add('line', {
+    x1: 0, x2: 0, y1: top, y2: bottom,
+    stroke: 'currentColor', 'stroke-opacity': '0', 'stroke-width': '1',
+  });
+  const wired = trackPoints({
+    svg, w, xs,
+    onFocus: i => {
+      guide.setAttribute('x1', xs[i]); guide.setAttribute('x2', xs[i]);
+      guide.setAttribute('stroke-opacity', '0.3');
+      out.textContent = text(i);
+    },
+    onClear: () => { guide.setAttribute('stroke-opacity', '0'); out.textContent = ''; },
+  });
+  return wired ? out : null;
+}
+
 /* -------------------------------- ranges ------------------------------- */
 
 /* Time ranges offered by the chart controls.
@@ -557,7 +601,7 @@ function rangePills({ ranges, value, onPick, label }) {
 
 module.exports = {
   themeColors, createChart, scales, gridlines, axisLabels, phoneWidth, phoneLayout, PHONE_TEXT, PHONE_TEXT_WIDE,
-  linePath, areaPath, areaGradient, arcPath, tip, trackPoints,
+  linePath, areaPath, areaGradient, arcPath, tip, trackPoints, pointReadout,
   SLICE_PALETTE, parseColor, colorDistance, distinctColors,
   RANGES, historicalRanges, rangeFor, rangePills,
 };

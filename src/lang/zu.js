@@ -1481,6 +1481,9 @@ module.exports = {
     one: 'ihlanganisa {shown} kwezikweletu ezingu-{total} · {missing} asinazinga',
     other: 'ihlanganisa {shown} kwezikweletu ezingu-{total} · {missing} azinazinga',
   },
+  'debt.curve.aria': 'Isamba sesikweletu ngaphansi kohlelo ngalunye lokukhokha, kusukela ku-{from} kuya ku-{to}, kuqalwa ku-{start}. {plans}',
+  'debt.curve.aria.cleared': '{plan}: sikhokhwe sonke ngo-{month}.',
+  'debt.curve.aria.owed': '{plan}: kusakweletwa {amount} ngo-{month}.',
 
   /* --- report.* / nav.report / shell.tx.report — machine-assisted, added
      alongside the Report feature (views/report.js, src/report.js). --- */

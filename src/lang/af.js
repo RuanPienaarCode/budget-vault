@@ -1453,6 +1453,9 @@ module.exports = {
     one: 'dek {shown} van {total} skulde · {missing} sonder koers',
     other: 'dek {shown} van {total} skulde · {missing} sonder koers',
   },
+  'debt.curve.aria': 'Totaal verskuldig onder elke afbetalingsplan, {from} tot {to}, met {start} as beginpunt. {plans}',
+  'debt.curve.aria.cleared': '{plan}: afbetaal teen {month}.',
+  'debt.curve.aria.owed': '{plan}: {amount} steeds verskuldig in {month}.',
 
   /* --- report.* / nav.report / shell.tx.report — machine-assisted, added
      alongside the Report feature (views/report.js, src/report.js). --- */

@@ -1384,6 +1384,9 @@ module.exports = {
   'debt.interest.partial': {
     other: '涵盖 {total} 笔债务中的 {shown} 笔 · {missing} 笔没有利率',
   },
+  'debt.curve.aria': '各还款方案下的欠款总额，{from} 至 {to}，起始为 {start}。{plans}',
+  'debt.curve.aria.cleared': '{plan}：{month} 前还清。',
+  'debt.curve.aria.owed': '{plan}：到 {month} 仍欠 {amount}。',
 
   /* --- report.* / nav.report / shell.tx.report — machine-assisted, added
      alongside the Report feature (views/report.js, src/report.js). --- */

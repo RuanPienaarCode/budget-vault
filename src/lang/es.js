@@ -1455,6 +1455,9 @@ module.exports = {
     one: 'cubre {shown} de {total} deudas · {missing} no tiene tipo de interés',
     other: 'cubre {shown} de {total} deudas · {missing} no tienen tipo de interés',
   },
+  'debt.curve.aria': 'Total adeudado con cada plan de pago, de {from} a {to}, partiendo de {start}. {plans}',
+  'debt.curve.aria.cleared': '{plan}: saldado en {month}.',
+  'debt.curve.aria.owed': '{plan}: aún se deben {amount} en {month}.',
 
   /* --- report.* / nav.report / shell.tx.report — machine-assisted, added
      alongside the Report feature (views/report.js, src/report.js). --- */

@@ -38,7 +38,7 @@ const { sharePercentLabel } = require('../share-percents');
 const i18n = require('../i18n');
 const {
   themeColors, createChart, scales, gridlines, axisLabels, phoneWidth,
-  linePath, areaPath, areaGradient, tip, RANGES, rangeFor,
+  linePath, areaPath, areaGradient, tip, pointReadout, RANGES, rangeFor,
 } = require('../chart');
 
 /* Debt kinds, in the order a household usually meets them. Stored verbatim in
@@ -1111,9 +1111,30 @@ module.exports = function registerDebts(ctx) {
     const max = Math.max(1, peak) * 1.08;
     // 50 on a phone for the larger axis text — see chart.js, phoneWidth.
     const s = scales({ w: W, h: H, count: span + 1, max, padB: phoneWidth() ? 50 : 34 });
+    const chartToday = todayForMonths();   // one clock read for the whole chart, not one per point
+    const monthAt = m => monthLabel(addMonths(m, chartToday));
+    /* The label states FIGURES. It used to read "Total owed over the next 5
+       years under each payoff plan" — a description of the axes — and the
+       chart is role="img", so that sentence was everything a screen reader
+       got from it: no opening total, and no word on where any plan ends, which
+       is the one thing the chart is drawn to compare (audit of 11 Nov 2026,
+       task 18). Now: what is owed today, and for each plan either the month
+       its line reaches zero or what is still owed where the chart stops.
+
+       Through i18n, as every new accessible name is. The plan names are the
+       ones the cards beside the chart print. */
+    const ends = lines.map(l => {
+      let cleared = -1;
+      for (let m = 0; m <= span; m++) if (at(l.series, m) < 0.005) { cleared = m; break; }
+      return cleared >= 0
+        ? i18n.t('debt.curve.aria.cleared', { plan: l.label, month: monthAt(cleared) })
+        : i18n.t('debt.curve.aria.owed', { plan: l.label, amount: money(at(l.series, span), 0), month: monthAt(span) });
+    });
     const { svg, add } = createChart({
       w: W, h: H,
-      label: `Total owed over the next ${humanMonths(span)} under each payoff plan`,
+      label: i18n.t('debt.curve.aria', {
+        from: monthAt(0), to: monthAt(span), start: money(at(lines[0].series, 0), 0), plans: ends.join(' '),
+      }),
     });
 
     const fill = areaGradient(add, 'debtCurveArea', colorFor(chosen), 0.18);
@@ -1136,22 +1157,41 @@ module.exports = function registerDebts(ctx) {
       });
     }
 
-    /* A year's worth of months is 12 hit strips; ten years is 120, which is
-       both useless to aim at and 120 nodes to build. Sample to at most 24. */
+    /* A year's worth of months is 12 points to read; ten years is 120, which
+       is both useless to aim at and 120 steps of an arrow key. Sample to at
+       most 24 — and always include the last month, which is where the plans
+       have ended up and the first thing the readout says. */
     const step = Math.max(1, Math.ceil(span / 24));
-    const chartToday = todayForMonths();   // one clock read for the whole chart, not one per strip
-    for (let m = 0; m <= span; m += step) {
-      const hit = add('rect', {
-        x: s.x(m) - s.innerW / (span * 2), y: s.padT,
-        width: s.innerW / span, height: s.innerH, fill: 'transparent',
-      });
-      tip(add, hit, `${monthLabel(addMonths(m, chartToday))} — ` +
-        lines.map(l => `${l.label} ${money(at(l.series, m), 0)}`).join(' · '));
+    const samples = [];
+    for (let m = 0; m <= span; m += step) samples.push(m);
+    if (samples[samples.length - 1] !== span) samples.push(span);
+    const monthLine = m => `${monthAt(m)} — ` +
+      lines.map(l => `${l.label} ${money(at(l.series, m), 0)}`).join(' · ');
+
+    /* Each month's three figures, read out one point at a time (chart.js
+       pointReadout): the arrow keys walk them, and a finger or a mouse over
+       the chart reads the same line. They were native <title> tooltips on
+       invisible strips — inside a role="img" node, so no keyboard and no
+       screen reader ever reached one. The strips stay only where the readout
+       cannot be wired (an engine with no PointerEvent), never beside it. */
+    const readout = pointReadout({
+      svg, add, w: W, xs: samples.map(m => s.x(m)), top: s.padT, bottom: s.baseline,
+      text: i => monthLine(samples[i]),
+    });
+    if (!readout) {
+      for (let m = 0; m <= span; m += step) {
+        const hit = add('rect', {
+          x: s.x(m) - s.innerW / (span * 2), y: s.padT,
+          width: s.innerW / span, height: s.innerH, fill: 'transparent',
+        });
+        tip(add, hit, monthLine(m));
+      }
     }
 
-    axisLabels(add, s, Array.from({ length: span + 1 }, (_, m) => monthLabel(addMonths(m, chartToday))), H);
+    axisLabels(add, s, Array.from({ length: span + 1 }, (_, m) => monthAt(m)), H);
 
     wrap.append(svg);
+    if (readout) wrap.append(readout);
   }
 
   function replan() { renderDebtKpis(); renderDebtPlan(); }

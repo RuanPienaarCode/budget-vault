@@ -3,7 +3,7 @@
 
 const { el, kpiTiles, icoEl, caveatChip } = require('../dom');
 const { accountsOfType, accountType } = require('../vocabulary');
-const { themeColors, createChart, tip, parseColor, distinctColors, phoneLayout } = require('../chart');
+const { themeColors, createChart, tip, pointReadout, parseColor, distinctColors, phoneLayout } = require('../chart');
 const { isStale, isStaleValuation, stalenessSummary } = require('../reconcile');
 const { todayIso } = require('../dates');
 const { accountFlows, totalReturn, growthTotals, growthSeries, chartable, poolCatType, growthRate,
@@ -1194,11 +1194,28 @@ module.exports = function registerSavings(ctx) {
       stroke: 'currentColor', 'stroke-opacity': '0.14', 'stroke-width': '1',
     });
 
+    /* Each month's two figures, read out one point at a time (chart.js
+       pointReadout): the arrow keys walk the months, and a finger or a mouse
+       over the chart reads the same line. The label above states where the
+       balance ENDED; how it got there is what the chart is drawn to show, and
+       that was reachable by nothing — the two <title>s below name the closing
+       totals again, on a role="img" node no keyboard or screen reader enters
+       (audit of 11 Nov 2026, task 18). Named as the legend under the chart
+       names them, so the readout and the legend are one vocabulary. The
+       <title>s stay only where the readout cannot be wired: with both, a
+       hover would show this month's figure in the line and the closing one in
+       the tooltip. */
+    const readout = pointReadout({
+      svg, add, w: W, xs: s.points.map((_, i) => X(i)), top: padT, bottom: padT + innerH,
+      text: i => `${s.points[i].month} — Put in ${money(s.points[i].capital)}`
+        + (last.posted ? ` · Growth recorded ${money(s.points[i].posted)}` : ''),
+    });
+
     const capArea = add('path', { d: areaFor(() => 0, cap), fill: cIn, 'fill-opacity': '0.55' }, band);
-    tip(add, capArea, `Put in: ${money(last.capital)}`);
+    if (!readout) tip(add, capArea, `Put in: ${money(last.capital)}`);
     if (last.posted) {
       const gArea = add('path', { d: areaFor(cap, stack), fill: cGrow, 'fill-opacity': '0.65' }, band);
-      tip(add, gArea, `Growth your accounts recorded: ${money(last.posted)}`);
+      if (!readout) tip(add, gArea, `Growth your accounts recorded: ${money(last.posted)}`);
       add('path', {
         d: lineFor(stack), fill: 'none', stroke: cGrow, 'stroke-width': '2',
         'stroke-linejoin': 'round',
@@ -1260,6 +1277,8 @@ module.exports = function registerSavings(ctx) {
     if (last.posted) key(cGrow, 'Growth recorded', last.posted);
     if (undated) key(cGrow, 'Growth with no date', undated);
     wrap.append(legend);
+    // Under the legend, whose closing figures it reads beside.
+    if (readout) wrap.append(readout);
 
     /* Named under the chart, not only in the subtitle. An account left out is
        the one thing that could make this disagree with the tiles above, and a

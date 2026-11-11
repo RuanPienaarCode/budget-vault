@@ -1410,6 +1410,9 @@ module.exports = {
   'debt.interest.partial': {
     other: 'mencakup {shown} dari {total} utang · {missing} tanpa suku bunga',
   },
+  'debt.curve.aria': 'Total utang menurut tiap rencana pelunasan, {from} sampai {to}, mulai dari {start}. {plans}',
+  'debt.curve.aria.cleared': '{plan}: lunas pada {month}.',
+  'debt.curve.aria.owed': '{plan}: masih terutang {amount} pada {month}.',
 
   /* --------------------------------- report ------------------------------- */
   'report.pageSub': 'Satu catatan Markdown · baca di Obsidian, bagikan, atau tempelkan ke obrolan AI',

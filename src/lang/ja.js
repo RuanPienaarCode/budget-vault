@@ -1384,6 +1384,9 @@ module.exports = {
   'debt.interest.partial': {
     other: '{total} 件中 {shown} 件が対象 · {missing} 件に金利の記録なし',
   },
+  'debt.curve.aria': '各返済プランでの負債総額（{from}〜{to}、開始時 {start}）。{plans}',
+  'debt.curve.aria.cleared': '{plan}：{month}までに完済。',
+  'debt.curve.aria.owed': '{plan}：{month}時点で残り {amount}。',
 
   /* --- report.* / nav.report / shell.tx.report — machine-assisted, added
      alongside the Report feature (views/report.js, src/report.js). --- */

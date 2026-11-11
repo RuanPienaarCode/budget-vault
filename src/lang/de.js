@@ -1454,6 +1454,9 @@ module.exports = {
     one: 'deckt {shown} von {total} Schulden ab · bei {missing} fehlt der Zinssatz',
     other: 'deckt {shown} von {total} Schulden ab · bei {missing} fehlt der Zinssatz',
   },
+  'debt.curve.aria': 'Gesamtschuld je Tilgungsplan, {from} bis {to}, ausgehend von {start}. {plans}',
+  'debt.curve.aria.cleared': '{plan}: getilgt bis {month}.',
+  'debt.curve.aria.owed': '{plan}: im {month} noch {amount} offen.',
 
   /* --- report.* / nav.report / shell.tx.report — machine-assisted, added
      alongside the Report feature (views/report.js, src/report.js). --- */

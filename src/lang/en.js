@@ -1671,6 +1671,14 @@ module.exports = {
     one: 'covers {shown} of {total} debts · {missing} has no rate',
     other: 'covers {shown} of {total} debts · {missing} have no rate',
   },
+  /* The payoff curve's accessible name. The chart is role="img", so this is
+     everything a screen reader gets from it: what is owed today, then one
+     sentence per plan ({plans}, joined by a space) saying where its line ends —
+     the month it reaches zero, or what is still owed where the chart stops.
+     {plan} is the plan's name as the cards beside the chart print it. */
+  'debt.curve.aria': 'Total owed under each payoff plan, {from} to {to}, starting at {start}. {plans}',
+  'debt.curve.aria.cleared': '{plan}: cleared by {month}.',
+  'debt.curve.aria.owed': '{plan}: {amount} still owed in {month}.',
 
   /* --------------------------------- report -------------------------------
      views/report.js (the page) and src/report.js (the generated note's own
