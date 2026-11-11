@@ -1475,17 +1475,25 @@ function mountApp(view) {
       if (plugin.settings.privacyLock) { lockGate(); return; }
       await connectVault();
     },
-    /* Called from BudgetView.onClose. These four timers are scheduled by hand
+    /* Called from BudgetView.onClose. These timers are scheduled by hand
        rather than through Obsidian's register* helpers, so nothing unwinds them
        automatically — and a reload timer that fires after contentEl.empty()
        re-reads the whole vault into a dead view and then throws on the first
-       null query result. */
+       null query result.
+
+       All four search debounces, not three: `_foodQ` was added with the Food
+       page and never joined this list, so typing in its item search and
+       closing the view inside 200 ms left renderFood() to fire into the
+       emptied view (2026-11-11 audit, task 13). tests/controller-destroy-
+       clears-timers.test.cjs holds every `S.<handle> = setTimeout(` in this
+       file to a clearTimeout here, so the fifth cannot be missed the same way. */
     destroy: () => {
       reloads.cancel();
       offStale();
       clearTimeout(S._q);
       clearTimeout(S._acctQ);
       clearTimeout(S._noteQ);
+      clearTimeout(S._foodQ);
       const t = $('#toast');
       if (t) clearTimeout(t._h);
       if (dockObserver) dockObserver.disconnect();
