@@ -39,13 +39,15 @@
        hand-spelled prefix, so it drops every event in a root book: no stale
        mark, no refusal, no reload.
 
-   SO THE WRITE STAYS REFUSED, deliberately, until the watcher can see a root
-   book. That refusal is the only thing between such a book and a Save that
-   overwrites a phone's row unopposed; lifting it first would trade "cannot
-   save" for "can lose an edit". Section 3 pins both halves together, as a
-   ratchet: the day fsChangeInBudget answers true for a root book, this suite
-   fails and says to lift the refusal (io.js withinBudget — one line, onto
-   insideBook; branch fix/audit-root-book-writes carries it with its tests).
+   SO THE WRITE STAYED REFUSED, deliberately, until the watcher could see a
+   root book. That refusal was the only thing between such a book and a Save
+   that overwrites a phone's row unopposed; lifting it first would have traded
+   "cannot save" for "can lose an edit". Section 3 pinned both halves together
+   as a ratchet, and the ratchet has now turned once: the watcher sees a root
+   book (io.js bookOwns, tests/root-book-watcher.test.cjs) and the write is
+   STILL refused here, on its own change, so that either half can be read —
+   and reverted — without the other. Lifting it is io.js withinBudget, onto
+   bookOwns.
 
    AND SO DOES THE DELETE, which is new. io.trashFile had no containment of
    its own; a root book could not reach it only because its garbled rels
@@ -220,13 +222,15 @@ function relsOf(S) {
       ok(r.io.fileAt('Categories/Food.md'), say('io finds a root book\'s file by its rel'));
       await refused(() => r.io.trashFile(r.io.fileAt('Categories/Food.md')), say('T2: …and a root book\'s delete is refused with its writes'));
       eq(r.keys(), before, say('and nothing in the vault moved'));
-      /* THE RATCHET. A root book may write only where the watcher can see a
-         change in it — otherwise io's stale ledger is never told, and a Save
-         overwrites whatever the phone wrote. Today it cannot. */
-      eq(fsChangeInBudget(r.io.basePath(), { path: 'Transactions/Cheque/2026-07.md' }), false,
-        say('the vault watcher does not see a change in a root book — which is WHY its writes are still refused. '
-          + 'If this is now true, the watcher has been taught the root: lift the refusal in io.js guardedPath '
-          + '(use insideBook; branch fix/audit-root-book-writes has it, with the config-folder refusal and its tests) and retire this section'));
+      /* THE RATCHET, turned once. A root book may write only where the
+         watcher can see a change in it — otherwise io's stale ledger is never
+         told, and a Save overwrites whatever the phone wrote. It can now; the
+         refusal above is the half still to lift. */
+      eq(fsChangeInBudget(r.io.basePath(), { path: 'Transactions/Cheque/2026-07.md' }), true,
+        say('T2: the vault watcher sees a change in a root book — the condition for ever letting one write. '
+          + 'If this is false again, the watcher has lost the root and the refusal above must stay'));
+      eq(fsChangeInBudget(r.io.basePath(), { path: 'Journal/2026-11-12.md' }), false,
+        say('T2: …and does not take a note that merely lives in the vault for the budget\'s'));
     }
 
     /* ---- 4. the real loader at the root ---- */

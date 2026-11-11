@@ -145,15 +145,29 @@ function modalOpenIn(docs) {
 }
 
 function fsChangeInBudget(basePath, file, oldPath) {
-  const under = p => typeof p === 'string' && p !== '' && (p === basePath || p.startsWith(basePath + '/'));
+  /* io.js bookOwns, not a prefix spelled here (2026-11-11 audit, task 2). The
+     prefix was `p === basePath || p.startsWith(basePath + '/')`, and a book at
+     the vault root has '/' for a base, which no vault path starts with — so
+     every change in such a book was dropped here, io.observeChange was never
+     told, and nothing would have refused a Save over a phone's edit. That is
+     why a root book could not be allowed to write. bookOwns is also the test
+     io's write containment asks, deliberately the same one: at the root it is
+     the book's own files and folders, NOT every path in the vault — a root
+     book shares its folder with the reader's notes, and reloading the budget
+     after each save of one of those would be this bug's opposite. In a folder
+     it answers exactly as the prefix did (tests/root-book-watcher.test.cjs). */
+  const under = p => registerIo.bookOwnsPath(basePath, p);
   return under(file && file.path) || under(oldPath);
 }
 
 function classifyRename(basePath, oldPath, newPath, categories) {
   const bp = basePath;
   const kindOf = p => {
-    if (typeof p !== 'string' || (p !== bp && !p.startsWith(bp + '/'))) return null;
-    const rel = p.slice(bp.length + 1);
+    /* Root-aware, as fsChangeInBudget above: the slice dropped the first two
+       characters of every path in a root book ('Accounts/Cheque.md' →
+       'counts/Cheque.md'), so no rename there was ever an account's. */
+    if (!registerIo.bookOwnsPath(bp, p)) return null;
+    const rel = registerIo.relUnder(bp, p);
     if (/^Accounts\/[^/]+\.md$/.test(rel)) return 'account';
     if (/^Categories\/[^/]+\.md$/.test(rel)) return 'category';
     return null;
@@ -183,7 +197,7 @@ function classifyRename(basePath, oldPath, newPath, categories) {
      bug, and it is the second time in this repo (import.js, July: a safeSeg'd
      label probed against a raw one). */
   if (kind === 'category') {
-    const rel = oldPath.slice(bp.length + 1);
+    const rel = registerIo.relUnder(bp, oldPath);
     const cat = (categories || []).find(c => c.rel === rel);
     if (cat && cat.name !== base(oldPath)) return null;
   }

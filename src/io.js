@@ -72,6 +72,56 @@ function relUnder(base, path) {
   return path.startsWith(root + '/') ? path.slice(root.length + 1) : path;
 }
 
+/* ---- what a book at the vault root OWNS (2026-11-11 audit, task 2) ----
+
+   insideBook answers "is this path under the book's folder", and for a book in
+   a folder that is the whole of "is this the book's": the folder was given to
+   the budget, and everything in it has always been treated as the budget's.
+   At the vault root the two questions come apart. The folder is the VAULT,
+   and most of a vault is not a budget — the daily notes, a project folder,
+   another plugin's files. Asked only insideBook there, the watcher would
+   re-read the whole budget 800 ms after every save of any note in the vault
+   and mark that note stale, and the write containment would let a rel built
+   from bad data be written over, or trashed, anywhere the vault reaches.
+
+   So a root book owns what this app keeps in a book and nothing else, told by
+   the first segment of the path: the six files it reads and writes beside
+   Settings.md, and the nine folders it reads files from or writes them into
+   (load.js's mdFilesUnder / subfoldersUnder / readFile call sites, plus
+   Receipts/ and Data/, which report.js's MANAGED_SUBFOLDERS does not need).
+   A folder name on its own is the book's too: `Transactions` renamed away is
+   a change to every month in it. tests/root-book-watcher.test.cjs holds the
+   two lists to the names the rest of src/ spells, so a new book-level file
+   that is not added here fails that suite — and, in a root book, is refused
+   as outside the budget folder rather than written unwatched.
+
+   Compared the way the filesystem compares (foldSeg): `categories/Food.md` is
+   a file in Categories/ on APFS and iOS, and this one predicate is asked by
+   BOTH the watcher (controller.js fsChangeInBudget, api.js underBudget) and
+   the write containment (withinBudget, below) — a path one of them owned and
+   the other did not is exactly a write the stale ledger never hears about.
+   Folding can only ever add a reload or a refusal.
+
+   `resolved` is collapsePath's answer, as for insideBook. For a book in a
+   folder this IS insideBook: nothing about such a book changes. */
+const BOOK_FILES = ['Settings.md', 'Exchange Rates.md', 'Owed Money.md', 'Debts.md', 'Assets.md', 'Services.md'];
+const BOOK_FOLDERS = ['Categories', 'Accounts', 'Budgets', 'Plans', 'Tax', 'Transactions', 'Notes', 'Receipts', 'Data'];
+const BOOK_FILE_KEYS = BOOK_FILES.map(foldSeg);
+const BOOK_FOLDER_KEYS = BOOK_FOLDERS.map(foldSeg);
+function bookOwns(base, resolved) {
+  if (!insideBook(base, resolved)) return false;
+  if (collapsePath(base) !== '') return true;
+  const cut = resolved.indexOf('/');
+  const top = foldSeg(cut < 0 ? resolved : resolved.slice(0, cut));
+  return BOOK_FOLDER_KEYS.includes(top) || (cut < 0 && BOOK_FILE_KEYS.includes(top));
+}
+/* bookOwns for a path as a vault EVENT hands it over (a TAbstractFile's path,
+   or a rename's old path): anything that is not a non-empty string is no
+   path, and so nobody's. The spelling the three watchers share. */
+function bookOwnsPath(base, path) {
+  return typeof path === 'string' && path !== '' && bookOwns(base, collapsePath(path));
+}
+
 /* destinationProblem(folder, { configDir, budgetFolder, budgetFolders }) — may an export
    write into the folder the reader TYPED? The one answer for every export
    that takes a destination: the Report uses it; the Transactions export and
@@ -1153,3 +1203,9 @@ module.exports.opWriterOf = opWriterOf;
    hand (see "a book at the vault root", top of this file). */
 module.exports.insideBook = insideBook;
 module.exports.relUnder = relUnder;
+/* And what a book owns — the same question at a folder, a narrower one at the
+   vault root (see "what a book at the vault root OWNS", above). */
+module.exports.bookOwns = bookOwns;
+module.exports.bookOwnsPath = bookOwnsPath;
+module.exports.BOOK_FILES = BOOK_FILES;
+module.exports.BOOK_FOLDERS = BOOK_FOLDERS;

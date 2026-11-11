@@ -298,9 +298,17 @@ module.exports = function registerNotes(ctx) {
        is always created at the top of Notes/, so a nested path can never
        actually collide with one — they are in the set for completeness rather
        than because they can clash. */
+    /* io.js relUnder, required here rather than at the top of the file: the
+       slice it replaces (`f.path.slice(ctx.basePath().length + 1)`) dropped the
+       first two characters of every path in a book at the vault root, whose
+       base is '/' — 'tes/2026-08-12 bank call.md' — so the listing half of
+       this set matched nothing there, and a note written since the load was
+       reported free to a title differing only in case (2026-11-11 audit,
+       task 2). */
+    const { relUnder } = require('../io');
     const used = new Set(
       S.notes.map(n => n.rel.toLowerCase()).concat(
-        mdFilesUnder(NOTES_DIR).map(f => f.path.slice(ctx.basePath().length + 1).toLowerCase())));
+        mdFilesUnder(NOTES_DIR).map(f => relUnder(ctx.basePath(), f.path).toLowerCase())));
     return p => used.has(p.toLowerCase()) || !!fileAt(p);
   }
 
