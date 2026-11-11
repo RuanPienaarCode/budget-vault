@@ -200,3 +200,21 @@ same licence.
 Releases up to and including 1.11.11 were published under the MIT licence and
 stay MIT for anyone holding a copy of them. See [NOTICE](NOTICE) for the full
 licence history.
+
+### Third-party material
+
+Two things in a release are not the author's own work. Each keeps its own
+terms, and [NOTICE](NOTICE) carries them in full:
+
+- **Geist**, the typeface the interface is set in, is embedded in `styles.css`
+  as a single Latin-subset variable font, used as supplied. Copyright 2024 The
+  Geist Project Authors ([vercel/geist-font](https://github.com/vercel/geist-font)),
+  licensed under the [SIL Open Font License, Version 1.1](assets/fonts/OFL-Geist.txt).
+  The OFL covers the font only; it does not change the licence of the plugin's
+  own code.
+- **Helvetica character widths.** The PDF export places its text using the
+  advance widths of Helvetica and Helvetica-Bold from Adobe's Core 14 AFM font
+  metric files — the published widths only; no font program is included.
+  Copyright © 1985, 1987, 1989, 1990, 1991, 1992, 1993, 1997 Adobe Systems
+  Incorporated. All Rights Reserved. The notice those files are distributed
+  under is retained in NOTICE, as it requires.
