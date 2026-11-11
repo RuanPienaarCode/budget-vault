@@ -6,9 +6,9 @@
    leaves the reader ON the page. The same defect was still in the seven views
    that round did not own — Accounts, Budget, Plan, Food, Loans, Report and
    Score — and a one-line grep had guessed at five handlers. Reading each view
-   end to end found forty-five across four of them, one in Report, and none in
-   Loans or Score, whose forms are built once and whose outputs hold no
-   control. Every one is driven here the way that suite drives its own: focus
+   end to end found forty-five: sixteen on Plan, fourteen on Accounts, nine on
+   Budget, five on Food, one on Report — and none on Loans or Score, whose
+   controls are built once and repainted in place. Every one is driven here the way that suite drives its own: focus
    the control, press it, ask where focus is, against the focus model in
    tests/helpers/focus-stub.cjs (a control destroyed by a rebuild stops being
    the active element, exactly as in a browser).
@@ -144,12 +144,34 @@ const RECEIPT_FILES = () => {
   return out;
 };
 
+/* Six accounts across two owners and nobody. Cheque, Joint and Second each
+   have a row dated after their balance was confirmed, so each DRIFTS and the
+   inspector offers the implied figure; Card has never been confirmed; Wallet
+   and Pot are quiet. Pot also has a row dated ON its confirmation day, which
+   earns the inspector's same-day line. */
+const ACCOUNT_FILES = () => ({
+  [`${B}/Settings.md`]: '---\nmonth_start_day: 1\ncurrency: "R"\ncountry: za\n---\n',
+  [`${B}/Categories/Groceries.md`]: '---\ntype: expense\ncolor: "#888888"\n---\n',
+  [`${B}/Accounts/Cheque.md`]: '---\ntype: checking\nowner: Sam\ntx_label: "Cheque"\nbalance: 12000.00\nbalance_updated: 2026-10-01\n---\n',
+  [`${B}/Accounts/Joint.md`]: '---\ntype: checking\nowner: Lee\ntx_label: "Joint"\nbalance: 8000.00\nbalance_updated: 2026-10-01\n---\n',
+  [`${B}/Accounts/Second.md`]: '---\ntype: checking\nowner: Lee\ntx_label: "Second"\nbalance: 6000.00\nbalance_updated: 2026-10-01\n---\n',
+  [`${B}/Accounts/Card.md`]: '---\ntype: credit_card\nowner: Sam\ntx_label: "Card"\nbalance: -4000.00\n---\n',
+  [`${B}/Accounts/Pot.md`]: '---\ntype: savings\nowner: Lee\ntx_label: "Pot"\nbalance: 5000.00\nbalance_updated: 2026-10-14\n---\n',
+  [`${B}/Accounts/Wallet.md`]: '---\ntype: cash\nbalance: 300.00\nbalance_updated: 2026-10-14\n---\n',
+  [`${B}/Transactions/Cheque/2026-10.md`]: TX_HEAD + '| 2026-10-05 | Shop | Groceries | -500.00 |  |  |  |\n',
+  [`${B}/Transactions/Joint/2026-10.md`]: TX_HEAD + '| 2026-10-06 | Shop | Groceries | -250.00 |  |  |  |\n',
+  [`${B}/Transactions/Second/2026-10.md`]: TX_HEAD + '| 2026-10-07 | Shop | Groceries | -75.00 |  |  |  |\n',
+  [`${B}/Transactions/Card/2026-10.md`]: TX_HEAD + '| 2026-10-02 | Shop | Groceries | -100.00 |  |  |  |\n',
+  [`${B}/Transactions/Wallet/2026-10.md`]: TX_HEAD + '| 2026-10-02 | Kiosk | Groceries | -20.00 |  |  |  |\n',
+  [`${B}/Transactions/Pot/2026-10.md`]: TX_HEAD + '| 2026-10-03 | Move | Groceries | 100.00 |  |  |  |\n| 2026-10-14 | Move | Groceries | 60.00 |  |  |  |\n',
+});
+
 /* The shell's own controls, as real ones (see refocus-views: the harness
    auto-creates anything asked for by id as a <div>, which focus cannot land
    on — right for a div, wrong for the buttons these pages fall back to). */
 const SHELL = { '#budAddCat': 'button', '#budCopyPrev': 'button', '#budSave': 'button',
   '#planStart': 'button', '#planNew': 'button', '#planDelete': 'button',
-  '#planAddSource': 'button', '#planAddEnvelope': 'button', '#foodAdd': 'button' };
+  '#planAddSource': 'button', '#planAddEnvelope': 'button', '#foodAdd': 'button', '#acctAdd': 'button' };
 
 async function mount(files = FILES()) {
   focus.reset();
@@ -603,6 +625,174 @@ const keysOf = (root, prefix) => descend(root).map(e => e.getAttribute('data-foc
       await press(mid);
       eq(focus.at(), mid, 'and the centre keeps focus when it clears the part');
       eq(rows[1].getAttribute('aria-pressed'), 'false', 'having cleared it');
+    }
+
+    /* ================= Accounts =========================================== */
+    {
+      const M = await mount(ACCOUNT_FILES());
+      M.view = 'Accounts';
+      const $ = M.ctx.$;
+      const summary = $('#acctSummary'), deck = $('#acctDeck'), owners = $('#acctOwners'),
+        filters = $('#acctFilters'), table = $('#acctTable'), insp = $('#acctInspector');
+      const v = () => M.S.acctView;
+      const saved = async () => { for (let i = 0; i < 4; i++) await settle(); };
+      const show = (open, filter = 'all') => { v().open = open; v().filter = filter; M.ctx.renderAccounts(); focus.reset(); };
+      const shownName = () => byClass(insp, 'acct-insp-name')[0].textContent;
+      M.ctx.renderAccounts();
+
+      // The figure cut by owner: a press filters the list and redraws the page.
+      await press(need(summary, 'ownerrow:sam'));
+      landed('ownerrow:sam', 'filtering by an owner in the summary lands back on that owner');
+      eq(focus.at().getAttribute('aria-pressed'), 'true', 'which is now the pressed one');
+      await press(focus.at());
+      landed('ownerrow:sam', 'and so does taking the filter off');
+
+      // The two chip rows.
+      await press(need(owners, 'owner:is:lee'));
+      landed('owner:is:lee', 'an owner chip lands back on itself');
+      await press(need(owners, 'owner:is:'));
+      landed('owner:is:', 'the "nobody\'s" chip is its own key, apart from "everyone"');
+      await press(need(owners, 'owner:all'));
+      landed('owner:all', 'and "everyone" lands on itself');
+      await press(need(filters, 'filter:acct.group.savings'));
+      landed('filter:acct.group.savings', 'a kind chip lands back on itself');
+      eq(focus.at().getAttribute('aria-pressed'), 'true', 'which is now the pressed one');
+      await press(need(filters, 'filter:all'));
+      landed('filter:all', 'and so does All');
+
+      // A sort header: redrawn with the table, so the second press had nowhere to land.
+      await press(need(table, 'sort:name'));
+      landed('sort:name', 'sorting lands back on the column sorted by');
+      const first = keysOf(table, 'bal:')[0];
+      await press(focus.at());
+      landed('sort:name', 'and a second press, which flips the direction, lands there too');
+      ok(keysOf(table, 'bal:')[0] !== first, 'with the list really reversed');
+
+      // "Show them": a door into the list.
+      await press(need(deck, 'deck:show'));
+      eq(v().filter, 'flag', 'the list is filtered to the accounts that want a look');
+      landed('row:0', 'Show them lands on the first account it showed');
+      eq(focus.at().tagName, 'TR', 'which is the row itself');
+
+      // A row's balance.
+      show(null);
+      answers.fields = { balance: '310', as_at: '2026-10-15' };
+      await press(need(table, 'bal:Wallet'));
+      await saved();
+      landed('bal:Wallet', 'saving a balance from the row lands back on that account\'s balance');
+      ok(/310/.test(focus.at().textContent), 'which shows the figure just typed');
+
+      // The inspector, on a quiet account: every action lands on itself.
+      show('Wallet');
+      eq(shownName(), 'Wallet', 'the inspector shows the chosen account');
+      answers.fields = { balance: '320', as_at: '2026-10-15' };
+      await press(need(insp, 'insp:editBalance'));
+      await saved();
+      landed('insp:editBalance', 'editing the balance from the inspector lands back on Edit balance');
+      await press(need(insp, 'insp:budget'));
+      await saved();
+      landed('insp:budget', 'leaving an account out of the budget lands back on that button');
+      ok(M.S.accounts.find(a => a.name === 'Wallet').in_budget === false, 'which really flipped');
+      answers.fields = { type: 'cash', institution: 'Tin', owner: '', account_number: '', tx_label: '', currency: '', currency_code: '', ignore_warnings: [], budget: 'no' };
+      await press(need(insp, 'insp:edit'));
+      await saved();
+      eq(M.S.accounts.find(a => a.name === 'Wallet').institution, 'Tin', 'the edit was saved');
+      landed('insp:edit', 'editing an account lands back on Edit');
+      // An action that leaves the page is left alone: no redraw, no landing.
+      M.ctx.app.workspace = { getLeaf: () => ({ openFile: async () => {} }) };
+      const note = need(insp, 'insp:note');
+      await press(note);
+      eq(focus.at(), note, 'Open note redraws nothing and is not followed by a landing');
+
+      // The same-day line: its button goes once the figure is re-dated.
+      show('Pot');
+      answers.fields = { balance: '5160', as_at: '2026-10-15' };
+      await press(need(insp, 'insp:sameday'));
+      await saved();
+      eq(keyed(insp, 'insp:sameday'), null, 'the same-day line is gone once the balance is dated after its rows');
+      landed('insp:transactions', 'and the reader is on the action that stood after it');
+      eq(shownName(), 'Pot', 'in the same account\'s inspector');
+
+      // A flagged account whose answer takes the pressed button away.
+      show('Cheque');
+      await press(need(insp, 'insp:ignore'));
+      await saved();
+      eq(keyed(insp, 'insp:ignore'), null, 'an ignored warning has no Ignore');
+      eq(shownName(), 'Cheque', 'the inspector still shows the account');
+      landed('insp:editBalance', 'ignoring a warning lands on the action that stood after it');
+      show('Joint');
+      await press(need(insp, 'insp:answer'));
+      await saved();
+      eq(keyed(insp, 'insp:answer'), null, 'an accepted figure has no offer left');
+      eq(shownName(), 'Joint', 'the inspector still shows the account');
+      landed('insp:transactions', 'accepting the implied figure lands on the action that stood after it');
+
+      // THE ONE THAT MATTERS: the inspector moves on to another account.
+      // Filtered to "Needs a look" with nothing chosen, it shows the first
+      // flagged account; accepting its figure takes it off the list, and the
+      // inspector fills with the next — whose primary button has the same key.
+      show(null, 'flag');
+      const flagged = keysOf(table, 'bal:').map(k => k.slice(4));
+      ok(flagged.length >= 2, 'two accounts still want a look');
+      const was = shownName();
+      await press(need(insp, 'insp:answer'));
+      await saved();
+      ok(shownName() !== was, 'the inspector now shows a different account');
+      ok(keyed(insp, 'insp:answer'), 'which has an answer button of its own');
+      ok(!insp.contains(focus.at()), 'and focus is NOT in that other account\'s inspector');
+      eq(focus.at().tagName, 'TR', 'it is on a row of the list');
+      ok(/^row:/.test(focus.key()), 'the one that took the accepted account\'s place');
+
+      // An account still in the list while the inspector shows another. With
+      // every account on show and nothing chosen, the inspector picks the one
+      // flagged account left; once that is answered nothing is flagged, and it
+      // falls back to the first row of the list — a different account.
+      v().sort = 'name'; v().dir = -1;
+      show(null);
+      eq(shownName(), 'Card', 'the inspector picked the one account that still wants a look');
+      answers.fields = { balance: '-4100', as_at: '2026-10-15' };
+      await press(need(insp, 'insp:answer'));
+      await saved();
+      ok(shownName() !== 'Card', 'answered, it is no longer the inspector\'s pick');
+      ok(!insp.contains(focus.at()), 'so focus is not in the other account\'s inspector');
+      eq(focus.at().tagName, 'TR', 'the reader is on a row of the list');
+      ok(/Card/.test(focus.at().textContent), 'the answered account\'s own row, which is still there');
+
+      // Deleting: the account is gone, so the landing is in the list.
+      show('Wallet');
+      const rows = () => keysOf(table, 'row:');
+      const at = descend(table).filter(e => e.tagName === 'TR' && e.getAttribute('data-focus-key')).findIndex(e => /Wallet/.test(e.textContent));
+      ok(at >= 0 && at < rows().length - 1, 'Wallet is in the list with a row after it');
+      const nextName = descend(table).filter(e => e.tagName === 'TR' && e.getAttribute('data-focus-key'))[at + 1].textContent;
+      answers.confirm = false;
+      await press(need(insp, 'insp:delete'));
+      await saved();
+      landed('insp:delete', 'a delete that was cancelled leaves the reader on Delete');
+      answers.confirm = true;
+      answers.fields = { folder: 'keep' };
+      await press(need(insp, 'insp:delete'));
+      await saved();
+      ok(!M.S.accounts.some(a => a.name === 'Wallet'), 'the account is deleted');
+      landed(`row:${at}`, 'deleting an account lands on the row that took its place');
+      eq(focus.at().textContent, nextName, 'which is the next account');
+      // The last row of the list: the one above.
+      {
+        const trs = descend(table).filter(e => e.tagName === 'TR' && e.getAttribute('data-focus-key'));
+        const last = trs[trs.length - 1];
+        const name = byClass(last, 'acct-name-btn')[0].textContent;
+        show(name);
+        await press(need(insp, 'insp:delete'));
+        await saved();
+        landed(`row:${trs.length - 2}`, 'deleting the last account in the list lands on the one above');
+      }
+      // The only account: Add account.
+      while (M.S.accounts.length > 1) M.S.accounts.pop();
+      show(M.S.accounts[0].name);
+      await press(need(insp, 'insp:delete'));
+      await saved();
+      eq(M.S.accounts.length, 0, 'no account is left');
+      eq(focus.at(), $('#acctAdd'), 'deleting the only account lands on Add account');
+      answers.fields = null;
     }
   } finally {
     unpin();
