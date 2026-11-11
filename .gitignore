@@ -17,6 +17,13 @@ _preview/
 # Claude Code agent files — backed up in the Claude-config repo, never committed here
 .claude/agents/
 
+# Claude Code launch config — one developer's preview servers for the
+# gitignored _preview/ harness, addressed by that machine's absolute path. It
+# was tracked until the 2026-11-11 audit noticed a home directory in a public
+# repo; nothing a contributor could use, since the harness it serves is not
+# here either.
+.claude/launch.json
+
 # OS noise
 .DS_Store
 
