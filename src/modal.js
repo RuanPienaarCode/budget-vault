@@ -46,6 +46,82 @@ function enterSubmits(target) {
   return true;
 }
 
+/* ---- a field's accessible name, bound to the label on screen -------------
+   Obsidian's Setting prints the label through setName() as a <div
+   class="setting-item-name"> BESIDE the control — a sibling, not a <label
+   for> — so nothing tied the words to the field, and a screen reader
+   announced "edit text" with no name on every dialog behind askFields (audit
+   of 11 Nov 2026, task 15). The wizard's fields never had the gap:
+   src/onboarding.js names each of its own.
+
+   Bound by REFERENCE (aria-labelledby onto the name element, aria-describedby
+   onto the hint), not by copying the string into an aria-label: the label a
+   sighted reader sees and the one a screen reader speaks are then one node,
+   so they cannot drift, and a caller that already translated its label has
+   nothing further to translate. aria-label is kept only as the fallback for a
+   Setting that exposes no name element.
+
+   The hint is referenced only when the field HAS one. Setting always creates
+   the description element, so pointing at it unconditionally would describe
+   every field by an empty node.
+
+   One counter for the whole session, never reset: two dialogs can be on
+   screen at once (a confirmation over a form), and ids must not repeat
+   between them. */
+let fieldSeq = 0;
+function refIds(setting, hasDesc) {
+  const n = ++fieldSeq;
+  const ids = { name: '', desc: '' };
+  if (setting.nameEl) { ids.name = `bud-field-${n}-name`; setting.nameEl.setAttribute('id', ids.name); }
+  if (hasDesc && setting.descEl) { ids.desc = `bud-field-${n}-desc`; setting.descEl.setAttribute('id', ids.desc); }
+  return ids;
+}
+function nameControl(control, label, names, descs) {
+  if (!control) return;
+  const by = names.filter(Boolean).join(' ');
+  if (by) control.setAttribute('aria-labelledby', by);
+  else control.setAttribute('aria-label', label);
+  const described = descs.filter(Boolean).join(' ');
+  if (described) control.setAttribute('aria-describedby', described);
+}
+
+/* A toggle needs more than a name, because of what Obsidian's is made of
+   (app.js, read 11 Nov 2026): a <label class="checkbox-container"
+   tabindex="0"> around an <input type="checkbox" tabindex="-1">. The LABEL is
+   the tab stop, and a label has no role, so focus landed on an element that
+   was neither named nor anything. Its state lives in `on` and an `is-enabled`
+   class: setValue() never touches the checkbox's `checked`, so the one
+   element that does have a role reported "unchecked" about a toggle that was
+   on.
+
+   So the tab stop is made a switch, with its state written by the same
+   callback that records the value; and the checkbox underneath is named and
+   kept in step too, since it is what a pointer click focuses. Two elements
+   that say the same thing, rather than one hidden — hiding an element that
+   can take focus is its own defect.
+
+   Older builds put the tab stop on the checkbox itself, inside a plain <div>.
+   There the checkbox takes the name and the container is left alone, so
+   whichever element is in the tab order is the one that is named.
+
+   Returns the function that publishes a new state. */
+function nameToggle(tg, label, names, descs) {
+  const box = tg.toggleEl;
+  if (!box) return () => {};
+  const inner = typeof box.querySelector === 'function' ? box.querySelector('input') : null;
+  const stop = box.getAttribute('tabindex');
+  const boxIsTabStop = (stop !== null && Number(stop) >= 0) || !inner;
+  if (boxIsTabStop) {
+    box.setAttribute('role', 'switch');
+    nameControl(box, label, names, descs);
+  }
+  nameControl(inner, label, names, descs);
+  return on => {
+    if (boxIsTabStop) box.setAttribute('aria-checked', on ? 'true' : 'false');
+    if (inner) inner.checked = !!on;
+  };
+}
+
 class FieldModal extends Modal {
   constructor(app, title, fields, resolve) {
     super(app);
@@ -61,6 +137,9 @@ class FieldModal extends Modal {
     for (const f of this.fieldDefs) {
       const s = new Setting(this.contentEl).setName(f.label);
       if (f.desc) s.setDesc(f.desc);
+      // The field's label and hint, as ids every branch below binds to its
+      // control (refIds, above).
+      const ids = refIds(s, !!f.desc);
       if (f.type === 'toggles') {
         /* A set of independent yes/no choices under one heading — for
            "which of these do you want off", where a dropdown would force the
@@ -76,12 +155,20 @@ class FieldModal extends Modal {
         for (const o of f.options) {
           const row = new Setting(this.contentEl).setName(o.label);
           if (o.desc) row.setDesc(o.desc);
+          /* Named by the heading AND the row. "Low balance" under "Mute
+             warnings" is a complete thought on screen and half of one when
+             the row is read alone, which is how a screen reader reaches it. */
+          const own = refIds(row, !!o.desc);
           row.addToggle(tg => {
-            tg.setValue(this.values[f.key].includes(o.value));
-            tg.onChange(on => {
+            const on = this.values[f.key].includes(o.value);
+            tg.setValue(on);
+            const publish = nameToggle(tg, o.label, [ids.name, own.name], [ids.desc, own.desc]);
+            publish(on);
+            tg.onChange(now => {
               const cur = this.values[f.key].filter(v => v !== o.value);
-              if (on) cur.push(o.value);
+              if (now) cur.push(o.value);
               this.values[f.key] = cur;
+              publish(now);
             });
           });
         }
@@ -100,6 +187,7 @@ class FieldModal extends Modal {
           t.setValue(this.values[f.key]);
           if (f.placeholder) t.setPlaceholder(f.placeholder);
           t.inputEl.rows = f.rows || 5;
+          nameControl(t.inputEl, f.label, [ids.name], [ids.desc]);
           t.onChange(v => { this.values[f.key] = v; });
         });
       } else if (f.type === 'select') {
@@ -107,6 +195,7 @@ class FieldModal extends Modal {
         s.addDropdown(d => {
           for (const o of f.options) d.addOption(o.value ?? o, o.label ?? o);
           d.setValue(this.values[f.key]);
+          nameControl(d.selectEl, f.label, [ids.name], [ids.desc]);
           d.onChange(v => { this.values[f.key] = v; });
         });
       } else {
@@ -116,6 +205,7 @@ class FieldModal extends Modal {
           if (f.placeholder) t.setPlaceholder(f.placeholder);
           if (f.type === 'number') { t.inputEl.type = 'number'; t.inputEl.step = '0.01'; }
           if (f.type === 'date') t.inputEl.type = 'date';
+          nameControl(t.inputEl, f.label, [ids.name], [ids.desc]);
           t.onChange(v => { this.values[f.key] = v; });
           firstInputs.push(t.inputEl);
         });

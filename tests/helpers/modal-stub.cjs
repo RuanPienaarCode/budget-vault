@@ -76,6 +76,9 @@ function installModalDom() {
 }
 
 function makeObsidian({ legacyToggle = false } = {}) {
+  /* Read when a toggle is BUILT, so one suite can open a dialog in each shape
+     without re-requiring src/modal.js against a second stub. */
+  const shape = { legacyToggle };
   class Scope {
     constructor() { this.keys = []; }
     register(modifiers, key, func) { this.keys.push({ modifiers, key, func }); }
@@ -145,10 +148,11 @@ function makeObsidian({ legacyToggle = false } = {}) {
       cb(c); return this;
     }
     addToggle(cb) {
-      const toggleEl = legacyToggle
+      const legacy = shape.legacyToggle;
+      const toggleEl = legacy
         ? this.controlEl.createDiv('checkbox-container')
         : this.controlEl.createEl('label', { cls: 'checkbox-container', attr: { tabindex: '0' } });
-      const input = toggleEl.createEl('input', { type: 'checkbox', attr: { tabindex: legacyToggle ? '0' : '-1' } });
+      const input = toggleEl.createEl('input', { type: 'checkbox', attr: { tabindex: legacy ? '0' : '-1' } });
       const c = {
         toggleEl,
         on: false,
@@ -180,7 +184,7 @@ function makeObsidian({ legacyToggle = false } = {}) {
     }
   }
 
-  return { Modal, Setting, setIcon() {}, normalizePath: p => p };
+  return { Modal, Setting, setIcon() {}, normalizePath: p => p, shape };
 }
 
 /* Swap `obsidian` for the stub. Call before requiring anything under src/. */
