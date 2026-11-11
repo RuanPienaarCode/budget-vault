@@ -29,7 +29,7 @@
    unpaid refund into a purchase you make today is a plan that overdraws you. */
 
 const { opWriterOf } = require('../io');
-const { el, keepScroll, icoEl } = require('../dom');
+const { el, keepScroll, icoEl, refocus } = require('../dom');
 const { normalizeAmount } = require('../amount');
 const { escMd, patchFrontmatter, yamlStr, freshLeadLines, withLeadExtra } = require('../markdown');
 const { PLAN_TABLES, plainTableLines } = require('../table-schema');
@@ -104,6 +104,27 @@ module.exports = function registerPlan(ctx) {
 
   /* ------------------------------- render -------------------------------- */
 
+  /* WHERE THE READER IS AFTER A PRESS. renderPlan() empties and rebuilds the
+     picker, the sources, the buckets and the loud card, and nearly every
+     control on this page lives inside one of them and asks for exactly that
+     — so the control pressed was destroyed by its own press and focus fell to
+     <body> (audit of 11 Nov 2026, task 16). The worst of it was the bucket's
+     slider: an arrow key is a `change`, so every single step of a keyboard
+     reader's adjustment threw them off the slider they were adjusting.
+
+     Each such control carries a `data-focus-key` and its handler says where
+     the reader should be once the page is back (dom.js refocus, which only
+     ever restores — a press that redrew nothing, a cancelled dialog, is left
+     where it is). Sources and buckets are keyed by their position in the
+     plan, items by their position in the open bucket, because a removal's
+     landing is positional by nature: the one that took its place, else the
+     one before it, else the list's own Add button.
+
+     A collapsed bucket's row and the open card's Collapse button share one
+     key, `env:<n>`. They are the same control in two states — one opens the
+     bucket, the other closes it — so pressing either lands on the other,
+     which is what now stands where it stood. */
+
   function renderPlan() {
     const p = P();
     const has = !!p;
@@ -145,9 +166,12 @@ module.exports = function registerPlan(ctx) {
     const keys = Object.keys(S.plans).sort((a, b) =>
       S.plans[a].name.localeCompare(S.plans[b].name));
     for (const key of keys) {
-      const b = el('button', { class: 'plan-seg', type: 'button',
+      const b = el('button', { class: 'plan-seg', type: 'button', 'data-focus-key': `plan:${key}`,
         'aria-pressed': key === S.planName ? 'true' : 'false' }, S.plans[key].name);
-      b.addEventListener('click', () => { if (key !== S.planName) changePlan(key); });
+      /* Switching redraws the whole page, this picker with it: the reader is
+         put back on the plan they chose, which now reads pressed (dom.js
+         refocus; see WHERE THE READER IS above renderPlan). */
+      b.addEventListener('click', () => { if (key !== S.planName) { changePlan(key); refocus(wrap, `plan:${key}`); } });
       wrap.append(b);
     }
     $('#planPickerWrap').classList.toggle('hidden', keys.length < 2);
@@ -323,12 +347,22 @@ module.exports = function registerPlan(ctx) {
         return;
       }
       const list = el('div', { class: 'src2-list' });
-      for (const s of p.sources) {
+      /* The row that took this one's place, else the one before it, else Add a
+         source — for the ✕, and for an edit whose sheet removed the source. An
+         edit that kept it finds the same row under the same key.
+
+         Always the row's own button, which opens its sheet, and never its ✕.
+         The ✕ removes with no question asked, and Enter held down repeats:
+         landing on the next row's ✕ would let one long press empty the list,
+         where before the press stopped because focus had gone (review of this
+         change). The same care the bucket's delete takes below. */
+      const afterSource = n => refocus(host, [`src:${n}`, `src:${n - 1}`, $('#planAddSource')]);
+      p.sources.forEach((s, n) => {
         const received = s.status === 'received';
         list.append(el('div', { class: 'src2-row' },
-          el('button', { class: 'src2-main', type: 'button',
+          el('button', { class: 'src2-main', type: 'button', 'data-focus-key': `src:${n}`,
             'aria-label': i18n.t('plan.source.editAria', { name: s.name }),
-            onclick: () => editSource(p, s) },
+            onclick: async () => { await editSource(p, s); afterSource(n); } },
             el('div', { class: 'src2-line1' },
               el('span', { class: 'src2-name' }, s.name),
               el('span', { class: 'kind' }, s.kind || 'Other')),
@@ -337,10 +371,10 @@ module.exports = function registerPlan(ctx) {
               el('span', { class: received ? 'src2-status-in' : 'src2-status-exp' },
                 received ? i18n.t('plan.source.inAccount') : i18n.t('plan.source.expected')))),
           el('div', { class: `src2-amt num${received ? '' : ' src2-amt-muted'}` }, money(s.amount)),
-          el('button', { class: 'btn-ghost btn-ghost-sm src2-del', type: 'button',
+          el('button', { class: 'btn-ghost btn-ghost-sm src2-del', type: 'button', 'data-focus-key': `srcdel:${n}`,
             'aria-label': i18n.t('plan.source.removeAria', { name: s.name }),
-            onclick: () => removeSource(p, s) }, '✕')));
-      }
+            onclick: () => { removeSource(p, s); afterSource(n); } }, '✕')));
+      });
       host.append(list);
     });
   }
@@ -483,12 +517,15 @@ module.exports = function registerPlan(ctx) {
       el('i', { class: 'esb-spent', style: `width:${bar.spent}%` }),
       el('i', { class: 'esb-left', style: `width:${bar.left}%` }),
       el('i', { class: 'esb-over', style: `width:${bar.over}%` }));
+    const at = p.envelopes.indexOf(env);
     return el('button', {
       class: `env-sum${state.isOverspent ? ' is-overspent' : ''}${state.isOvercommitted ? ' is-overcommitted' : ''}`,
       type: 'button',
       style: `--tint:${env.tint || 'transparent'}`,
       'aria-label': i18n.t('plan.env.expandAria', { name: env.name }) + ` — ${rem.text}`,
-      onclick: () => { expandedEnvelope = env.name; renderPlan(); },
+      'data-focus-key': `env:${at}`,
+      // Lands on the open card's Collapse button, which carries the same key.
+      onclick: () => { expandedEnvelope = env.name; renderPlan(); refocus($('#planEnvelopes'), `env:${at}`); },
     },
       el('span', { class: 'env-sum-swatch' }),
       el('span', { class: 'env-sum-main' },
@@ -577,8 +614,12 @@ module.exports = function registerPlan(ctx) {
       /* "placed", the word the page prints for what a bucket holds — this was
          "allocated", a word on no part of the screen (2026-10-20 audit, D2-14). */
       'aria-label': `Amount placed in ${env.name}`,
+      'data-focus-key': `slider:${at}`,
       ...(initialFill ? { style: initialFill } : {}),
     });
+    /* The buckets' container: where this card's controls are looked for again
+       once renderPlan() has replaced the card. */
+    const host = $('#planEnvelopes');
 
     /* Assigned once the elements below exist — the listener is attached now,
        but only FIRES later, by which point both closures-over are set. */
@@ -606,9 +647,12 @@ module.exports = function registerPlan(ctx) {
       const fill = overFillStyle(liveState, v, spent, pctOf);
       if (fill) slider.setAttribute('style', fill); else slider.removeAttribute('style');
     });
+    /* Back on the slider. An arrow key is a `change` of its own, so without
+       this a keyboard reader was dropped to <body> after every step and could
+       not take a second one. */
     slider.addEventListener('change', () => {
       env.amount = Number(slider.value);
-      mark(); renderPlan();
+      mark(); renderPlan(); refocus(host, `slider:${at}`);
     });
 
     /* Tap the figure to type it. The slider is the good part of this design and
@@ -616,7 +660,8 @@ module.exports = function registerPlan(ctx) {
        unreachable by touch and unreachable by keyboard at any sensible step. */
     const amtBtn = el('button', { class: 'env-amt-btn', type: 'button',
       'aria-label': `Set the amount for ${env.name} by typing it`,
-      onclick: () => editEnvelopeAmount(env) }, amtEl);
+      'data-focus-key': `amt:${at}`,
+      onclick: async () => { await editEnvelopeAmount(env); refocus(host, `amt:${at}`); } }, amtEl);
 
     flagsHost = el('div', { class: 'env-rail-flags' }, ...railFlags(state, spent));
 
@@ -642,16 +687,30 @@ module.exports = function registerPlan(ctx) {
       el('div', { class: 'env-top' },
         el('button', { class: 'env-collapse', type: 'button',
           'aria-label': i18n.t('plan.env.collapseAria', { name: env.name }),
-          onclick: () => { expandedEnvelope = NONE_OPEN; renderPlan(); } },
+          'data-focus-key': `env:${at}`,
+          // Lands on this bucket's collapsed row, which carries the same key.
+          onclick: () => { expandedEnvelope = NONE_OPEN; renderPlan(); refocus(host, `env:${at}`); } },
           icoEl(['chevron-down', 'chevron-up'])),
         el('button', { class: 'env-name', type: 'button',
           'aria-label': `Rename spending bucket ${env.name}`,
-          onclick: () => renameEnvelope(p, env) },
+          'data-focus-key': `rename:${at}`,
+          onclick: async () => { await renameEnvelope(p, env); refocus(host, `rename:${at}`); } },
           env.name, icoEl(['pencil', 'square-pen', 'pen-line'], 'env-name-ico')),
         shareEl,
         el('button', { class: 'env-del-ico', type: 'button',
           'aria-label': i18n.t('plan.env.deleteAria', { name: env.name }),
-          onclick: () => removeEnvelope(p, env) }, icoEl(['trash-2', 'trash']))),
+          'data-focus-key': `envdel:${at}`,
+          /* A bucket that is gone: the one that took its place (its row, or
+             its Collapse button if the accordion opened it), else the one
+             before, else Add a spending bucket. Never `envdel` of whichever
+             bucket the accordion opened instead — a second Enter would be a
+             press on a different bucket's delete. A removal that was
+             cancelled leaves the bucket, and the reader on its delete. */
+          onclick: async () => {
+            await removeEnvelope(p, env);
+            refocus(host, p.envelopes.includes(env) ? `envdel:${at}`
+              : [`env:${at}`, `env:${at - 1}`, $('#planAddEnvelope')]);
+          } }, icoEl(['trash-2', 'trash']))),
       amtBtn,
       el('div', { class: 'env-rail' },
         slider,
@@ -659,10 +718,10 @@ module.exports = function registerPlan(ctx) {
           el('span', {}, env.note || ''),
           flagsHost)),
       el('ul', { class: 'env-items' },
-        ...items.map(i => itemRow(p, i)),
+        ...items.map((i, k) => itemRow(p, i, k, at)),
         el('li', { class: 'env-item env-item-add' },
-          el('button', { class: 'env-add', type: 'button',
-            onclick: () => addItem(p, env.name) }, '＋ item'))),
+          el('button', { class: 'env-add', type: 'button', 'data-focus-key': `additem:${at}`,
+            onclick: async () => { await addItem(p, env.name); refocus(host, `additem:${at}`); } }, '＋ item'))),
       el('div', { class: 'env-foot' },
         el('span', { class: 'env-count' },
           items.length
@@ -672,13 +731,18 @@ module.exports = function registerPlan(ctx) {
     return card;
   }
 
-  function itemRow(p, i) {
+  /* `k` is the item's position in its bucket and `at` the bucket's in the
+     plan — what the two controls on the row are keyed by, see WHERE THE READER
+     IS above renderPlan. */
+  function itemRow(p, i, k, at) {
     const done = i.status === 'done';
     const part = i.status === 'part';
+    const host = $('#planEnvelopes');
     const tick = el('button', {
       class: `ei-tick ${done ? 'done' : part ? 'part' : ''}`, type: 'button',
       'aria-label': `${i.name}: ${i.status} — click to advance`,
       title: 'planned → part-bought → done',
+      'data-focus-key': `tick:${k}`,
     }, done ? '✓' : part ? '·' : '');
     /* Three states cycled by tapping, the same gesture Owed and Tax use for
        their statuses. Landing on `done` with nothing recorded as spent copies
@@ -688,7 +752,7 @@ module.exports = function registerPlan(ctx) {
       i.status = done ? 'planned' : part ? 'done' : 'part';
       if (i.status === 'done' && !i.spent) i.spent = i.amount;
       if (i.status === 'planned') i.spent = 0;
-      mark(); renderPlan();
+      mark(); renderPlan(); refocus(host, `tick:${k}`);
     });
 
     /* A part-bought item shows both figures because neither alone is the
@@ -702,7 +766,15 @@ module.exports = function registerPlan(ctx) {
 
     return el('li', { class: 'env-item' }, tick,
       el('button', { class: `ei-name ${done ? 'done' : ''}`, type: 'button',
-        'aria-label': `Edit ${i.name}`, onclick: () => editItem(p, i) }, i.name),
+        'aria-label': `Edit ${i.name}`, 'data-focus-key': `item:${k}`,
+        /* The sheet can remove the item, or move it to another bucket — which
+           takes it off this card just the same. Then: the item that took its
+           place, else the one before it, else this bucket's "+ item". An edit
+           that kept it here finds it under the same key. */
+        onclick: async () => {
+          await editItem(p, i);
+          refocus(host, [`item:${k}`, `item:${k - 1}`, `additem:${at}`]);
+        } }, i.name),
       right);
   }
 
@@ -787,10 +859,26 @@ module.exports = function registerPlan(ctx) {
         /* The button offers `placeable`, never `free` — it was the second
            place the overstated figure reached the reader, and the one that
            would have written it into a bucket. */
+        /* Both buttons redraw this card, or take it away: a plan with nothing
+           left over has no loud card at all, and the card is HIDDEN then, not
+           emptied, so the button pressed is still in it with nothing to show
+           it. While the card stands the reader goes back to the button they
+           pressed. Once it is gone they go to what the press made — the new
+           bucket, which the accordion has just opened — or, for a source, to
+           the page's own Add a source. */
         ...(over || sum.placeable <= 0.005 ? [] : [el('button', { class: 'btn-gradient', type: 'button',
-          onclick: () => addEnvelope(p, sum.placeable) }, 'Put it in a new spending bucket')]),
-        el('button', { class: 'btn-ghost', type: 'button',
-          onclick: () => addSource(p) }, '＋ Add a source')));
+          'data-focus-key': 'free:place',
+          onclick: async () => {
+            await addEnvelope(p, sum.placeable);
+            refocus(card, 'free:place');
+            refocus($('#planEnvelopes'), [`env:${p.envelopes.length - 1}`, $('#planAddEnvelope')]);
+          } }, 'Put it in a new spending bucket')]),
+        el('button', { class: 'btn-ghost', type: 'button', 'data-focus-key': 'free:source',
+          onclick: async () => {
+            await addSource(p);
+            refocus(card, 'free:source');
+            refocus($('#planSources'), $('#planAddSource'));
+          } }, '＋ Add a source')));
   }
 
   /* ------------------------------ actions -------------------------------- */
@@ -1000,6 +1088,13 @@ module.exports = function registerPlan(ctx) {
     S.planName = key;
     expandedEnvelope = null;
     mark(); renderPlan();
+    /* "Start a plan" sits in the empty-state card, which is hidden the moment
+       a plan exists — so the reader's first press on this page left them on a
+       button that is no longer displayed. A new plan has nothing in it yet,
+       and Add a source is the first thing it asks for. Pressed from New plan
+       instead, that button is still there, holds focus, and this leaves it
+       alone. */
+    refocus($('#planContent'), $('#planAddSource'));
   }
 
   /* Delete the plan on screen.
@@ -1052,6 +1147,11 @@ module.exports = function registerPlan(ctx) {
       .sort((a, b) => S.plans[a].name.localeCompare(S.plans[b].name))[0] || null;
     expandedEnvelope = null; // a different plan's buckets — the accordion guard re-opens the first one
     renderPlan();
+    /* Deleting the LAST plan swaps the page for its empty state and hides the
+       button that was pressed with it; the way back in is Start a plan. With a
+       plan still standing the button is still there, holds focus, and this
+       leaves it alone — the Tax page's Delete year does the same. */
+    refocus($('#planEmptyCard'), $('#planStart'));
     toast(`Deleted plan “${p.name}”`);
   }
 

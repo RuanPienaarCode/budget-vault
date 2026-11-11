@@ -38,9 +38,11 @@
      7a. A FORM CONTROL'S EDGE against what the field sits on: 1.20:1 light,
          1.24:1 dark, on all four palettes. WCAG 1.4.11 asks 3:1 of the
          boundary a control is found by.
-     7b. A GRADIENT BUTTON'S LABEL against the lightest point of its own
-         gradient: 3.74:1 on vault-green and 3.68:1 on ocean, where 13.6px
-         bold text needs 4.5:1.
+     7b. A LABEL ON THE BRAND GRADIENT against the lightest point of that
+         gradient: 3.74:1 on vault-green and 3.68:1 on ocean, where small
+         bold text needs 4.5:1. Three controls put a label there — the
+         gradient button, the top bar's avatar and the dock's Save — and all
+         three are held, at rest and hovered.
      7c. THE INFO INK of the Budget page's pressed "fixed bill" toggle,
          painted in the info FILL: 2.77:1 on a white card.
 
@@ -394,33 +396,32 @@ function norm(v) {
       return flat;
     };
 
-    /* STILL UNDER 3:1, and not this gate's to fix. Both rules belonged to
-       other lanes in the audit-fix round this gate was written in (2026-11-11),
-       so they are recorded here — with what they measure on vault-green light,
-       against the field's own fill — instead of edited or left unseen:
+    /* STILL UNDER 3:1 — nothing, and the list stays.
 
-         - The Transactions page's "firmer edge": --text-primary at 30%, written
-           when a field's edge was the hairline and 30% was the firmer of the
-           two. It carries an id, so nothing in the base rules can out-rank it,
-           and wherever color-mix() parses it holds the filter selects, the
-           search box and the Note field on every row at 1.96:1 — firmer than
-           the old hairline, under 3:1, and now WEAKER than every other field
-           in the app. (Its .btn-ghost selector is a button, not a field; it
-           rides along because it shares the declaration.)
+       It held two rules when this gate was written (2026-11-11), each in a
+       file the lane that wrote it did not own, each recorded with what it
+       measured rather than edited or left unseen:
+
+         - The Transactions page's "firmer edge": --text-primary at 30%,
+           written when a field's edge was the hairline and 30% was the firmer
+           of the two. It carried an id, so nothing in the base rules could
+           out-rank it, and it held the filter selects, the search box and the
+           Note field on every row at 1.96:1 against their own fill and
+           1.72:1 against the worst page — WEAKER than every other field in
+           the app once those moved to --control-border.
          - The Accounts search box, which is not a .form-control and still
-           draws the --border-color hairline: 1.20:1.
+           drew the --border-color hairline: 1.20:1, and 1.06:1 on the page.
 
-       An entry cannot rot. It fails when its rule is gone or renamed, and it
-       fails when its rule is brought up to 3:1 — either way the fix is to
-       delete the entry — and a rule that is under 3:1 and NOT listed fails
-       for that. */
-    const STILL_FAILING = [
-      '.budget-app-root #view-transactions .tx-filters .form-select-sm:not(:focus), '
-        + '.budget-app-root #view-transactions .tx-filters #txSearch:not(:focus), '
-        + '.budget-app-root #view-transactions .tx-actions .btn-ghost:not(:hover), '
-        + '.budget-app-root #view-transactions .table tbody td:nth-child(7) input:not(:focus)',
-      '.budget-app-root .acct-search input',
-    ];
+       Both read --control-border now (3.79:1 at worst against the fill,
+       3.51:1 against the page), so the sweep below holds them like any other
+       field and the list is empty on purpose. It stays for the reason
+       GRANDFATHERED does in section 2: the mechanism is the valuable part.
+       An entry cannot rot — it fails when its rule is gone or renamed, and
+       it fails when its rule is brought up to 3:1, and either way the fix is
+       to delete the entry — and a rule that is under 3:1 and NOT listed
+       fails for that. Adding one is a decision to ship a field nobody can
+       find the edge of, and should read like one. */
+    const STILL_FAILING = [];
     const swept = new Map();
     for (const r of rules) {
       if (!r.selectors.some(isField)) continue;
@@ -462,64 +463,142 @@ function norm(v) {
     });
   }
 
-  /* -- 7b. the label on a gradient button ---------------------------------
+  /* -- 7b. a label on the brand gradient ----------------------------------
 
-     .btn-gradient is 13.6px bold, which is not "large text", so it needs the
-     full 4.5:1 — and against the LIGHTEST point of the gradient, not its
-     average, because a label spans the button. White on the accent seed was
-     3.74:1 on vault-green and 3.68:1 on ocean.
+     Three controls print a label on the accent-to-primary gradient: the
+     gradient button, the top bar's avatar (the household's initials) and the
+     dock's Save. Each is small text, so each needs the full 4.5:1 — and
+     against the LIGHTEST point of the gradient, not its average, because a
+     label spans its control. White on the accent seed was 3.74:1 on
+     vault-green and 3.68:1 on ocean. The first round moved the button; the
+     avatar and the dock's Save were in rules it did not own and still ran the
+     whole gradient under white.
+
+     Text, all three, and the gate says so rather than assuming it: each
+     control's font-size and weight are read from the rule that sets them and
+     put against WCAG's "large text" line (24px, or 18.66px bold). Under it,
+     4.5:1; a control that grew past it would be held to 3:1, which is also
+     what an icon on the same fill is owed — the logo, the pressed menu
+     button and the drawer's current page are icons, clear 3:1 on the whole
+     run (3.68:1 at worst), and are not in here.
 
      Measured as painted. The stops are read from the rule; the gradient is
-     sampled across the part of it the button actually shows (a stop placed
-     outside 0-100% is legal CSS, and is how the light button now starts
+     sampled across the part of it the control actually shows (a stop placed
+     outside 0-100% is legal CSS, and is how each light fill now starts
      part-way into the same accent-to-primary run); and the hover state is
-     measured too, because `filter: brightness()` lightens the fill under a
-     label that is already white and cannot follow it. */
+     measured too — as `filter: brightness()` where the control has one, which
+     lightens the fill under a label that is already white and cannot follow
+     it, and as the hover rule's own fill and label where it has those. */
   {
-    const AA = 4.5;
-    const BTN = '.budget-app-root .btn-gradient';
-    const DARK = '.budget-app-root.bud-dark .btn-gradient';
-
-    eq(touching(['btn-gradient'], /^(background(-image|-color)?|color|filter)$/), [
-      `${BTN} { background }`,
-      `${BTN} { color }`,
-      `${BTN}:disabled { filter }`,
-      `${BTN}:hover { filter }`,
-      `${DARK} { background }`,
-      `${DARK} { color }`,
-    ].sort(), 'nothing else paints a gradient button\'s fill, label or hover — a new rule has to be measured here');
+    const R = '.budget-app-root', D = '.budget-app-root.bud-dark';
+    const PAINT = /^(background(-image|-color)?|color|filter)$/;
+    const LABELS = [
+      { what: 'gradient-button label', cls: 'btn-gradient',
+        light: `${R} .btn-gradient`, dark: `${D} .btn-gradient`, font: `${R} .btn-gradient`,
+        hover: { filter: `${R} .btn-gradient:hover` },
+        also: [`${R} .btn-gradient:disabled { filter }`] },
+      { what: 'top-bar avatar initials', cls: 'topbar-avatar',
+        light: `${R} .topbar-avatar`, dark: `${D} .topbar-avatar`, font: `${R} .topbar-avatar`,
+        hover: { filter: `${R} .topbar-avatar:hover` },
+        also: [] },
+      /* No brightness() here: the dock's Save restates its fill and label for
+         :hover, to out-rank the dock's own hover tint, so the hover selectors
+         are measured as rules. Its type is the dock button's. The ::before is
+         the hairline that sets Save apart from the page buttons, not a fill. */
+      { what: 'dock Save label', cls: 'dock-save',
+        light: `${R} .dock-save:not(:disabled)`, dark: `${D} .dock-save:not(:disabled)`, font: `${R} .dock-btn`,
+        hover: { light: `${R} .dock-save:not(:disabled):hover`, dark: `${D} .dock-save:not(:disabled):hover` },
+        also: [`${R} .dock-save::before { background }`] },
+    ];
 
     /* linear-gradient(<angle>, var(--a) [n%], var(--b) [n%]) -> two stops. */
     const stopsOf = value => {
       const m = /^linear-gradient\(\s*[\d.]+deg\s*,\s*var\((--[a-z0-9-]+)\)\s*(-?[\d.]+%)?\s*,\s*var\((--[a-z0-9-]+)\)\s*(-?[\d.]+%)?\s*\)$/.exec(value);
-      ok(m, `the gate can read the button's gradient: ${value}`);
+      ok(m, `the gate can read this gradient: ${value}`);
       return [{ token: m[1], at: m[2] ? parseFloat(m[2]) / 100 : 0 }, { token: m[3], at: m[4] ? parseFloat(m[4]) / 100 : 1 }];
     };
-    const hover = /^brightness\(([\d.]+)\)$/.exec(only(`${BTN}:hover`, 'filter'));
-    ok(hover, 'the hover state is a brightness() the gate can apply');
     /* brightness() scales each sRGB channel and clamps — the whole element,
        label included, which is why a white label gains nothing from it. */
-    const lift = hex => toHex(rgb(hex).map(c => Math.min(255, c * Number(hover[1]))));
-
-    const fill = { light: stopsOf(only(BTN, 'background')), dark: stopsOf(only(DARK, 'background')) };
-    const label = { light: only(BTN, 'color'), dark: only(DARK, 'color') };
-
-    each((p, mode, t) => {
-      const [a, b] = fill[mode].map(s => ({ at: s.at, c: rgb(resolve(`var(${s.token})`, t)) }));
-      ok(b.at > a.at, `${p.id}/${mode}: the gradient's stops are in order`);
-      const ink = toHex(norm(resolve(label[mode], t)));
-      let rest = Infinity, hovered = Infinity;
-      /* 0..1 is the whole of what a corner-to-corner gradient shows: its line
-         is sized so that 0% and 100% land exactly on the two corners. */
+    const lifted = k => hex => toHex(rgb(hex).map(c => Math.min(255, c * k)));
+    const asIs = hex => hex;
+    /* The weakest ratio between a label and its fill, across what is shown.
+       0..1 is the whole of what a corner-to-corner gradient shows: its line
+       is sized so that 0% and 100% land exactly on the two corners. */
+    const weakest = (stops, labelValue, t, lift, where) => {
+      const [a, b] = stops.map(s => ({ at: s.at, c: rgb(resolve(`var(${s.token})`, t)) }));
+      ok(b.at > a.at, `${where}: the gradient's stops are in order`);
+      const ink = toHex(norm(resolve(labelValue, t)));
+      let worst = Infinity;
       for (let i = 0; i <= 200; i++) {
         const k = Math.min(1, Math.max(0, (i / 200 - a.at) / (b.at - a.at)));
         const here = toHex(a.c.map((c, j) => c + k * (b.c[j] - c)));
-        rest = Math.min(rest, contrast(ink, here));
-        hovered = Math.min(hovered, contrast(lift(ink), lift(here)));
+        worst = Math.min(worst, contrast(lift(ink), lift(here)));
       }
-      ok(rest >= AA, `${p.id}/${mode}: gradient-button label ${ink} is ${rest.toFixed(2)}:1 at the weakest point of its fill, below AA ${AA}:1`);
-      ok(hovered >= AA, `${p.id}/${mode}: gradient-button label is ${hovered.toFixed(2)}:1 under the hover brightness(${hover[1]}), below AA ${AA}:1`);
-    });
+      return { worst, ink };
+    };
+    /* A control's type, as the LARGEST it is ever drawn: the reading nearest
+       the large-text line, so "small text" here is small at every width. More
+       than one rule may size it (the phone lane lifts small text to its own
+       floor, through a token), so every rule on the selector is read. */
+    const customProp = name => {
+      for (const r of rules) for (const d of r.decls) if (d.prop === name) return d.value;
+      return '';
+    };
+    const px = value => {
+      const v = String(value).trim();
+      const token = /^var\(\s*(--[a-z0-9-]+)\s*\)$/.exec(v);
+      if (token) return px(customProp(token[1]));
+      return /rem$/.test(v) ? parseFloat(v) * 16 : /px$/.test(v) ? parseFloat(v) : NaN;
+    };
+    const typeOf = selector => {
+      const read = prop => rules.filter(r => r.selectors.includes(selector))
+        .flatMap(r => r.decls.filter(d => d.prop === prop).map(d => d.value));
+      const sizes = read('font-size').map(px), weights = read('font-weight').map(Number);
+      ok(sizes.length && weights.length && [...sizes, ...weights].every(n => n > 0),
+        `the gate can read the type on "${selector}": sizes ${read('font-size').join(', ') || 'none'}, weights ${read('font-weight').join(', ') || 'none'}`);
+      return { size: Math.max(...sizes), weight: Math.max(...weights) };
+    };
+
+    for (const L of LABELS) {
+      const hoverRules = L.hover.filter
+        ? [`${L.hover.filter} { filter }`]
+        : [L.hover.light, L.hover.dark].flatMap(sel => [`${sel} { background }`, `${sel} { color }`]);
+      eq(touching([L.cls], PAINT), [
+        `${L.light} { background }`, `${L.light} { color }`,
+        `${L.dark} { background }`, `${L.dark} { color }`,
+        ...hoverRules, ...L.also,
+      ].sort(), `nothing else paints the ${L.what}'s fill, label or hover — a new rule has to be measured here`);
+
+      /* Which threshold: text under WCAG's large-text line needs 4.5:1. */
+      const { size, weight } = typeOf(L.font);
+      const large = size >= 24 || (size >= 18.66 && weight >= 700);
+      const need = large ? 3 : 4.5;
+      eq(need, 4.5, `the ${L.what} is at most ${size}px at weight ${weight}: small text, held to 4.5:1`);
+
+      const fill = { light: stopsOf(only(L.light, 'background')), dark: stopsOf(only(L.dark, 'background')) };
+      const label = { light: only(L.light, 'color'), dark: only(L.dark, 'color') };
+      let lift = asIs, hoverName = 'hovered';
+      const hoverFill = { ...fill }, hoverLabel = { ...label };
+      if (L.hover.filter) {
+        const m = /^brightness\(([\d.]+)\)$/.exec(only(L.hover.filter, 'filter'));
+        ok(m, `the ${L.what}'s hover is a brightness() the gate can apply`);
+        lift = lifted(Number(m[1]));
+        hoverName = `under the hover brightness(${m[1]})`;
+      } else {
+        for (const mode of ['light', 'dark']) {
+          hoverFill[mode] = stopsOf(only(L.hover[mode], 'background'));
+          hoverLabel[mode] = only(L.hover[mode], 'color');
+        }
+      }
+
+      each((p, mode, t) => {
+        const where = `${p.id}/${mode} ${L.what}`;
+        const rest = weakest(fill[mode], label[mode], t, asIs, where);
+        ok(rest.worst >= need, `${where} ${rest.ink} is ${rest.worst.toFixed(2)}:1 at the weakest point of its fill, below ${need}:1`);
+        const hovered = weakest(hoverFill[mode], hoverLabel[mode], t, lift, where);
+        ok(hovered.worst >= need, `${where} is ${hovered.worst.toFixed(2)}:1 ${hoverName}, below ${need}:1`);
+      });
+    }
   }
 
   /* -- 7c. the info ink ---------------------------------------------------
@@ -554,4 +633,4 @@ function norm(v) {
   }
 }
 
-console.log(`PASS — palette generator: reproduces Vault Green, AA in ${PRESETS.length * 2} blocks, dropdown parity, form-control edge / gradient-button label / info ink gated per palette (${checks} checks).`);
+console.log(`PASS — palette generator: reproduces Vault Green, AA in ${PRESETS.length * 2} blocks, dropdown parity, form-control edge / labels on the brand gradient (button, avatar, dock Save) / info ink gated per palette (${checks} checks).`);

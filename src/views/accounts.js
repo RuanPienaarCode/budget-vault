@@ -4,7 +4,7 @@
    was entered. Clicking a balance updates the account's markdown file in place. */
 
 const { opWriterOf } = require('../io');
-const { el, icoEl, keepScroll, caveatChip, tableCells } = require('../dom');
+const { el, icoEl, keepScroll, caveatChip, tableCells, refocus } = require('../dom');
 /* The ring reuses the Dashboard's own chart primitives rather than a second
    donut implementation — same arc maths, same tooltip, same theme lookup, so
    the two rings on this app cannot drift apart visually. */
@@ -1318,6 +1318,7 @@ module.exports = function registerAccounts(ctx) {
       const line = el('button', { type: 'button',
         class: `acct-owner-row${view().owner === r.key ? ' is-on' : ''}`,
         'aria-pressed': String(view().owner === r.key),
+        'data-focus-key': `ownerrow:${r.key}`,
         'aria-label': i18n.t('acct.owner.aria', { owner: r.label, amount: money(r.net) + (tag ? ` ${tag}` : '') }) },
       el('div', { class: 'acct-owner-top' },
         el('span', { class: 'acct-owner-name' }, r.label),
@@ -1329,7 +1330,12 @@ module.exports = function registerAccounts(ctx) {
       /* Clicking a row filters the ledger to that owner — the figure and the
          accounts behind it are one click apart, rather than the figure being
          here and the way to check it being a chip further down the page. */
-      line.addEventListener('click', () => setOwnerFilter(view().owner === r.key ? null : r.key));
+      /* The filter redraws the page, this card with it; the reader is put back
+         on the owner they pressed (see WHERE THE READER IS, above `drawn`). */
+      line.addEventListener('click', () => {
+        setOwnerFilter(view().owner === r.key ? null : r.key);
+        refocus($('#acctSummary'), `ownerrow:${r.key}`);
+      });
       body.append(line);
     }
     card.append(body);
@@ -1621,11 +1627,17 @@ module.exports = function registerAccounts(ctx) {
     const line = el('div', { class: 'acct-deck-banner' },
       el('span', { class: 'acct-deck-dot' }),
       el('span', { class: 'acct-deck-banner-txt' }, i18n.t('acct.deck.title', { count: flagged.length })));
-    const showBtn = el('button', { type: 'button', class: 'acct-deck-btn' }, i18n.t('acct.deck.show'));
+    const showBtn = el('button', { type: 'button', class: 'acct-deck-btn', 'data-focus-key': 'deck:show' }, i18n.t('acct.deck.show'));
+    /* "Show them" is a door into the list, so the reader lands on the first
+       account it showed — the same landing the Transactions scope note's
+       "show them" has — and only on the button's own redrawn copy if the
+       list somehow came back empty. */
     showBtn.addEventListener('click', () => {
       view().filter = 'flag';
       view().open = null;
       renderAccounts();
+      refocus($('#acctTable'), 'row:0');
+      refocus(wrap, 'deck:show');
     });
     wrap.append(line, showBtn);
   }
@@ -1742,10 +1754,13 @@ module.exports = function registerAccounts(ctx) {
     wrap.className = 'acct-segs acct-segs--owner acct-rail';
 
     const chip = (key, label, n) => {
+      /* null is "every owner" and '' is "nobody's", so the two are spelled
+         apart in the focus key as they are in the filter itself. */
+      const focusKey = key === null ? 'owner:all' : `owner:is:${key}`;
       const b = el('button', { type: 'button', class: 'acct-seg',
-        'aria-pressed': String(v.owner === key) },
+        'aria-pressed': String(v.owner === key), 'data-focus-key': focusKey },
       label, el('span', { class: 'acct-seg-n' }, String(n)));
-      b.addEventListener('click', () => setOwnerFilter(key));
+      b.addEventListener('click', () => { setOwnerFilter(key); refocus(wrap, focusKey); });
       wrap.append(b);
     };
     chip(null, i18n.t('acct.owner.all'), rows.length);
@@ -1776,12 +1791,15 @@ module.exports = function registerAccounts(ctx) {
       if (!n && f.key !== 'all' && v.filter !== f.key) continue;
       const b = el('button', { type: 'button',
         class: `acct-seg${f.warn ? ' is-warn' : ''}`,
-        'aria-pressed': String(v.filter === f.key) },
+        'aria-pressed': String(v.filter === f.key), 'data-focus-key': `filter:${f.key}` },
         f.label, el('span', { class: 'acct-seg-n' }, String(n)));
       b.addEventListener('click', () => {
         v.filter = f.key;
         v.open = null;                     // a selection left on a filtered-out row
         renderAccounts();
+        /* The chip just pressed is always drawn again: a selected chip is
+           kept even when it filters to nothing (see above). */
+        refocus(wrap, `filter:${f.key}`);
       });
       wrap.append(b);
     }
@@ -1988,9 +2006,13 @@ module.exports = function registerAccounts(ctx) {
      a sentence and three buttons is what measured ~270px tall on a 760px pane
      with the buttons clipped (tests/accounts-inspector.test.cjs holds the
      line). Clicking the row selects it. */
-  function accountRow(r, selected) {
+  function accountRow(r, selected, n) {
     const a = r.a;
     const tr = el('tr', {
+      /* The row's position in the list as drawn: what a press that took an
+         account off the list lands by (see WHERE THE READER IS, above
+         `drawn`). */
+      'data-focus-key': `row:${n}`,
       /* A currency conflict flags the ROW as well as carrying a badge in the
          inspector: it is a contradiction in the file, not a figure that has
          merely aged, and a reader should not have to select an account to
@@ -2028,10 +2050,18 @@ module.exports = function registerAccounts(ctx) {
       : acctMoney(a, r.live);
     const balBtn = el('button', { type: 'button',
       class: `acct-bal num${unreadable ? ' text-warning' : r.live < 0 ? ' text-danger' : ''}`,
-      'data-fig': 'acct-bal',
+      'data-fig': 'acct-bal', 'data-focus-key': `bal:${a.name}`,
       'aria-label': i18n.t('acct.aria.balance', { name: a.name, amount: balLabel }) },
       balLabel);
-    balBtn.addEventListener('click', e => { e.stopPropagation(); editBalance(a); });
+    /* A saved balance redraws the whole page (ctx.render in editBalance), this
+       row with it: back on the same account's balance, which now shows the
+       figure just typed. Keyed by NAME — a new figure can move the row under
+       the balance sort, and a name is in the list once. */
+    balBtn.addEventListener('click', async e => {
+      e.stopPropagation();
+      await editBalance(a);
+      refocus($('#acctTable'), `bal:${a.name}`);
+    });
 
     /* The period's movement stays on the ROW, a short quiet line under the
        balance, rather than moving into the inspector with the sparkline. The
@@ -2161,6 +2191,7 @@ module.exports = function registerAccounts(ctx) {
     const split = $('#acctSplit');
     if (split) split.classList.toggle('has-insp', !!r);
     wrap.classList.toggle('is-empty', !r);
+    inspected = { name: r ? r.a.name : null, keys: [] };
     if (!r) return;
 
     const a = r.a;
@@ -2201,24 +2232,27 @@ module.exports = function registerAccounts(ctx) {
     /* ---- actions ---- */
     const primary = [...r.labels][0];
     const plan = inspectorActions(r, { hasTransactions: !!primary });
-    const btn = (label, cls, run, aria, icon) => {
+    /* Every action here is keyed, so it can be found again once its press has
+       redrawn the inspector under it — see WHERE THE READER IS, above `drawn`. */
+    const btn = (key, label, cls, run, aria, icon) => {
       const b = el('button', { type: 'button', class: `acct-insp-btn${cls ? ' ' + cls : ''}`,
+        'data-focus-key': `insp:${key}`,
         ...(aria ? { 'aria-label': aria } : {}) }, ...(icon ? [icoEl([icon])] : []), label);
-      b.addEventListener('click', run);
+      b.addEventListener('click', inspectorPress(key, a, run));
       return b;
     };
     const acts = el('div', { class: 'acct-insp-acts' });
     if (plan.primary === 'answer') {
       const act = deckAction(r);
-      acts.append(btn(act.label, 'is-primary', act.run, null, 'check'));
+      acts.append(btn('answer', act.label, 'is-primary', act.run, null, 'check'));
     }
     const second = el('div', { class: 'acct-insp-acts-2' });
     for (const name of plan.secondary) {
       if (name === 'transactions') {
-        second.append(btn(i18n.t('acct.btn.seeTx'), '', () => openTransactions(primary),
+        second.append(btn('transactions', i18n.t('acct.btn.seeTx'), '', () => openTransactions(primary),
           i18n.t('acct.aria.showTx', { name: a.name })));
       } else if (name === 'editBalance') {
-        second.append(btn(i18n.t('acct.btn.editBalance'), '', () => editBalance(a),
+        second.append(btn('editBalance', i18n.t('acct.btn.editBalance'), '', () => editBalance(a),
           i18n.t('acct.aria.balance', { name: a.name, amount: bal })));
       } else if (name === 'ignore') {
         /* Ignore: the third answer to a decision, beside "look" and "fix". Only
@@ -2227,7 +2261,7 @@ module.exports = function registerAccounts(ctx) {
            mutedWarnings applies to a hand-written key. Appends to whatever is
            already muted on the account and saves that one key, so nothing else
            in the file moves. */
-        second.append(btn(i18n.t('acct.deck.ignore'), 'is-quiet', () => ignoreWarning(r),
+        second.append(btn('ignore', i18n.t('acct.deck.ignore'), 'is-quiet', () => ignoreWarning(r),
           i18n.t('acct.deck.ariaIgnore', { name: a.name })));
       }
     }
@@ -2237,26 +2271,27 @@ module.exports = function registerAccounts(ctx) {
     /* The smaller controls the drawer carried. Edit balance appears here only
        while a decision is on screen (see inspectorActions). */
     const tools = el('div', { class: 'acct-drawer-acts' });
-    const tool = (label, aria, run, cls) => {
-      const b = el('button', { type: 'button', class: `acct-drawer-act${cls ? ' ' + cls : ''}`, 'aria-label': aria }, label);
-      b.addEventListener('click', run);
+    const tool = (key, label, aria, run, cls) => {
+      const b = el('button', { type: 'button', class: `acct-drawer-act${cls ? ' ' + cls : ''}`, 'aria-label': aria,
+        'data-focus-key': `insp:${key}` }, label);
+      b.addEventListener('click', inspectorPress(key, a, run));
       tools.append(b);
     };
     for (const name of plan.tools) {
       if (name === 'editBalance') {
-        tool(i18n.t('acct.btn.editBalance'), i18n.t('acct.aria.balance', { name: a.name, amount: bal }), () => editBalance(a));
+        tool('editBalance', i18n.t('acct.btn.editBalance'), i18n.t('acct.aria.balance', { name: a.name, amount: bal }), () => editBalance(a));
       } else if (name === 'edit') {
-        tool(i18n.t('acct.btn.edit'), i18n.t('acct.aria.edit', { name: a.name }), () => editAccount(a));
+        tool('edit', i18n.t('acct.btn.edit'), i18n.t('acct.aria.edit', { name: a.name }), () => editAccount(a));
       } else if (name === 'budget') {
-        tool(i18n.t(a.in_budget ? 'acct.btn.exclude' : 'acct.btn.include'),
+        tool('budget', i18n.t(a.in_budget ? 'acct.btn.exclude' : 'acct.btn.include'),
           i18n.t(a.in_budget ? 'acct.aria.exclude' : 'acct.aria.include', { name: a.name }),
           () => toggleBudget(a));
       } else if (name === 'note') {
-        tool(i18n.t('acct.btn.openNote'), i18n.t('acct.aria.openNote', { name: a.name }), () => openAccountFile(a));
+        tool('note', i18n.t('acct.btn.openNote'), i18n.t('acct.aria.openNote', { name: a.name }), () => openAccountFile(a));
       } else if (name === 'delete') {
         // Last, and on its own class: it is the only action here that removes
         // something, and it should not sit a thumb's width from "Edit".
-        tool(i18n.t('acct.btn.delete'), i18n.t('acct.aria.delete', { name: a.name }),
+        tool('delete', i18n.t('acct.btn.delete'), i18n.t('acct.aria.delete', { name: a.name }),
           () => deleteAccount(a), 'acct-drawer-del');
       }
     }
@@ -2433,9 +2468,11 @@ module.exports = function registerAccounts(ctx) {
         date: ctx.dateText(a.balance_updated),
         amount: `${sd.net >= 0 ? '+' : '−'}${acctMoney(a, Math.abs(sd.net))}`,
       })));
-    const btn = el('button', { type: 'button', class: 'acct-recon-btn acct-sameday-btn' },
+    const btn = el('button', { type: 'button', class: 'acct-recon-btn acct-sameday-btn',
+      'data-focus-key': 'insp:sameday' },
       i18n.t('acct.deck.do.nodate'));
-    btn.addEventListener('click', e => { e.stopPropagation(); editBalance(a); });
+    const press = inspectorPress('sameday', a, () => editBalance(a));
+    btn.addEventListener('click', e => { e.stopPropagation(); press(); });
     line.append(btn);
     return line;
   }
@@ -2455,12 +2492,16 @@ module.exports = function registerAccounts(ctx) {
     const v = view();
     const on = v.sort === key;
     const b = el('button', { type: 'button', ...(cls ? { class: cls } : {}),
-      'aria-label': i18n.t('acct.aria.sortBy', { column: label }) },
+      'aria-label': i18n.t('acct.aria.sortBy', { column: label }), 'data-focus-key': `sort:${key}` },
     label, el('span', { class: 'acct-caret' }, on ? (v.dir === -1 ? '↓' : '↑') : '↕'));
     b.addEventListener('click', () => {
       if (v.sort === key) v.dir = -v.dir;
       else { v.sort = key; v.dir = key === 'name' ? 1 : -1; }
       renderAccounts();
+      /* The header is redrawn with the table: back on the column just sorted
+         by, whose caret now shows the direction — a second press flips it,
+         and until this the second press had nothing to land on. */
+      refocus($('#acctTable'), `sort:${key}`);
     });
     return b;
   }
@@ -2498,6 +2539,70 @@ module.exports = function registerAccounts(ctx) {
      focus on the row a keyboard reader just chose, and the scroll where it
      was; a rebuild of the table drops both. */
   let drawn = { order: [], rowEls: new Map() };
+
+  /* WHERE THE READER IS AFTER A PRESS (audit of 11 Nov 2026, task 16).
+
+     renderAccounts() empties and rebuilds every band of this page, and
+     ctx.render() — what a saved balance, an edit, an accepted figure and a
+     delete all end in — does the same. A chip, a sort header, a row's balance
+     and every button in the inspector live inside what they redraw, so each
+     was destroyed by its own press and focus fell to <body>. Each now carries
+     a `data-focus-key` and says where the reader should be once the page is
+     back (dom.js refocus, which only ever restores: a press that redrew
+     nothing, a cancelled dialog, a reader who has moved on while a save was
+     in flight — all are left exactly where they are).
+
+     Chips, sort headers and a row's balance land on their own redrawn copy.
+     The INSPECTOR is the one that needs care, because what it shows is
+     decided again on every render (pickSelection): accept the implied figure
+     on a flagged account while the list is filtered to "Needs a look", and
+     the account leaves the list and the inspector fills with the NEXT flagged
+     account — whose primary button carries the same key and offers to accept
+     a different account's figure. Landing there would turn a second Enter
+     into a decision about an account the reader never looked at. So:
+
+       the inspector still shows the same account
+           -> the button pressed; if the press took that button away (an
+              accepted figure has no "use this", an ignored warning no
+              "ignore"), the action that stood after it, else the one before
+       it shows another account, or none
+           -> the account's own row if it is still in the list, else the row
+              that took its place, else the one above, else Add account
+
+     `inspected` is what the last renderInspector drew — whose account, and
+     the keys of its actions in the order they stand — derived from the render
+     like `drawn`, never state of its own. */
+  let inspected = { name: null, keys: [] };
+
+  /* Wrap one inspector action. `run` is called as it always was and its result
+     only observed: a rejection it did not catch itself surfaces exactly as it
+     did before (chart.js rangePills does the same). "See transactions" and
+     "Open note" are NOT wrapped. Neither redraws this page — one switches
+     view, which puts focus on the new page's heading itself, and the other
+     opens a tab — and pulling focus back to a button the reader has just
+     left would take them out of where they went. They are still keyed, so
+     they can be the landing for a neighbour that went. */
+  const LEAVES_THE_PAGE = new Set(['transactions', 'note']);
+  function inspectorPress(key, a, run) {
+    inspected.keys.push(key);
+    if (LEAVES_THE_PAGE.has(key)) return run;
+    return () => {
+      const name = a.name;
+      const before = inspected.keys;
+      const at = before.indexOf(key);
+      const row = drawn.order.findIndex(r => r.a.name === name);
+      const restore = () => {
+        if (inspected.name === name) {
+          refocus($('#acctInspector'), [key, ...before.slice(at + 1), ...before.slice(0, at).reverse()]
+            .map(k => `insp:${k}`));
+        }
+        refocus($('#acctTable'), [drawn.rowEls.get(name), `row:${row}`, `row:${row - 1}`, $('#acctAdd')]);
+      };
+      const done = run();
+      if (done && typeof done.then === 'function') done.then(restore);
+      else restore();
+    };
+  }
 
   function paintSelection() {
     const sel = pickSelection(drawn.order, view().open);
@@ -2573,7 +2678,7 @@ module.exports = function registerAccounts(ctx) {
 
       const body = el('tbody', {});
       const emit = r => {
-        const tr = accountRow(r, !!sel && sel.a.name === r.a.name);
+        const tr = accountRow(r, !!sel && sel.a.name === r.a.name, drawn.rowEls.size);
         drawn.rowEls.set(r.a.name, tr);
         body.append(tr);
       };

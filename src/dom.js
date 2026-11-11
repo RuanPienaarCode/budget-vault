@@ -142,6 +142,12 @@ function keepScroll(elm, rebuild) {
    end the quoted string early are escaped; a key built from a file path (the
    Notes page) is safe to pass as it is. */
 const NATIVE_FOCUS = /^(A|BUTTON|INPUT|SELECT|TEXTAREA|SUMMARY)$/i;
+const underInert = node => {
+  for (let n = node; n; n = n.parentElement) {
+    if (typeof n.hasAttribute === 'function' && n.hasAttribute('inert')) return true;
+  }
+  return false;
+};
 function refocus(root, keys) {
   if (!root || typeof root.querySelector !== 'function') return null;
   const doc = root.ownerDocument || (typeof document !== 'undefined' ? document : null);
@@ -154,7 +160,23 @@ function refocus(root, keys) {
     const hit = typeof k === 'string'
       ? root.querySelector(`[data-focus-key="${k.replace(/["\\]/g, '\\$&')}"]`)
       : k;
-    if (!hit || typeof hit.focus !== 'function' || hit.disabled) continue;
+    /* `hit === live`: the control that LOST focus can still be found by its
+       key when its card was hidden rather than emptied (the Plan page's "not
+       spoken for" card). focus() on it is refused — it has no box — but it is
+       still document.activeElement until the next frame, so the check after
+       the call below would read that as a landing, on a control nobody can
+       see. Anything that reaches this loop as `live` was already judged lost
+       above, so it is never a candidate. */
+    if (!hit || hit === live || typeof hit.focus !== 'function' || hit.disabled) continue;
+    /* Nor is anything under an inert ancestor — the page behind the open
+       drawer, everything behind the privacy gate. Real `inert` refuses the
+       focus() by itself. The fallback at the bottom of this file cannot: a
+       tabindex of -1 takes a control out of the Tab order and does nothing to
+       stop focus(), so on iOS 15.0-15.4 a handler that finished behind the
+       gate would have put focus on the control it had just redrawn there,
+       typable under a cover whose whole purpose is that it is not. setInert
+       writes the attribute on every engine, so the attribute is the test. */
+    if (underInert(hit)) continue;
     /* A landing that is not a control — a table row, for "Show more" — is made
        focusable here, at the moment it is needed, and not where it is built.
        tabindex="-1" on every row of every table would make each one
@@ -336,4 +358,44 @@ function setInert(elm, on) {
   }
 }
 
-module.exports = { el, dateInput, keepScroll, refocus, setIco, icoEl, caveatChip, kpiTiles, setInert, tableCells, longFig };
+/* ---- inert that holds through a redraw ---------------------------------
+   Real `inert` covers whatever its subtree holds at any moment. The fallback
+   above stamps the focusable descendants that exist WHEN IT IS CALLED, so
+   anything the page draws afterwards arrives without the tabindex: tabbable,
+   and behind a cover. The privacy gate answers that from the render path
+   (controller.js render() re-asserts its lock), which is enough for a gate
+   only render() can redraw under. It is not enough for the open drawer: a
+   view finishing its own save calls its own render function, not the
+   controller's, and no single call site sees them all (audit of 11 Nov 2026,
+   task 18, second round).
+
+   So this watches. While `still()` holds, anything added under one of `elms`
+   is brought under the lock by running setInert on it again — which is
+   idempotent, and remembers a control's original tabindex only the first time
+   it meets it. Returns the function that ends the watch.
+
+   Children only, never attributes: the fallback writes tabindex itself, and a
+   watcher that woke on its own writes would never sleep. A record is
+   delivered on a microtask, so a control is stamped before any key the reader
+   presses next can reach it.
+
+   It can only ever ADD a lock. Releasing stays with whoever locked — the
+   caller ends the watch and then calls setInert(elm, false) itself — so
+   nothing here can lift a lock that someone else is holding on the same
+   node, which is what matters to the gate.
+
+   Nothing to do, and nothing done, on an engine where `inert` is real; and
+   an engine with neither `inert` nor MutationObserver is older than anything
+   this plugin runs on (the observer is Safari 7). */
+function watchInert(elms, still) {
+  if (INERT_SUPPORTED || typeof MutationObserver !== 'function') return () => {};
+  const targets = elms.filter(Boolean);
+  const watcher = new MutationObserver(() => {
+    if (!still()) return;
+    for (const elm of targets) setInert(elm, true);
+  });
+  for (const elm of targets) watcher.observe(elm, { childList: true, subtree: true });
+  return () => watcher.disconnect();
+}
+
+module.exports = { el, dateInput, keepScroll, refocus, setIco, icoEl, caveatChip, kpiTiles, setInert, watchInert, tableCells, longFig };

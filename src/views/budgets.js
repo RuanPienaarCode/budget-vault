@@ -3,7 +3,7 @@
    Budgets/<period>.md. */
 
 const { opWriterOf } = require('../io');
-const { el, icoEl, tableCells, longFig, caveatChip } = require('../dom');
+const { el, icoEl, tableCells, longFig, caveatChip, refocus } = require('../dom');
 const { parseFrontmatter } = require('../markdown');
 /* The Budgets/<period>.md format lives in one pure module, shared with the
    setup wizard — see the header of budget-file.js for why it stopped being
@@ -212,8 +212,14 @@ module.exports = function registerBudgets(ctx) {
       box.append(el('div', { class: 'bud-shape-note-t' }, i18n.t('bud.fresh.title')));
       box.append(el('p', {}, i18n.t('bud.fresh.body', { count: fresh.count, period: label })));
       box.append(el('button', {
-        class: 'btn btn-ghost', type: 'button',
-        onclick: copyPreviousBudget,
+        class: 'btn btn-ghost', type: 'button', 'data-focus-key': 'copy',
+        /* The copy fills the draft, and a draft with rows is what makes this
+           note step aside (above) — so the button pressed is gone, with the
+           box around it, and focus fell to <body>. The reader lands on the
+           first row of the budget the press just filled; if nothing was
+           copied the note is still up, and so is this button (audit of
+           11 Nov 2026, task 16). */
+        onclick: () => { copyPreviousBudget(); afterNote('copy'); },
       }, i18n.t('shell.bud.copyPrev')));
       return;
     }
@@ -225,14 +231,28 @@ module.exports = function registerBudgets(ctx) {
     const n = others.length;
     box.append(el('div', { class: 'bud-shape-note-t' }, i18n.t('bud.shape.title')));
     box.append(el('p', {}, i18n.t('bud.shape.body', { count: n, newest })));
+    /* Both offers redraw the page, this note with it. The note reads the
+       SAVED budget, which neither offer changes, so each button is drawn
+       again and takes focus back by its key. */
     box.append(el('button', {
-      class: 'btn btn-ghost', type: 'button',
-      onclick: () => bringOverFrom(newest),
+      class: 'btn btn-ghost', type: 'button', 'data-focus-key': 'bring',
+      onclick: () => { bringOverFrom(newest); afterNote('bring'); },
     }, i18n.t('bud.shape.bring', { newest })));
     box.append(el('button', {
-      class: 'btn btn-ghost', type: 'button',
-      onclick: () => resliceFrom(newest),
+      class: 'btn btn-ghost', type: 'button', 'data-focus-key': 'reslice',
+      onclick: async () => { await resliceFrom(newest); afterNote('reslice'); },
     }, i18n.t('bud.shape.bringAmounts')));
+  }
+  /* Where the reader is after one of the note's own buttons redrew the page:
+     on the new copy of that button while the note is still up, else on the
+     first row of the table the note was about (dom.js refocus — it only ever
+     restores, so a press that redrew nothing is left where it is). The note is
+     asked only while it is shown: a hidden box has been emptied, and a key
+     looked up in it would find nothing anyway. */
+  function afterNote(key) {
+    const box = $('#budShapeNote');
+    if (!box.classList.contains('hidden')) refocus(box, key);
+    refocus($('#budTable'), 'row:0');
   }
 
   /* How many days the CURRENT period runs — the denominator's partner in the
@@ -814,6 +834,14 @@ module.exports = function registerBudgets(ctx) {
       groups.get(type).push(d);
     }
     const sortedTypes = [...groups.keys()].sort((a, b) => typeRank(a, order) - typeRank(b, order));
+    /* The categories in the order their rows are drawn, for the handlers below
+       that redraw this table under their own control and have to say where
+       the reader should be afterwards (dom.js refocus). Every control worth
+       finding again is keyed by its row's CATEGORY, not its position: a row's
+       position moves when a category is deleted or changes group, its name
+       does not, and a category is on this page once. `shown` is read when a
+       handler fires, by which time it holds every row. */
+    const shown = [];
     for (const type of sortedTypes) {
       const catRows = groups.get(type).sort((a, b) => a.category.localeCompare(b.category));
       /* The dot takes its colour from `data-type` in budget.css; a custom group
@@ -831,6 +859,8 @@ module.exports = function registerBudgets(ctx) {
            Dashboard row reading what had really arrived. `over`, `unbudgeted`
            and `remaining` are budgetRowStatus's, the Dashboard's own. */
         const row = rowOf.get(d.category);
+        const cat = d.category;
+        const at = shown.push(cat) - 1;
         /* The loader reads an amount cell it cannot parse as 0 and keeps the
            reader's text in amountRaw. Without this the Budget field was
            blank and nothing said why a typed figure had stopped counting
@@ -879,7 +909,7 @@ module.exports = function registerBudgets(ctx) {
         const actualTd = el('td', { class: `num${overActual ? ' text-danger' : assumed ? ' bud-actual-assumed' : ' text-muted'}`, style: 'white-space:nowrap' },
           money(actual),
           assumed && row.realSpend <= 0 ? el('div', { class: 'bud-assumed-note' }, i18n.t('bud.assumed.note')) : '');
-        body.append(el('tr', {},
+        body.append(el('tr', { 'data-focus-key': `row:${at}` },
           el('td', {}, d.category,
             assumed ? el('div', { class: 'bud-assumed-tag' }, i18n.t('bud.assumed.tag')) : ''),
           // Deliberately the RAW stored cell, not `type` — this is the one
@@ -898,17 +928,23 @@ module.exports = function registerBudgets(ctx) {
               ? { type: 'text', inputmode: 'decimal', class: 'form-control form-control-sm', value: d.amountRaw, 'aria-invalid': 'true' }
               : { type: 'number', step: '0.01', class: 'form-control form-control-sm', value: d.amount || '' }),
               'aria-label': i18n.t('bud.aria.amount', { category: d.category }),
+              'data-focus-key': `amount:${cat}`,
               /* normalizeAmount, not `parseFloat(...) || 0` — the guard
                  views/assets.js documents. An empty field is what a plain
                  number input reports when an SA-locale keypad writes
                  "15 000 000,00" into it, and reading that as 0 while clearing
                  amountRaw beside it erases the reader's own text on save.
                  Two existing keys composed rather than a thirteenth invented:
-                 both already carry all twelve translations. */
+                 both already carry all twelve translations.
+
+                 Either way the table is redrawn, and this field with it: the
+                 reader is put back in the row's amount, on the figure it now
+                 holds. Enter commits without leaving the field, and until
+                 this the next keystroke went to <body>. */
               onchange: e => {
                 const v = normalizeAmount(e.target.value);
-                if (v === null) { toast(i18n.t('acct.err.notNumber', { field: i18n.t('bud.col.amount') }), true); renderBudgets(); return; }
-                d.amount = v; d.amountRaw = null; mark(); renderBudgets();
+                if (v === null) { toast(i18n.t('acct.err.notNumber', { field: i18n.t('bud.col.amount') }), true); renderBudgets(); refocus(t, `amount:${cat}`); return; }
+                d.amount = v; d.amountRaw = null; mark(); renderBudgets(); refocus(t, `amount:${cat}`);
               } }),
             unreadableAmt ? caveatChip(i18n.t('bud.amount.unreadableChip'), i18n.t('bud.amount.unreadable', { raw: d.amountRaw })) : '',
             remainingEl,
@@ -922,7 +958,8 @@ module.exports = function registerBudgets(ctx) {
                  forbids), and without a count t() can only ever resolve the
                  `other` form — so "1 period back" would read as "1 periods". */
               title: i18n.t('bud.pull.title', { lag: S.settings.overspend_lag, count: S.settings.overspend_lag }),
-              onclick: () => pullPreviousOverspend(d),
+              'data-focus-key': `pull:${cat}`,
+              onclick: async () => { await pullPreviousOverspend(d); refocus(t, `pull:${cat}`); },
             }, i18n.t('bud.pull.label')) : '')),
           actualTd,
           el('td', {}, el('input', { type: 'text', class: 'form-control form-control-sm', value: d.notes, style: 'width:230px',
@@ -935,7 +972,8 @@ module.exports = function registerBudgets(ctx) {
               'aria-pressed': assumed ? 'true' : 'false',
               'aria-label': i18n.t('bud.aria.assume', { category: d.category }),
               title: i18n.t(assumed ? 'bud.title.assumeOff' : 'bud.title.assumeOn'),
-              onclick: () => toggleAssumeSpent(d.category, !assumed),
+              'data-focus-key': `assume:${cat}`,
+              onclick: async () => { await toggleAssumeSpent(d.category, !assumed); refocus(t, `assume:${cat}`); },
             }, icoEl(['circle-check', 'check-circle', 'check'])),
             // Same income/transfer exclusion as the assume-spent button just
             // above, same reason: a fixed bill is a commitment to pay, and
@@ -947,16 +985,20 @@ module.exports = function registerBudgets(ctx) {
             // it, `lock` chosen as the one that reads as "locked in" rather
             // than a place or a pin.
             type === 'income' || type === 'transfer' ? '' : el('button', {
-              // `bud-fixed-on` carries no rule in styles.css yet — that file
-              // is outside this lane's owner list this round, so the "on"
-              // state is unstyled beyond aria-pressed for now. The class is
-              // still applied, mirroring bud-assume-on, so styling it later
-              // is a CSS-only change with nothing to wire up in this file.
+              // `bud-fixed-on` is the pressed state's class, mirroring
+              // bud-assume-on. Its rule is in src/styles.css (and again, at
+              // the page's own specificity, in src/statement/budget.css): the
+              // lock is drawn in --color-info-ink, #0369a1 in light — 5.93:1
+              // on a card where the info FILL it first used was 2.77:1 — and
+              // the fill itself in dark, where that already clears AA
+              // (tests/palette.test.cjs, 7c). aria-pressed still carries the
+              // state for a screen reader; the colour is for everyone else.
               class: `btn-ghost btn-ghost-sm bud-act bud-act-fixed${fixed ? ' bud-fixed-on' : ''}`, type: 'button',
               'aria-pressed': fixed ? 'true' : 'false',
               'aria-label': i18n.t('bud.aria.fixed', { category: d.category }),
               title: i18n.t(fixed ? 'bud.title.fixedOff' : 'bud.title.fixedOn'),
-              onclick: () => toggleFixed(d.category, !fixed),
+              'data-focus-key': `fixed:${cat}`,
+              onclick: async () => { await toggleFixed(d.category, !fixed); refocus(t, `fixed:${cat}`); },
             }, icoEl(['lock', 'pin', 'landmark'])),
             /* Clear (this period only) vs Delete (everywhere) sat side by side
                with the distinction living only in `title` — invisible on touch,
@@ -981,16 +1023,26 @@ module.exports = function registerBudgets(ctx) {
                behind its own confirmModal with the used-transaction count and
                vault-trash explanation spelled out (see promptDeleteCategory in
                categories.js). The confirm dialog is the real safety net here;
-               the row button is only ever the entry point to it. */
+               the row button is only ever the entry point to it.
+
+               Where the reader is afterwards (dom.js refocus). Clear takes
+               itself off the row — a cleared row is no longer in the file,
+               and only a row in the file has one — so focus goes to what
+               stands beside where it was, in the same cell. Delete takes the
+               row off the page unless this period's file still names the
+               category: the row itself if it stayed, else the one that moved
+               up into its place, else the one above, else Add category. */
             d.inFile
-              ? el('button', { class: 'btn-ghost btn-ghost-sm bud-act bud-act-clear', 'aria-label': i18n.t('bud.aria.clear', { category: d.category }), title: i18n.t('bud.title.clear'), onclick: () => { d.amount = 0; d.amountRaw = null; d.notes = ''; d.inFile = false; mark(); renderBudgets(); } }, icoEl(['rotate-ccw', 'undo-2', 'list-restart']))
+              ? el('button', { class: 'btn-ghost btn-ghost-sm bud-act bud-act-clear', 'aria-label': i18n.t('bud.aria.clear', { category: d.category }), title: i18n.t('bud.title.clear'), 'data-focus-key': `clear:${cat}`, onclick: () => { d.amount = 0; d.amountRaw = null; d.notes = ''; d.inFile = false; mark(); renderBudgets(); refocus(t, [`clear:${cat}`, `del:${cat}`]); } }, icoEl(['rotate-ccw', 'undo-2', 'list-restart']))
               : '',
-            el('button', { class: 'btn-ghost btn-ghost-sm bud-act bud-act-delete', 'aria-label': i18n.t('bud.aria.delete', { category: d.category }), title: i18n.t('bud.title.delete'), onclick: async () => {
+            el('button', { class: 'btn-ghost btn-ghost-sm bud-act bud-act-delete', 'aria-label': i18n.t('bud.aria.delete', { category: d.category }), title: i18n.t('bud.title.delete'), 'data-focus-key': `del:${cat}`, onclick: async () => {
               if (await promptDeleteCategory(d.category)) {
                 const draft = budgetDraft();
                 const i = draft.indexOf(d);
                 if (i !== -1 && !d.inFile) draft.splice(i, 1);
                 renderBudgets();
+                refocus(t, [`del:${cat}`, at + 1 < shown.length ? `del:${shown[at + 1]}` : null,
+                  at > 0 ? `del:${shown[at - 1]}` : null, $('#budAddCat')]);
               }
             } }, icoEl(['trash-2', 'trash'])))));
       }

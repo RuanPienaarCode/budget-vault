@@ -22,7 +22,7 @@
    registerDirty, the same choice views/notes.js records. */
 
 const { opWriterOf } = require('../io');
-const { el, kpiTiles, icoEl, caveatChip, tableCells } = require('../dom');
+const { el, kpiTiles, icoEl, caveatChip, tableCells, refocus } = require('../dom');
 const { isSplitPart } = require('../tx-role');
 const { splitAroundTable } = require('../markdown');
 const { SCHEMAS } = require('../table-schema');
@@ -123,10 +123,17 @@ module.exports = function registerFood(ctx) {
     for (const c of sum.byCategory) {
       const share = sum.spend > 0 ? c.amount / sum.spend : 0;
       const active = S.foodFilter.cat === c.category;
+      /* The press filters the Items table and redraws the whole page, this
+         list with it, so the row pressed was destroyed by its own press and
+         focus fell to <body> (audit of 11 Nov 2026, task 16). The reader is
+         put back on the same category, which now reads pressed — or no longer
+         does (dom.js refocus). Keyed by the category's name: the list is
+         sorted by spend, and a name is on it once. */
       const row = el('button', {
         type: 'button', class: 'food-cat-row' + (active ? ' is-active' : ''),
         'aria-pressed': active ? 'true' : 'false',
-        onclick: () => { S.foodFilter.cat = active ? '' : c.category; renderFood(); },
+        'data-focus-key': `cat:${c.category}`,
+        onclick: () => { S.foodFilter.cat = active ? '' : c.category; renderFood(); refocus(box, `cat:${c.category}`); },
       },
       el('span', { class: 'food-cat-name' }, c.category),
       el('span', { class: 'food-cat-bar', 'aria-hidden': 'true' },
@@ -310,14 +317,35 @@ module.exports = function registerFood(ctx) {
       return;
     }
     const cats = categoryChoices();
-    for (const it of rows) {
-      const catSel = el('select', { class: 'form-select form-select-sm', 'aria-label': `Category for ${it.name}` });
+    /* Each of a row's three controls redraws the page under itself, and says
+       where the reader should be afterwards (dom.js refocus). Keyed by the
+       PRODUCT (receipt-file.js rowKey), not the row's position: the table is
+       sorted by what was spent, and a row is a product once. Re-filing is the
+       one press that can take its own row off the page — with the category
+       filter on, a product moved to another category is no longer in the list
+       — and then the landing is the row that moved up, else the one above,
+       else the filter that is hiding it. On that row it is the product's
+       NAME, never its category select: on Windows and Linux an arrow key on a
+       closed select is a `change`, so a reader arrowing down a list of
+       categories would have re-filed the product, been put on the next
+       product's select, and re-filed that one with the very next press —
+       one product per keystroke, down the page (review of this change). The
+       name only opens a price chart. A re-file is several file writes, so a
+       reader who has moved on by the time it finishes is left where they
+       went: refocus only restores. */
+    rows.forEach((it, n) => {
+      const after = prefix => [`${prefix}:${it.key}`,
+        rows[n + 1] ? `item:${rows[n + 1].key}` : null,
+        rows[n - 1] ? `item:${rows[n - 1].key}` : null, sel];
+      const catSel = el('select', { class: 'form-select form-select-sm', 'aria-label': `Category for ${it.name}`,
+        'data-focus-key': `filed:${it.key}` });
       for (const c of new Set([...cats, it.category])) catSel.append(el('option', { value: c }, c));
       catSel.value = it.category;
-      catSel.addEventListener('change', () => refile(it, { category: catSel.value }));
-      const healthyBox = el('input', { type: 'checkbox', 'aria-label': `${it.name} is healthy` });
+      catSel.addEventListener('change', async () => { await refile(it, { category: catSel.value }); refocus(body, after('filed')); });
+      const healthyBox = el('input', { type: 'checkbox', 'aria-label': `${it.name} is healthy`,
+        'data-focus-key': `healthy:${it.key}` });
       healthyBox.checked = !!it.healthy;
-      healthyBox.addEventListener('change', () => refile(it, { healthy: healthyBox.checked }));
+      healthyBox.addEventListener('change', async () => { await refile(it, { healthy: healthyBox.checked }); refocus(body, after('healthy')); });
       /* Against last month when it was bought then — the question the
          column beside it asks — else against the start of the chart window,
          so the arrow agrees with the price chart one tap away. Each says
@@ -345,7 +373,8 @@ module.exports = function registerFood(ctx) {
       const open = S.foodOpen === it.key;
       const nameBtn = el('button', {
         type: 'button', class: 'food-item-name', 'aria-expanded': open ? 'true' : 'false',
-        onclick: () => { S.foodOpen = open ? null : it.key; renderFood(); },
+        'data-focus-key': `item:${it.key}`,
+        onclick: () => { S.foodOpen = open ? null : it.key; renderFood(); refocus(body, `item:${it.key}`); },
       }, it.name);
       body.append(el('tr', { class: open ? 'is-open' : '' },
         el('td', {}, nameBtn),
@@ -356,7 +385,7 @@ module.exports = function registerFood(ctx) {
         lastMonthCell,
         priceCell));
       if (open) body.append(el('tr', { class: 'food-item-detail' }, el('td', { colspan: '7' }, priceChart(it, win))));
-    }
+    });
     /* data-label per cell, so the phone layout can fold each row into a
        card with its own captions (src/styles.css, Food). */
     tableCells($('#foodItemsTable'), ['Item', 'Category', 'Healthy', 'Bought', 'Spent', 'Last month', 'Last price']);
@@ -370,7 +399,7 @@ module.exports = function registerFood(ctx) {
     if (!inRange.length) {
       body.append(el('tr', {}, el('td', { colspan: '5', class: 'text-muted' }, 'No receipts dated in this period.')));
     }
-    for (const r of inRange) {
+    inRange.forEach((r, n) => {
       const t = matches.get(r.rel);
       const paid = receiptPaid(r);
       const off = r.total != null && Math.round(paid * 100) !== Math.round(r.total * 100);
@@ -384,18 +413,27 @@ module.exports = function registerFood(ctx) {
         el('td', {}, r.store),
         totalCell,
         el('td', {}, bank),
-        el('td', {}, el('button', { class: 'btn-ghost btn-ghost-sm', onclick: () => openReceipt(r) },
+        el('td', {}, el('button', { class: 'btn-ghost btn-ghost-sm', 'data-focus-key': `open:${n}`, onclick: () => openReceipt(r, n) },
           icoEl(['file-text', 'file']), 'Open'))));
-    }
+    });
     tableCells($('#foodReceiptsTable'), ['Date', 'Shop', 'Total', 'Bank line', null]);
     $('#foodReceiptsNote').textContent = unmatchedElsewhere
       ? `${unmatchedElsewhere} receipt${unmatchedElsewhere === 1 ? '' : 's'} in other periods still ha${unmatchedElsewhere === 1 ? 's' : 've'} no bank line.`
       : '';
   }
 
-  async function openReceipt(r) {
+  /* `n` is the row's position in the receipts table. Only the vanished-file
+     branch redraws, and it takes the row that was pressed off the page: the
+     receipt that moved up into its place, else the one above, else Add
+     receipt. An Open that opens is left alone — the reader is in the new tab,
+     and pulling focus back here would take them out of it. */
+  async function openReceipt(r, n) {
     const f = fileAt(r.rel);
-    if (!f) { await ctx.loadReceipts(); renderFood(); return toast('That receipt is no longer in the vault', true); }
+    if (!f) {
+      await ctx.loadReceipts(); renderFood();
+      refocus($('#foodReceiptsBody'), [`open:${n}`, `open:${n - 1}`, $('#foodAdd')]);
+      return toast('That receipt is no longer in the vault', true);
+    }
     await app.workspace.getLeaf('tab').openFile(f);
   }
 

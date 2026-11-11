@@ -45,7 +45,7 @@
    as-of today regardless of which period is selected, and says so in the
    document rather than leaving the two kinds of figure to look like one. */
 
-const { el } = require('../dom');
+const { el, refocus } = require('../dom');
 const { poolAccounts } = require('../vocabulary');
 const { debtMonthly } = require('../committed');
 const { rangePills } = require('../chart');
@@ -370,10 +370,16 @@ module.exports = function registerReport(ctx) {
     const formatRow = el('div', { class: 'chart-range', role: 'group', 'aria-label': i18n.t('report.format.pillsAria') });
     for (const o of formatOpts) {
       const active = formats.has(o.key);
+      /* rangePills puts its reader back on the pill that was pressed
+         (chart.js); this hand-built group did not, so a press on a format
+         redrew the group under its own button and focus fell to <body>
+         (audit of 11 Nov 2026, task 16). Same contract, same helper: keyed by
+         the format, and the new copy of the pill takes focus back. */
       formatRow.append(el('button', {
         type: 'button', class: `chart-range-btn${active ? ' is-active' : ''}`,
         'aria-pressed': active ? 'true' : 'false',
-        onclick: () => toggleFormat(o.key),
+        'data-focus-key': `format:${o.key}`,
+        onclick: () => { toggleFormat(o.key); refocus(formatPills, `format:${o.key}`); },
       }, o.label));
     }
     formatPills.append(formatRow);

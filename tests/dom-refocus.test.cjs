@@ -136,6 +136,29 @@ const find = (root, key) => root.querySelector(`[data-focus-key="${key}"]`);
   eq(focus.key(), 'year', 'focus on a control that is no longer displayed counts as lost, and is restored');
 }
 
+/* ---- 5c. ...and that hidden control is never its own landing ---------------
+   The Plan page's "not spoken for" card is hidden WITHOUT being emptied, so
+   the button that was pressed is still in it, still carries its key, and is
+   still the active element. Asked to restore to that key first, refocus found
+   the hidden button, called focus() on it (refused: it has no box), read
+   document.activeElement, saw the very same button, and reported a landing —
+   on a control nobody can see, which the browser drops to <body> a frame
+   later. The candidate that IS the lost control is passed over. */
+{
+  const card = el('div', {}, el('button', { 'data-focus-key': 'place' }, 'Put it in a bucket'));
+  const page = el('div', {}, card, el('button', { 'data-focus-key': 'bucket' }, 'New bucket'));
+  const place = focus.on(find(page, 'place'));
+  card.classList.add('hidden');
+  const hit = refocus(page, ['place', 'bucket']);
+  ok(hit !== place, 'the hidden control that lost focus is not reported as the landing');
+  eq(focus.key(), 'bucket', 'the next candidate takes focus instead');
+
+  focus.on(find(page, 'bucket'));
+  card.classList.remove('hidden');
+  page.children[1].classList.add('hidden');
+  eq(refocus(page, 'bucket'), null, 'and with nothing else to offer, refocus reports no landing at all');
+}
+
 /* ---- 6. quiet no-ops ------------------------------------------------------ */
 {
   focus.reset();
