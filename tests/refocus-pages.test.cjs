@@ -13,7 +13,12 @@
    tests/helpers/focus-stub.cjs (a control destroyed by a rebuild stops being
    the active element, exactly as in a browser).
 
-   The landings follow that suite's rules, and add nothing to them:
+   The landings follow that suite's rules, with one thing said out loud that
+   they left implicit (the review of this change found it twice): the landing
+   on a row that took another's place is that row's QUIET control — its name,
+   its edit button — wherever the control pressed commits without asking. The
+   next source's ✕ under an Enter held down, or the next product's category
+   select under an arrow key, would act on a row the reader never chose.
 
      the control is redrawn      -> its own replacement, by key
      a row or a card is removed  -> the one that took its place, else the one
@@ -335,10 +340,14 @@ const keysOf = (root, prefix) => descend(root).map(e => e.getAttribute('data-foc
       await press(need(sources, 'src:0'));
       landed('src:0', 'editing a source lands back on that source');
       ok(/21/.test(focus.at().parentElement.textContent), 'on the rebuilt row, showing the new amount');
+      /* On the row, not on its ✕: the ✕ asks nothing, and Enter held down
+         repeats — a landing on the next ✕ would empty the list in one press. */
+      const second = M.S.plans.Alpha.sources[1].name;
       await press(need(sources, 'srcdel:0'));
-      landed('srcdel:0', 'removing a source lands on the one that moved up');
+      landed('src:0', 'removing a source lands on the one that moved up');
+      ok(focus.at()._cls.has('src2-main') && new RegExp(second).test(focus.at().textContent), 'on that source\'s own button, never its ✕');
       await press(need(sources, 'srcdel:1'));
-      landed('srcdel:0', 'removing the last source lands on the one above');
+      landed('src:0', 'removing the last source lands on the one above');
       answers.fields = { ...source, remove: ['yes'] };
       await press(need(sources, 'src:0'));
       eq(M.S.plans.Alpha.sources.length, 0, 'the edit sheet removed the only source');
@@ -503,7 +512,11 @@ const keysOf = (root, prefix) => descend(root).map(e => e.getAttribute('data-foc
       await change(need(items, keyFor('filed', 'Milk 2L')), n => { n.value = 'Drinks'; });
       await written();
       eq(keysOf(items, 'filed:'), [yoghurt], 'the re-filed product has left the filtered list');
-      landed(yoghurt, 'and the reader is on the row that moved up into its place');
+      /* On its NAME, not its category select: an arrow key on a closed select
+         is a `change` on Windows and Linux, and the next press would re-file
+         a product the reader never chose. */
+      landed(keyFor('item', 'Yoghurt'), 'and the reader is on the row that moved up into its place');
+      ok(focus.at()._cls.has('food-item-name'), 'on the product\'s name, never its category select');
       // ...and the only row left under a filter AND a search: the filter itself.
       // A second product is filed under Drinks first, so the category outlives
       // the re-file: the page drops a filter that names no category.

@@ -324,13 +324,19 @@ module.exports = function registerFood(ctx) {
        one press that can take its own row off the page — with the category
        filter on, a product moved to another category is no longer in the list
        — and then the landing is the row that moved up, else the one above,
-       else the filter that is hiding it. A re-file is several file writes, so
-       a reader who has moved on by the time it finishes is left where they
+       else the filter that is hiding it. On that row it is the product's
+       NAME, never its category select: on Windows and Linux an arrow key on a
+       closed select is a `change`, so a reader arrowing down a list of
+       categories would have re-filed the product, been put on the next
+       product's select, and re-filed that one with the very next press —
+       one product per keystroke, down the page (review of this change). The
+       name only opens a price chart. A re-file is several file writes, so a
+       reader who has moved on by the time it finishes is left where they
        went: refocus only restores. */
     rows.forEach((it, n) => {
       const after = prefix => [`${prefix}:${it.key}`,
-        rows[n + 1] ? `${prefix}:${rows[n + 1].key}` : null,
-        rows[n - 1] ? `${prefix}:${rows[n - 1].key}` : null, sel];
+        rows[n + 1] ? `item:${rows[n + 1].key}` : null,
+        rows[n - 1] ? `item:${rows[n - 1].key}` : null, sel];
       const catSel = el('select', { class: 'form-select form-select-sm', 'aria-label': `Category for ${it.name}`,
         'data-focus-key': `filed:${it.key}` });
       for (const c of new Set([...cats, it.category])) catSel.append(el('option', { value: c }, c));

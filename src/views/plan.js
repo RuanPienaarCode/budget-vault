@@ -349,14 +349,20 @@ module.exports = function registerPlan(ctx) {
       const list = el('div', { class: 'src2-list' });
       /* The row that took this one's place, else the one before it, else Add a
          source — for the ✕, and for an edit whose sheet removed the source. An
-         edit that kept it finds the same row under the same key. */
-      const afterSource = (key, n) => refocus(host, [`${key}:${n}`, `${key}:${n - 1}`, $('#planAddSource')]);
+         edit that kept it finds the same row under the same key.
+
+         Always the row's own button, which opens its sheet, and never its ✕.
+         The ✕ removes with no question asked, and Enter held down repeats:
+         landing on the next row's ✕ would let one long press empty the list,
+         where before the press stopped because focus had gone (review of this
+         change). The same care the bucket's delete takes below. */
+      const afterSource = n => refocus(host, [`src:${n}`, `src:${n - 1}`, $('#planAddSource')]);
       p.sources.forEach((s, n) => {
         const received = s.status === 'received';
         list.append(el('div', { class: 'src2-row' },
           el('button', { class: 'src2-main', type: 'button', 'data-focus-key': `src:${n}`,
             'aria-label': i18n.t('plan.source.editAria', { name: s.name }),
-            onclick: async () => { await editSource(p, s); afterSource('src', n); } },
+            onclick: async () => { await editSource(p, s); afterSource(n); } },
             el('div', { class: 'src2-line1' },
               el('span', { class: 'src2-name' }, s.name),
               el('span', { class: 'kind' }, s.kind || 'Other')),
@@ -367,7 +373,7 @@ module.exports = function registerPlan(ctx) {
           el('div', { class: `src2-amt num${received ? '' : ' src2-amt-muted'}` }, money(s.amount)),
           el('button', { class: 'btn-ghost btn-ghost-sm src2-del', type: 'button', 'data-focus-key': `srcdel:${n}`,
             'aria-label': i18n.t('plan.source.removeAria', { name: s.name }),
-            onclick: () => { removeSource(p, s); afterSource('srcdel', n); } }, '✕')));
+            onclick: () => { removeSource(p, s); afterSource(n); } }, '✕')));
       });
       host.append(list);
     });
