@@ -19,7 +19,6 @@
 
      node tests/nav-sentence-case.test.cjs */
 
-const assert = require('assert');
 const fs = require('fs');
 const path = require('path');
 
@@ -56,5 +55,4 @@ for (const m of shell.matchAll(/<(\w+)[^>]*?\sdata-i18n="([^"]+)"[^>]*>([^<]*)</
 ok(seen >= 40, `sanity: the shell's nav/shell/topbar labels are read, found ${seen}`);
 
 if (failures.length) { console.error(`FAIL — nav-sentence-case: ${failures.length} of ${checks} checks\n  ` + failures.join('\n  ')); process.exit(1); }
-assert.ok(true);
 console.log(`PASS — nav-sentence-case: ${navKeys.length} page names in sentence case, ${seen} shell fallbacks equal to en.js (${checks} checks).`);
