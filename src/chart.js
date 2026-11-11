@@ -22,7 +22,7 @@
    `display:none` section returns zeroes and would silently collapse the
    geometry. */
 
-const { el } = require('./dom');
+const { el, refocus } = require('./dom');
 
 const NS = 'http://www.w3.org/2000/svg';
 
@@ -515,16 +515,41 @@ function historicalRanges(span = 0, allLabel = 'All') {
    role="group" rather than a radiogroup: these are buttons that act
    immediately, and announcing them as radios promises a selection the reader
    then has to commit, which is not what happens. aria-pressed carries the
-   state instead. */
+   state instead.
+
+   Picking a range keeps the reader ON the range. Every caller answers onPick
+   by redrawing its chart and mounting a fresh set of pills where these were,
+   so the pill that was pressed is destroyed by its own click and focus fell to
+   <body>: a keyboard reader comparing 3M with 6M was sent to the top of the
+   page between the two presses, every time (audit of 11 Nov 2026, task 16).
+   The restore lives here rather than in the six callers because none of them
+   holds the pill — they hold the container, which is what `host` is: the
+   element the caller mounted this group into, read when the pill is pressed
+   and still on the page after the redraw. Each pill is keyed by its range, so
+   the new copy of the one that was pressed is the one that takes focus.
+
+   onPick is still called synchronously and its result is only OBSERVED, never
+   handled: a caller that awaits a settings write before redrawing (the
+   Dashboard, Food) is waited for, and a rejection it did not catch itself
+   surfaces exactly as it did before. */
 function rangePills({ ranges, value, onPick, label }) {
   const wrap = el('div', { class: 'chart-range', role: 'group', 'aria-label': label });
   for (const r of ranges) {
     const active = r.key === value;
+    const key = `range:${r.key}`;
     wrap.append(el('button', {
       type: 'button',
       class: `chart-range-btn${active ? ' is-active' : ''}`,
       'aria-pressed': active ? 'true' : 'false',
-      onclick: () => { if (!active) onPick(r.key); },
+      'data-focus-key': key,
+      onclick: () => {
+        if (active) return;
+        const host = wrap.parentElement;
+        const done = onPick(r.key);
+        const restore = () => refocus(host, key);
+        if (done && typeof done.then === 'function') done.then(restore);
+        else restore();
+      },
     }, r.label));
   }
   return wrap;

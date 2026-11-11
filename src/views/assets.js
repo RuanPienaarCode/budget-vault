@@ -13,7 +13,7 @@
    dominated by one number somebody typed four years ago should say so. */
 
 const { opWriterOf } = require('../io');
-const { el, dateInput, keepScroll, icoEl, tableCells } = require('../dom');
+const { el, dateInput, keepScroll, refocus, icoEl, tableCells } = require('../dom');
 const { normalizeAmount } = require('../amount');
 const { SCHEMAS, mdTableFile } = require('../table-schema');
 const { askFields } = require('../modal');
@@ -286,7 +286,9 @@ module.exports = function registerAssets(ctx) {
     wrap.append(el('div', { class: 'kpi-caveat-txt' }, icoEl(['info', 'alert-circle']), `${bits.join('. ')}.`));
   }
 
-  function renderAssets(focusRow) {
+  /* landing: where focus goes back to after the rebuild — a focus key, or a
+     list of them (dom.js refocus), built from the row's index. */
+  function renderAssets(landing) {
     renderAssetKpis();
     renderAssetStale();
     const t = $('#assetTable');
@@ -300,7 +302,7 @@ module.exports = function registerAssets(ctx) {
         el('th', { scope: 'col' }, 'Notes'),
         el('th', { scope: 'col' }, ''))));
       const body = el('tbody', {});
-      for (const a of S.assets) {
+      for (const [i, a] of S.assets.entries()) {
         const age = valuedAge(a);
         /* Beside the Value field, updated in place by its own editor (the row
            is not rebuilt on a value edit — see renderAssetKpis). Empty unless
@@ -324,17 +326,17 @@ module.exports = function registerAssets(ctx) {
           // Assets.md, or a list trimmed between versions) keeps an option of
           // its own — without it the select silently rewrites the file's own
           // value to whichever preset happens to be first.
-          el('td', {}, el('select', { class: 'form-select form-select-sm', 'aria-label': `Kind of ${a.name}`,
-            // focusRow: rebuilding the table drops focus to <body> otherwise —
-            // see the restore block below. Same fix as Owed Money and Debt.
-            onchange: e => { a.type = e.target.value; mark(); renderAssets(S.assets.indexOf(a)); } },
+          el('td', {}, el('select', { class: 'form-select form-select-sm', 'aria-label': `Kind of ${a.name}`, 'data-focus-key': `kind:${i}`,
+            // The landing: rebuilding the table drops focus to <body> otherwise —
+            // see the restore below. Same fix as Owed Money and Debt.
+            onchange: e => { a.type = e.target.value; mark(); renderAssets(`kind:${S.assets.indexOf(a)}`); } },
             // Labelled in sentence case, valued by the stored word (D1-08).
             ...(a.type && !ASSET_TYPES.includes(a.type)
               ? [el('option', { value: a.type, selected: '' }, kindLabel(a.type))] : []),
             ...ASSET_TYPES.map(k => el('option', { value: k, ...(k === a.type ? { selected: '' } : {}) }, kindLabel(k))))),
           el('td', { class: 'num' }, el('input', { type: 'number', step: '0.01', min: '0',
             class: 'form-control form-control-sm', value: shownFigure(a, 'value'),
-            'aria-label': `Value of ${a.name}`,
+            'aria-label': `Value of ${a.name}`, 'data-focus-key': `value:${i}`,
             // Routed through normalizeAmount, matching addAsset — an invalid
             // cell (an SA-locale phone's numeric keypad writes "15 000 000,00"
             // into a plain number input, which the browser reports as an
@@ -345,7 +347,10 @@ module.exports = function registerAssets(ctx) {
             // of the invalid text still sitting in it.
             onchange: e => {
               const value = normalizeAmount(e.target.value);
-              if (value === null) { toast('Value must be a number', true); renderAssets(); return; }
+              /* Back in the field that was refused, showing the stored figure
+                 again — the redraw used to leave the reader on <body> with a
+                 toast about a field they were no longer in. */
+              if (value === null) { toast('Value must be a number', true); renderAssets(`value:${S.assets.indexOf(a)}`); return; }
               /* valueRaw is the verbatim text of a cell the loader could not
                  read (table-schema.js's money()); the writer prefers it over a
                  fabricated 0 so a save cannot erase what the reader typed.
@@ -366,12 +371,18 @@ module.exports = function registerAssets(ctx) {
              forever while meaning nothing. */
           el('td', {}, dateInput(a.valued, { class: 'form-control form-control-sm',
             'aria-label': `Date ${a.name} was valued` },
-            v => { a.valued = v; mark(); renderAssets(S.assets.indexOf(a)); })),
+            v => { a.valued = v; mark(); renderAssets(`kind:${S.assets.indexOf(a)}`); })),
           el('td', {}, el('input', { type: 'text', class: 'form-control form-control-sm',
             value: a.notes, 'aria-label': `Notes for ${a.name}`,
             onchange: e => { a.notes = e.target.value; mark(); } })),
-          el('td', {}, el('button', { class: 'btn-ghost btn-ghost-sm', 'aria-label': `Remove ${a.name}`,
-            onclick: () => { S.assets.splice(S.assets.indexOf(a), 1); mark(); renderAssets(); } }, '✕'))));
+          el('td', {}, el('button', { class: 'btn-ghost btn-ghost-sm', 'aria-label': `Remove ${a.name}`, 'data-focus-key': `del:${i}`,
+            // The asset that moved up into this one's place, else the one
+            // above, else New asset (audit of 11 Nov 2026, task 16).
+            onclick: () => {
+              const row = S.assets.indexOf(a);
+              S.assets.splice(row, 1); mark();
+              renderAssets([`del:${row}`, `del:${row - 1}`, $('#assetAdd')]);
+            } }, '✕'))));
       }
       if (!S.assets.length) {
         body.append(el('tr', {}, el('td', { colspan: '6', class: 'text-muted' },
@@ -387,10 +398,7 @@ module.exports = function registerAssets(ctx) {
     /* Rebuilding the table drops focus to <body>, which ejects a keyboard or
        screen-reader user to the top of the page after every kind change. Same
        fix as Owed Money and Debt. */
-    if (focusRow !== undefined && focusRow >= 0) {
-      const sel = t.querySelectorAll('tbody select')[focusRow];
-      if (sel) sel.focus();
-    }
+    if (landing !== undefined) refocus(t, landing);
   }
 
   /* Columns, escaping and number formatting come from the same declaration

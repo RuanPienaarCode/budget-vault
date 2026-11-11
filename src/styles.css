@@ -1324,6 +1324,15 @@ body.is-phone .budget-app-root .drawer-book:not(.hidden) { display: block; }
 .budget-app-root .table tbody tr:last-child td { border-bottom: none; }
 .budget-app-root .table tbody tr { transition: background 0.12s; }
 .budget-app-root .table.table-hover tbody tr:hover { background: var(--color-primary-light); }
+/* A row that focus LANDS on: the first row "Show more" reveals on Transactions
+   and the import review, and a service's row once its offered billing date is
+   taken (src/dom.js refocus). A row is the landing there because nothing in it
+   is safe to focus — the category cell opens its picker on focus, and a date
+   field raises the phone's picker. refocus gives the row tabindex="-1" at that
+   moment, so it is in no tab order and this ring only ever shows on a row
+   focus was put on. Inset, the same as an Accounts row, so it cannot spill
+   out of the table's scroll box. */
+.budget-app-root .table tbody tr[data-focus-key]:focus-visible { outline: 2px solid var(--color-primary); outline-offset: -2px; }
 /* Money never wraps. In a narrow pane the amount columns get tight enough that
    "R 12,000.00" breaks after the currency symbol, which doubles the height of
    every row it hits and leaves the table looking ragged — the horizontal scroll
@@ -4110,6 +4119,7 @@ body.is-phone .budget-app-root .drawer-book:not(.hidden) { display: block; }
   .budget-app-root .tx-undo-x:focus { outline: 2px solid var(--color-primary); outline-offset: 2px; }
   .budget-app-root .table thead th button:focus { outline: 2px solid var(--color-primary); outline-offset: 2px; }
   .budget-app-root .table tbody tr.acct-row:focus { outline: 2px solid var(--color-primary); outline-offset: -2px; }
+  .budget-app-root .table tbody tr[data-focus-key]:focus { outline: 2px solid var(--color-primary); outline-offset: -2px; }
   .budget-app-root .chart-range-btn:focus { outline: 2px solid var(--color-primary); outline-offset: 2px; }
   .budget-app-root .trend-svg-wrap svg:focus { outline: 2px solid var(--color-primary); outline-offset: 2px; border-radius: 8px; }
   .budget-app-root .acct-recon-btn:focus { outline: 2px solid var(--color-primary); outline-offset: 2px; }

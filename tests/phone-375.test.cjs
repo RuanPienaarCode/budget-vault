@@ -240,7 +240,8 @@ for (const sl of ['.env-slider', '.loan-range']) {
   }
   // the markup half: the cell wraps the box in the label the CSS sizes
   const txSrc = fs.readFileSync(path.join(ROOT, 'src/views/transactions.js'), 'utf8');
-  const cell = /function excludedCell\(item, mark\) \{[\s\S]*?\n  \}\n/.exec(txSrc);
+  // `i` is the row's position, which the cell's focus key is built from (dom.js refocus).
+  const cell = /function excludedCell\(item, mark, i\) \{[\s\S]*?\n  \}\n/.exec(txSrc);
   ok(cell && /el\('label', \{ class: 'tbl-tick' \}, el\('input', \{ type: 'checkbox'/.test(cell[0]),
     "views/transactions.js excludedCell wraps the non-parent checkbox in <label class='tbl-tick'>");
   ok(cell && /'aria-label': i18n\.t\('tx\.aria\.exclude'/.test(cell[0]) && /onchange: e => \{ r\.excluded = e\.target\.checked; mark\(\); \}/.test(cell[0]),

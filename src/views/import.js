@@ -17,7 +17,7 @@
    because `t` is already a local in several files. */
 const { opWriterOf } = require('../io');
 const i18n = require('../i18n');
-const { el, tableCells } = require('../dom');
+const { el, tableCells, refocus } = require('../dom');
 const { normalizeAmount, inferGrouping } = require('../amount');
 const { parseStatement, decodeStatement, parseStatementDate, detectStatementColumns, reconcileAmounts, applyCounterparties,
   statementAccountNumber, sameAccountNumber, TRANSFER_LEG_DAYS } = require('../statement');
@@ -978,7 +978,7 @@ module.exports = function registerImport(ctx) {
       el('th', { scope: 'col', class: 'num' }, 'Amount'), el('th', { scope: 'col' }, 'Category'), el('th', { scope: 'col' }, 'Excl.'))));
     const body = el('tbody', {});
     const visible = p.items.slice(0, importShown);
-    for (const it of visible) {
+    for (const [i, it] of visible.entries()) {
       const cls = (it.dup ? 'imp-dup' : it.near || it.pending ? 'imp-near' : '') + (inCurrent(it) ? ' imp-current' : '');
       // Spelled out rather than left to the badge: the row is unticked, and the
       // user needs to know WHICH existing row it collided with to judge whether
@@ -994,7 +994,8 @@ module.exports = function registerImport(ctx) {
           + 'and a settled row at a different amount would import as a second transaction. It will arrive on the next '
           + 'statement as a final figure. Tick to import it now anyway.'
         : '';
-      body.append(el('tr', { class: cls.trim() },
+      // Keyed by position as the landing for "Show more" below (dom.js refocus).
+      body.append(el('tr', { class: cls.trim(), 'data-focus-key': `row:${i}` },
         /* Both ticks sit in a <label> so the phone card can give them a 44px
            target (statement/phone-tables.css); inert on a desktop. */
         el('td', {}, it.dup ? el('span', { class: 'category-badge badge-dup' }, 'dup') :
@@ -1052,9 +1053,15 @@ module.exports = function registerImport(ctx) {
     }
     if (p.items.length > visible.length) {
       const rest = p.items.length - visible.length;
-      const more = el('button', { class: 'btn-ghost', style: 'width:100%;padding:0.6rem' },
+      const more = el('button', { class: 'btn-ghost', style: 'width:100%;padding:0.6rem', 'data-focus-key': 'more' },
         `Show ${Math.min(IMPORT_PAGE, rest)} more of ${rest} remaining`);
-      more.addEventListener('click', () => { importShown += IMPORT_PAGE; renderImportReview(); });
+      /* The press rebuilds the table with this button in it, and focus fell to
+         <body> — on the one screen where a keyboard reader is working down a
+         statement row by row. They land on the first row the press revealed.
+         The ROW, not its tick: a duplicate has no control to land on, and the
+         category cell opens a picker the moment it takes focus. */
+      const revealedFrom = visible.length;
+      more.addEventListener('click', () => { importShown += IMPORT_PAGE; renderImportReview(); refocus(t, [`row:${revealedFrom}`, 'more']); });
       body.append(el('tr', {}, el('td', { colspan: '6', style: 'padding:0' }, more)));
       // Say so out loud — a silent cap reads as "these are all the rows", and
       // the user is about to press a button that imports the ones off-screen too.

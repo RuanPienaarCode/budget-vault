@@ -6,7 +6,7 @@
    presentation and editing only. */
 
 const { opWriterOf } = require('../io');
-const { el, kpiTiles, keepScroll, icoEl, caveatChip, tableCells } = require('../dom');
+const { el, kpiTiles, keepScroll, refocus, icoEl, caveatChip, tableCells } = require('../dom');
 const { debtMonthly } = require('../committed');
 const { normalizeAmount } = require('../amount');
 const { SCHEMAS, mdTableFile } = require('../table-schema');
@@ -667,10 +667,11 @@ module.exports = function registerDebts(ctx) {
   }
 
   /* ------------------------------ the table ------------------------------
-     focusRow: index into S.debts whose status pill should get focus back after
-     the rebuild. An index rather than a name — two debts can share one, and
-     looking the row up by name put focus on the wrong pill. */
-  function renderDebts(focusRow) {
+     landing: where focus goes back to after the rebuild — a focus key, or a
+     list of them (dom.js refocus). Keys are built from the row's index rather
+     than a name — two debts can share one, and looking the row up by name put
+     focus on the wrong pill. */
+  function renderDebts(landing) {
     renderDebtKpis();
     renderDebtPlan();
     renderDebtPayments();
@@ -722,7 +723,7 @@ module.exports = function registerDebts(ctx) {
         el('th', { scope: 'col' }, ''))));
       const body = el('tbody', {});
 
-      for (const d of S.debts) {
+      for (const [i, d] of S.debts.entries()) {
         // Derived cells are updated in place by refreshRow() so editing an
         // amount never rebuilds the row the field lives in (see renderDebtKpis).
         const payoffCell = el('td', { class: 'num' });
@@ -833,13 +834,13 @@ module.exports = function registerDebts(ctx) {
         }
 
         const paidPill = d.status === 'paid';
-        const pill = el('button', { class: `status-pill status-${paidPill ? 'paid' : 'outstanding'}`,
+        const pill = el('button', { class: `status-pill status-${paidPill ? 'paid' : 'outstanding'}`, 'data-focus-key': `pill:${i}`,
           'aria-label': `${d.name}: ${paidPill ? 'Settled' : 'Active'} — click to change` },
           icoEl(paidPill ? ['circle-check', 'check-circle'] : ['hourglass']), paidPill ? 'Settled' : 'Active');
         pill.addEventListener('click', () => {
           const row = S.debts.indexOf(d);
           d.status = paidPill ? 'active' : 'paid';
-          mark(); renderDebts(row);
+          mark(); renderDebts(`pill:${row}`);
         });
 
         // A settled debt leaves the totals and the plan but stays on the page —
@@ -883,8 +884,15 @@ module.exports = function registerDebts(ctx) {
             ...S.categories.map(c => el('option', { value: c.name, ...(c.name === d.category ? { selected: '' } : {}) }, c.name)))),
           payoffCell, clearCell, interestCell,
           el('td', {}, pill),
-          el('td', {}, el('button', { class: 'btn-ghost btn-ghost-sm', 'aria-label': `Remove ${d.name}`,
-            onclick: () => { S.debts.splice(S.debts.indexOf(d), 1); mark(); renderDebts(); } }, '✕'))));
+          el('td', {}, el('button', { class: 'btn-ghost btn-ghost-sm', 'aria-label': `Remove ${d.name}`, 'data-focus-key': `del:${i}`,
+            /* The pill had a focus restore and this did not, so removing a
+               debt left the reader on <body> (audit of 11 Nov 2026, task 16).
+               The debt that moved up, else the one above, else New debt. */
+            onclick: () => {
+              const row = S.debts.indexOf(d);
+              S.debts.splice(row, 1); mark();
+              renderDebts([`del:${row}`, `del:${row - 1}`, $('#debtAdd')]);
+            } }, '✕'))));
 
         refreshRow();
       }
@@ -905,10 +913,7 @@ module.exports = function registerDebts(ctx) {
     // Cycling a status is the main keyboard interaction here; rebuilding the
     // table drops focus to <body>, which ejects the reader to the top of the
     // page on every click. Same fix as Owed Money.
-    if (focusRow !== undefined && focusRow >= 0) {
-      const pill = t.querySelectorAll('.status-pill')[focusRow];
-      if (pill) pill.focus();
-    }
+    if (landing !== undefined) refocus(t, landing);
   }
 
   /* ------------------------------ persistence ---------------------------- */

@@ -3,7 +3,7 @@
    Services.md. */
 
 const { opWriterOf } = require('../io');
-const { el, kpiTiles, dateInput, keepScroll, icoEl, tableCells } = require('../dom');
+const { el, kpiTiles, dateInput, keepScroll, refocus, icoEl, tableCells } = require('../dom');
 const { normalizeAmount } = require('../amount');
 const { SCHEMAS, mdTableFile, CYCLES } = require('../table-schema');
 const { askFields } = require('../modal');
@@ -373,7 +373,7 @@ module.exports = function registerServices(ctx) {
      while the tooltip quoted the main charge on the 5th). The cadence is
      worded by the cycle; "around day N each week" read a day-of-the-MONTH
      median as if a week had thirty days. */
-  function svcNextHint(s, c, date) {
+  function svcNextHint(s, c, date, n) {
     const stale = !s.next || s.next < todayIso();
     const { last, first, skipped } = c.next;
     const title = `Last charged ${last}, billed every ${CYCLE_NOUN[s.cycle] || 'month'}, so the next charge is due ${date}.`
@@ -381,10 +381,15 @@ module.exports = function registerServices(ctx) {
         /* The records stop before the date: nothing says it did not happen. */
         ? ` ${first} has passed, but ${c.paidFrom.name} is not imported yet that far (${c.paidFrom.byImport ? 'last import' : 'balance confirmed'} ${c.paidFrom.through}), so this is the next date after today.`
         : ` ${first} has passed with no charge in your transactions yet, so this is the next date after today.`) : '');
-    const btn = el('button', { type: 'button', class: 'svc-next-hint', title,
+    const btn = el('button', { type: 'button', class: 'svc-next-hint', title, 'data-focus-key': `hint:${n}`,
       'aria-label': `Set next billing for ${s.name} to ${date}` },
     icoEl(['calendar-check', 'calendar']), stale ? `due ${date}` : date);
-    btn.addEventListener('click', () => { s.next = date; mark(); renderServices(); });
+    /* Taking the date removes the offer: the stored date now matches, so the
+       redraw has no hint to draw and the button that was pressed is gone. The
+       reader lands on the service's ROW, which now reads the date they took.
+       Not on the date field beside it — focusing a date input from inside a
+       tap opens the picker on a phone, for a date that has just been set. */
+    btn.addEventListener('click', () => { s.next = date; mark(); renderServices(); refocus($('#svcTable'), `row:${n}`); });
     return btn;
   }
 
@@ -399,11 +404,18 @@ module.exports = function registerServices(ctx) {
         el('th', { scope: 'col' }, 'Cycle'), el('th', { scope: 'col' }, 'Next billing'), el('th', { scope: 'col' }, 'Active'), el('th', { scope: 'col' }, ''))));
       const body = el('tbody', {});
       const groups = serviceGroups();
+      /* `n` counts service rows in the order they are drawn, across the
+         category bars — the position the focus keys below are built from
+         (dom.js refocus). S.services' own index would not do: the page groups
+         and sorts, so "the row that moved up" is the next one DRAWN. */
+      let n = -1;
       for (const cat of Object.keys(groups).sort()) {
         body.append(el('tr', { class: 'type-row', 'data-cat': cat },
           el('td', { colspan: '6' }, cat),
           el('td', { class: 'num' }, subtotalText(groups[cat]))));
         for (const s of groups[cat]) {
+          n++;
+          const at = n;
           /* Beside the Amount field, updated in place by its own editor (the row
              is not rebuilt on an amount edit — see renderServicesKpis). Empty
              unless the figure is below zero, whether typed now or already in a
@@ -416,7 +428,7 @@ module.exports = function registerServices(ctx) {
           const refresh = () => { mark(); renderServicesKpis(); renderServiceSubtotals(); };
           const c = charged.get(s) || {};
           const hintDate = offeredNext(s, c);
-          body.append(el('tr', { class: s.active ? '' : 'svc-inactive' },
+          body.append(el('tr', { class: s.active ? '' : 'svc-inactive', 'data-focus-key': `row:${at}` },
             el('td', { style: 'font-weight:600' }, s.name, ctx.noteButton('service', s.name), ...svcFlags(s, c)),
             el('td', { class: 'text-muted' }, s.provider),
             el('td', { class: 'num' }, el('input', { type: 'number', step: '0.01', class: 'form-control form-control-sm', value: s.amount || '',
@@ -451,14 +463,22 @@ module.exports = function registerServices(ctx) {
                next is 2 August. Offered rather than written, because the reader
                may be tracking a plan change the history cannot know about —
                see offeredNext for when it is held back. */
-            ...(hintDate ? [svcNextHint(s, c, hintDate)] : [])),
+            ...(hintDate ? [svcNextHint(s, c, hintDate, at)] : [])),
             /* In a <label> so the phone card can give the tick a 44px target
                without inflating the native glyph (a checkbox renders no
                ::after for the house overlay trick). Inert on a desktop. */
+            /* Both handlers below redraw the table they sit in, so each says
+               where the reader should be afterwards (dom.js refocus): on the
+               same tick, and — after a removal — on the service that moved up
+               into this one's place, else the one above, else New service. */
             el('td', {}, el('label', { class: 'tbl-tick' }, el('input', { type: 'checkbox', 'aria-label': `${s.name} is active`, ...(s.active ? { checked: '' } : {}),
-              onchange: e => { s.active = e.target.checked; mark(); renderServices(); } }))),
-            el('td', {}, el('button', { class: 'btn-ghost btn-ghost-sm', 'aria-label': `Remove ${s.name}`,
-              onclick: () => { S.services.splice(S.services.indexOf(s), 1); mark(); renderServices(); } }, '✕'))));
+              'data-focus-key': `active:${at}`,
+              onchange: e => { s.active = e.target.checked; mark(); renderServices(); refocus($('#svcTable'), `active:${at}`); } }))),
+            el('td', {}, el('button', { class: 'btn-ghost btn-ghost-sm', 'aria-label': `Remove ${s.name}`, 'data-focus-key': `del:${at}`,
+              onclick: () => {
+                S.services.splice(S.services.indexOf(s), 1); mark(); renderServices();
+                refocus($('#svcTable'), [`del:${at}`, `del:${at - 1}`, $('#svcAdd')]);
+              } }, '✕'))));
         }
       }
       if (!S.services.length) body.append(el('tr', {}, el('td', { colspan: '7', class: 'text-muted' }, 'No services yet.')));
