@@ -408,17 +408,28 @@ class BudgetPlugin extends Plugin {
      writer the wizard's own scaffold already uses (createVaultFileIfAbsent):
      the folder was typed by the person sitting there, not built from synced
      data, so the containment is "inside the vault", not "inside the open
-     book" — which, for a book that is not the open one, is the whole point. */
+     book" — which, for a book that is not the open one, is the whole point.
+
+     THE BOOK IS ASKED FOR ONCE (2026-11-11 audit, task 3). With no folder
+     named, the path used to be resolved from the open book, the file READ —
+     an await — and the result written through io.writeFile('Settings.md'),
+     which resolves the open book a second time. A switch landing inside the
+     read wrote book A's whole Settings.md, household and period and all, into
+     book B; and this io is the plugin's own, with no loadedBook, so io.js's
+     book-changed refusal could not fire. Now the folder is taken before
+     anything is awaited — the caller's, or the open book's at this instant —
+     and the one path built from it is both read and written. A setting lands
+     in the book it was asked for, whatever is open by the time it lands
+     (tests/settings-write-book-bound.test.cjs). */
   async updateBudgetSettingsMd(key, value, folder) {
-    const named = typeof folder === 'string';
-    const mdPath = named ? normalizePath(folder + '/Settings.md') : this.settingsMdPath();
+    const book = typeof folder === 'string' ? folder : this.activeFolder();
+    const mdPath = normalizePath(book + '/Settings.md');
     const f = this.app.vault.getFileByPath(mdPath);
-    /* One guarded writer for both branches. makeIo's writeFile is rooted at
-       the budget folder ('Settings.md' resolves to settingsMdPath), does the
-       create-or-modify split itself, carries the containment check this
-       method used to lack, and stamps the shared write-guard — which was
-       previously spelled out by hand four times here, where missing one
-       means the watcher reloads over our own write. */
+    /* One guarded writer. makeIo's writeVaultFile does the create-or-modify
+       split itself, collapses the path and refuses one that leaves the vault,
+       and stamps the shared write-guard — which was previously spelled out by
+       hand four times here, where missing one means the watcher reloads over
+       our own write. */
     const io = makeIo({ vault: this.app.vault, plugin: this });
     let text;
     if (f) {
@@ -453,8 +464,7 @@ class BudgetPlugin extends Plugin {
       defaults[key] = value;
       text = '---\n' + Object.entries(defaults).map(([k, v]) => `${k}: ${v}`).join('\n') + '\n---\n\n# Budget Settings\n';
     }
-    if (named) await io.writeVaultFile(mdPath, text);
-    else await io.writeFile('Settings.md', text);
+    await io.writeVaultFile(mdPath, text);
   }
 
   /* The privacy gate's way to the plugin-level session flag: controller.js

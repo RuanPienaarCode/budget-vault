@@ -166,6 +166,71 @@ function readFlatTable(schema, text) {
   return { rows, lead, trail, extraCols: extraColsOf(known, header, sep, dataRows) };
 }
 
+/* One month file's text, parsed: everything load keeps of it that depends on
+   the TEXT alone. Label, month and rel come from the file's path and are added
+   by the caller. Pure — which is what lets a reload reuse it (parsedMonth,
+   below) instead of parsing an unchanged file again. */
+function parseTxText(text) {
+  const { raw } = parseFrontmatter(text);
+  /* ISSUE 69 — a hand-added column (a running Balance) past what this
+     schema knows about; parseMdTableWithSeparator, not parseMdTable, since
+     the header/separator cells past `known` are what names and aligns it.
+     `known` is read off the file's OWN header rather than assumed to be
+     the full 7-column schema, because Split is itself conditional
+     (serializeTxFile writes it only into a file that has one) — a
+     6-column file with a hand-added Balance column also has 7 cells on
+     disk, and treating position 6 as Split there would read the reader's
+     figure through splitRole and lose it outright. */
+  const { header, sep, dataRows, tx } = tableParts(text, SCHEMAS.transactions.columns[0].header);
+  const splitCol = SCHEMAS.transactions.columns[6];
+  const hasSplitHeader = !!(header && header[6] && header[6].trim().toLowerCase() === splitCol.header.toLowerCase());
+  const known = hasSplitHeader ? 7 : 6;
+  return {
+    fmRaw: raw,
+    /* CONTRACT 1, the loader's half: the prose around the table and the
+       file's own separator, which the next write of the month deleted or
+       rewrote (L3-02, L3-22). Exactly what each holds: verbatimAroundTable;
+       tests/tx-file-lead-trail-sep.test.cjs pins them and the round trip. */
+    lead: tx.lead, trail: tx.trail, sep: tx.sep,
+    extraCols: extraColsOf(known, header, sep, dataRows),
+    /* ISSUE 69 — serializeTxFile decides per save whether a row still
+       needs Split at all; when this file ALSO carries an extra column
+       that decision must not move it, since the extra sits at position
+       `known` regardless of whether a split survives today's edit. */
+    splitHeaderPresent: hasSplitHeader,
+
+    /* The Split column was added after these files started being written —
+       absent on every row of every file that predates it, which the
+       schema's read yields as '' exactly as it reads a blank cell. The
+       truncation sweep in tests/table-schema-guards.test.cjs holds that
+       property for every column, current and future.
+
+       `c.slice(0, known)`, not the raw row: rowToObject then sees an
+       index past `known` as undefined, the same shape a short row has
+       always read as, so a six-column file's own extra cell can never be
+       misread as Split — attachExtraCells below still gets the REAL `c`. */
+    rows: dataRows.map(c => attachExtraCells(rowToObject(SCHEMAS.transactions, c.slice(0, known)), known, c)),
+  };
+}
+
+/* The two halves of "the cache keeps its own copy" (parsedMonth, below).
+   freezeDeep: what is kept can never be changed, by anyone, in strict mode
+   (every file in src/ is). thaw: a fresh, ordinary, editable copy — same
+   keys in the same order, a key holding undefined still there. Plain data
+   only (objects, arrays, primitives), which is all a parse is. */
+function freezeDeep(v) {
+  if (v === null || typeof v !== 'object' || Object.isFrozen(v)) return v;
+  for (const k of Object.keys(v)) freezeDeep(v[k]);
+  return Object.freeze(v);
+}
+function thaw(v) {
+  if (Array.isArray(v)) return v.map(x => thaw(x));
+  if (v === null || typeof v !== 'object') return v;
+  const o = {};
+  for (const k of Object.keys(v)) o[k] = thaw(v[k]);
+  return o;
+}
+
 module.exports = function registerLoad(ctx) {
   const { S, vault, currentPeriod, periodKeyValid } = ctx;
 
@@ -194,10 +259,43 @@ module.exports = function registerLoad(ctx) {
      whose load was superseded follows the switch. `committed` is the folder
      the state in S was read from (basePath() form) and the load's sequence
      number — io.js refuses a write into any other folder (loadedBook). */
-  let committed = null;     // { folder, seq } — frozen; replaced, never mutated
+  /* `staleMark` is WHEN that load began, on io.js's stale sequence: every
+     change somebody else made that was marked at or before it, this load read
+     after. It is the only honest bound for lifting those marks, and it travels
+     with the load rather than with whoever asked for it, because the asker may
+     have JOINED (2026-11-11 audit, task 1). controller.js's reloadFromDisk took
+     its own mark; joined onto a load that had already read a month file, it
+     lifted the mark for a phone row that load never saw, and the next Save
+     deleted the row (tests/save-refuses-stale-joined-reload.test.cjs). */
+  let committed = null;    // { folder, seq, staleMark } — frozen; replaced, never mutated
   let seq = 0;
   let inFlight = null;      // { folder, promise } — the load a same-folder caller joins
   const openFolder = () => ctx.basePath();
+
+  /* ---- a reload parses only the month files that changed ----
+     2026-11-11 audit, task 11. Every external change re-reads the vault, and
+     the time is the transaction tables: 80–94 ms a reload at five years (240
+     files, 17 760 rows) on a desktop, linear in rows — a sync burst on a phone
+     pays it a dozen times over for files nobody touched. So the last committed
+     load's parses are kept, by vault path, beside the TEXT each came from. A
+     file whose text is the same string is not parsed again. The whole text,
+     never a hash: a false "same" here would put one file's rows on screen
+     under another's name and let the next Save write them there. */
+  let txParsed = new Map();     // vault path → { text, parse } — parse deep-frozen
+  /* What is kept is frozen and never handed out; every load, hit or miss, gets
+     its own thaw() of it. Edits mutate rows in place and a reload must give
+     back the disk's, so no object may be shared between the cache and a
+     state, or between two loads (tests/load-parse-cache.test.cjs). One path
+     for both cases on purpose: a copy that lost anything would show on every
+     load in every suite, not only on a reload. `seen` collects this load's
+     entries; they replace the cache when — and only if — the load commits. */
+  function parsedMonth(path, text, seen) {
+    const held = txParsed.get(path);
+    const parse = held && typeof text === 'string' && held.text === text
+      ? held.parse : freezeDeep(parseTxText(text));
+    seen.set(path, { text, parse });
+    return thaw(parse);
+  }
 
   function loadVault() {
     const folder = openFolder();
@@ -224,7 +322,7 @@ module.exports = function registerLoad(ctx) {
   }
 
   /* The book the state in memory was read from, or null before the first load:
-     { folder, seq }, one frozen object per committed load, so a caller holding
+     { folder, seq, staleMark }, one frozen object per committed load, so a caller holding
      one across an await can tell "still the same load" by identity.
      ADR-0007 · A confirmation dialog takes a load stamp. io.js opWriter() takes
      this before the operation's first await and binds every write to it. */
@@ -239,6 +337,10 @@ module.exports = function registerLoad(ctx) {
   }
 
   async function doLoadVault(folder, mySeq) {
+    /* Taken before the first read, and before anything is awaited: what was
+       marked stale up to here is older than every byte this load will hold.
+       A ctx assembled without io.js's ledger has nothing to bound. */
+    const began = typeof ctx.staleMark === 'function' ? ctx.staleMark() : 0;
     // Every read below goes through R, rooted at `folder`; T is committed at the end.
     const R = ctx.readersAt(folder);
     const T = { settings: JSON.parse(JSON.stringify(SETTINGS_DEFAULTS)) };
@@ -340,7 +442,7 @@ module.exports = function registerLoad(ctx) {
         /* Budget-folder-relative, because that is the currency readFile and
            writeFile deal in — file.path is absolute within the vault and would
            be re-prefixed by relPath into a path that does not exist. */
-        rel: file.path.slice(R.basePath().length + 1),   // ISSUE 97 — READ from, never assembled
+        rel: R.relOf(file.path),   // ISSUE 97 — READ from, never assembled
       });
     }
     const order = typeOrder(T.settings.groups);
@@ -363,14 +465,13 @@ module.exports = function registerLoad(ctx) {
     /* ADR-0007 · Two accounts claiming one transaction folder. ISSUE 72: keyed the way
        accountForLabel keys; filled after the accounts loop below. */
     T.accountsDuplicated = [];
-    const acctBase = R.basePath();
     for (const { file: f, text: acctText } of await read(acctFiles)) {
       const { fm, body, raw } = parseFrontmatter(acctText);
       /* An account file that OPENS a frontmatter block and never closes it:
          the fence is lost, not absent. A note with no `---` at all is a
          hand-made account and legitimately has no properties (L3-07). */
       if (startsFence(acctText) && !hasFrontmatterBlock(acctText)) {
-        unreadable.push({ rel: f.path.slice(acctBase.length + 1), why: 'frontmatter' });
+        unreadable.push({ rel: R.relOf(f.path), why: 'frontmatter' });
       }
       T.accounts.push({
         name: f.basename,
@@ -381,7 +482,7 @@ module.exports = function registerLoad(ctx) {
            assembled path for every account loaded today, so nothing moves —
            see the ADR-0007 register, "An account carries the path it was read
            from", for why the writers must adopt it before the loader recurses. */
-        rel: f.path.slice(acctBase.length + 1),
+        rel: R.relOf(f.path),
         fmRaw: raw,   // verbatim frontmatter, for lossless write-back of unmodeled keys
         type: fm.type || 'other', institution: fm.institution || '',
         account_number: fm.account_number || '', tx_label: fm.tx_label || '',
@@ -493,7 +594,7 @@ module.exports = function registerLoad(ctx) {
       }
       T.budgets[period] = rows;
       T.budgetMeta[period] = {
-        raw, rel: f.path.slice(R.basePath().length + 1), leadRaw: before, trailRaw: after,
+        raw, rel: R.relOf(f.path), leadRaw: before, trailRaw: after,
         extraCols: extraColsOf(4, header, sep, dataRows), order, unnamed,
       };
     }
@@ -523,7 +624,7 @@ module.exports = function registerLoad(ctx) {
     const txFiles = [];
     for (const folder of R.subfoldersUnder('Transactions')) {
       const months = folder.children.filter(f => f instanceof TFile && f.extension === 'md' && /^\d{4}-\d{2}$/.test(f.basename));
-      const rel = folder.path.slice(R.basePath().length + 1);
+      const rel = R.relOf(folder.path);
       const depth = rel.split('/').length - 1;          // Transactions/Cheque -> 1
       if (T.txFolderPaths[folder.name] !== undefined) {
         // A shallower folder already claimed this label. Only say so if this
@@ -544,49 +645,18 @@ module.exports = function registerLoad(ctx) {
       for (const f of months) txFiles.push({ acct: folder, f });
     }
     const txTexts = await Promise.all(txFiles.map(({ f }) => vault.cachedRead(f)));
+    const parsedNow = new Map();
     txFiles.forEach(({ acct, f }, i) => {
       const month = f.basename;
-      const text = txTexts[i];
-      const { raw } = parseFrontmatter(text);
-      /* ISSUE 69 — a hand-added column (a running Balance) past what this
-         schema knows about; parseMdTableWithSeparator, not parseMdTable, since
-         the header/separator cells past `known` are what names and aligns it.
-         `known` is read off the file's OWN header rather than assumed to be
-         the full 7-column schema, because Split is itself conditional
-         (serializeTxFile writes it only into a file that has one) — a
-         6-column file with a hand-added Balance column also has 7 cells on
-         disk, and treating position 6 as Split there would read the reader's
-         figure through splitRole and lose it outright. */
-      const { header, sep, dataRows, tx } = tableParts(text, SCHEMAS.transactions.columns[0].header);
-      const splitCol = SCHEMAS.transactions.columns[6];
-      const hasSplitHeader = !!(header && header[6] && header[6].trim().toLowerCase() === splitCol.header.toLowerCase());
-      const known = hasSplitHeader ? 7 : 6;
+      const p = parsedMonth(f.path, txTexts[i], parsedNow);
       T.txFiles[`${acct.name}/${month}`] = {
-        label: acct.name, month, dirty: false, fmRaw: raw,
-        rel: f.path.slice(R.basePath().length + 1),   // ISSUE 97 — the path it was READ from
-        /* CONTRACT 1, the loader's half: the prose around the table and the
-           file's own separator, which the next write of the month deleted or
-           rewrote (L3-02, L3-22). Exactly what each holds: verbatimAroundTable;
-           tests/tx-file-lead-trail-sep.test.cjs pins them and the round trip. */
-        lead: tx.lead, trail: tx.trail, sep: tx.sep,
-        extraCols: extraColsOf(known, header, sep, dataRows),
-        /* ISSUE 69 — serializeTxFile decides per save whether a row still
-           needs Split at all; when this file ALSO carries an extra column
-           that decision must not move it, since the extra sits at position
-           `known` regardless of whether a split survives today's edit. */
-        splitHeaderPresent: hasSplitHeader,
-
-        /* The Split column was added after these files started being written —
-           absent on every row of every file that predates it, which the
-           schema's read yields as '' exactly as it reads a blank cell. The
-           truncation sweep in tests/table-schema-guards.test.cjs holds that
-           property for every column, current and future.
-
-           `c.slice(0, known)`, not the raw row: rowToObject then sees an
-           index past `known` as undefined, the same shape a short row has
-           always read as, so a six-column file's own extra cell can never be
-           misread as Split — attachExtraCells below still gets the REAL `c`. */
-        rows: dataRows.map(c => attachExtraCells(rowToObject(SCHEMAS.transactions, c.slice(0, known)), known, c)),
+        label: acct.name, month, dirty: false, fmRaw: p.fmRaw,
+        rel: R.relOf(f.path),   // ISSUE 97 — the path it was READ from
+        // The rest is parseTxText's, above — where each field is explained.
+        lead: p.lead, trail: p.trail, sep: p.sep,
+        extraCols: p.extraCols,
+        splitHeaderPresent: p.splitHeaderPresent,
+        rows: p.rows,
       };
     });
 
@@ -728,7 +798,7 @@ module.exports = function registerLoad(ctx) {
         /* ADR-0007 · Plans are keyed by basename, not display name. The file is the identity;
            writers derive the path from `file`. */
         file: f.basename,
-        rel: f.path.slice(R.basePath().length + 1),   // ISSUE 97 — READ from, never assembled
+        rel: R.relOf(f.path),   // ISSUE 97 — READ from, never assembled
         name: (fm.plan || '').toString().trim() || f.basename,
         fmRaw: raw,   // verbatim frontmatter, for lossless write-back
         leadRaw: plan67.lead, extras: plan67.extras,
@@ -820,7 +890,7 @@ module.exports = function registerLoad(ctx) {
       }));
       T.tax[f.basename] = {
         fmRaw: raw,   // verbatim frontmatter, for lossless write-back of unmodeled keys
-        rel: f.path.slice(R.basePath().length + 1),   // ISSUE 97 — READ from, never assembled
+        rel: R.relOf(f.path),   // ISSUE 97 — READ from, never assembled
         leadRaw: tax67.lead, extras: tax67.extras, sectionLeads: tax67.leads,
         extraCols: { steps: steps.extraCols, docs: docs.extraCols, figures: figures.extraCols },
         /* The two frontmatter vocabularies go through cellVocab, the reader
@@ -863,7 +933,8 @@ module.exports = function registerLoad(ctx) {
        to the end, so no render, write or second load can see half of it. */
     if (folder !== openFolder() || (committed && mySeq < committed.seq)) return false;
     Object.assign(S, T);
-    committed = Object.freeze({ folder, seq: mySeq });
+    committed = Object.freeze({ folder, seq: mySeq, staleMark: began });
+    txParsed = parsedNow;     // this book's month files, and only those
     setLanguage(language);
     /* The three selections that survive a reload — the open plan, the open
        tax year, the period on screen — are the reader's, kept when the
@@ -885,7 +956,11 @@ module.exports = function registerLoad(ctx) {
      and views/food.js call these after their own writes): the book the state
      in memory was read from, so a note list re-read in the window between a
      switch and its reload is the same book's as everything beside it. */
-  const committedReaders = () => (committed ? ctx.readersAt(committed.folder) : ctx);
+  /* Before any load has committed there is no such book yet: the open one,
+     through the same readersAt() — never the bare ctx, whose readers carry no
+     relOf, the one spelling of "what is this file called inside the book"
+     that is right for a book at the vault root (io.js relUnder). */
+  const committedReaders = () => ctx.readersAt(committed ? committed.folder : ctx.basePath());
 
   /* Receipts/ — one file per till slip, read the way Notes are: under, not
      in (a household files them by month), in parallel, and a slip that
@@ -899,12 +974,11 @@ module.exports = function registerLoad(ctx) {
   async function loadReceipts(into = S, R = committedReaders()) {
     const files = R.mdFilesUnder(RECEIPTS_DIR);
     const texts = await Promise.all(files.map(f => vault.cachedRead(f).catch(() => null)));
-    const base = R.basePath();
     const receipts = [];
     into.foodItems = new Map();
     files.forEach((f, i) => {
       if (texts[i] == null) return;
-      const rel = f.path.slice(base.length + 1);
+      const rel = R.relOf(f.path);
       if (rel === FOOD_ITEMS_FILE) {
         into.foodItems = parseFoodItems(texts[i]);
         return;
@@ -926,14 +1000,13 @@ module.exports = function registerLoad(ctx) {
        blank because of it. See mdFilesUnder in io.js. */
     const files = R.mdFilesUnder(NOTES_DIR);
     const texts = await Promise.all(files.map(f => vault.cachedRead(f).catch(() => null)));
-    const base = R.basePath();
     const notes = [];
     files.forEach((f, i) => {
       if (texts[i] == null) return;
       /* Derived from the file's OWN path rather than assembled from the folder
          and the name — the note may be several levels down, and every writer
          (readFile, writeFile, fileAt) takes a budget-folder-relative path. */
-      const rel = f.path.slice(base.length + 1);
+      const rel = R.relOf(f.path);
       notes.push({ rel, name: f.name, ...parseNote(texts[i], rel) });
     });
     into.notes = sortNotes(notes);

@@ -282,19 +282,46 @@ class BudgetSettingTab extends PluginSettingTab {
     const fmSection = containerEl.createDiv();
     this.renderMdSettings(fmSection);
   }
-  /* Obsidian calls this when the tab closes. The six text fields below debounce
-     their Settings.md write by 800ms, so closing the tab mid-keystroke otherwise
+  /* ---- the debounced Settings.md fields ----
+     The ten text fields below write Settings.md 800 ms after the last
+     keystroke. Each used to keep its own handle (_hhTimer, _curTimer, …),
+     and two things followed from there being ten of them (2026-11-11 audit,
+     task 3):
+
+       - hide() cleared eight by name. _emergencyTimer, _milesTimer and
+         _codeTimer were added later and never joined the list, so closing the
+         tab inside 800 ms left three writes to fire against a closed tab.
+       - nothing tied a pending write to a BOOK. The timer's body called
+         updateBudgetSettingsMd() with no folder, which patches whichever book
+         is open when it runs — so a value typed for one book, followed inside
+         800 ms by a switch or a Remove, was written into another.
+
+     So there is one door. typed(slot, write) debounces per field (`slot`), and
+     takes the open book's folder AT THE KEYSTROKE: `write(book)` hands it to
+     updateBudgetSettingsMd as the folder to patch, and the value lands in the
+     book it was typed for whatever is open by then. dropTyped() cancels every
+     pending one, and a field added tomorrow is covered by both without anyone
+     remembering to list it. A plugin stand-in without the book seam (a guard
+     test's plain object) gets `undefined`, which is "the open book", as before. */
+  typed(slot, write) {
+    const pending = this._typed || (this._typed = new Map());
+    clearTimeout(pending.get(slot));
+    const book = typeof this.plugin.activeFolder === 'function' ? this.plugin.activeFolder() : undefined;
+    pending.set(slot, setTimeout(() => {
+      pending.delete(slot);
+      return write(book);
+    }, 800));
+  }
+  dropTyped() {
+    if (!this._typed) return;
+    for (const handle of this._typed.values()) clearTimeout(handle);
+    this._typed.clear();
+  }
+  /* Obsidian calls this when the tab closes. Closing it mid-keystroke otherwise
      left a write + reloadViews() to fire against a tab that no longer exists —
      the same teardown discipline the view controller applies in destroy(). */
   hide() {
-    clearTimeout(this._hhTimer);
-    clearTimeout(this._ownersTimer);
-    clearTimeout(this._groupsTimer);
-    clearTimeout(this._nonEssTimer);
-    clearTimeout(this._msdTimer);
-    clearTimeout(this._curTimer);
-    clearTimeout(this._lagTimer);
-    clearTimeout(this._anchorTimer);
+    this.dropTyped();
   }
   async renderMdSettings(containerEl) {
     const md = await this.plugin.readBudgetSettingsMd();
@@ -310,15 +337,14 @@ class BudgetSettingTab extends PluginSettingTab {
       .addText(t => {
         t.setValue(md.household ?? '');
         t.onChange(v => {
-          clearTimeout(this._hhTimer);
-          this._hhTimer = setTimeout(async () => {
+          this.typed('hh', async book => {
             // yamlStr, same as the currency field below and the declarative tab
             // above: the hand-rolled quoting this replaced DELETED embedded
             // quotes rather than escaping them, so 'Alex "The General"' saved
             // as 'Alex The General'.
-            await this.plugin.updateBudgetSettingsMd('household', yamlStr(v.trim()));
+            await this.plugin.updateBudgetSettingsMd('household', yamlStr(v.trim()), book);
             this.plugin.reloadViews();
-          }, 800);
+          });
         });
       });
 
@@ -332,11 +358,10 @@ class BudgetSettingTab extends PluginSettingTab {
         // duplicate reads back tidied instead of sitting there looking accepted.
         t.setValue(parseOwners(md.owners).join(', '));
         t.onChange(v => {
-          clearTimeout(this._ownersTimer);
-          this._ownersTimer = setTimeout(async () => {
-            await this.plugin.updateBudgetSettingsMd('owners', yamlStr(parseOwners(v).join(', ')));
+          this.typed('owners', async book => {
+            await this.plugin.updateBudgetSettingsMd('owners', yamlStr(parseOwners(v).join(', ')), book);
             this.plugin.reloadViews();
-          }, 800);
+          });
         });
       });
 
@@ -349,15 +374,14 @@ class BudgetSettingTab extends PluginSettingTab {
         // duplicate reads back dropped instead of sitting there looking accepted.
         t.setValue(parseGroups(md.groups).join(', '));
         t.onChange(v => {
-          clearTimeout(this._groupsTimer);
-          this._groupsTimer = setTimeout(async () => {
-            await this.plugin.updateBudgetSettingsMd('groups', yamlStr(parseGroups(v).join(', ')));
+          this.typed('groups', async book => {
+            await this.plugin.updateBudgetSettingsMd('groups', yamlStr(parseGroups(v).join(', ')), book);
             this.plugin.reloadViews();
             /* A new group is a new row below, and a removed one takes its row
                with it — without this the list underneath describes the groups
                this tab opened with, not the ones the vault now has. */
             if (this._redrawNonEssential) await this._redrawNonEssential();
-          }, 800);
+          });
         });
       });
 
@@ -399,8 +423,7 @@ class BudgetSettingTab extends PluginSettingTab {
         t.inputEl.type = 'number';
         t.setValue(String(md.month_start_day ?? 23));
         t.onChange(v => {
-          clearTimeout(this._msdTimer);
-          this._msdTimer = setTimeout(async () => {
+          this.typed('msd', async book => {
             const n = parseInt(v, 10);
             // Say so. A bare return left the rejected value sitting in the field
             // looking saved, and the period silently kept its old start day.
@@ -411,9 +434,9 @@ class BudgetSettingTab extends PluginSettingTab {
             // Read the previous value before the write, same ordering as the
             // anchor field below — afterwards there is nothing to compare against.
             this.noticeMonthStartReslices(md, Number(md.month_start_day ?? 23), n);
-            await this.plugin.updateBudgetSettingsMd('month_start_day', String(n));
+            await this.plugin.updateBudgetSettingsMd('month_start_day', String(n), book);
             this.plugin.reloadViews();
-          }, 800);
+          });
         });
       });
 
@@ -424,8 +447,7 @@ class BudgetSettingTab extends PluginSettingTab {
         t.inputEl.type = 'number';
         t.setValue(String(overspendLag(md.overspend_lag)));
         t.onChange(v => {
-          clearTimeout(this._lagTimer);
-          this._lagTimer = setTimeout(async () => {
+          this.typed('lag', async book => {
             const n = parseInt(v, 10);
             // Say so, same as the month start day above — a bare return leaves
             // the rejected value sitting in the field looking saved.
@@ -433,9 +455,9 @@ class BudgetSettingTab extends PluginSettingTab {
               new Notice(`Budget: "${v}" is not a valid overspend lag — enter a number from 1 to ${OVERSPEND_LAG_MAX}.`, 6000);
               return;
             }
-            await this.plugin.updateBudgetSettingsMd('overspend_lag', String(n));
+            await this.plugin.updateBudgetSettingsMd('overspend_lag', String(n), book);
             this.plugin.reloadViews();
-          }, 800);
+          });
         });
       });
 
@@ -446,8 +468,7 @@ class BudgetSettingTab extends PluginSettingTab {
         t.inputEl.type = 'number';
         t.setValue(String(emergencyTarget(md.emergency_target_months)));
         t.onChange(v => {
-          clearTimeout(this._emergencyTimer);
-          this._emergencyTimer = setTimeout(async () => {
+          this.typed('emergency', async book => {
             const n = parseInt(v, 10);
             // Say so, same as the two above — a bare return leaves the rejected
             // value sitting in the field looking saved.
@@ -455,9 +476,9 @@ class BudgetSettingTab extends PluginSettingTab {
               new Notice(`Budget: "${v}" is not a valid emergency fund target — enter a number of months from 1 to ${EMERGENCY_TARGET_MAX}.`, 6000);
               return;
             }
-            await this.plugin.updateBudgetSettingsMd('emergency_target_months', String(n));
+            await this.plugin.updateBudgetSettingsMd('emergency_target_months', String(n), book);
             this.plugin.reloadViews();
-          }, 800);
+          });
         });
       });
 
@@ -469,8 +490,7 @@ class BudgetSettingTab extends PluginSettingTab {
         t.inputEl.step = '0.01';
         t.setValue(String(milesRate(md.miles_rate)));
         t.onChange(v => {
-          clearTimeout(this._milesTimer);
-          this._milesTimer = setTimeout(async () => {
+          this.typed('miles', async book => {
             const n = Number(String(v).trim().replace(',', '.'));
             // Say so, like the three above — and refuse rather than clamp: a
             // "10" typed to mean "10 Miles to the rand" must not become a rate
@@ -479,9 +499,9 @@ class BudgetSettingTab extends PluginSettingTab {
               new Notice(i18n.t('settings.milesRate.invalid', { value: v, max: MILES_RATE_MAX }), 6000);
               return;
             }
-            await this.plugin.updateBudgetSettingsMd('miles_rate', String(n));
+            await this.plugin.updateBudgetSettingsMd('miles_rate', String(n), book);
             this.plugin.reloadViews();
-          }, 800);
+          });
         });
       });
 
@@ -511,15 +531,14 @@ class BudgetSettingTab extends PluginSettingTab {
         t.inputEl.type = 'date';
         t.setValue((md.period_anchor ?? '').toString().trim());
         t.onChange(v => {
-          clearTimeout(this._anchorTimer);
-          this._anchorTimer = setTimeout(async () => {
+          this.typed('anchor', async book => {
             const next = v.trim();
             if (next && !isRealIsoDate(next)) {
               new Notice(i18n.t('settings.dateNotReal', { value: next }), 6000);
               return;
             }
             await this.warnIfAnchorReslices(md, next);
-            await this.plugin.updateBudgetSettingsMd('period_anchor', next);
+            await this.plugin.updateBudgetSettingsMd('period_anchor', next, book);
             this.plugin.reloadViews();
             /* Period length's description is derived from this value, so fixing
                the anchor here has to redraw it — otherwise the tab goes on
@@ -528,7 +547,7 @@ class BudgetSettingTab extends PluginSettingTab {
                doing that on every keystroke-settled edit would yank the focus
                out of this very field. */
             if (periodNeedsAnchor(md) !== periodNeedsAnchor({ ...md, period_anchor: next })) this.display();
-          }, 800);
+          });
         });
       });
 
@@ -596,12 +615,11 @@ class BudgetSettingTab extends PluginSettingTab {
       .addText(t => {
         t.setValue(md.currency ?? 'R');
         t.onChange(v => {
-          clearTimeout(this._curTimer);
-          this._curTimer = setTimeout(async () => {
+          this.typed('cur', async book => {
             if (!v.trim()) return;
-            await this.plugin.updateBudgetSettingsMd('currency', yamlStr(v.trim()));
+            await this.plugin.updateBudgetSettingsMd('currency', yamlStr(v.trim()), book);
             this.plugin.reloadViews();
-          }, 800);
+          });
         });
       });
 
@@ -619,11 +637,10 @@ class BudgetSettingTab extends PluginSettingTab {
         t.setPlaceholder('ZAR');
         t.setValue(md.currency_code ?? '');
         t.onChange(v => {
-          clearTimeout(this._codeTimer);
-          this._codeTimer = setTimeout(async () => {
-            await this.plugin.updateBudgetSettingsMd('currency_code', yamlStr(normalizeCode(v)));
+          this.typed('code', async book => {
+            await this.plugin.updateBudgetSettingsMd('currency_code', yamlStr(normalizeCode(v)), book);
             this.plugin.reloadViews();
-          }, 800);
+          });
         });
       });
 
@@ -698,8 +715,16 @@ class BudgetSettingTab extends PluginSettingTab {
      book's Settings.md (settingsMdPath), so counting the home book's files
      would warn about a different book's budgets than the one whose period is
      being changed. */
+  /* The open book's Budgets/ as a path prefix, for the three counts below.
+     Through normalizePath, not `${activeFolder()}/Budgets/`: a book at the
+     vault root is '/' (io.js, "a book at the vault root"), and the bare
+     template made that '//Budgets/' — a prefix no file has, so a root book
+     was never warned that a period change strands its budgets. */
+  budgetsPrefix() {
+    return `${normalizePath(`${this.plugin.activeFolder()}/Budgets`)}/`;
+  }
   datedBudgetCount() {
-    const base = `${this.plugin.activeFolder()}/Budgets/`;
+    const base = this.budgetsPrefix();
     return this.app.vault.getMarkdownFiles()
       .filter(f => f.path.startsWith(base) && ISO_DATE.test(f.basename)).length;
   }
@@ -714,7 +739,7 @@ class BudgetSettingTab extends PluginSettingTab {
     const anchor = (this.mdSettings().period_anchor ?? '').toString().trim();
     if (!days || !isRealIsoDate(anchor)) return 0;
     const a = isoDayNumber(anchor);
-    const base = `${this.plugin.activeFolder()}/Budgets/`;
+    const base = this.budgetsPrefix();
     return this.app.vault.getMarkdownFiles().filter(f =>
       f.path.startsWith(base) && ISO_DATE.test(f.basename) &&
       (isoDayNumber(f.basename) - a) % days !== 0).length;
@@ -741,7 +766,7 @@ class BudgetSettingTab extends PluginSettingTab {
     new Notice(i18n.t('settings.budgetsKept', { count: n }), 10000);
   }
   monthBudgetCount() {
-    const base = `${this.plugin.activeFolder()}/Budgets/`;
+    const base = this.budgetsPrefix();
     return this.app.vault.getMarkdownFiles()
       .filter(f => f.path.startsWith(base) && /^\d{4}-\d{2}$/.test(f.basename)).length;
   }
@@ -1028,6 +1053,7 @@ class BudgetSettingTab extends PluginSettingTab {
      whether their client's files went with it. */
   async removeBookRow(item) {
     let r;
+    const shown = typeof this.plugin.activeFolder === 'function' ? this.plugin.activeFolder() : undefined;
     try {
       r = await this.plugin.removeBook(item.folder);
     } catch (e) {
@@ -1044,6 +1070,15 @@ class BudgetSettingTab extends PluginSettingTab {
       return r;
     }
     new Notice(i18n.t('books.removed', { label: item.label, folder: item.folder || '/' }), 8000);
+    /* What was still pending was typed into the fields of the book this tab
+       was showing. If that was the removed one, the tab is about to redraw for
+       the home book and the reader will not see those fields again: dropped,
+       as hide() drops them — a debounced write must not outlive the screen it
+       was typed on. Removing some OTHER book changes nothing the reader was
+       typing into, so those keystrokes are still wanted and still land in the
+       book they were typed for; a refused Remove returns above and never gets
+       here. */
+    if (typeof this.plugin.activeFolder === 'function' && this.plugin.activeFolder() !== shown) this.dropTyped();
     this.refreshTab();
     return r;
   }

@@ -29,6 +29,49 @@ const { lineEndingOf } = require('./table-schema');
    to every segment of a vault-root path. */
 const foldSeg = s => String(s ?? '').normalize('NFC').toLowerCase();
 
+/* ---- a book at the vault root (2026-11-11 audit, task 2) ----
+
+   Every "is this path inside the book" and "what is this path called inside
+   the book" question used to be spelled `p.startsWith(base + '/')` and
+   `p.slice(base.length + 1)`, each written for a book in a folder. A book AT
+   the vault root has no folder name to be a prefix: Obsidian's normalizePath
+   answers '/' for it (read out of obsidian-1.15.0.asar: an empty result
+   becomes "/"), the bare-node harness's stub answers '', and collapsePath
+   turns both into ''. Against that base the prefix test is startsWith('/'),
+   which no vault path satisfies, and the slice dropped the first two
+   characters of every path load.js read ('Categories/Food.md' →
+   'tegories/Food.md') — so the `rel` each writer addresses a file by named a
+   file that does not exist.
+
+   These two are the one spelling of both questions, root included. Both take
+   the book's folder in basePath()'s form and a vault path; both are pure.
+
+   insideBook: `resolved` is collapsePath's answer for the path — null when it
+   climbed above the vault root, which is outside every book. At the root that
+   is the WHOLE containment test, and it is not a weaker one: the root book's
+   folder is the vault, so "outside the book" and "outside the vault" are the
+   same set, and `../` is the only way into it. Only a base that IS the root
+   counts as it: one that merely collapses to nothing ("." or "a/..", which
+   books.js refuses as a book and only a hand-edited data.json can hold) is
+   inside nothing. */
+function insideBook(base, resolved) {
+  if (resolved === null) return false;
+  if (String(base ?? '').split('/').some(seg => /^\.+$/.test(seg))) return false;
+  const root = collapsePath(base);
+  if (root === null) return false;
+  if (root === '') return true;
+  return resolved === root || resolved.startsWith(root + '/');
+}
+/* relUnder: the book-relative form of a vault path — what readFile, writeFile
+   and fileAt deal in. A path that is not under the book comes back as it was
+   given (a message can still name it); at the root the two forms are the same
+   string. */
+function relUnder(base, path) {
+  const root = collapsePath(base);
+  if (!root) return path;
+  return path.startsWith(root + '/') ? path.slice(root.length + 1) : path;
+}
+
 /* destinationProblem(folder, { configDir, budgetFolder, budgetFolders }) — may an export
    write into the folder the reader TYPED? The one answer for every export
    that takes a destination: the Report uses it; the Transactions export and
@@ -223,10 +266,7 @@ function makeIo(deps, { view = false } = {}) {
   const relPath = p => normalizePath(basePath() + '/' + p);
   const keyOf = p => foldSeg(p);
   /* The budget-relative form of a vault path, for a message a person reads. */
-  const relOf = p => {
-    const base = basePath();
-    return p.startsWith(base + '/') ? p.slice(base.length + 1) : p;
-  };
+  const relOf = p => relUnder(basePath(), p);
 
   /* ---- own-write record ---- */
   function ownRemember(path, mark) {
@@ -348,12 +388,8 @@ function makeIo(deps, { view = false } = {}) {
     /* The write window (below): a write in the same burst as one that began
        under another book's state is that operation's, not a new one's. */
     if (win.folder != null && win.folder !== folder) throw bookChangedError(rel);
-    if (path != null) {
-      const root = collapsePath(base);
-      const resolved = collapsePath(path);
-      // collapsePath turns a book at the vault root ('/') into ''.
-      if (resolved === null || (root !== '' && resolved !== root && !resolved.startsWith(root + '/'))) throw bookChangedError(rel);
-    }
+    // insideBook (top of this file) knows a book at the vault root.
+    if (path != null && !insideBook(base, collapsePath(path))) throw bookChangedError(rel);
   }
 
   /* ---- an operation's own load (the 2026-11 re-review) ----
@@ -547,10 +583,12 @@ function makeIo(deps, { view = false } = {}) {
     p.then(done, done);
     return p;
   }
-  /* A full reload brackets itself: staleMark() before it reads anything,
+  /* A full load brackets itself: staleMark() before it reads anything,
      staleClear(mark) once it has completed. Only marks made BEFORE the mark
-     are cleared — a change that lands while the reload is reading is newer
-     than what the reload read and must survive it. */
+     are cleared — a change that lands while the load is reading is newer
+     than what the load read and must survive it. The mark is taken by the
+     LOAD (load.js, kept on loadedBook()), never by a caller that may only
+     have joined one already reading: see controller.js reloadFromDisk. */
   const staleMark = () => rec.seq;
   function staleClear(mark) {
     for (const [k, v] of Array.from(rec.stale)) if (v.seq <= mark) rec.stale.delete(k);
@@ -575,11 +613,39 @@ function makeIo(deps, { view = false } = {}) {
   // folder. normalizePath does NOT strip "../", so a label like
   // "../../evil" pulled from a synced Accounts file could otherwise escape;
   // collapse the segments and verify containment before touching disk.
+  /* withinBudget is that containment, on a vault path already collapsed — the
+     one test both halves of a budget-rooted change go through: a write
+     (guardedPath, below) and a delete (trashFile).
+
+     A BOOK AT THE VAULT ROOT IS STILL REFUSED HERE, and for now that is on
+     purpose (2026-11-11 audit, task 2). The prefix test is the one that
+     cannot see a root book — its base collapses to '' — and has refused every
+     write such a book makes since the first release. insideBook (top of this
+     file) is the test that can, and switching to it is one line. It is not
+     switched yet because this refusal is the only thing standing between a
+     root book and a lost edit: the vault watcher asks "is this change in the
+     budget?" with the same hand-spelled prefix (controller.js
+     fsChangeInBudget; api.js underBudget), so it drops every event in a root
+     book before io.observeChange hears it. No stale mark, no refusal, no
+     reload — a Save there would overwrite a phone's row unopposed. Reading is
+     right at the root now (load.js's rels, through relOf below); writing
+     follows the watcher.
+
+     Deletes are held by the same test, and that half is NEW. trashFile had no
+     containment of its own, and a root book could not reach it only by
+     accident: its garbled rels resolved to no file, so every delete was a
+     silent "nothing to delete". With the rels right, a confirmed delete would
+     have landed in a book where no Save can — and where nothing can say the
+     file had changed since it was read. (One write does reach a root book,
+     and is meant to: main.js's Settings.md updater, which re-reads the file
+     and patches the one key it was asked to, through writeVaultFile.) */
+  const withinBudget = resolved => {
+    const base = collapsePath(basePath());
+    return resolved !== null && (resolved === base || resolved.startsWith(base + '/'));
+  };
   function guardedPath(rel) {
     const path = relPath(rel);
-    const resolved = collapsePath(path);
-    const base = collapsePath(basePath());
-    if (resolved === null || (resolved !== base && !resolved.startsWith(base + '/'))) {
+    if (!withinBudget(collapsePath(path))) {
       throw new Error(`Refused write outside the budget folder: ${rel}`);
     }
     return path;
@@ -773,6 +839,12 @@ function makeIo(deps, { view = false } = {}) {
          the same refusal as a write (assertSameBook, above), before and after
          the wait. */
       assertSameBook(relOf(file.path), null, stamp);
+      /* And the containment a write gets (withinBudget, above): this app
+         deletes nothing outside the open book's folder — and, for as long as a
+         book at the vault root cannot be saved into, nothing inside one. */
+      if (!withinBudget(collapsePath(file.path))) {
+        throw new Error(`Refused delete outside the budget folder: ${relOf(file.path)}`);
+      }
       /* Re-asked here, after whatever dialog the caller put the reader through
          (2026-10-14 audit, L3-13). A TFile follows its file through a rename, so
          a path that no longer resolves to THIS file means it is gone (nothing to
@@ -1024,7 +1096,11 @@ function makeIo(deps, { view = false } = {}) {
       }
       return out;
     }
-    return { basePath: base, relPath: rp, readFile, mdFilesIn, mdFilesUnder, subfoldersIn, subfoldersUnder };
+    /* relOf: what a file these readers found is called inside their book —
+       the `rel` load.js keeps beside everything it reads, so a writer can
+       address the file it came from. relUnder (top of this file), so a book at
+       the vault root gets the path whole instead of minus its first letters. */
+    return { basePath: base, relPath: rp, relOf: p => relUnder(base(), p), readFile, mdFilesIn, mdFilesUnder, subfoldersIn, subfoldersUnder };
   }
 
   return {
@@ -1073,3 +1149,7 @@ module.exports = registerIo;
 module.exports.makeIo = makeIo;
 module.exports.destinationProblem = destinationProblem;
 module.exports.opWriterOf = opWriterOf;
+/* The two root-aware path questions, for any module that still spells them by
+   hand (see "a book at the vault root", top of this file). */
+module.exports.insideBook = insideBook;
+module.exports.relUnder = relUnder;
