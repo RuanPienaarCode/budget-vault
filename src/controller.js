@@ -389,10 +389,34 @@ function visibleUnreadable(list, onboarded) {
   return items.filter(x => !(x && x.rel === 'Settings.md' && x.why === 'missing'));
 }
 
+/* The banner's second sentence: transactions filed under the wrong month's
+   file, which no period lists or counts while the account balance still does
+   (src/misfiled.js has the rule; period.js misfiledTx(null) hands over the
+   whole vault's as { count, files: [{ rel, count }] }). Wave 1 disclosed them
+   on the Dashboard hero and the Transactions page, and a reader on any other
+   page — Accounts, say, looking at the balance the row moved — was told
+   nothing (2026-11-11 audit, task 5 follow-up). Same shape as the sentence
+   above and the same limit: each file once with its own count, four of them,
+   then an ellipsis. It names the file and the count and what follows; the
+   row stays where the reader typed it. Read defensively, like `list` above:
+   the seam is another module's. */
+function misfiledSummary(found, t = i18n.t) {
+  const files = (found && Array.isArray(found.files) ? found.files : [])
+    .filter(f => f && typeof f.rel === 'string' && f.rel && f.count > 0);
+  const count = files.reduce((sum, f) => sum + f.count, 0);
+  if (!count) return '';
+  const shown = files.slice(0, 4).map(f => t('load.misfiled.item', { file: f.rel, count: f.count }));
+  if (files.length > shown.length) shown.push('…');
+  return t('load.misfiled.head', { count, list: shown.join('; ') }) + ' ' + t('load.misfiled.tail', { count });
+}
+
 /* The sentence the banner prints: '' when there is nothing to say. Split from
-   the closure so a bare node test can drive it. */
-function unreadableBannerText(list, onboarded, t = i18n.t) {
-  return unreadableSummary(visibleUnreadable(list, onboarded), t);
+   the closure so a bare node test can drive it. `misfiled` is optional and
+   comes last so every existing caller reads as it did; the unreadable files
+   are said first, because what they hold is missing from every figure, and
+   the misfiled rows after, which are missing from a period's. */
+function unreadableBannerText(list, onboarded, t = i18n.t, misfiled) {
+  return [unreadableSummary(visibleUnreadable(list, onboarded), t), misfiledSummary(misfiled, t)].filter(Boolean).join(' ');
 }
 
 /* The ONLY sanctioned way to re-read the vault. loadVault() is a whole-state
@@ -815,7 +839,9 @@ function mountApp(view) {
     root.classList.toggle('bv-cur-1', Array.from(sym).length === 1);
   }
   /* The one banner for files that are present but unreadable (S.unreadableFiles,
-     set by the loader). Built here rather than in the static shell because it
+     set by the loader) and, after them, for transactions filed under the wrong
+     month's file (ctx.misfiledTx — the whole vault's, because the banner sits
+     above every page and no one period is its subject). Built here rather than in the static shell because it
      exists only when something is wrong, and it sits above every page —
      whichever one the reader is on — since the figures on all of them are
      built from the same defaults. It is held by reference, not looked up by
@@ -829,7 +855,8 @@ function mountApp(view) {
   function renderUnreadableBanner() {
     const scroll = $('.bud-scroll');
     if (!scroll) return;
-    const text = unreadableBannerText(S.unreadableFiles, plugin.settings.onboarded);
+    const text = unreadableBannerText(S.unreadableFiles, plugin.settings.onboarded, i18n.t,
+      typeof ctx.misfiledTx === 'function' ? ctx.misfiledTx(null) : null);
     if (!text) {
       if (unreadableEl) unreadableEl.remove();
       unreadableEl = null;

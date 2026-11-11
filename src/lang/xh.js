@@ -1697,6 +1697,15 @@ module.exports = {
   'load.unreadable.why.table': "akukho ithebhulu ebhalekayo",
   'load.unreadable.why.other': "ayikwazanga ukufundwa",
   'load.unreadable.tail': "Oko zinako kuthathwa njengokungenanto okanye njengezicwangciso eziqhelekileyo, ngoko onke amanani ngezantsi asithatha oko.",
+  'load.misfiled.head': {
+    one: 'Intengiselwano engu-{count} igcinwe phantsi kwenye inyanga: {list}.',
+    other: 'Iintengiselwano ezingu-{count} zigcinwe phantsi kwenye inyanga: {list}.',
+  },
+  'load.misfiled.item': '{file} ({count})',
+  'load.misfiled.tail': {
+    one: 'Akukho xesha liyidwelisayo okanye liyibalayo, kodwa ibhalansi yeakhawunti isayibala.',
+    other: 'Akukho xesha lizidwelisayo okanye lizibalayo, kodwa ibhalansi yeakhawunti isazibala.',
+  },
 
   'bud.amount.unreadableChip': 'Ayinakufundwa',
   'bud.amount.unreadable': 'Ayikwazanga ukufunda "{raw}" — ibalwa njenge-0 kude uphinde utshaze inani',

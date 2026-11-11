@@ -1598,6 +1598,13 @@ module.exports = {
   'load.unreadable.why.table': "没有可读取的表格",
   'load.unreadable.why.other': "无法读取",
   'load.unreadable.tail': "它们的内容被视为空或默认设置，因此下面所有数字都以此为前提。",
+  'load.misfiled.head': {
+    other: '有 {count} 笔交易存放在与其日期不符的月份文件中：{list}。',
+  },
+  'load.misfiled.item': '{file}（{count} 笔）',
+  'load.misfiled.tail': {
+    other: '任何周期都不会列出或计入它们，但账户余额仍会计入它们。',
+  },
 
   'bud.amount.unreadableChip': '无法读取',
   'bud.amount.unreadable': '无法读取“{raw}” — 在你重新输入金额之前按 0 计算',

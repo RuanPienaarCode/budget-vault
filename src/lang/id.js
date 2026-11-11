@@ -1619,6 +1619,13 @@ module.exports = {
   'load.unreadable.why.table': "tidak ada tabel yang bisa dibaca",
   'load.unreadable.why.other': "tidak dapat dibaca",
   'load.unreadable.tail': "Isinya diperlakukan sebagai kosong atau pengaturan bawaan, jadi semua angka di bawah mengandaikan hal itu.",
+  'load.misfiled.head': {
+    other: '{count} transaksi disimpan di berkas bulan yang berbeda dari tanggalnya: {list}.',
+  },
+  'load.misfiled.item': '{file} ({count})',
+  'load.misfiled.tail': {
+    other: 'Tidak ada periode yang menampilkan atau menghitungnya, sedangkan saldo rekening tetap menghitungnya.',
+  },
 
   'bud.amount.unreadableChip': 'Tidak terbaca',
   'bud.amount.unreadable': '"{raw}" tidak bisa dibaca — dihitung sebagai 0 sampai Anda mengetik ulang jumlahnya',

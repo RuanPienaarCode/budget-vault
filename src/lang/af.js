@@ -1674,6 +1674,15 @@ module.exports = {
   'load.unreadable.why.table': "geen tabel wat gelees kan word nie",
   'load.unreadable.why.other': "kon nie gelees word nie",
   'load.unreadable.tail': "Wat hulle bevat word as leeg of as verstekinstellings hanteer, so elke syfer hieronder neem dit aan.",
+  'load.misfiled.head': {
+    one: '{count} transaksie is onder \'n ander maand as sy datum geliasseer: {list}.',
+    other: '{count} transaksies is onder \'n ander maand as hul datums geliasseer: {list}.',
+  },
+  'load.misfiled.item': '{file} ({count})',
+  'load.misfiled.tail': {
+    one: 'Geen tydperk lys of tel dit nie, terwyl die rekeningsaldo dit steeds tel.',
+    other: 'Geen tydperk lys of tel hulle nie, terwyl die rekeningsaldo hulle steeds tel.',
+  },
 
   'bud.amount.unreadableChip': 'Kon nie lees nie',
   'bud.amount.unreadable': 'Kon nie "{raw}" lees nie — dit tel as 0 totdat jy die bedrag weer intik',
