@@ -3,7 +3,7 @@
    Services.md. */
 
 const { opWriterOf } = require('../io');
-const { el, kpiTiles, dateInput, keepScroll, refocus, icoEl, tableCells } = require('../dom');
+const { el, kpiTiles, dateInput, keepScroll, refocus, icoEl, caveatChip, tableCells } = require('../dom');
 const { normalizeAmount } = require('../amount');
 const { SCHEMAS, mdTableFile, CYCLES } = require('../table-schema');
 const { askFields } = require('../modal');
@@ -290,24 +290,30 @@ module.exports = function registerServices(ctx) {
   /* Badges beside the service name. Every one of them is a QUESTION or an
      observation, never an assertion: this can see an absence of charges, and an
      absence is not a cancellation — a bank posts late, a card gets reissued,
-     an annual plan is silent for eleven months by design. */
+     an annual plan is silent for eleven months by design.
+
+     Every one is a chip (dom.js caveatChip), not a <span> with a `title`. The
+     flag is two words and the sentence behind it is the whole point — "not
+     seen" means nothing until it says which name it looked for — and a title
+     on a span is reachable by a mouse and by nothing else: no focus, so no
+     keyboard, and no hover on a phone (audit of 11 Nov 2026, task 18). The
+     badge classes ride along so each keeps its colour. */
+  const flag = (badge, text, why) => caveatChip(text, why, `category-badge ${badge} badge-chip`);
   function svcFlags(s, c) {
     const out = [];
     /* "Not seen" is a claim about EVERY charge, so it is read from every
        charge (c.seen) — never from the price stats, which are empty whenever
        the charges are in another currency (SVC-4). */
     if (!c.seen) {
-      out.push(el('span', { class: 'category-badge badge-dup',
-        title: `No charge in your transactions matches "${s.provider || s.name}". Either it is paid from an account you have not imported, or the name here does not match what your bank prints.` },
-      'not seen'));
+      out.push(flag('badge-dup', 'not seen',
+        `No charge in your transactions matches "${s.provider || s.name}". Either it is paid from an account you have not imported, or the name here does not match what your bank prints.`));
       return out;
     }
     if (s.active && c.status && c.status.state === 'overdue') {
       const months = Math.round(c.status.daysSince / 30);
       // c.seen.last: the charge the overdue reading itself was measured from.
-      out.push(el('span', { class: 'category-badge badge-transfer',
-        title: `Last charged ${c.seen.last}. Still marked active — has it been cancelled?` },
-      `last charged ${months}mo ago`));
+      out.push(flag('badge-transfer', `last charged ${months}mo ago`,
+        `Last charged ${c.seen.last}. Still marked active — has it been cancelled?`));
     }
     /* A price verdict is printed in the service's OWN currency — the one both
        sides of the comparison are now in (SVC-1). money() for the household's,
@@ -323,14 +329,12 @@ module.exports = function registerServices(ctx) {
          simply cannot check its price. Saying so beats both alternatives —
          a silent blank reads as "checked and fine", and the old behaviour
          asserted a price change that never happened. */
-      out.push(el('span', { class: 'category-badge badge-dup',
-        title: `This service is billed in ${c.otherSymbols.join(' · ')}, and the amount on this page is in ${c.symbol}. `
-          + 'Comparing them would need an exchange rate for the day of each charge, which this vault does not store — so no price check is offered rather than a wrong one.' },
-      `billed in ${c.otherSymbols.join(' · ')}`));
+      out.push(flag('badge-dup', `billed in ${c.otherSymbols.join(' · ')}`,
+        `This service is billed in ${c.otherSymbols.join(' · ')}, and the amount on this page is in ${c.symbol}. `
+          + 'Comparing them would need an exchange rate for the day of each charge, which this vault does not store — so no price check is offered rather than a wrong one.'));
     } else if (c.price && c.price.varies) {
-      out.push(el('span', { class: 'category-badge badge-dup',
-        title: 'The recent charges for this merchant differ too much from each other to call any of them the price — top-ups, or several products billed under one name.' },
-      'varies'));
+      out.push(flag('badge-dup', 'varies',
+        'The recent charges for this merchant differ too much from each other to call any of them the price — top-ups, or several products billed under one name.'));
     } else if (c.price && !c.price.agrees) {
       const d = c.price.diff;
       /* A settled price (SVC-2) says so: the verdict rests on the last two
@@ -339,8 +343,7 @@ module.exports = function registerServices(ctx) {
       const basis = c.price.settled
         ? `Your last two charges were ${fmt(c.price.actual)}, not ${fmt(c.price.stated)} — the price looks to have changed.`
         : `Your bank is charging ${fmt(c.price.actual)}, not ${fmt(c.price.stated)}. Based on the last few charges, so a price rise shows up here rather than an old average.`;
-      out.push(el('span', { class: `category-badge ${d > 0 ? 'badge-debt' : 'badge-savings'}`, title: basis },
-      `really ${fmt(c.price.actual, 0)}`));
+      out.push(flag(d > 0 ? 'badge-debt' : 'badge-savings', `really ${fmt(c.price.actual, 0)}`, basis));
     }
     return out;
   }

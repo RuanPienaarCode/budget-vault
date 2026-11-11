@@ -71,13 +71,20 @@ const rowOf = (table, name) => all(table, n => n.tagName === 'TR').find(tr => tx
     const { ctx } = M;
     const eur = (v, dp) => ctx.moneyIn('€', v, dp);
 
-    /* ---- Owed Money: the pill and its title ---- */
+    /* ---- Owed Money: the pill, and the breakdown beside it ----
+       The breakdown was the pill's `title`; it is a chip of its own now
+       (dom.js caveatChip, audit of 11 Nov 2026), so a phone and a keyboard can
+       read it. Same sentence, same symbol — on the chip's detail line. */
     ctx.renderOwed();
     const owedTable = M.nodes.get('#owedTable');
     const anaPill = all(rowOf(owedTable, 'Ana'), n => has(n, 'status-pill'))[0];
     eq(txt(anaPill), txt({ textContent: `${eur(300, 0)} left` }), 'the euro loan reads "€ 300 left", not "R 300 left"');
-    eq(anaPill.attrs.title, `${eur(500)} lent · ${eur(200)} back · ${eur(300)} outstanding`,
-      'and its title states all three in euro');
+    const anaChip = all(rowOf(owedTable, 'Ana'), n => has(n, 'caveat-chip'))[0];
+    ok(anaChip, 'the partly-repaid euro loan carries its breakdown chip');
+    eq(txt(all(anaChip, n => has(n, 'caveat-chip-btn'))[0]), txt({ textContent: `${eur(200, 0)} back` }),
+      'the chip says what has come back, in euro');
+    eq(txt(all(anaChip, n => has(n, 'caveat-chip-detail'))[0]), txt({ textContent: `${eur(500)} lent · ${eur(200)} back · ${eur(300)} outstanding` }),
+      'and its detail states all three in euro');
     const thaboPill = all(rowOf(owedTable, 'Thabo'), n => has(n, 'status-pill'))[0];
     eq(txt(thaboPill), txt({ textContent: `${ctx.money(1500, 0)} left` }), 'control: the rand loan still reads in rand');
 

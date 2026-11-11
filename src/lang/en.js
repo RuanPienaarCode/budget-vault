@@ -1646,6 +1646,10 @@ module.exports = {
 
   'dash.err.render': 'Could not draw the {label} — {error}',
 
+  /* Owed money. The chip beside a partly-repaid entry's status: how much has
+     come back. Its tap reveals the whole sum (lent, back, outstanding). */
+  'owed.repaid.chip': '{amount} back',
+
   /* ------------------------------- Debt page ------------------------------
      "Interest this month" on the Debt page. Both strings exist because a debt
      with a BLANK rate is unknown, not zero: summing only the debts that state

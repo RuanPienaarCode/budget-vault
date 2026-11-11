@@ -19,7 +19,7 @@
    serialized from state. See the header of src/notes.js. */
 
 const { opWriterOf } = require('../io');
-const { el, kpiTiles, icoEl, refocus } = require('../dom');
+const { el, kpiTiles, icoEl, refocus, caveatChip } = require('../dom');
 const { askFields, confirmModal } = require('../modal');
 const { yamlStr, parseFrontmatter } = require('../markdown');
 const { todayIso } = require('../dates');
@@ -198,11 +198,17 @@ module.exports = function registerNotes(ctx) {
          a cell in Debts.md, or an account renamed while the plugin was closed,
          cannot be observed at all — so the note says plainly that its subject
          has gone and puts the fix one tap away rather than pretending. */
-      meta.append(el('button', {
-        type: 'button', class: 'category-badge badge-dup note-orphan',
-        title: `Nothing in your ${KIND_LABELS[n.kind].toLowerCase()} list is called "${n.subject}" any more — it was probably renamed. Tap to point this note at something else.`,
-        onclick: () => repointOne(n),
-      }, icoEl(['unlink', 'link-2off', 'alert-triangle']), 'unmatched'));
+      /* "Says plainly" was only true under a mouse. This was a button whose
+         one tap went straight to the re-point dialog, with the sentence that
+         explains WHY in its `title` — so on a phone the reader was asked what
+         the note is about before being told that anything was wrong with it
+         (audit of 11 Nov 2026, task 18). It is a chip now (dom.js caveatChip):
+         the tap reveals the reason, and the reason names the button that
+         fixes it, which sits on this same card. */
+      meta.append(caveatChip(
+        [icoEl(['unlink', 'link-2off', 'alert-triangle']), 'unmatched'],
+        `Nothing in your ${KIND_LABELS[n.kind].toLowerCase()} list is called "${n.subject}" any more — it was probably renamed. Use Change subject, below, to point this note at something else.`,
+        'category-badge badge-dup note-orphan'));
     }
 
     const card = el('div', { class: 'note-card' }, head, meta);

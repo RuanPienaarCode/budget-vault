@@ -1467,6 +1467,7 @@ module.exports = {
 
   /* --- Debt page: "Interest this month" says what it covers, because a debt
      with a blank rate is unknown rather than zero (the why is in en.js) --- */
+  'owed.repaid.chip': '{amount} वापस',
   'debt.interest.noRates': 'यह देखने के लिए किसी कर्ज़ पर दर दर्ज करें',
   'debt.interest.partial': {
     one: '{total} में से {shown} कर्ज़ शामिल · {missing} पर दर नहीं',

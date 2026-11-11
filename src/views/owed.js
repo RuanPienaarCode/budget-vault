@@ -2,7 +2,12 @@
 /* Owed Money — who owes the household what, saved to Owed Money.md. */
 
 const { opWriterOf } = require('../io');
-const { el, kpiTiles, dateInput, keepScroll, refocus, icoEl, tableCells } = require('../dom');
+const { el, kpiTiles, dateInput, keepScroll, refocus, icoEl, caveatChip, tableCells } = require('../dom');
+/* Imported as a namespace, the way every view does: `t` is a local in several
+   of them. This page's own strings are still plain English (the i18n sweep is
+   a later wave); the namespace is here for the one accessible name added
+   since — the repaid chip below. */
+const i18n = require('../i18n');
 const { normalizeAmount } = require('../amount');
 const { SCHEMAS, mdTableFile } = require('../table-schema');
 const { askFields } = require('../modal');
@@ -108,9 +113,18 @@ module.exports = function registerOwed(ctx) {
         const left = outstandingOf(o);
         const label = settled ? 'Paid' : (o.repaid > 0 ? `${oMoney(o, left, 0)} left` : 'Outstanding');
         const pill = el('button', { class: `status-pill status-${settled ? 'paid' : 'outstanding'}`, 'data-focus-key': `pill:${i}`,
-          title: o.repaid > 0 ? `${oMoney(o, o.amount)} lent · ${oMoney(o, o.repaid)} back · ${oMoney(o, left)} outstanding` : '',
           'aria-label': `${o.person}: ${label} — click to change` },
           icoEl(settled ? ['circle-check', 'check-circle'] : ['hourglass']), label);
+        /* What has come back, and the sum it belongs to. This was the pill's
+           `title`: lent · back · outstanding, on a button whose one press
+           flips the status, so a phone could not read it without changing the
+           entry and a keyboard could not read it at all (audit of 11 Nov 2026,
+           task 18). A chip beside the pill instead (dom.js caveatChip) — its
+           own button, so asking how much is back never marks anything paid. */
+        const repaidChip = o.repaid > 0
+          ? caveatChip(i18n.t('owed.repaid.chip', { amount: oMoney(o, o.repaid, 0) }),
+            `${oMoney(o, o.amount)} lent · ${oMoney(o, o.repaid)} back · ${oMoney(o, left)} outstanding`)
+          : null;
         pill.addEventListener('click', () => { const row = S.owed.indexOf(o); o.status = settled ? 'outstanding' : 'paid'; mark(); renderOwed(`pill:${row}`); });
         /* Age, not the due date. The due-date column was empty on every row of
            the vault this was built against — it asks for something you do not
@@ -188,7 +202,7 @@ module.exports = function registerOwed(ctx) {
             v => { const row = S.owed.indexOf(o); o.lent = v; mark(); renderOwed(`pill:${row}`); })),
           el('td', {}, dateInput(o.due, { class: 'form-control form-control-sm', 'aria-label': `Due date for ${o.person}` },
             v => { o.due = v; mark(); })),
-          el('td', {}, pill),
+          el('td', {}, pill, ...(repaidChip ? [repaidChip] : [])),
           el('td', {}, el('div', { class: 'owed-acts' },
             el('button', { class: 'btn-ghost btn-ghost-sm', 'aria-label': `Record a repayment from ${o.person}`,
               title: 'Record money that came back', onclick: () => recordRepayment(o) }, icoEl(['plus'])),

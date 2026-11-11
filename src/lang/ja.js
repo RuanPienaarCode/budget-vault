@@ -1379,6 +1379,7 @@ module.exports = {
 
   /* --- Debt page: "Interest this month" says what it covers, because a debt
      with a blank rate is unknown rather than zero (the why is in en.js) --- */
+  'owed.repaid.chip': '{amount} 返済済み',
   'debt.interest.noRates': 'いずれかの負債に金利を記録すると表示されます',
   'debt.interest.partial': {
     other: '{total} 件中 {shown} 件が対象 · {missing} 件に金利の記録なし',

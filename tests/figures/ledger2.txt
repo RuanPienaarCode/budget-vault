@@ -581,6 +581,10 @@ money	R 500,00	500	owedKpis/div.mini[1]/div.v[1]
 number	1	-	owedKpis/div.mini[2]/div.v[1]
 number	182	-	owedTable/tbody/tr/td[0]/div.owed-age
 money	R 1 500	1500	owedTable/tbody/tr/td[5]/button.status-pill
+money	R 500	500	owedTable/tbody/tr/td[5]/span.caveat-chip/button.caveat-chip-btn
+money	R 2 000,00	2000	owedTable/tbody/tr/td[5]/span.caveat-chip/div.caveat-chip-detail
+money	R 500,00	500	owedTable/tbody/tr/td[5]/span.caveat-chip/div.caveat-chip-detail
+money	R 1 500,00	1500	owedTable/tbody/tr/td[5]/span.caveat-chip/div.caveat-chip-detail
 
 ## services
 money	R 1 304,46	1304.46	servicesKpis/div.mini[0]/div.v[1]
@@ -589,7 +593,7 @@ number	2	-	servicesKpis/div.mini[2]/div.v[1]
 number	2	-	servicesKpis/div.mini[3]/div.v[1]
 money	R 1 087,05	1087.05	svcTable/tbody/tr.type-row[0]/td.num[1]
 money	R 217,41	217.41	svcTable/tbody/tr.type-row[2]/td.num[1]
-number	1	-	svcTable/tbody/tr[3]/td[0]/span.category-badge
+number	1	-	svcTable/tbody/tr[3]/td[0]/span.caveat-chip/button.category-badge
 
 ## tax
 number	2026	-	taxSubNote/

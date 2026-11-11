@@ -1470,6 +1470,7 @@ module.exports = {
 
   /* --- Debt page: "Interest this month" says what it covers, because a debt
      with a blank rate is unknown rather than zero (the why is in en.js) --- */
+  'owed.repaid.chip': '{amount} ibuyile',
   'debt.interest.noRates': 'yongeza izinga kulo naliphi na ityala ukuze ubone oku',
   'debt.interest.partial': {
     one: 'ibandakanya {shown} kumatyala angu-{total} · {missing} alinazinga',

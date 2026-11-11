@@ -1448,6 +1448,7 @@ module.exports = {
 
   /* --- Debt page: "Interest this month" says what it covers, because a debt
      with a blank rate is unknown rather than zero (the why is in en.js) --- */
+  'owed.repaid.chip': '{amount} zurück',
   'debt.interest.noRates': 'hinterlege bei einer Schuld einen Zinssatz, um das hier zu sehen',
   'debt.interest.partial': {
     one: 'deckt {shown} von {total} Schulden ab · bei {missing} fehlt der Zinssatz',

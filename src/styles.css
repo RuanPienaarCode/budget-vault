@@ -1497,6 +1497,17 @@ body.is-phone .budget-app-root .drawer-book:not(.hidden) { display: block; }
 @supports (color: color-mix(in srgb, red, blue)) {
   .budget-app-root.bud-dark .badge-giving { color: #ef5ca4; }
 }
+/* A badge that is a chip — src/dom.js caveatChip() wearing a badge's classes.
+   The flags on Services ("not seen", "really R 219") and the import review
+   ("transfer?") were spans with their reason in a `title`; they are buttons
+   now, so the reason opens on a tap. The badge rules above already dress a
+   <button> (the Notes page's "unmatched" has been one from the start, and the
+   tablet padding twin for .category-badge is in the block at the top of this
+   file), so all this adds is what a span never needed: the pointer, and a
+   focus ring. No colour of its own — the badge keeps the one that says what
+   kind of flag it is. */
+.budget-app-root .badge-chip { cursor: pointer; }
+.budget-app-root .badge-chip:focus-visible { outline: 2px solid var(--color-primary); outline-offset: 2px; }
 
 /* ============================================================
    CATEGORY USAGE BARS (Budget page)
@@ -4125,6 +4136,7 @@ body.is-phone .budget-app-root .drawer-book:not(.hidden) { display: block; }
   .budget-app-root .acct-recon-btn:focus { outline: 2px solid var(--color-primary); outline-offset: 2px; }
   .budget-app-root .kpi-caveat-btn:focus { outline: 2px solid var(--color-primary); outline-offset: 2px; }
   .budget-app-root .caveat-chip-btn:focus { outline: 2px solid var(--color-primary); outline-offset: 2px; }
+  .budget-app-root .badge-chip:focus { outline: 2px solid var(--color-primary); outline-offset: 2px; }
   .budget-app-root .svc-next-hint:focus { outline: 2px solid var(--color-primary); outline-offset: 2px; }
   .budget-app-root .import-help summary:focus { outline: 2px solid var(--text-muted); outline-offset: 2px; border-radius: 4px; }
   .budget-app-root .cat-cell-btn:focus { outline: 2px solid var(--color-accent); outline-offset: 1px; }

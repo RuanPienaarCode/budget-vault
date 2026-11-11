@@ -17,7 +17,7 @@
    because `t` is already a local in several files. */
 const { opWriterOf } = require('../io');
 const i18n = require('../i18n');
-const { el, tableCells, refocus } = require('../dom');
+const { el, tableCells, refocus, caveatChip } = require('../dom');
 const { normalizeAmount, inferGrouping } = require('../amount');
 const { parseStatement, decodeStatement, parseStatementDate, detectStatementColumns, reconcileAmounts, applyCounterparties,
   statementAccountNumber, sameAccountNumber, TRANSFER_LEG_DAYS } = require('../statement');
@@ -1022,15 +1022,22 @@ module.exports = function registerImport(ctx) {
           // left counted, so the reader can make the call the app would not.
           /* The closing sentence follows the tick as it stands, so a row the
              reader has decided on never reads as the opposite of its box. */
+          /* A chip, not a <span> with a `title` (dom.js caveatChip). "Named,
+             not silent" was only true under a mouse: this is the row whose
+             Exclude tick the reader is being asked to judge, and on a phone
+             or a keyboard the reason it arrived ticked — or did not — could
+             not be reached at all (audit of 11 Nov 2026, task 18). The near
+             and pending badges above already print their reason beside
+             themselves; these two were the ones that did not. */
           it.transferLeg
-            ? el('span', { class: 'category-badge badge-transfer',
-              title: `The description names your ${it.transferTo} account, and ${it.transferTo} already has the same amount the other way on ${it.transferLeg} — money moved between your own accounts rather than income or spend. `
-                + (it.excluded ? 'So it arrives excluded; untick Exclude to count it.' : 'You have chosen to count it anyway.') },
-            'transfer')
-            : el('span', { class: 'category-badge badge-transfer',
-              title: `The description quotes the number of your ${it.transferTo} account, but ${it.transferTo} has no matching amount the other way within ${TRANSFER_LEG_DAYS} days — and anyone paying you can type that number as their reference. `
-                + (it.excluded ? 'You have excluded it as a transfer.' : 'So it is counted as income or spend, not as a transfer; tick Exclude if it really was money moved between your own accounts.') },
-            'transfer?'),
+            ? caveatChip('transfer',
+              `The description names your ${it.transferTo} account, and ${it.transferTo} already has the same amount the other way on ${it.transferLeg} — money moved between your own accounts rather than income or spend. `
+                + (it.excluded ? 'So it arrives excluded; untick Exclude to count it.' : 'You have chosen to count it anyway.'),
+              'category-badge badge-transfer badge-chip')
+            : caveatChip('transfer?',
+              `The description quotes the number of your ${it.transferTo} account, but ${it.transferTo} has no matching amount the other way within ${TRANSFER_LEG_DAYS} days — and anyone paying you can type that number as their reference. `
+                + (it.excluded ? 'You have excluded it as a transfer.' : 'So it is counted as income or spend, not as a transfer; tick Exclude if it really was money moved between your own accounts.'),
+              'category-badge badge-transfer badge-chip'),
         ] : [])),
         el('td', { class: `num${it.amount >= 0 ? ' text-success' : ''}`, style: 'white-space:nowrap;font-weight:600' }, previewMoney(it.amount)),
         el('td', {}, it.dup ? (it.cat || '') : deferredCatSelect(it.cat, v => { it.cat = v; it.manual = true; }, `Category for ${it.desc}`),

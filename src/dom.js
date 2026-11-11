@@ -219,11 +219,21 @@ function icoEl(names, cls) {
    button (the way the score ring centres its own) keeps that positioning
    without a fight.
 
+   `cls` dresses the button as something the page already has. A FLAG — the
+   "not seen" on a service, the "transfer?" on an import row — was a
+   `.category-badge` <span> with its reason in a `title`, and its colour is
+   part of what it says: a price above the listed one is the debt colour,
+   below it the savings one. Making those the chip's own outlined pill would
+   have thrown that away, so the chip takes the badge's classes instead of its
+   own. A badge on a <button> is already styled (the Notes page's "unmatched"
+   has been one since it was written), and `badge-chip` adds the two things a
+   span never needed: a pointer cursor and a focus ring.
+
    Returns the wrapping `<span>`; append it wherever a bare `title=` used to
    sit — the whole point is that nothing else about the call site changes. */
-function caveatChip(shortText, detailText) {
+function caveatChip(shortText, detailText, cls = 'caveat-chip-btn') {
   const btn = el('button', {
-    type: 'button', class: 'caveat-chip-btn', title: detailText, 'aria-expanded': 'false',
+    type: 'button', class: cls, title: detailText, 'aria-expanded': 'false',
   }, shortText);
   const detail = el('div', { class: 'caveat-chip-detail hidden' }, detailText);
   btn.addEventListener('click', e => {
