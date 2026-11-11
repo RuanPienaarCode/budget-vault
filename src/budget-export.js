@@ -234,10 +234,21 @@ function nameRepeats(list) {
 
    Without a stamped row (a hand-built period, no env to stamp against) only
    what the row itself says can be flagged: its Excluded cell and its split
-   role — what the listing did before the ledger was asked. */
+   role — what the listing did before the ledger was asked.
+
+   "A split parent" is tx-role's to say, not the Split cell's. A split is
+   reversed by hand — untick Excluded, delete the parts — and that leaves
+   `parent` in the cell of a row the ledger counts as an ordinary transaction:
+   supersededBySplit wants the role AND the tick, so that unticking means
+   "this row is real again" everywhere at once. Read off the cell alone, the
+   listing printed "split parent" beside a row the figure above it had
+   counted, under a note saying flagged rows are not part of that figure
+   (2026-11-11 audit, wave 2). Asked here rather than destructured at the top
+   of the file, beside splitRole, only to keep this change inside the one
+   function it is about. */
 function flagKeys(t, stamped, today) {
+  if (require('./tx-role').supersededBySplit(t)) return ['splitParent'];
   const role = splitRole(t.split);
-  if (role === 'parent') return ['splitParent'];
   const out = [];
   if (stamped) { for (const k of LENSES.BUDGET.drop) if (stamped[k]) out.push(k); }
   else if (t.excluded) out.push('excluded');
