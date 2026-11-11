@@ -198,6 +198,18 @@ const inert = n => n.hasAttribute('inert');
     eq(ti(row), null, 'a control drawn in the same task as the close is never stamped afterwards');
     eq(inert(s.main), false, 'and the page is not left inert behind a closed drawer');
 
+    // The drawer shut by something that never went through closeDrawer: the
+    // watch asks before it locks, so it does not re-lock a page it should
+    // not be holding.
+    drawer.openDrawer(s.$);
+    s.appDrawer.classList.remove('open');
+    const stray = el('button', {}, 'stray');
+    s.table.append(stray);
+    await tick();
+    eq(ti(stray), null, 'a watcher whose drawer is no longer open locks nothing');
+    s.appDrawer.classList.add('open');
+    drawer.closeDrawer(s.$);
+
     // Open, close, open again: one watcher, not two.
     drawer.openDrawer(s.$);
     drawer.openDrawer(s.$);
