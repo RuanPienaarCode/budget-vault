@@ -166,6 +166,71 @@ function readFlatTable(schema, text) {
   return { rows, lead, trail, extraCols: extraColsOf(known, header, sep, dataRows) };
 }
 
+/* One month file's text, parsed: everything load keeps of it that depends on
+   the TEXT alone. Label, month and rel come from the file's path and are added
+   by the caller. Pure — which is what lets a reload reuse it (parsedMonth,
+   below) instead of parsing an unchanged file again. */
+function parseTxText(text) {
+  const { raw } = parseFrontmatter(text);
+  /* ISSUE 69 — a hand-added column (a running Balance) past what this
+     schema knows about; parseMdTableWithSeparator, not parseMdTable, since
+     the header/separator cells past `known` are what names and aligns it.
+     `known` is read off the file's OWN header rather than assumed to be
+     the full 7-column schema, because Split is itself conditional
+     (serializeTxFile writes it only into a file that has one) — a
+     6-column file with a hand-added Balance column also has 7 cells on
+     disk, and treating position 6 as Split there would read the reader's
+     figure through splitRole and lose it outright. */
+  const { header, sep, dataRows, tx } = tableParts(text, SCHEMAS.transactions.columns[0].header);
+  const splitCol = SCHEMAS.transactions.columns[6];
+  const hasSplitHeader = !!(header && header[6] && header[6].trim().toLowerCase() === splitCol.header.toLowerCase());
+  const known = hasSplitHeader ? 7 : 6;
+  return {
+    fmRaw: raw,
+    /* CONTRACT 1, the loader's half: the prose around the table and the
+       file's own separator, which the next write of the month deleted or
+       rewrote (L3-02, L3-22). Exactly what each holds: verbatimAroundTable;
+       tests/tx-file-lead-trail-sep.test.cjs pins them and the round trip. */
+    lead: tx.lead, trail: tx.trail, sep: tx.sep,
+    extraCols: extraColsOf(known, header, sep, dataRows),
+    /* ISSUE 69 — serializeTxFile decides per save whether a row still
+       needs Split at all; when this file ALSO carries an extra column
+       that decision must not move it, since the extra sits at position
+       `known` regardless of whether a split survives today's edit. */
+    splitHeaderPresent: hasSplitHeader,
+
+    /* The Split column was added after these files started being written —
+       absent on every row of every file that predates it, which the
+       schema's read yields as '' exactly as it reads a blank cell. The
+       truncation sweep in tests/table-schema-guards.test.cjs holds that
+       property for every column, current and future.
+
+       `c.slice(0, known)`, not the raw row: rowToObject then sees an
+       index past `known` as undefined, the same shape a short row has
+       always read as, so a six-column file's own extra cell can never be
+       misread as Split — attachExtraCells below still gets the REAL `c`. */
+    rows: dataRows.map(c => attachExtraCells(rowToObject(SCHEMAS.transactions, c.slice(0, known)), known, c)),
+  };
+}
+
+/* The two halves of "the cache keeps its own copy" (parsedMonth, below).
+   freezeDeep: what is kept can never be changed, by anyone, in strict mode
+   (every file in src/ is). thaw: a fresh, ordinary, editable copy — same
+   keys in the same order, a key holding undefined still there. Plain data
+   only (objects, arrays, primitives), which is all a parse is. */
+function freezeDeep(v) {
+  if (v === null || typeof v !== 'object' || Object.isFrozen(v)) return v;
+  for (const k of Object.keys(v)) freezeDeep(v[k]);
+  return Object.freeze(v);
+}
+function thaw(v) {
+  if (Array.isArray(v)) return v.map(x => thaw(x));
+  if (v === null || typeof v !== 'object') return v;
+  const o = {};
+  for (const k of Object.keys(v)) o[k] = thaw(v[k]);
+  return o;
+}
+
 module.exports = function registerLoad(ctx) {
   const { S, vault, currentPeriod, periodKeyValid } = ctx;
 
@@ -206,6 +271,31 @@ module.exports = function registerLoad(ctx) {
   let seq = 0;
   let inFlight = null;      // { folder, promise } — the load a same-folder caller joins
   const openFolder = () => ctx.basePath();
+
+  /* ---- a reload parses only the month files that changed ----
+     2026-11-11 audit, task 11. Every external change re-reads the vault, and
+     the time is the transaction tables: 80–94 ms a reload at five years (240
+     files, 17 760 rows) on a desktop, linear in rows — a sync burst on a phone
+     pays it a dozen times over for files nobody touched. So the last committed
+     load's parses are kept, by vault path, beside the TEXT each came from. A
+     file whose text is the same string is not parsed again. The whole text,
+     never a hash: a false "same" here would put one file's rows on screen
+     under another's name and let the next Save write them there. */
+  let txParsed = new Map();     // vault path → { text, parse } — parse deep-frozen
+  /* What is kept is frozen and never handed out; every load, hit or miss, gets
+     its own thaw() of it. Edits mutate rows in place and a reload must give
+     back the disk's, so no object may be shared between the cache and a
+     state, or between two loads (tests/load-parse-cache.test.cjs). One path
+     for both cases on purpose: a copy that lost anything would show on every
+     load in every suite, not only on a reload. `seen` collects this load's
+     entries; they replace the cache when — and only if — the load commits. */
+  function parsedMonth(path, text, seen) {
+    const held = txParsed.get(path);
+    const parse = held && typeof text === 'string' && held.text === text
+      ? held.parse : freezeDeep(parseTxText(text));
+    seen.set(path, { text, parse });
+    return thaw(parse);
+  }
 
   function loadVault() {
     const folder = openFolder();
@@ -555,49 +645,18 @@ module.exports = function registerLoad(ctx) {
       for (const f of months) txFiles.push({ acct: folder, f });
     }
     const txTexts = await Promise.all(txFiles.map(({ f }) => vault.cachedRead(f)));
+    const parsedNow = new Map();
     txFiles.forEach(({ acct, f }, i) => {
       const month = f.basename;
-      const text = txTexts[i];
-      const { raw } = parseFrontmatter(text);
-      /* ISSUE 69 — a hand-added column (a running Balance) past what this
-         schema knows about; parseMdTableWithSeparator, not parseMdTable, since
-         the header/separator cells past `known` are what names and aligns it.
-         `known` is read off the file's OWN header rather than assumed to be
-         the full 7-column schema, because Split is itself conditional
-         (serializeTxFile writes it only into a file that has one) — a
-         6-column file with a hand-added Balance column also has 7 cells on
-         disk, and treating position 6 as Split there would read the reader's
-         figure through splitRole and lose it outright. */
-      const { header, sep, dataRows, tx } = tableParts(text, SCHEMAS.transactions.columns[0].header);
-      const splitCol = SCHEMAS.transactions.columns[6];
-      const hasSplitHeader = !!(header && header[6] && header[6].trim().toLowerCase() === splitCol.header.toLowerCase());
-      const known = hasSplitHeader ? 7 : 6;
+      const p = parsedMonth(f.path, txTexts[i], parsedNow);
       T.txFiles[`${acct.name}/${month}`] = {
-        label: acct.name, month, dirty: false, fmRaw: raw,
+        label: acct.name, month, dirty: false, fmRaw: p.fmRaw,
         rel: R.relOf(f.path),   // ISSUE 97 — the path it was READ from
-        /* CONTRACT 1, the loader's half: the prose around the table and the
-           file's own separator, which the next write of the month deleted or
-           rewrote (L3-02, L3-22). Exactly what each holds: verbatimAroundTable;
-           tests/tx-file-lead-trail-sep.test.cjs pins them and the round trip. */
-        lead: tx.lead, trail: tx.trail, sep: tx.sep,
-        extraCols: extraColsOf(known, header, sep, dataRows),
-        /* ISSUE 69 — serializeTxFile decides per save whether a row still
-           needs Split at all; when this file ALSO carries an extra column
-           that decision must not move it, since the extra sits at position
-           `known` regardless of whether a split survives today's edit. */
-        splitHeaderPresent: hasSplitHeader,
-
-        /* The Split column was added after these files started being written —
-           absent on every row of every file that predates it, which the
-           schema's read yields as '' exactly as it reads a blank cell. The
-           truncation sweep in tests/table-schema-guards.test.cjs holds that
-           property for every column, current and future.
-
-           `c.slice(0, known)`, not the raw row: rowToObject then sees an
-           index past `known` as undefined, the same shape a short row has
-           always read as, so a six-column file's own extra cell can never be
-           misread as Split — attachExtraCells below still gets the REAL `c`. */
-        rows: dataRows.map(c => attachExtraCells(rowToObject(SCHEMAS.transactions, c.slice(0, known)), known, c)),
+        // The rest is parseTxText's, above — where each field is explained.
+        lead: p.lead, trail: p.trail, sep: p.sep,
+        extraCols: p.extraCols,
+        splitHeaderPresent: p.splitHeaderPresent,
+        rows: p.rows,
       };
     });
 
@@ -875,6 +934,7 @@ module.exports = function registerLoad(ctx) {
     if (folder !== openFolder() || (committed && mySeq < committed.seq)) return false;
     Object.assign(S, T);
     committed = Object.freeze({ folder, seq: mySeq, staleMark: began });
+    txParsed = parsedNow;     // this book's month files, and only those
     setLanguage(language);
     /* The three selections that survive a reload — the open plan, the open
        tax year, the period on screen — are the reader's, kept when the
