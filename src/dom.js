@@ -154,7 +154,14 @@ function refocus(root, keys) {
     const hit = typeof k === 'string'
       ? root.querySelector(`[data-focus-key="${k.replace(/["\\]/g, '\\$&')}"]`)
       : k;
-    if (!hit || typeof hit.focus !== 'function' || hit.disabled) continue;
+    /* `hit === live`: the control that LOST focus can still be found by its
+       key when its card was hidden rather than emptied (the Plan page's "not
+       spoken for" card). focus() on it is refused — it has no box — but it is
+       still document.activeElement until the next frame, so the check after
+       the call below would read that as a landing, on a control nobody can
+       see. Anything that reaches this loop as `live` was already judged lost
+       above, so it is never a candidate. */
+    if (!hit || hit === live || typeof hit.focus !== 'function' || hit.disabled) continue;
     /* A landing that is not a control — a table row, for "Show more" — is made
        focusable here, at the moment it is needed, and not where it is built.
        tabindex="-1" on every row of every table would make each one
