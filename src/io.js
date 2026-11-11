@@ -667,31 +667,42 @@ function makeIo(deps, { view = false } = {}) {
      one test both halves of a budget-rooted change go through: a write
      (guardedPath, below) and a delete (trashFile).
 
-     A BOOK AT THE VAULT ROOT IS STILL REFUSED HERE, and for now that is on
-     purpose (2026-11-11 audit, task 2). The prefix test is the one that
-     cannot see a root book — its base collapses to '' — and has refused every
-     write such a book makes since the first release. insideBook (top of this
-     file) is the test that can, and switching to it is one line. It is not
-     switched yet because this refusal is the only thing standing between a
-     root book and a lost edit: the vault watcher asks "is this change in the
-     budget?" with the same hand-spelled prefix (controller.js
-     fsChangeInBudget; api.js underBudget), so it drops every event in a root
-     book before io.observeChange hears it. No stale mark, no refusal, no
-     reload — a Save there would overwrite a phone's row unopposed. Reading is
-     right at the root now (load.js's rels, through relOf below); writing
-     follows the watcher.
+     It is bookOwns (top of this file), which is what lets a book at the
+     vault root write at all: the test here was a bare prefix match against a
+     base that collapses to '' there, and refused "Settings.md" as outside the
+     budget folder (2026-11-11 audit, task 2). For a book in a folder bookOwns
+     is that prefix match, so nothing about such a book moves.
 
-     Deletes are held by the same test, and that half is NEW. trashFile had no
-     containment of its own, and a root book could not reach it only by
-     accident: its garbled rels resolved to no file, so every delete was a
-     silent "nothing to delete". With the rels right, a confirmed delete would
-     have landed in a book where no Save can — and where nothing can say the
-     file had changed since it was read. (One write does reach a root book,
-     and is meant to: main.js's Settings.md updater, which re-reads the file
-     and patches the one key it was asked to, through writeVaultFile.) */
+     THIS ONLY HOLDS TOGETHER WITH THE WATCHER, and by being the watcher's own
+     predicate. A root book may write because a change somebody else makes in
+     one is now reported: controller.js fsChangeInBudget asks bookOwns too,
+     tells observeChange, and a Save over that file refuses as stale. Had this
+     asked a wider question than the watcher does — insideBook, say, which at
+     the root is every path in the vault — there would be paths a Save could
+     land on that no event is ever reported for. tests/root-book.test.cjs
+     holds the two to each other over a corpus, through the real io.
+
+     And it is why a root book cannot touch the rest of the vault. Its folder
+     holds the reader's journal and every other note they keep; the book owns
+     Settings.md, its five sibling files and its nine folders. A rel built
+     from bad data that resolves anywhere else is refused here as `../` is,
+     for a write and for a delete.
+
+     One thing a root book's folder holds that the lists cannot rule out on
+     their own: Obsidian's config folder (books.js refuses a book inside it;
+     the root merely contains it). Its name is the vault's to choose, and
+     data.json is in there. No budget file lives in it — Obsidian indexes
+     nothing under a dot-folder for the loader to have read — so a
+     budget-rooted write or delete resolving into it is refused whatever it is
+     called, compared the way the filesystem compares (foldSeg): `.Obsidian/`
+     is the same folder on APFS. */
   const withinBudget = resolved => {
-    const base = collapsePath(basePath());
-    return resolved !== null && (resolved === base || resolved.startsWith(base + '/'));
+    const base = basePath();
+    if (!bookOwns(base, resolved)) return false;
+    if (collapsePath(base) !== '') return true;
+    const cfg = foldSeg(collapsePath(normalizePath(String(vault.configDir || '.obsidian'))) || '');
+    const at = foldSeg(resolved);
+    return !(cfg && (at === cfg || at.startsWith(cfg + '/')));
   };
   function guardedPath(rel) {
     const path = relPath(rel);
@@ -890,8 +901,9 @@ function makeIo(deps, { view = false } = {}) {
          the wait. */
       assertSameBook(relOf(file.path), null, stamp);
       /* And the containment a write gets (withinBudget, above): this app
-         deletes nothing outside the open book's folder — and, for as long as a
-         book at the vault root cannot be saved into, nothing inside one. */
+         deletes nothing outside the open book's folder — and, in a book at the
+         vault root, nothing that is not one of the book's own files, however
+         the caller came by the TFile. */
       if (!withinBudget(collapsePath(file.path))) {
         throw new Error(`Refused delete outside the budget folder: ${relOf(file.path)}`);
       }
