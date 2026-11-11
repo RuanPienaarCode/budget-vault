@@ -985,11 +985,14 @@ module.exports = function registerBudgets(ctx) {
             // it, `lock` chosen as the one that reads as "locked in" rather
             // than a place or a pin.
             type === 'income' || type === 'transfer' ? '' : el('button', {
-              // `bud-fixed-on` carries no rule in styles.css yet — that file
-              // is outside this lane's owner list this round, so the "on"
-              // state is unstyled beyond aria-pressed for now. The class is
-              // still applied, mirroring bud-assume-on, so styling it later
-              // is a CSS-only change with nothing to wire up in this file.
+              // `bud-fixed-on` is the pressed state's class, mirroring
+              // bud-assume-on. Its rule is in src/styles.css (and again, at
+              // the page's own specificity, in src/statement/budget.css): the
+              // lock is drawn in --color-info-ink, #0369a1 in light — 5.93:1
+              // on a card where the info FILL it first used was 2.77:1 — and
+              // the fill itself in dark, where that already clears AA
+              // (tests/palette.test.cjs, 7c). aria-pressed still carries the
+              // state for a screen reader; the colour is for everyone else.
               class: `btn-ghost btn-ghost-sm bud-act bud-act-fixed${fixed ? ' bud-fixed-on' : ''}`, type: 'button',
               'aria-pressed': fixed ? 'true' : 'false',
               'aria-label': i18n.t('bud.aria.fixed', { category: d.category }),
