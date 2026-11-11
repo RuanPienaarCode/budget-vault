@@ -29,6 +29,7 @@
   --ink-faint:           #5f6779;
   --border-color:        rgba(15,23,32,.09);
   --line-soft:           rgba(15,23,32,.055);
+  --control-border:      rgba(15,23,32,.55);
   --focus-ring:          rgba(6,95,70,0.20);
   --glow-accent-rgb:     110,231,183;
   --glow-primary-rgb:    16,185,129;
@@ -54,6 +55,7 @@
   --ink-faint:           #7d85a7;
   --border-color:        rgba(255,255,255,.08);
   --line-soft:           rgba(255,255,255,.04);
+  --control-border:      rgba(255,255,255,.4);
   --focus-ring:          rgba(16,185,129,0.28);
 }
 
@@ -77,6 +79,7 @@
   --ink-faint:           #5b697c;
   --border-color:        rgba(12,26,40,.09);
   --line-soft:           rgba(12,26,40,.055);
+  --control-border:      rgba(12,26,40,.55);
   --focus-ring:          rgba(12,74,110,0.20);
   --glow-accent-rgb:     125,211,252;
   --glow-primary-rgb:    56,189,248;
@@ -102,6 +105,7 @@
   --ink-faint:           #74849e;
   --border-color:        rgba(255,255,255,.08);
   --line-soft:           rgba(255,255,255,.04);
+  --control-border:      rgba(255,255,255,.4);
   --focus-ring:          rgba(56,189,248,0.28);
 }
 
@@ -125,6 +129,7 @@
   --ink-faint:           #655874;
   --border-color:        rgba(26,15,34,.09);
   --line-soft:           rgba(26,15,34,.055);
+  --control-border:      rgba(26,15,34,.55);
   --focus-ring:          rgba(107,33,168,0.20);
   --glow-accent-rgb:     233,213,255;
   --glow-primary-rgb:    192,132,252;
@@ -150,6 +155,7 @@
   --ink-faint:           #877ca5;
   --border-color:        rgba(255,255,255,.08);
   --line-soft:           rgba(255,255,255,.04);
+  --control-border:      rgba(255,255,255,.4);
   --focus-ring:          rgba(192,132,252,0.28);
 }
 
@@ -173,6 +179,7 @@
   --ink-faint:           #5d6674;
   --border-color:        rgba(15,20,28,.09);
   --line-soft:           rgba(15,20,28,.055);
+  --control-border:      rgba(15,20,28,.55);
   --focus-ring:          rgba(51,65,85,0.20);
   --glow-accent-rgb:     203,213,225;
   --glow-primary-rgb:    148,163,184;
@@ -198,5 +205,6 @@
   --ink-faint:           #7a8392;
   --border-color:        rgba(255,255,255,.08);
   --line-soft:           rgba(255,255,255,.04);
+  --control-border:      rgba(255,255,255,.4);
   --focus-ring:          rgba(148,163,184,0.28);
 }

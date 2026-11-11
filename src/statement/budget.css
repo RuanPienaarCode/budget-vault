@@ -294,7 +294,8 @@
   }
   .budget-app-root .bud-table .bud-act:hover { border-color: var(--border-color); }
   .budget-app-root .bud-table .bud-act.bud-assume-on { color: var(--color-accent); }
-  .budget-app-root .bud-table .bud-act.bud-fixed-on { color: var(--color-info); }
+  /* The ink, not the fill: see .bud-fixed-on in src/styles.css (2.77:1 -> 5.93:1 in light). */
+  .budget-app-root .bud-table .bud-act.bud-fixed-on { color: var(--color-info-ink); }
   .budget-app-root .bud-table .bud-act-delete:hover { color: var(--color-danger-ink); }
   .budget-app-root .bud-table .bud-act-fixed + .bud-act-delete { margin-left: var(--bud-slot); }
   .budget-app-root .bud-table .bud-act-clear:first-child { margin-left: calc(var(--bud-slot) * 2); }

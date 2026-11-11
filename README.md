@@ -43,6 +43,7 @@ Put your vault in iCloud Drive, Obsidian Sync, Dropbox or Syncthing and your bud
 - **Food** — paste a till slip's text (Live Text on iPhone or Mac) and see what the groceries actually were: meat, dairy, cheese, snacks, wine, by category and by product, with discounts, the healthy share and price changes. Checkers slips are read line by line; any other shop's, or a list typed by hand, too. The bank line stays one transaction — the receipt sits beside it.
 - **Notes** — ordinary notes that can point at a category or an account
 - **Several currencies** — accounts in other currencies are named beside your totals, and added into them if you switch on exchange rates (see above)
+- **Several books** — more than one budget in the same vault, one per client or a personal and a business one, switched from the top bar and never added together (see [Several books in one vault](#several-books-in-one-vault))
 - **Twelve languages** — English, Afrikaans, Deutsch, Español, Français, हिन्दी, Bahasa Indonesia, 日本語, Português, isiXhosa, 中文 and isiZulu; set separately from the country
 - Payday-aligned periods, and full support on iOS and Android — including a small phone
 
@@ -121,6 +122,18 @@ Columns are read by **position**, not by header name, so keep the first twelve i
 
 The plugin rewrites the whole table on save, so a file created through **New debt** always has the right shape. This matters only if you write one by hand.
 
+## Several books in one vault
+
+A **book** is one budget folder — its own `Settings.md`, categories, accounts and transactions. Most people need exactly one, and a vault with one book looks and behaves as it always has: no switcher, nothing new to learn. If you keep several — a book per client, or a personal and a business book — add the others under Settings → Budget Vault → **Books**, and switch between them from the top bar (on a phone, from the menu drawer).
+
+- **Adding a book** asks for a folder and a label. A new or empty folder is set up by the setup wizard; a folder that already holds a budget is added exactly as it is. Two books can't share files, so a folder inside another book, or one that contains another book, is refused.
+- **One book is open per device.** The list of books is saved with the plugin's settings, so it goes wherever those sync. Which book is open is remembered separately on each device and is never synced — your phone and your laptop can have different books open without tripping over each other.
+- **Switching refuses while anything is unsaved**, and says so, rather than carry a row typed into one book over into another's files. Save first, or reload from disk to discard.
+- **Nothing is ever added up across books.** There is no combined total and there are no shared categories; one book's numbers never appear in another's.
+- **Removing a book edits the list and touches no files.** The folder, its `Settings.md` and every transaction in it stay exactly where they are, and adding the folder again later brings the book back as it stands. If the book you remove is the one that's open, you are switched to the home book first — and, like any switch, that is refused while anything is unsaved. The home book — the one named in the Budget folder setting — can't be removed.
+
+The reasoning is written up in [ADR 0009](docs/adr/0009-a-vault-can-hold-several-books.md).
+
 ## CSV import
 
 Any statement with Date / Description / Amount columns works. Discovery Bank, FNB, Capitec and Nedbank exports have been imported end to end, but nothing is hardcoded per bank — columns are matched by header, then by layout shape for headerless files, and you can map them by hand if neither resolves.
@@ -130,6 +143,18 @@ A Discovery Bank **Miles** export (`DiscoveryBankMiles_….csv`, which has a Mil
 Sign conventions are verified, not guessed: where a statement carries a running balance, the amounts are checked against it, so a bank that lists money out as a positive number can't quietly import every expense as income. If it can't be verified, the review screen says so.
 
 No supported bank? Build your own CSV with `Date`, `Title` and `Amount` columns — negative for money out.
+
+## For other plugins
+
+Budget Vault exposes a small headless API at `app.plugins.plugins['budget-app'].api`, so a sibling plugin can show the Dashboard's own "left to spend" figure instead of working it out from the files a second time and arriving at a different number.
+
+- `apiVersion` — `2` today. Version 2 only adds to version 1, so a version 1 consumer keeps working unchanged; test `apiVersion >= 2` before calling the two books functions.
+- `currentPeriod()` — resolves to the open book's figure for the current period (budgeted, spent, left and the notes the Dashboard prints beside them — and, from version 2, `book: { folder, label }`, so the figure says whose it is), to `{ locked: true }` while the privacy splash screen hasn't been opened, or to `null` when no budget is set up.
+- `onChange(cb)` — calls `cb()` after a change to the budget has been reloaded, when the privacy lock opens or closes, and after a switch of book. Returns a function that unsubscribes.
+- `books()` *(version 2)* — resolves to `[{ folder, label, active }]`: the home book first, exactly one of them `active`. A vault with a single book answers with one entry, so there is no "no books" case to handle. While the privacy lock is closed it resolves to `{ locked: true }` instead — a book's label is usually a client's name.
+- `setActiveBook(folder)` *(version 2)* — switches the open book on this device, under the same rules as the top-bar switcher. Resolves to `{ ok: true }` or `{ ok: false, reason }`, where `reason` is `'unknown'` (not one of your books), `'dirty'` (a page has unsaved edits) or `'locked'`; it doesn't throw for any of the three, and a refusal changes nothing. Pass a `folder` exactly as `books()` gave it.
+
+The API reads. The one thing it can change is which book is open on this device. While the privacy splash screen is closed it reads nothing from the vault and says only that it is locked — a consumer should say the same, not fall back to reading the budget files itself. The whole contract, guarantee by guarantee, is the header of [src/api.js](src/api.js).
 
 ## Development
 
@@ -175,3 +200,21 @@ same licence.
 Releases up to and including 1.11.11 were published under the MIT licence and
 stay MIT for anyone holding a copy of them. See [NOTICE](NOTICE) for the full
 licence history.
+
+### Third-party material
+
+Two things in a release are not the author's own work. Each keeps its own
+terms, and [NOTICE](NOTICE) carries them in full:
+
+- **Geist**, the typeface the interface is set in, is embedded in `styles.css`
+  as a single Latin-subset variable font, used as supplied. Copyright 2024 The
+  Geist Project Authors ([vercel/geist-font](https://github.com/vercel/geist-font)),
+  licensed under the [SIL Open Font License, Version 1.1](assets/fonts/OFL-Geist.txt).
+  The OFL covers the font only; it does not change the licence of the plugin's
+  own code.
+- **Helvetica character widths.** The PDF export places its text using the
+  advance widths of Helvetica and Helvetica-Bold from Adobe's Core 14 AFM font
+  metric files — the published widths only; no font program is included.
+  Copyright © 1985, 1987, 1989, 1990, 1991, 1992, 1993, 1997 Adobe Systems
+  Incorporated. All Rights Reserved. The notice those files are distributed
+  under is retained in NOTICE, as it requires.

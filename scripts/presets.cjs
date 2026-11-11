@@ -32,7 +32,9 @@
                                       surface colour, so no single rule covers
                                       both without inventing one)
      textPrimary/textMuted/textLight  text, darkest to faintest
-     inkBase                          "r,g,b" the hairlines are drawn in */
+     inkBase                          "r,g,b" the hairlines are drawn in — and,
+                                      at a stronger alpha, the edge of a form
+                                      control (--control-border) */
 
 const PRESETS = [
   {

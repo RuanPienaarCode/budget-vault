@@ -39,6 +39,15 @@
      would have shipped the one label on the page that was hardest to read. */
   --color-danger-ink:    #be123c;   /* AA on --surface (6.3:1); the fill rose was 3.7:1 */
   --color-info:          #0ea5e9;
+  /* The third fill to need an ink of its own — see the amber and the rose
+     above. --color-info is right behind a badge and inside a bar, and 2.77:1
+     on a white card (2.44:1 on the page), which is under the 3:1 even a glyph
+     is allowed. The Budget page's pressed "fixed bill" toggle was painted in
+     it (2026-11-11 audit). #0369a1 is the ink the light-mode Income and
+     Services badges further down already reach for by literal, so the two
+     now agree on what "info, as ink" is. The dark block points it straight
+     back at the fill, as it does for the other two. */
+  --color-info-ink:      #0369a1;   /* AA on --surface (5.93:1) and on --body-bg (5.23:1); the fill sky was 2.77:1 */
   --color-info-light:    #f0f9ff;
 
   /* The lighter endpoint of the warning/danger bar-fill gradients — .cat-bar-fill
@@ -57,6 +66,18 @@
   --surface:          #ffffff;
   --body-bg:          #eef1f4;
   --border-color:     rgba(15,23,32,.09);
+  /* The edge of a form control, and of nothing else. --border-color above is a
+     hairline. That is right between two rows of a table and wrong around a
+     field, where the line is the only thing saying where the field is (its
+     fill is the card's own white): 1.20:1 against that fill and 1.06:1 against
+     the page, on all four palettes (2026-11-11 audit). WCAG 1.4.11 asks 3:1 of
+     the boundary a control is found by. A token of its own rather than a
+     darker --border-color, which would have turned every divider, card outline
+     and table rule in the app into a grey line to fix the fields. The same ink
+     at .55 — flattened onto the field it is #7b7f84, 4.03:1 on --surface and
+     3.55:1 on --body-bg. .50 is the least that clears 3:1 and leaves ocean at
+     2.99:1 on its page, hence the step above it. */
+  --control-border:   rgba(15,23,32,.55);
   --text-primary:     #12151c;
   --text-muted:       #4b5262;
   --text-light:       #5f6779;   /* AA (5.0:1) on --body-bg; was #7b8494 (3.3:1) */
@@ -109,6 +130,10 @@
   --surface:      #12162a;
   --body-bg:      #04050b;
   --border-color: rgba(255,255,255,.08);
+  /* The form-control edge again — see the light block. White at .4 over the
+     dark field's own fill is #71737f: 3.80:1 on --surface and 4.32:1 on
+     --body-bg, where the hairline above was 1.24:1. */
+  --control-border: rgba(255,255,255,.4);
   --text-primary: #f2f4fe;
   --text-muted:   #b3bad6;
   --text-light:   #7d85a7;
@@ -131,6 +156,9 @@
      5.0:1 as text, while the darkened light-mode ink drops to 1.5:1 — the
      unreadable one here. Point it back at the fill. */
   --color-danger-ink:    var(--color-danger);
+  /* And the sky, the same way round: on #12162a the fill measures 6.45:1 as
+     ink, while the darkened light-mode ink drops to 3.01:1. */
+  --color-info-ink:      var(--color-info);
   --color-info-light:    rgba(14,165,233,0.12);
 
   --bg-0:              #04050b;
@@ -1379,8 +1407,28 @@ body.is-phone .budget-app-root .drawer-book:not(.hidden) { display: block; }
 .budget-app-root .btn-ghost:hover { background: var(--color-primary-light); border-color: var(--color-primary); }
 .budget-app-root .btn-ghost:focus-visible { outline: 2px solid var(--color-primary); outline-offset: 2px; }
 
+/* The gradient starts part-way in, on purpose. Run from 0% it began on the
+   accent itself, and this label — white, 13.6px bold, so not "large text" —
+   measured 3.74:1 there on vault-green and 3.68:1 on ocean, against the 4.5:1
+   it needs (2026-11-11 audit). The label spans the button, so the lightest
+   point of the fill is the one that counts. Placing the accent stop at -100%
+   keeps the same accent-to-primary run and shows its second half: the button
+   now begins on the even mix of the two (#0a7a67 on vault-green, 5.26:1) and
+   ends where it always did. Every palette clears AA with room for :hover's
+   brightness(1.06) below, which lightens the fill under a label that is
+   already white and cannot follow it (4.80:1 at worst, vault-green).
+
+   Fixed here and not by darkening the accent SEED, which the audit offered.
+   --color-accent is also a data colour: the Cash account type, the "spoken
+   for" share on Plan, and the allocated segment of the plan bar, whose
+   boundary against the primary would have dropped from 2.05:1 to 1.40:1. And
+   src/chart.js and views/savings.js each restate the seed as a literal
+   fallback, which would have gone stale. A stop position reaches none of it.
+   A stop outside 0-100% is plain CSS Images 3 on every engine back past the
+   iOS 15 floor — no color-mix(), so nothing here needs an @supports fallback.
+   Held per palette, at rest and hovered, by tests/palette.test.cjs (7b). */
 .budget-app-root .btn-gradient {
-  background: linear-gradient(135deg, var(--color-accent), var(--color-primary));
+  background: linear-gradient(135deg, var(--color-accent) -100%, var(--color-primary) 100%);
   border: 1px solid transparent;
   color: #fff;
   border-radius: 999px;
@@ -1393,7 +1441,15 @@ body.is-phone .budget-app-root .drawer-book:not(.hidden) { display: block; }
 }
 .budget-app-root .btn-gradient:hover { filter: brightness(1.06); }
 .budget-app-root .btn-gradient:focus-visible { outline: 2px solid var(--color-primary); outline-offset: 2px; }
-.budget-app-root.bud-dark .btn-gradient { color: var(--ink-on-accent); }
+/* Dark keeps the whole run. Its label is the near-black --ink-on-accent, and
+   against that the bright accent end is the STRONG one (13.20:1 on
+   vault-green); the weakest point is the primary end, 7.93:1, which the light
+   rule's shifted start would not have moved. So nothing here was failing, and
+   the dark button is left looking exactly as it did. */
+.budget-app-root.bud-dark .btn-gradient {
+  color: var(--ink-on-accent);
+  background: linear-gradient(135deg, var(--color-accent), var(--color-primary));
+}
 .budget-app-root .btn-gradient:disabled, .budget-app-root .btn-ghost:disabled { opacity: .45; cursor: default; filter: none; }
 
 /* ============================================================
@@ -1403,7 +1459,12 @@ body.is-phone .budget-app-root .drawer-book:not(.hidden) { display: block; }
   font-family: var(--font-sans);
   font-size: 0.875rem;
   border-radius: var(--radius-sm);
-  border: 1px solid var(--border-color);
+  /* --control-border, not the --border-color hairline every other line in the
+     app is drawn in. A field's fill is the card's own colour, so this edge is
+     all that says where the field is, and it is held to the 3:1 WCAG 1.4.11
+     asks of a control's boundary — on every palette, in both modes, against
+     the card and the page (tests/palette.test.cjs, section 7a). */
+  border: 1px solid var(--control-border);
   background-color: var(--surface);
   color: var(--text-primary);
   padding: 0.5rem 0.75rem;
@@ -1426,7 +1487,7 @@ body.is-phone .budget-app-root .drawer-book:not(.hidden) { display: block; }
   height: auto;
   box-shadow: none;
   border-radius: var(--radius-sm);
-  border: 1px solid var(--border-color);
+  border: 1px solid var(--control-border);   /* a field's edge, not a hairline — see .form-control above */
   background-color: var(--surface);
   color: var(--text-primary);
 }
@@ -2497,8 +2558,14 @@ body.is-phone .budget-app-root .drawer-book:not(.hidden) { display: block; }
    arrive for this" against "this bill cannot be stopped" — so sharing an accent
    would leave a reader with two identical-looking pressed buttons and no way to
    tell which state they had just set. `aria-pressed` already distinguishes them
-   for a screen reader; this is the sighted half of the same job. */
-.budget-app-root .bud-fixed-on { color: var(--color-info); }
+   for a screen reader; this is the sighted half of the same job.
+
+   The info INK, not the info fill. --color-info is #0ea5e9, 2.77:1 on a white
+   card — too faint for the one glyph that says a bill is locked in.
+   --color-info-ink is #0369a1 in light (5.93:1) and the fill itself in dark
+   (6.26:1 or better on every palette's card). Still a different colour from
+   the accent beside it, which is the point of the paragraph above. */
+.budget-app-root .bud-fixed-on { color: var(--color-info-ink); }
 .budget-app-root .bud-pull { margin-top: 4px; font-size: 11.5px; white-space: nowrap; }
 
 /* Budget page: period totals strip, repeated above and below the table */
