@@ -121,16 +121,25 @@ ok(provided.get('writeFile') === 'io.js',
    TOP of a register function must already exist at that point — a controller
    base key, or a key provided by a module registered earlier. */
 {
-  const reqFile = new Map([...controller.matchAll(/const (register\w+) = require\('\.\/(.+?)'\)/g)]
-    .map(m => [m[1], m[2] + '.js']));
-  const order = [...controller.matchAll(/^\s{2}(register\w+)\(ctx\);/gm)].map(m => m[1]);
-  ok(order.length >= 15, `controller registers the modules in one block (found ${order.length})`);
+  /* The order is src/wiring.js's since the 2026-11-11 audit (task 23): the
+     controller mounts through wire(ctx), and the list it used to spell — a
+     require per module above, a call per module in mountApp — lives there,
+     read here as text like everything else in this suite. */
+  const wiring = fs.readFileSync(path.join(SRC, 'wiring.js'), 'utf8');
+  const order = [...wiring.matchAll(/^\s{2}\{ id: '[\w-]+', load: \(\) => require\('\.\/(.+?)'\) \},/gm)].map(m => m[1] + '.js');
+  ok(order.length >= 15, `wiring.js lists the modules in one block (found ${order.length})`);
+  /* Every entry, not only the ones shaped the way the pattern above expects:
+     an entry written across two lines would otherwise drop out of this check
+     without a word. */
+  eq(order.length, (wiring.match(/load: \(\) => require\(/g) || []).length,
+    'every wiring.js entry was read — keep each on one line, `{ id, load: () => require(...) },`');
+  ok(/^\s{2}wire\(ctx\);/m.test(controller), 'controller.js registers the modules through wire(ctx)');
 
   /* Base keys are only what exists BEFORE the register block runs — the ctx
      literal plus ctx.<k> assignments above it. reloadFromDisk, assigned
      below the block, is deliberately NOT base: destructuring it at register
      time would be exactly the bug this check exists to catch. */
-  const preamble = controller.slice(0, controller.indexOf(`${order[0]}(ctx);`));
+  const preamble = controller.slice(0, controller.search(/^\s{2}wire\(ctx\);/m));
   const avail = new Set();
   const lit = preamble.match(/const ctx = \{([^}]*)\}/);
   ok(lit, 'controller still builds ctx as one literal');
@@ -144,9 +153,8 @@ ok(provided.get('writeFile') === 'io.js',
   }
 
   const violations = [];
-  for (const reg of order) {
-    const rel = reqFile.get(reg);
-    ok(rel, `the registrar ${reg} resolves to a required file`);
+  for (const rel of order) {
+    ok(fs.existsSync(path.join(SRC, rel)), `the wired module ${rel} resolves to a file`);
     const text = fs.readFileSync(path.join(SRC, rel), 'utf8');
     /* Only the destructure at the TOP of the register function runs at
        register time; ones inside handlers are late-bound and order-immune.

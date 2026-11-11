@@ -116,7 +116,6 @@ const pdfText = bytes => readable([...Buffer.from(bytes).toString('latin1').matc
   const unpin = pinClock(TODAY);
   try {
     const M = await mountFor(FILES, { period: PERIOD, budgetFolder: B });
-    require('../src/views/budget-export')(M.ctx);
     const { ctx } = M;
     const money = v => readable(ctx.money(v));
 

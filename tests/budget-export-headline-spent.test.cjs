@@ -58,7 +58,6 @@ const headlines = doc => doc.blocks.filter(b => b.type === 'note' && /^Income /.
   const unpin = pinClock(TODAY);
   try {
     const M = await mountFor(SEED, { period: PERIOD, budgetFolder: B });
-    require('../src/views/budget-export')(M.ctx);
     const { ctx } = M;
 
     /* ---- 1, 4. a period's headline -------------------------------------- */
