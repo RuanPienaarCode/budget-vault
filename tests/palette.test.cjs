@@ -38,6 +38,9 @@
      7a. A FORM CONTROL'S EDGE against what the field sits on: 1.20:1 light,
          1.24:1 dark, on all four palettes. WCAG 1.4.11 asks 3:1 of the
          boundary a control is found by.
+     7b. A GRADIENT BUTTON'S LABEL against the lightest point of its own
+         gradient: 3.74:1 on vault-green and 3.68:1 on ocean, where 13.6px
+         bold text needs 4.5:1.
 
    Each is read out of the stylesheet rather than restated here, so the gate
    measures the rule that ships, and each also refuses a second rule that
@@ -390,6 +393,66 @@ function norm(v) {
         `${p.id}/${mode}: --control-border is a separate, stronger token than the --border-color hairline`);
     });
   }
+
+  /* -- 7b. the label on a gradient button ---------------------------------
+
+     .btn-gradient is 13.6px bold, which is not "large text", so it needs the
+     full 4.5:1 — and against the LIGHTEST point of the gradient, not its
+     average, because a label spans the button. White on the accent seed was
+     3.74:1 on vault-green and 3.68:1 on ocean.
+
+     Measured as painted. The stops are read from the rule; the gradient is
+     sampled across the part of it the button actually shows (a stop placed
+     outside 0-100% is legal CSS, and is how the light button now starts
+     part-way into the same accent-to-primary run); and the hover state is
+     measured too, because `filter: brightness()` lightens the fill under a
+     label that is already white and cannot follow it. */
+  {
+    const AA = 4.5;
+    const BTN = '.budget-app-root .btn-gradient';
+    const DARK = '.budget-app-root.bud-dark .btn-gradient';
+
+    eq(touching(['btn-gradient'], /^(background(-image|-color)?|color|filter)$/), [
+      `${BTN} { background }`,
+      `${BTN} { color }`,
+      `${BTN}:disabled { filter }`,
+      `${BTN}:hover { filter }`,
+      `${DARK} { background }`,
+      `${DARK} { color }`,
+    ].sort(), 'nothing else paints a gradient button\'s fill, label or hover — a new rule has to be measured here');
+
+    /* linear-gradient(<angle>, var(--a) [n%], var(--b) [n%]) -> two stops. */
+    const stopsOf = value => {
+      const m = /^linear-gradient\(\s*[\d.]+deg\s*,\s*var\((--[a-z0-9-]+)\)\s*(-?[\d.]+%)?\s*,\s*var\((--[a-z0-9-]+)\)\s*(-?[\d.]+%)?\s*\)$/.exec(value);
+      ok(m, `the gate can read the button's gradient: ${value}`);
+      return [{ token: m[1], at: m[2] ? parseFloat(m[2]) / 100 : 0 }, { token: m[3], at: m[4] ? parseFloat(m[4]) / 100 : 1 }];
+    };
+    const hover = /^brightness\(([\d.]+)\)$/.exec(only(`${BTN}:hover`, 'filter'));
+    ok(hover, 'the hover state is a brightness() the gate can apply');
+    /* brightness() scales each sRGB channel and clamps — the whole element,
+       label included, which is why a white label gains nothing from it. */
+    const lift = hex => toHex(rgb(hex).map(c => Math.min(255, c * Number(hover[1]))));
+
+    const fill = { light: stopsOf(only(BTN, 'background')), dark: stopsOf(only(DARK, 'background')) };
+    const label = { light: only(BTN, 'color'), dark: only(DARK, 'color') };
+
+    each((p, mode, t) => {
+      const [a, b] = fill[mode].map(s => ({ at: s.at, c: rgb(resolve(`var(${s.token})`, t)) }));
+      ok(b.at > a.at, `${p.id}/${mode}: the gradient's stops are in order`);
+      const ink = toHex(norm(resolve(label[mode], t)));
+      let rest = Infinity, hovered = Infinity;
+      /* 0..1 is the whole of what a corner-to-corner gradient shows: its line
+         is sized so that 0% and 100% land exactly on the two corners. */
+      for (let i = 0; i <= 200; i++) {
+        const k = Math.min(1, Math.max(0, (i / 200 - a.at) / (b.at - a.at)));
+        const here = toHex(a.c.map((c, j) => c + k * (b.c[j] - c)));
+        rest = Math.min(rest, contrast(ink, here));
+        hovered = Math.min(hovered, contrast(lift(ink), lift(here)));
+      }
+      ok(rest >= AA, `${p.id}/${mode}: gradient-button label ${ink} is ${rest.toFixed(2)}:1 at the weakest point of its fill, below AA ${AA}:1`);
+      ok(hovered >= AA, `${p.id}/${mode}: gradient-button label is ${hovered.toFixed(2)}:1 under the hover brightness(${hover[1]}), below AA ${AA}:1`);
+    });
+  }
 }
 
-console.log(`PASS — palette generator: reproduces Vault Green, AA in ${PRESETS.length * 2} blocks, dropdown parity, form-control edge gated per palette (${checks} checks).`);
+console.log(`PASS — palette generator: reproduces Vault Green, AA in ${PRESETS.length * 2} blocks, dropdown parity, form-control edge / gradient-button label gated per palette (${checks} checks).`);

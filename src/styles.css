@@ -1386,8 +1386,28 @@ body.is-phone .budget-app-root .drawer-book:not(.hidden) { display: block; }
 .budget-app-root .btn-ghost:hover { background: var(--color-primary-light); border-color: var(--color-primary); }
 .budget-app-root .btn-ghost:focus-visible { outline: 2px solid var(--color-primary); outline-offset: 2px; }
 
+/* The gradient starts part-way in, on purpose. Run from 0% it began on the
+   accent itself, and this label — white, 13.6px bold, so not "large text" —
+   measured 3.74:1 there on vault-green and 3.68:1 on ocean, against the 4.5:1
+   it needs (2026-11-11 audit). The label spans the button, so the lightest
+   point of the fill is the one that counts. Placing the accent stop at -100%
+   keeps the same accent-to-primary run and shows its second half: the button
+   now begins on the even mix of the two (#0a7a67 on vault-green, 5.26:1) and
+   ends where it always did. Every palette clears AA with room for :hover's
+   brightness(1.06) below, which lightens the fill under a label that is
+   already white and cannot follow it (4.80:1 at worst, vault-green).
+
+   Fixed here and not by darkening the accent SEED, which the audit offered.
+   --color-accent is also a data colour: the Cash account type, the "spoken
+   for" share on Plan, and the allocated segment of the plan bar, whose
+   boundary against the primary would have dropped from 2.05:1 to 1.40:1. And
+   src/chart.js and views/savings.js each restate the seed as a literal
+   fallback, which would have gone stale. A stop position reaches none of it.
+   A stop outside 0-100% is plain CSS Images 3 on every engine back past the
+   iOS 15 floor — no color-mix(), so nothing here needs an @supports fallback.
+   Held per palette, at rest and hovered, by tests/palette.test.cjs (7b). */
 .budget-app-root .btn-gradient {
-  background: linear-gradient(135deg, var(--color-accent), var(--color-primary));
+  background: linear-gradient(135deg, var(--color-accent) -100%, var(--color-primary) 100%);
   border: 1px solid transparent;
   color: #fff;
   border-radius: 999px;
@@ -1400,7 +1420,15 @@ body.is-phone .budget-app-root .drawer-book:not(.hidden) { display: block; }
 }
 .budget-app-root .btn-gradient:hover { filter: brightness(1.06); }
 .budget-app-root .btn-gradient:focus-visible { outline: 2px solid var(--color-primary); outline-offset: 2px; }
-.budget-app-root.bud-dark .btn-gradient { color: var(--ink-on-accent); }
+/* Dark keeps the whole run. Its label is the near-black --ink-on-accent, and
+   against that the bright accent end is the STRONG one (13.20:1 on
+   vault-green); the weakest point is the primary end, 7.93:1, which the light
+   rule's shifted start would not have moved. So nothing here was failing, and
+   the dark button is left looking exactly as it did. */
+.budget-app-root.bud-dark .btn-gradient {
+  color: var(--ink-on-accent);
+  background: linear-gradient(135deg, var(--color-accent), var(--color-primary));
+}
 .budget-app-root .btn-gradient:disabled, .budget-app-root .btn-ghost:disabled { opacity: .45; cursor: default; filter: none; }
 
 /* ============================================================
