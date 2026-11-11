@@ -346,10 +346,9 @@ eq(shellSaveIds.filter(id => !registeredSave.has(id)), [],
   const topbar = /<header class="topbar"[\s\S]*?<\/header>/.exec(shell);
   ok(topbar && /id="bookSwitch"/.test(topbar[0]) && !/id="drawerBookSwitch"/.test(topbar[0]),
     'the top bar keeps its own copy, #bookSwitch, for windows wider than a phone');
-  ok(/const onBookPicked = async e =>/.test(controller)
-    && /\$\('#bookSelect'\)\.addEventListener\('change', onBookPicked\)/.test(controller)
-    && /\$\('#drawerBookSelect'\)\.addEventListener\('change', onBookPicked\)/.test(controller),
-    'both selects change book through one handler (pickBook, then applyBooks redraws both)');
+  ok(/const onBookPicked = async select =>/.test(controller)
+    && /for \(const select of \[\$\('#bookSelect'\), \$\('#drawerBookSelect'\)\]\) \{\s*settleBookSelect\(select, \(\) => onBookPicked\(select\)/.test(controller),
+    'both selects change book through one handler (pickBook, then applyBooks redraws both), once the reader has settled on a book');
   const apply = /async function applyBooks\(\) \{[\s\S]*?\n  \}/.exec(controller);
   ok(apply && /bookSwitchers\(\)/.test(apply[0]) && /\$\('#drawerBookSwitch'\), \$\('#drawerBookSelect'\)/.test(controller),
     'applyBooks — which main.js refreshBookSwitchers() calls after a settings write — draws the drawer copy with the top bar one');

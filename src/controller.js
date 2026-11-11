@@ -16,7 +16,7 @@ const i18n = require('./i18n');
 const { PALETTE_PRESETS, DEFAULT_PALETTE } = require('./constants');
 
 const books = require('./books');
-const { renderBookSwitchers, pickBook } = require('./book-switcher');
+const { renderBookSwitchers, settleBookSelect, pickBook } = require('./book-switcher');
 const drawer = require('./drawer');
 const { showToast } = require('./toast');
 const registerIo = require('./io');
@@ -1257,17 +1257,25 @@ function mountApp(view) {
      switch the other copy follows. A switch made from the drawer closes it, as
      a drawer link does: the reader asked for another book, and the drawer
      staying over it would hide the answer. A refusal leaves it open, beside
-     the notice saying why. */
-  const onBookPicked = async e => {
-    const r = await pickBook(plugin, e.target.value, {
+     the notice saying why.
+
+     Called when the reader has SETTLED on a book, which is not every `change`
+     of the select: a keyboard stepping through a closed select fires one per
+     book passed, and each used to be a full reload. settleBookSelect
+     (src/book-switcher.js) holds those until Enter or blur, and passes a
+     mouse or a phone's pick straight through. Escape on a held step redraws
+     both copies, so the select goes back to the book that is actually open. */
+  const onBookPicked = async select => {
+    const r = await pickBook(plugin, select.value, {
       notify: msg => new Notice(msg, 7000),
       t: i18n.t,
     });
-    if (r.ok && e.target.id === 'drawerBookSelect') closeDrawer();
+    if (r.ok && select.id === 'drawerBookSelect') closeDrawer();
     applyBooks().catch(() => {});
   };
-  $('#bookSelect').addEventListener('change', onBookPicked);
-  $('#drawerBookSelect').addEventListener('change', onBookPicked);
+  for (const select of [$('#bookSelect'), $('#drawerBookSelect')]) {
+    settleBookSelect(select, () => onBookPicked(select), () => { applyBooks().catch(() => {}); });
+  }
   $('#menuBtn').addEventListener('click', () => $('#appDrawer').classList.contains('open') ? closeDrawer() : openDrawer());
   $('#drawerClose').addEventListener('click', closeDrawer);
   $('#drawerOverlay').addEventListener('click', closeDrawer);
