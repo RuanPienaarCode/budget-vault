@@ -130,7 +130,7 @@ A **book** is one budget folder — its own `Settings.md`, categories, accounts 
 - **One book is open per device.** The list of books is saved with the plugin's settings, so it goes wherever those sync. Which book is open is remembered separately on each device and is never synced — your phone and your laptop can have different books open without tripping over each other.
 - **Switching refuses while anything is unsaved**, and says so, rather than carry a row typed into one book over into another's files. Save first, or reload from disk to discard.
 - **Nothing is ever added up across books.** There is no combined total and there are no shared categories; one book's numbers never appear in another's.
-- **Removing a book edits the list and nothing else.** It touches no files: the folder, its `Settings.md` and every transaction in it stay exactly where they are, and adding the folder again later brings the book back as it stands. If the book you remove is the one that's open, you are switched to the home book first. The home book — the one named in the Budget folder setting — can't be removed.
+- **Removing a book edits the list and touches no files.** The folder, its `Settings.md` and every transaction in it stay exactly where they are, and adding the folder again later brings the book back as it stands. If the book you remove is the one that's open, you are switched to the home book first — and, like any switch, that is refused while anything is unsaved. The home book — the one named in the Budget folder setting — can't be removed.
 
 The reasoning is written up in [ADR 0009](docs/adr/0009-a-vault-can-hold-several-books.md).
 
