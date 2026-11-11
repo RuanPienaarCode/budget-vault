@@ -105,10 +105,34 @@ const FILES = () => ({
   [`${B}/Budgets/2026-10.md`]: BUDGET_HEAD + '| Groceries | expense | 5000.00 | |\n| Card payment | expense | 800.00 | |\n| Salary | income | 20000.00 | |\n',
 });
 
+/* A plan with three of everything, so "the one that moved up", "the one
+   before" and "the list's Add button" are each a different landing. */
+const planFile = (name, sources, envelopes, items = []) => [
+  '---', 'kind: plan', `plan: "${name}"`, 'started: "2026-08-01"', 'status: active', '---', '',
+  `# ${name}`, '', '## Money in', '',
+  '| Source | Kind | Amount | Date | Status | Notes |', '|--------|------|-------:|------|--------|-------|',
+  ...sources.map(([n, a]) => `| ${n} | Other | ${a} | 2026-08-03 | received |  |`), '',
+  '## Envelopes', '', '| Envelope | Amount | Note | Tint |', '|----------|-------:|------|------|',
+  ...envelopes.map(([n, a]) => `| ${n} | ${a} |  |  |`), '',
+  '## Items', '', '| Item | Envelope | Amount | Spent | Status | Category | Notes |',
+  '|------|----------|-------:|------:|--------|----------|-------|',
+  ...items.map(([n, e, a]) => `| ${n} | ${e} | ${a} | 0.00 | planned |  |  |`), '',
+].join('\n');
+const PLAN_FILES = () => ({
+  [`${B}/Settings.md`]: '---\nmonth_start_day: 1\ncurrency: "R"\ncountry: za\n---\n',
+  [`${B}/Plans/Alpha.md`]: planFile('Alpha',
+    [['Payout', '20000.00'], ['Refund', '3000.00'], ['Bonus', '2000.00']],
+    [['Settle up', '11600.00'], ['Coming up', '4500.00'], ['For us', '1200.00']],
+    [['Dinner out', 'For us', '400.00'], ['Cinema', 'For us', '300.00'], ['Weekend', 'For us', '500.00']]),
+  [`${B}/Plans/Beta.md`]: planFile('Beta', [['Gift', '5000.00']], [['First of Beta', '3000.00']]),
+});
+
 /* The shell's own controls, as real ones (see refocus-views: the harness
    auto-creates anything asked for by id as a <div>, which focus cannot land
    on — right for a div, wrong for the buttons these pages fall back to). */
-const SHELL = { '#budAddCat': 'button', '#budCopyPrev': 'button', '#budSave': 'button' };
+const SHELL = { '#budAddCat': 'button', '#budCopyPrev': 'button', '#budSave': 'button',
+  '#planStart': 'button', '#planNew': 'button', '#planDelete': 'button',
+  '#planAddSource': 'button', '#planAddEnvelope': 'button' };
 
 async function mount(files = FILES()) {
   focus.reset();
@@ -120,6 +144,10 @@ async function mount(files = FILES()) {
     node.attrs.id = id.slice(1);
     M.nodes.set(id, node);
   }
+  /* The two halves of the Plan page, nested the way the shell nests them, so
+     hiding a card hides what is in it. */
+  M.ctx.$('#planEmptyCard').append(M.ctx.$('#planStart'));
+  M.ctx.$('#planContent').append(M.ctx.$('#planNew'), M.ctx.$('#planDelete'), M.ctx.$('#planAddSource'), M.ctx.$('#planAddEnvelope'));
   M.ctx.render = () => { M.ctx[`render${M.view}`](); };
   M.ctx.switchView = () => {};
   M.ctx.reloadFromDisk = async () => {};
@@ -244,6 +272,147 @@ const keysOf = (root, prefix) => descend(root).map(e => e.getAttribute('data-foc
       await press(need(note, 'reslice'));
       landed('reslice', 'bringing the amounts over lands back on that offer');
       answers.reslice = null;
+    }
+
+    /* ================= Plan =============================================== */
+    {
+      const M = await mount(PLAN_FILES());
+      M.view = 'Plan';
+      const $ = M.ctx.$;
+      const picker = $('#planPicker'), sources = $('#planSources'), envs = $('#planEnvelopes'), free = $('#planFree');
+      M.ctx.renderPlan();
+      const cls = c => focus.at()._cls.has(c);
+
+      // The picker (before anything is edited: it refuses while the plan is dirty).
+      await press(need(picker, 'plan:Beta'));
+      landed('plan:Beta', 'switching plan lands on the plan that was chosen');
+      eq(focus.at().getAttribute('aria-pressed'), 'true', 'which is now the pressed one');
+      await press(need(picker, 'plan:Alpha'));
+      landed('plan:Alpha', 'and back');
+
+      // Sources: an edit, then removals from the top, the bottom, and the last.
+      const source = { name: 'Payout', kind: 'Other', amount: '21000', date: '2026-08-03', status: 'received', notes: '', remove: [] };
+      answers.fields = source;
+      await press(need(sources, 'src:0'));
+      landed('src:0', 'editing a source lands back on that source');
+      ok(/21/.test(focus.at().parentElement.textContent), 'on the rebuilt row, showing the new amount');
+      await press(need(sources, 'srcdel:0'));
+      landed('srcdel:0', 'removing a source lands on the one that moved up');
+      await press(need(sources, 'srcdel:1'));
+      landed('srcdel:0', 'removing the last source lands on the one above');
+      answers.fields = { ...source, remove: ['yes'] };
+      await press(need(sources, 'src:0'));
+      eq(M.S.plans.Alpha.sources.length, 0, 'the edit sheet removed the only source');
+      eq(focus.at(), $('#planAddSource'), 'and the reader is on Add a source');
+
+      // The accordion: a collapsed row and the open card's Collapse are one control.
+      await press(need(envs, 'env:1'));
+      landed('env:1', 'opening a bucket lands on the same key');
+      ok(cls('env-collapse'), 'which is now that bucket\'s Collapse button');
+      await press(focus.at());
+      landed('env:1', 'collapsing it lands on the same key again');
+      ok(cls('env-sum'), 'which is its collapsed row');
+      await press(need(envs, 'env:2'));
+      ok(cls('env-collapse'), 'the third bucket is open');
+
+      // Inside the open card.
+      await change(need(envs, 'slider:2'), n => { n.value = '1500'; });
+      landed('slider:2', 'a step on the slider lands back on the slider');
+      eq(M.S.plans.Alpha.envelopes[2].amount, 1500, 'with the step taken');
+      answers.fields = { amount: '1600' };
+      await press(need(envs, 'amt:2'));
+      landed('amt:2', 'typing the amount lands back on the figure');
+      answers.fields = { name: 'For us two', note: '' };
+      await press(need(envs, 'rename:2'));
+      landed('rename:2', 'renaming a bucket lands back on its name');
+      ok(/For us two/.test(focus.at().textContent), 'which is the new name');
+      answers.fields = { name: 'Picnic', amount: '100', category: '' };
+      await press(need(envs, 'additem:2'));
+      landed('additem:2', 'adding an item lands back on "+ item"');
+      await press(need(envs, 'tick:1'));
+      landed('tick:1', 'advancing an item lands back on its tick');
+      ok(cls('part'), 'which shows the new state');
+
+      // An item: edited in place, removed, moved to another bucket, the last one.
+      const item = n => ({ name: n, amount: '300', spent: '0', envelope: 'For us two', category: '', notes: '', remove: [] });
+      answers.fields = item('Cinema');
+      await press(need(envs, 'item:1'));
+      landed('item:1', 'editing an item lands back on that item');
+      answers.fields = { ...item('Dinner out'), remove: ['yes'] };
+      await press(need(envs, 'item:0'));
+      landed('item:0', 'removing an item lands on the one that moved up');
+      ok(/Cinema/.test(focus.at().textContent), 'which is the next item');
+      eq(keysOf(envs, 'item:').length, 3, 'three items are left in the bucket');
+      answers.fields = { ...item('Picnic'), envelope: 'Coming up' };
+      await press(need(envs, 'item:2'));
+      landed('item:1', 'moving the last item to another bucket lands on the one above');
+      for (const name of ['Cinema', 'Weekend']) {
+        answers.fields = { ...item(name), remove: ['yes'] };
+        await press(need(envs, 'item:0'));
+      }
+      landed('additem:2', 'removing the only item lands on the bucket\'s "+ item"');
+
+      // Removing a bucket.
+      answers.confirm = false;
+      await press(need(envs, 'envdel:2'));
+      landed('envdel:2', 'a removal that was cancelled leaves the reader on the delete');
+      answers.confirm = true;
+      await press(need(envs, 'envdel:2'));
+      landed('env:1', 'removing the last bucket lands on the one before it');
+      ok(cls('env-sum'), 'its row — not the delete of whichever bucket the accordion opened instead');
+      await press(need(envs, 'envdel:0'));
+      landed('env:0', 'removing a bucket lands on the one that took its place');
+      ok(cls('env-collapse'), 'which the accordion has opened');
+      await press(need(envs, 'envdel:0'));
+      eq(M.S.plans.Alpha.envelopes.length, 0, 'no bucket is left');
+      eq(focus.at(), $('#planAddEnvelope'), 'removing the only bucket lands on Add a spending bucket');
+
+      // The loud card. Nothing funds the plan and nothing is placed: no card.
+      ok(free._cls.has('hidden'), 'an empty plan has no loud card');
+      M.S.plans.Alpha.sources.push({ name: 'Payout', kind: 'Other', amount: 1000, date: '2026-08-03', status: 'received', notes: '' });
+      M.ctx.renderPlan();
+      ok(!free._cls.has('hidden'), 'money in no bucket brings the card up');
+      answers.fields = { name: 'Extra', kind: 'Other', amount: '500', date: '' };
+      await press(need(free, 'free:source'));
+      landed('free:source', 'adding a source from the card lands back on that button while the card stands');
+      answers.fields = { name: 'First', amount: '400', note: '' };
+      await press(need(free, 'free:place'));
+      landed('free:place', 'placing some of it lands back on the offer, which still stands');
+      answers.fields = { name: 'Rest', amount: '1100', note: '' };
+      await press(need(free, 'free:place'));
+      ok(free._cls.has('hidden'), 'placing all of it takes the card away');
+      landed('env:1', 'and the reader is on the bucket the press made');
+      ok(cls('env-collapse') && /Rest/.test(focus.at().parentElement.textContent), 'which the accordion has opened');
+      // Over-placed: only the source offer is left, and a source that covers it
+      // takes the card away with the button in it.
+      M.S.plans.Alpha.envelopes[1].amount = 1600;
+      M.ctx.renderPlan();
+      ok(!free._cls.has('hidden') && !keyed(free, 'free:place'), 'an over-placed plan shows the card with the one offer');
+      answers.fields = { name: 'Cover', kind: 'Other', amount: '500', date: '' };
+      await press(need(free, 'free:source'));
+      ok(free._cls.has('hidden'), 'a source that covers the gap takes the card away');
+      eq(focus.at(), $('#planAddSource'), 'and the reader is on the page\'s own Add a source');
+
+      // Deleting a plan with another still standing: the button is still there.
+      const del = $('#planDelete');
+      focus.on(del);
+      await M.ctx.deletePlan();
+      await settle();
+      eq(Object.keys(M.S.plans), ['Beta'], 'one plan is left');
+      eq(focus.at(), del, 'deleting one of two plans leaves focus on Delete plan, which is still on the page');
+      // Deleting the last one swaps the page for its empty state.
+      await M.ctx.deletePlan();
+      await settle();
+      eq(Object.keys(M.S.plans).length, 0, 'no plan is left');
+      eq(focus.at(), $('#planStart'), 'deleting the last plan lands on Start a plan, the way back in');
+      // ...and Start swaps it back.
+      answers.fields = { name: 'Fresh' };
+      focus.on($('#planStart'));
+      await M.ctx.newPlan();
+      await settle();
+      ok(M.S.plans.Fresh, 'a plan was started');
+      eq(focus.at(), $('#planAddSource'), 'starting a plan lands on Add a source, the first thing a new plan asks for');
+      answers.fields = null;
     }
   } finally {
     unpin();
