@@ -5463,10 +5463,16 @@ body.is-phone .budget-app-root .drawer-book:not(.hidden) { display: block; }
    exactly as they are — plan.js still uses several of them unchanged, and
    this file only adds what the redesign needed on top.
 
-   iOS 15 / WebKit floor: no :has(), no lookbehind, no inset shorthand. The
+   iOS 15 / WebKit floor: no :has(). (This note used to list the `inset`
+   shorthand beside it. That was wrong, and worth correcting rather than
+   deleting, because it reads as a rule: Safari has had `inset` since 14.1,
+   which is below the floor, and this stylesheet uses it with no fallback in
+   thirteen places — `inset: 0` on the drawer scrim, the page's ambient
+   background and the confetti layer among them. Nothing here needs the four
+   longhands.) The
    :focus-visible rings below are mirrored onto plain :focus inside the one
-   @supports not selector(:focus-visible) block near line 2921, which the
-   parity guard test reads. */
+   @supports not selector(:focus-visible) block earlier in this file, which
+   the parity guard, tests/focus-visible-fallback.test.cjs, reads. */
 
 /* ---- action rail: Save + New as pills, Delete demoted to a quiet icon ---- */
 .budget-app-root .plan-actions-v2 {
