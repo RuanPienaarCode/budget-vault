@@ -502,6 +502,37 @@ module.exports = function registerTransactions(ctx) {
      button, which is always there. */
   const afterBar = () => ['row:0', $('#txAdd')];
 
+  /* What a screen reader is told when one of the two bars above the table
+     appears, and when it goes.
+
+     The bars themselves cannot do it. They were role="status" and `hidden`
+     until the moment they were filled, and a live region that is not in the
+     accessibility tree is not being listened to: it appears already carrying
+     its text, nothing has CHANGED, and most screen readers say nothing. Nor
+     would un-hiding them have helped — their whole page section is
+     display:none while another page is open, and both bars are filled at the
+     moment it is shown (an import sends the reader here; so does a Dashboard
+     drill-through). So "42 rows imported, undo is available" reached everyone
+     but the reader who could not see it (audit of 11 Nov 2026, task 18).
+
+     The shell carries two regions for this at its top level (#txUndoSay,
+     #txScopeSay): always in the tree, empty at rest. `say` writes the sentence
+     into one — the sentence alone, never the bar's buttons, which a status
+     region would read out as part of the message.
+
+     Written only when it CHANGES. This runs on every render, and a render is
+     every keystroke in the search box: writing the same sentence again is a
+     change as far as a screen reader is concerned, and it would say it again.
+     Remembered here rather than read back off the element, so a region some
+     harness hands out as a stand-in is never trusted to hold state. */
+  const spoken = {};
+  function say(sel, text) {
+    if (spoken[sel] === text || (!text && spoken[sel] === undefined)) return;
+    spoken[sel] = text;
+    const live = $(sel);
+    if (live) live.textContent = text;
+  }
+
   /* The undo offer for the import that just landed on this page.
      Rebuilt on every render from S.lastImport, which import.js writes on commit
      and clears once it has been used or has become unusable — so there is
@@ -514,6 +545,9 @@ module.exports = function registerTransactions(ctx) {
     const r = S.lastImport;
     bar.empty();
     bar.classList.toggle('hidden', !r);
+    // What was imported, and how long the offer lasts: the two sentences the
+    // bar prints, without the filename, which is a detail and not the news.
+    say('#txUndoSay', r ? `${i18n.t('tx.undo.what', { count: r.count, label: r.label, at: r.at })} ${i18n.t('tx.undo.session')}` : '');
     if (!r) return;
     bar.append(el('div', { class: 'tx-undo-txt' },
       i18n.t('tx.undo.what', { count: r.count, label: r.label, at: r.at }),
@@ -549,16 +583,19 @@ module.exports = function registerTransactions(ctx) {
     note.empty();
     const any = outside + foreign + fund + future;
     note.classList.toggle('hidden', !any);
+    /* One sentence per reason, as before — the same strings are printed in the
+       note and spoken through #txScopeSay (see `say`). */
+    const lines = [];
+    if (outside) lines.push(i18n.t('tx.outside.hidden', { count: outside }));
+    if (foreign) lines.push(i18n.t('tx.foreign.hidden', { count: foreign }));
+    if (fund) lines.push(i18n.t('tx.fund.hidden', { count: fund }));
+    if (future) lines.push(i18n.t('tx.future.hidden', { count: future }));
+    say('#txScopeSay', lines.join(' '));
     if (!any) return;
     const show = el('button', { type: 'button', class: 'tx-undo-btn' }, i18n.t('tx.outside.show'));
     show.addEventListener('click', () => { inBudgetFor = null; renderTransactions(); refocus($('#txTable'), afterBar()); });
-    const said = [];
-    if (outside) said.push(el('div', {}, i18n.t('tx.outside.hidden', { count: outside })));
-    if (foreign) said.push(el('div', {}, i18n.t('tx.foreign.hidden', { count: foreign })));
-    if (fund) said.push(el('div', {}, i18n.t('tx.fund.hidden', { count: fund })));
-    if (future) said.push(el('div', {}, i18n.t('tx.future.hidden', { count: future })));
     note.append(
-      el('div', { class: 'tx-undo-txt' }, said),
+      el('div', { class: 'tx-undo-txt' }, lines.map(line => el('div', {}, line))),
       el('div', { class: 'tx-undo-acts' }, show));
   }
 

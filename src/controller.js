@@ -18,6 +18,7 @@ const { PALETTE_PRESETS, DEFAULT_PALETTE } = require('./constants');
 const books = require('./books');
 const { renderBookSwitchers, pickBook } = require('./book-switcher');
 const drawer = require('./drawer');
+const { showToast } = require('./toast');
 const registerIo = require('./io');
 const registerFxLive = require('./fx-live');
 const registerPeriod = require('./period');
@@ -584,21 +585,10 @@ function mountApp(view) {
     _foodQ: 0,                 // Food items-search debounce timer handle
   };
 
-  function toast(msg, bad = false) {
-    const t = $('#toast');
-    if (!t) return;
-    t.textContent = msg;
-    t.className = bad ? 'bad' : 'good';
-    t.classList.add('show');
-    /* Long enough to read. A flat 2.6 s suited "Saved"; it cut off the
-       two-sentence toasts — the drift warning after a balance edit, the
-       "counts as already inside that balance" note after Add transaction —
-       before a reader reached the second sentence. ~55 ms a character is a
-       slow reading pace; short toasts keep the old floor, and a cap stops a
-       paragraph from parking over the page. */
-    const ms = Math.min(9000, Math.max(2600, String(msg).length * 55));
-    clearTimeout(t._h); t._h = setTimeout(() => t.classList.remove('show'), ms);
-  }
+  /* Which region a message goes into, and how long it stays, is src/toast.js:
+     an error is an alert that stays twice as long as a success, and a toast
+     that has gone leaves no text behind. */
+  function toast(msg, bad = false) { showToast($, msg, bad); }
 
   /* Country locale profile for the configured country (Settings.md `country`,
      default South Africa). Resolved per call so a settings change applies on

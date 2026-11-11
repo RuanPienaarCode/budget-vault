@@ -73,6 +73,7 @@ const HOST_SIDE = new Map([
   ['book-switcher.js',       'fills the book <select>s (top bar, and drawer on a phone) through dom.js; the rule it renders is books.js'],
   ['book-settings.js',       "Settings → Books' two modals — require('obsidian'); the rules they apply are books.js"],
   ['drawer.js',              'opens and closes the navigation drawer, and inerts the app behind it, through dom.js setInert'],
+  ['toast.js',               "writes the toast into the shell's two live regions and times it with the host's setTimeout"],
   ['chart.js',               'draws SVG into the DOM'],
   ['dash-motion.js',         "the Dashboard's arrival motion — document and window"],
   ['welcome-motion.js',      'builds the welcome animation with createDiv'],

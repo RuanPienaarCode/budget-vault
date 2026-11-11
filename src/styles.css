@@ -2626,7 +2626,8 @@ body.is-phone .budget-app-root .drawer-book:not(.hidden) { display: block; }
 /* ============================================================
    ALERTS / TOAST
    ============================================================ */
-.budget-app-root #toast {
+.budget-app-root #toast,
+.budget-app-root #toastAlert {
   position: absolute;
   bottom: max(22px, calc(22px + env(safe-area-inset-bottom))); left: 50%;
   transform: translateX(-50%);
@@ -2647,9 +2648,17 @@ body.is-phone .budget-app-root .drawer-book:not(.hidden) { display: block; }
   overflow: hidden;
   text-overflow: ellipsis;
 }
-.budget-app-root.bud-dark #toast { background: var(--surface-glass-hi); -webkit-backdrop-filter: blur(20px); backdrop-filter: blur(20px); }
-.budget-app-root #toast.show { opacity: 1; }
-.budget-app-root #toast.bad { border-left: 4px solid var(--color-danger); }
+.budget-app-root.bud-dark #toast,
+.budget-app-root.bud-dark #toastAlert { background: var(--surface-glass-hi); -webkit-backdrop-filter: blur(20px); backdrop-filter: blur(20px); }
+.budget-app-root #toast.show,
+.budget-app-root #toastAlert.show { opacity: 1; }
+/* #toastAlert is the same toast with a different role: an error is written
+   into it so a screen reader announces it at once, where #toast is polite
+   (src/toast.js). Only one of the two ever shows, so they share one place on
+   screen and every rule here names both. `.bad` can still land on #toast: a
+   shell with no alert region shows the error in the one it has. */
+.budget-app-root #toast.bad,
+.budget-app-root #toastAlert.bad { border-left: 4px solid var(--color-danger); }
 .budget-app-root #toast.good { border-left: 4px solid var(--color-primary); }
 
 /* Reduced motion for the shared transitions. Placed AFTER the last of the rules
@@ -2665,6 +2674,7 @@ body.is-phone .budget-app-root .drawer-book:not(.hidden) { display: block; }
   .budget-app-root .card,
   .budget-app-root .upload-area,
   .budget-app-root #toast,
+  .budget-app-root #toastAlert,
   .budget-app-root .table tbody tr { transition: none; }
   /* The grow animations are decoration — the bar reads identically at rest. */
   .budget-app-root .cat-bar-fill,
@@ -3686,7 +3696,8 @@ body.is-phone .budget-app-root .drawer-book:not(.hidden) { display: block; }
   }
 
   /* Same reason — a toast pinned 22px off the bottom lands behind the toolbar. */
-  .budget-app-root #toast {
+  .budget-app-root #toast,
+  .budget-app-root #toastAlert {
     bottom: max(22px, var(--bud-bottom-chrome));
   }
 
@@ -6286,7 +6297,8 @@ body.is-phone .budget-app-root .drawer-book:not(.hidden) { display: block; }
 .budget-app-root.has-dock .main-content {
   padding-bottom: calc(var(--bv-dock-bottom) + var(--bv-dock-h) + 2rem);
 }
-.budget-app-root.has-dock #toast {
+.budget-app-root.has-dock #toast,
+.budget-app-root.has-dock #toastAlert {
   bottom: calc(var(--bv-dock-bottom) + var(--bv-dock-h) + 10px);
 }
 
