@@ -127,12 +127,29 @@ const PLAN_FILES = () => ({
   [`${B}/Plans/Beta.md`]: planFile('Beta', [['Gift', '5000.00']], [['First of Beta', '3000.00']]),
 });
 
+/* Two till slips in October, written by the app's own serializer so the
+   fixture is in the format the loader reads. Two products under "Dairy &
+   eggs", so filtering to it and re-filing one leaves the category standing. */
+const RECEIPT_FILES = () => {
+  const { serializeReceipt, receiptPath } = require('../src/receipt-file');
+  const line = (name, amount, category) => ({ barcode: '', name, amount, discount: 0, category, healthy: false });
+  const slips = [
+    { store: 'Grocer One', date: '2026-10-03', time: '10:15', total: 115,
+      items: [line('Milk 2L', 40, 'Dairy & eggs'), line('Brown bread', 30, 'Bakery'), line('Apples', 25, 'Fruit & veg'), line('Yoghurt', 20, 'Dairy & eggs')] },
+    { store: 'Grocer Two', date: '2026-10-09', time: '17:40', total: 125,
+      items: [line('Milk 2L', 45, 'Dairy & eggs'), line('Cheddar', 80, 'Cheese')] },
+  ];
+  const out = { [`${B}/Settings.md`]: '---\nmonth_start_day: 1\ncurrency: "R"\ncountry: za\n---\n' };
+  for (const r of slips) out[`${B}/${receiptPath(r)}`] = serializeReceipt(r);
+  return out;
+};
+
 /* The shell's own controls, as real ones (see refocus-views: the harness
    auto-creates anything asked for by id as a <div>, which focus cannot land
    on — right for a div, wrong for the buttons these pages fall back to). */
 const SHELL = { '#budAddCat': 'button', '#budCopyPrev': 'button', '#budSave': 'button',
   '#planStart': 'button', '#planNew': 'button', '#planDelete': 'button',
-  '#planAddSource': 'button', '#planAddEnvelope': 'button' };
+  '#planAddSource': 'button', '#planAddEnvelope': 'button', '#foodAdd': 'button' };
 
 async function mount(files = FILES()) {
   focus.reset();
@@ -413,6 +430,91 @@ const keysOf = (root, prefix) => descend(root).map(e => e.getAttribute('data-foc
       ok(M.S.plans.Fresh, 'a plan was started');
       eq(focus.at(), $('#planAddSource'), 'starting a plan lands on Add a source, the first thing a new plan asks for');
       answers.fields = null;
+    }
+
+    /* ================= Food =============================================== */
+    {
+      const M = await mount(RECEIPT_FILES());
+      M.view = 'Food';
+      const $ = M.ctx.$;
+      const cats = $('#foodCats'), items = $('#foodItemsBody'), slips = $('#foodReceiptsBody');
+      /* A re-file reads and rewrites every receipt carrying the product. */
+      const written = async () => { for (let i = 0; i < 6; i++) await settle(); };
+      M.ctx.renderFood();
+      eq(M.S.receipts.length, 2, 'both slips loaded');
+      const keyFor = (prefix, name) => {
+        const row = descend(items).find(e => e.tagName === 'TR' && byClass(e, 'food-item-name').some(b => b.textContent === name));
+        ok(row, `${name} is in the Items table`);
+        return descend(row).map(e => e.getAttribute('data-focus-key')).find(k => k && k.startsWith(prefix + ':'));
+      };
+
+      // The category list: a press filters the table and redraws the page.
+      await press(need(cats, 'cat:Bakery'));
+      landed('cat:Bakery', 'filtering by a category lands back on that category');
+      eq(focus.at().getAttribute('aria-pressed'), 'true', 'which is now the pressed one');
+      eq(keysOf(items, 'item:').length, 1, 'and the table is filtered to it');
+      await press(focus.at());
+      landed('cat:Bakery', 'and so does taking the filter off');
+      eq(keysOf(items, 'item:').length, 5, 'with every product back');
+
+      // A row's three controls.
+      const milk = keyFor('item', 'Milk 2L');
+      await press(need(items, milk));
+      landed(milk, 'opening a product\'s price chart lands back on its name');
+      eq(focus.at().getAttribute('aria-expanded'), 'true', 'which now reads expanded');
+      const healthy = keyFor('healthy', 'Apples');
+      await change(need(items, healthy), n => { n.checked = true; });
+      await written();
+      landed(healthy, 'ticking Healthy lands back on that tick, once the receipts are rewritten');
+      ok(M.S.receipts.some(r => r.items.some(it => it.name === 'Apples' && it.healthy)), 'and the re-file really happened');
+      const bread = keyFor('filed', 'Brown bread');
+      await change(need(items, bread), n => { n.value = 'Pantry'; });
+      await written();
+      landed(bread, 're-filing a product lands back on its category select');
+      eq(focus.at().value, 'Pantry', 'which shows where it is filed now');
+
+      // Re-filing under the category filter takes the row off the page.
+      M.S.foodFilter.cat = 'Dairy & eggs';
+      M.ctx.renderFood();
+      eq(keysOf(items, 'filed:'), [keyFor('filed', 'Milk 2L'), keyFor('filed', 'Yoghurt')], 'the filter shows the two dairy products');
+      const yoghurt = keyFor('filed', 'Yoghurt');
+      await change(need(items, keyFor('filed', 'Milk 2L')), n => { n.value = 'Drinks'; });
+      await written();
+      eq(keysOf(items, 'filed:'), [yoghurt], 'the re-filed product has left the filtered list');
+      landed(yoghurt, 'and the reader is on the row that moved up into its place');
+      // ...and the only row left under a filter AND a search: the filter itself.
+      // A second product is filed under Drinks first, so the category outlives
+      // the re-file: the page drops a filter that names no category.
+      M.S.foodFilter.cat = '';
+      M.ctx.renderFood();
+      await change(need(items, keyFor('filed', 'Cheddar')), n => { n.value = 'Drinks'; });
+      await written();
+      M.S.foodFilter.cat = 'Drinks';
+      M.S.foodFilter.q = 'milk';
+      M.ctx.renderFood();
+      eq(keysOf(items, 'filed:').length, 1, 'one product matches the filter and the search');
+      await change(need(items, keyFor('filed', 'Milk 2L')), n => { n.value = 'Pantry'; });
+      await written();
+      eq(keysOf(items, 'filed:').length, 0, 'and re-filing it leaves nothing on the page');
+      eq(focus.at(), $('#foodCatFilter'), 'so the reader is on the category filter that is hiding it');
+      M.S.foodFilter.cat = '';
+      M.S.foodFilter.q = '';
+
+      // A receipt that vanished from the vault under the page.
+      M.ctx.renderFood();
+      eq(keysOf(slips, 'open:'), ['open:0', 'open:1'], 'both receipts are listed');
+      const gone = async rel => M.ctx.vault.trash(M.ctx.vault.getFileByPath(`${B}/${rel}`));
+      await gone(M.S.receipts.find(r => r.store === 'Grocer One').rel);
+      const firstRow = descend(slips).find(e => e.tagName === 'TR' && /Grocer One/.test(e.textContent));
+      await press(descend(firstRow).find(e => /^open:/.test(e.getAttribute('data-focus-key') || '')));
+      await written();
+      eq(keysOf(slips, 'open:'), ['open:0'], 'the vanished receipt is no longer listed');
+      landed('open:0', 'and the reader is on the receipt that took its place');
+      ok(/Grocer Two/.test(focus.at().parentElement.parentElement.textContent), 'which is the other slip');
+      await gone(M.S.receipts[0].rel);
+      await press(need(slips, 'open:0'));
+      await written();
+      eq(focus.at(), $('#foodAdd'), 'opening the only receipt, gone too, lands on Add receipt');
     }
   } finally {
     unpin();
