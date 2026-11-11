@@ -35,14 +35,48 @@ const { t, setLanguage, resolveLanguage, pluralCategory, applyDom, TABLES, LANGU
 const en = TABLES.en;
 const enKeys = Object.keys(en).sort();
 
+/* ---- 0. every file in src/lang/ is a table this suite can actually see ----
+   The tables are loaded on first read now (tests/i18n-lazy-tables.test.cjs),
+   and one that fails to load reads as undefined through TABLES and as English
+   through t(). Both are the right behaviour for a reader and the wrong one for
+   this suite: every invariant below walks Object.entries(TABLES), so a table
+   that quietly was not there would be a table nothing below ever compared.
+   Pinned first, by name, against the directory — a file dropped into
+   src/lang/ with no loader in i18n.js fails here rather than shipping as a
+   language nobody can select. */
+const langFiles = fs.readdirSync(path.join(SRC, 'lang')).filter(f => f.endsWith('.js')).map(f => f.slice(0, -3)).sort();
+eq(Object.keys(TABLES).sort(), langFiles, 'TABLES offers exactly the tables in src/lang/ — no file unlisted, no loader without a file');
+for (const lang of langFiles) {
+  ok(TABLES[lang] && typeof TABLES[lang] === 'object' && !Array.isArray(TABLES[lang]),
+    `lang/${lang}.js loaded as a table — if this fails, the file threw or exported nothing, and every check below would have skipped it`);
+}
+
 /* ---- 1. every table has exactly English's key set ---- */
 ok(enKeys.length > 0, 'English table is not empty');
+const keyDrift = table => ({
+  missing: enKeys.filter(k => !(k in table)),
+  orphan: Object.keys(table).sort().filter(k => !(k in en)),
+});
 for (const [lang, table] of Object.entries(TABLES)) {
-  const keys = Object.keys(table).sort();
-  const missing = enKeys.filter(k => !(k in table));
-  const orphan = keys.filter(k => !(k in en));
+  const { missing, orphan } = keyDrift(table);
   eq(missing, [], `${lang}.js is missing keys English has: ${missing.join(', ')}`);
   eq(orphan, [], `${lang}.js has keys English does not — dead strings, or a typo'd key: ${orphan.join(', ')}`);
+}
+/* The control: the walk above reads the tables through TABLES' getters, so it
+   is only a check if what a getter hands back is the real table. A key removed
+   from, and a key added to, the live German table must both be seen — if the
+   getter ever returned a copy, or an empty stand-in, these two would be the
+   only lines in this file to notice. */
+{
+  const key = enKeys[0];
+  const kept = TABLES.de[key];
+  delete TABLES.de[key];
+  TABLES.de['test.only.german'] = 'nur hier';
+  const seen = keyDrift(TABLES.de);
+  TABLES.de[key] = kept;
+  delete TABLES.de['test.only.german'];
+  eq(seen, { missing: [key], orphan: ['test.only.german'] }, 'a missing key and an extra key in a table are both caught');
+  eq(keyDrift(TABLES.de), { missing: [], orphan: [] }, 'and the table is whole again');
 }
 
 /* ---- 2. plural entries stay plural, and cover their own categories ---- */

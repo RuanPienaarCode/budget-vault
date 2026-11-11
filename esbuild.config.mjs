@@ -71,7 +71,18 @@ writeFileSync(rel('styles.css'), require('./scripts/css-sources.cjs').assemble()
    and `??`, which Safari 15 supports natively (36KB of pointless expansion),
    while an ES-year target says nothing about the engine anyone is running.
    Letting esbuild pick its own default would make the floor an accident of
-   whichever version happened to be installed. */
+   whichever version happened to be installed.
+
+   charset utf8: esbuild's default writes the bundle as ASCII and spells every
+   character above U+007E as a six-byte \uXXXX escape. With twelve language
+   tables in the bundle that default was 96,607 escapes and 307 KB — lang/hi.js
+   alone came to 354 KB, most of it backslashes — for text UTF-8 stores in two
+   or three bytes a character. Obsidian reads main.js as UTF-8 on every
+   platform, so both spellings evaluate to the same strings; this one is just
+   the smaller file to download, sync and parse. esbuild still escapes U+2028
+   and U+2029 under it, the two characters that would end a line inside a
+   string for an older parser. tests/bundle-charset.test.cjs holds the setting
+   and checks the built file is strictly valid UTF-8 with no byte-order mark. */
 await esbuild.build({
   entryPoints: [rel('src/main.js')],
   outfile: rel('main.js'),
@@ -81,6 +92,7 @@ await esbuild.build({
   target: 'safari15',
   external: ['obsidian'],
   minify: true,
+  charset: 'utf8',
   legalComments: 'none',
   logLevel: 'info',
 });
