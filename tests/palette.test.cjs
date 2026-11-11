@@ -31,6 +31,18 @@
         mean the seed set is wrong — so the cap turns "the design is drifting"
         into a failed build rather than a slow accumulation nobody notices.
 
+   And a seventh section, numbered to match the code below, for the pairs
+   invariant 2 cannot see because they are not text on a surface. The
+   2026-11-11 audit measured each one failing:
+
+     7a. A FORM CONTROL'S EDGE against what the field sits on: 1.20:1 light,
+         1.24:1 dark, on all four palettes. WCAG 1.4.11 asks 3:1 of the
+         boundary a control is found by.
+
+   Each is read out of the stylesheet rather than restated here, so the gate
+   measures the rule that ships, and each also refuses a second rule that
+   would repaint the same pair somewhere the gate is not looking.
+
    Pure text and arithmetic — no Obsidian, no DOM, no bundle. */
 
 const assert = require('assert');
@@ -241,4 +253,143 @@ function norm(v) {
   eq(onDisk, generate(), 'src/styles-presets.css matches its seeds — run ./build.sh and commit');
 }
 
-console.log(`PASS — palette generator: reproduces Vault Green, AA in ${PRESETS.length * 2} blocks, dropdown parity (${checks} checks).`);
+/* ---- 7. the pairs invariant 2 cannot see ----
+
+   Invariant 2 gates text on a surface, straight from the seeds. The pairs here
+   are not that, so each is read from the RULE that paints it, resolved against
+   every palette's tokens, and measured with the same contrast() the audit
+   used. A gate that restated the values would stay green while the rule
+   drifted; this one fails the moment the rule stops saying what was measured.
+
+   Each part also lists the rules allowed to touch its pair. A later, more
+   specific rule that repainted it would otherwise pass straight under a gate
+   that only reads the base rule — which is how a page lane came to hold the
+   Transactions filters at a weaker edge than the one gated below. */
+{
+  const { readRules, locate } = require('./helpers/css-sources.cjs');
+  const rules = readRules();
+  const where = r => locate(r.line);
+
+  const hasClass = (sel, cls) => new RegExp(String.raw`\.${cls}(?![\w-])`).test(sel);
+  /* The one rule that sets `prop` on exactly this selector. More than one is
+     itself the failure: the gate would be measuring a value the cascade may
+     not be using. */
+  const only = (selector, prop) => {
+    const hits = rules.filter(r => r.selectors.includes(selector) && r.decls.some(d => d.prop === prop));
+    eq(hits.length, 1,
+      `exactly one rule sets ${prop} on "${selector}" (found ${hits.map(where).join(', ') || 'none'})`);
+    return hits[0].decls.filter(d => d.prop === prop).pop().value;
+  };
+  /* Every "selector { prop }" in the whole sheet where the selector carries one
+     of these classes and the rule sets a property the pattern matches. */
+  const touching = (classes, props) => {
+    const out = [];
+    for (const r of rules) {
+      for (const sel of r.selectors) {
+        if (!classes.some(c => hasClass(sel, c))) continue;
+        for (const d of r.decls) if (props.test(d.prop)) out.push(`${sel} { ${d.prop} }`);
+      }
+    }
+    return out.sort();
+  };
+
+  /* What a rule inside the root resolves a token to, per palette and mode, in
+     cascade order: the hand-written light block, then (dark only) the
+     hand-written dark block, then the palette's own blocks, which out-rank
+     both. The palette's light block applies in dark too — its selector matches
+     the root with or without .bud-dark — which is how the tokens a palette
+     sets once reach dark mode at all. */
+  const baseLight = tokensOf(baseCss, '.budget-app-root');
+  const baseDark = tokensOf(baseCss, '.budget-app-root.bud-dark');
+  const tokensFor = (p, mode) => {
+    const light = derive(p.light, 'light', p.lightOverrides || {});
+    return mode === 'light'
+      ? { ...baseLight, ...light }
+      : { ...baseLight, ...baseDark, ...light, ...derive(p.dark, 'dark', p.darkOverrides || {}) };
+  };
+  const resolve = (value, tokens) => {
+    let v = String(value).trim();
+    for (let hop = 0; hop < 4; hop++) {
+      const m = /^var\(\s*(--[a-z0-9-]+)\s*\)$/.exec(v);
+      if (!m) return v;
+      ok(m[1] in tokens, `${m[1]} is defined where "${value}" reads it`);
+      v = String(tokens[m[1]]).trim();
+    }
+    return v;
+  };
+
+  /* contrast() takes opaque hex only, on purpose (see scripts/palette.cjs). A
+     translucent colour is flattened here onto the surface the stylesheet says
+     is behind it, and the part that does so asserts that surface first. */
+  const toHex = c => '#' + c.slice(0, 3).map(x => Math.round(x).toString(16).padStart(2, '0')).join('');
+  const over = (fg, bgHex) => {
+    const [r, g, b, a] = norm(fg);
+    const under = rgb(bgHex);
+    return toHex([r, g, b].map((c, i) => under[i] + a * (c - under[i])));
+  };
+  const each = fn => { for (const p of PRESETS) for (const mode of ['light', 'dark']) fn(p, mode, tokensFor(p, mode)); };
+
+  /* -- 7a. the boundary of a form control ---------------------------------
+
+     WCAG 1.4.11: the edge that tells you where a control is needs 3:1 against
+     what is next to it. A field here is filled with --surface and sits on a
+     card or straight on the page, so the edge is measured against both. It was
+     the card hairline, --border-color: 1.20:1 light and 1.24:1 dark against
+     the fill, on all four palettes, and 1.06:1 against the light page.
+
+     The fix is a token of its own, --control-border, so that the hairline
+     stays a hairline everywhere else: the same ink the hairlines are drawn in,
+     at an alpha that clears 3:1 once flattened onto the field's own fill. */
+  {
+    const NON_TEXT = 3;
+    const CONTROLS = ['.budget-app-root .form-control', '.budget-app-root .form-select', '.budget-app-root .category-select'];
+    for (const sel of CONTROLS) {
+      eq(only(sel, 'border'), '1px solid var(--control-border)', `"${sel}" draws its edge in --control-border`);
+      /* The border is painted over the control's own background (the default
+         background-clip is border-box), so this is what it is flattened onto. */
+      eq(only(sel, 'background-color'), 'var(--surface)', `"${sel}" is filled with --surface, which the edge is flattened onto`);
+    }
+
+    /* Anything else that sets a border colour on these classes. Focus is
+       expected: it swaps the edge for the primary and adds the ring.
+
+       One entry is NOT expected, and is listed rather than hidden.
+       src/statement/transactions.css gives the Transactions filter selects a
+       "firmer edge" of --text-primary at 30%, written when a field's edge was
+       the hairline and 30% was the firmer of the two. It out-ranks the base
+       rule wherever color-mix() parses, so on that page the selects keep an
+       edge that measures 1.96:1 on vault-green light: firmer than the old
+       hairline, under 3:1, and now WEAKER than every other field in the app.
+       That file belonged to another lane in the audit-fix round this gate was
+       written in, so the rule is recorded here instead of edited. The entry
+       cannot rot — it fails when the rule is gone, and a new override anywhere
+       fails for not being listed. */
+    const KNOWN_OVERRIDES = [
+      '.budget-app-root #view-transactions .tx-filters .form-select-sm:not(:focus) { border-color }',
+    ];
+    const isFocus = s => /:focus/.test(s.replace(/:not\([^)]*\)/g, ''));
+    const base = new Set(CONTROLS.map(s => `${s} { border }`));
+    const overrides = touching(
+      ['form-control', 'form-control-sm', 'form-select', 'form-select-sm', 'category-select'],
+      /^border(-(top|right|bottom|left|block|inline)(-(start|end))?)?(-color)?$/,
+    ).filter(x => !base.has(x) && !isFocus(x.slice(0, x.indexOf(' {'))));
+    eq(overrides, KNOWN_OVERRIDES,
+      'the only rules repainting a form control\'s edge are the ones this gate knows about — measure a new one here, or delete a stale entry');
+
+    each((p, mode, t) => {
+      const s = p[mode];
+      eq(norm(t['--surface']), norm(s.surface), `${p.id}/${mode}: --surface is the surface seed`);
+      const edge = over(resolve('var(--control-border)', t), s.surface);
+      for (const [bg, name] of [[s.surface, 'surface'], [s.bodyBg, 'bodyBg']]) {
+        const r = contrast(edge, bg);
+        ok(r >= NON_TEXT, `${p.id}/${mode}: form-control edge ${edge} on ${name} is ${r.toFixed(2)}:1, below ${NON_TEXT}:1`);
+      }
+      /* And the hairline did not move to pay for it: the stronger edge is a
+         second token, not a darker --border-color. */
+      ok(norm(t['--control-border'])[3] > norm(t['--border-color'])[3] * 3,
+        `${p.id}/${mode}: --control-border is a separate, stronger token than the --border-color hairline`);
+    });
+  }
+}
+
+console.log(`PASS — palette generator: reproduces Vault Green, AA in ${PRESETS.length * 2} blocks, dropdown parity, form-control edge gated per palette (${checks} checks).`);

@@ -1,5 +1,5 @@
 'use strict';
-/* Palette derivation — 13 authored seeds per mode become the 19 custom
+/* Palette derivation — 13 authored seeds per mode become the 20 custom
    properties a preset actually sets.
 
    BUILD TIME ONLY. Nothing here is bundled into main.js, and that is the point:
@@ -7,8 +7,8 @@
    on a user's phone and nothing new leans on `color-mix()`, which the iOS 15
    WebKit floor does not have.
 
-   Why seeds at all, rather than writing each preset's 19 values by hand: most of
-   the 19 are not decisions. A focus ring is the primary at 20% and never
+   Why seeds at all, rather than writing each preset's 20 values by hand: most of
+   the 20 are not decisions. A focus ring is the primary at 20% and never
    anything else; `--ink-dim` has been a second name for `--text-muted` in both
    themes since the palette was written. Authoring those by hand is how they
    drift apart — styles.css already carried a comment admitting --focus-ring was
@@ -103,10 +103,21 @@ function glowTokens(preset) {
 /* Alphas that differ between the two modes. Lifted verbatim from the shipped
    palette rather than picked afresh — the whole point of running Vault Green
    through this generator is that it comes out the other side unchanged, so
-   every constant here has to be the one the hand-written palette already used. */
+   every constant here has to be the one the hand-written palette already used.
+
+   `control` is the one alpha here that was NOT lifted from the shipped palette,
+   because the shipped palette had no such thing. A form control drew its edge
+   with the hairline: 1.20:1 against its own fill in light and 1.24:1 in dark,
+   on all four palettes (2026-11-11 audit), where WCAG 1.4.11 asks 3:1 of the
+   boundary a control is found by. These are the lowest round alphas that clear
+   3:1 with room on every palette against BOTH things a field sits on, the card
+   and the page. .50 light is the bare minimum and still leaves ocean at 2.99:1
+   on its page; .55 measures 3.51-3.59 on the page and 3.95-4.11 on the card.
+   .34 is the bare minimum dark; .4 measures 3.79-3.82 on the card and
+   4.32-4.44 on the page. tests/palette.test.cjs holds every one of those. */
 const MODE = {
-  light: { border: '.09', line: '.055', ring: '0.20' },
-  dark: { border: '.08', line: '.04', ring: '0.28' },
+  light: { border: '.09', line: '.055', control: '.55', ring: '0.20' },
+  dark: { border: '.08', line: '.04', control: '.4', ring: '0.28' },
 };
 
 /* Seeds every preset must supply, per mode. Listed so a preset missing one
@@ -118,7 +129,7 @@ const SEEDS = [
   'inkBase', 'glass', 'glassHi',
 ];
 
-/* One mode of one preset: 13 seeds in, 19 declarations out.
+/* One mode of one preset: 13 seeds in, 20 declarations out.
 
    `overrides` is the escape hatch, and it is deliberately narrow. Some tokens
    genuinely are not derivable — light mode's --color-primary-light is #dcf5ec,
@@ -165,6 +176,11 @@ function derive(seeds, mode, overrides = {}) {
        something read off the text colour. */
     '--border-color': `rgba(${seeds.inkBase},${m.border})`,
     '--line-soft': `rgba(${seeds.inkBase},${m.line})`,
+    /* The edge of a form control, in the same ink as the hairlines but at an
+       alpha that makes it a boundary instead of a divider. A token of its own
+       so the fields could be brought up to 3:1 without turning every hairline
+       in the app — table rules, card outlines, dividers — into a grey line. */
+    '--control-border': `rgba(${seeds.inkBase},${m.control})`,
 
     /* The ring the hand-written palette warned was synced by hand. It is the
        primary at 20% light / 28% dark, exactly, in both shipped themes. */
