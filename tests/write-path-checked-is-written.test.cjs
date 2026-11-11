@@ -52,7 +52,9 @@ H.stubObsidian();
 const obsidianNormalize = p => {
   let o = String(p).replace(/([\\/])+/g, '/').replace(/(^\/+|\/+$)/g, '');
   if (o === '') o = '/';
-  return o.replace(/ | /g, ' ').normalize('NFC');
+  /* U+00A0 and U+202F, spelled as escapes: typed raw they are invisible, and
+     were once saved here as two ordinary spaces — a fold that folded nothing. */
+  return o.replace(/\u00A0|\u202F/g, ' ').normalize('NFC');
 };
 const stubNormalize = require('obsidian').normalizePath;
 const flavour = { fn: stubNormalize };
