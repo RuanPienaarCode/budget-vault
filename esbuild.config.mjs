@@ -13,7 +13,8 @@
    BOTH root main.js and root styles.css are BUILD OUTPUT. Neither is
    hand-edited:
      main.js     <- bundled from src/*.js
-     styles.css  <- the files listed in scripts/css-sources.cjs, in that order:
+     styles.css  <- the files listed in scripts/css-sources.cjs, in that order,
+                    then stripped of comments and whitespace:
                     src/styles-fonts.css (generated: scripts/fonts.cjs)
                     src/styles.css (hand-written, legacy)
                     src/statement/foundation.css + one file per page lane
@@ -48,8 +49,14 @@ execFileSync(process.execPath, [rel('scripts/fonts.cjs')], { stdio: 'inherit' })
    build and the tests cannot disagree about what "the stylesheet" is.
 
    Done in Node rather than `cat` so the build behaves the same wherever the
-   verifier runs it, and so the byte output cannot drift with a shell. */
-writeFileSync(rel('styles.css'), require('./scripts/css-sources.cjs').assemble());
+   verifier runs it, and so the byte output cannot drift with a shell.
+
+   `shipped()` is that concatenation with its comments and whitespace removed
+   (esbuild, whitespace-only) under the bundled font's licence notice — 598 KB
+   of sources ship as 332 KB. scripts/css-sources.cjs says why it stops at
+   whitespace, and tests/css-shipped-minified.test.cjs proves the result is
+   still the same rules. */
+writeFileSync(rel('styles.css'), require('./scripts/css-sources.cjs').shipped());
 
 /* minify: this source is commented far more heavily than most, and every one of
    those comments was being parsed by the engine on every plugin load — 175KB of

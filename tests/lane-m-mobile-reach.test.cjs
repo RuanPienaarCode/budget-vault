@@ -54,8 +54,10 @@ const phone = top.filter(b => /^@media\s*\(max-width:\s*600px\)$/.test(b.head)).
 const phone560 = top.filter(b => /^@media\s*\(max-width:\s*560px\)$/.test(b.head)).map(b => b.body).join('\n');
 ok(phone.length > 0, 'found the 600px media blocks');
 
-/* The build is current: root styles.css is exactly the assembled sources. */
-ok(built === src, 'root styles.css is the assembled sources of scripts/css-sources.cjs (run npm run build)');
+/* The build is current: root styles.css is exactly what the build makes of the
+   assembled sources — the same text with its comments and whitespace removed
+   (scripts/css-sources.cjs `shipped`). */
+ok(built === require('../scripts/css-sources.cjs').shipped(src), 'root styles.css is the assembled sources of scripts/css-sources.cjs as the build ships them (run npm run build)');
 
 /* --- desktop is untouched: nothing new sits outside a media block ----------- */
 const outsideMedia = top.filter(b => !b.head.startsWith('@')).map(b => b.head).join('\n');

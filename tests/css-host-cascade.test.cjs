@@ -33,7 +33,8 @@
 
    Reads the build input — every file scripts/css-sources.cjs lists (legacy
    sheet, statement foundation and page lanes, generated fonts and palettes),
-   byte-for-byte what ships as styles.css.
+   rule for rule what ships as styles.css (the build strips only comments and
+   whitespace from it — tests/css-shipped-minified.test.cjs).
      node tests/css-host-cascade.test.cjs */
 
 /* Every check runs and every failure is reported, rather than stopping at the

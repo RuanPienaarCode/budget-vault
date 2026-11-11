@@ -126,8 +126,26 @@ ok(/assets\/fonts\//.test(notice), 'NOTICE says where the font file and licence 
   ok(/SIL OPEN FONT LICENSE Version 1\.1/.test(read(file)), `Geist: the full OFL 1.1 text is kept in ${file}`);
 }
 
-/* ---- the shipped stylesheet carries the face ---- */
+/* ---- the shipped stylesheet carries the face ----
+   The build strips comments and whitespace from the assembly (November 2026),
+   so the root file no longer begins with the generated sheet byte for byte.
+   What has to hold is unchanged and is checked directly: the face is the FIRST
+   rule in the shipped file, its data URI still decodes to exactly the woff2
+   under assets/fonts/, and the licence notice the generated sheet's header used
+   to carry into the root file is still at the top of it. */
+const { assemble } = require('../scripts/css-sources.cjs');
+ok(assemble().startsWith(onDisk), 'the generated font sheet comes first in the assembly');
 const built = read('styles.css');
-ok(built.startsWith(onDisk), 'root styles.css begins with the generated font (they come first in the assembly)');
+const firstRule = built.replace(/^\s*\/\*[\s\S]*?\*\/\s*/, '');
+ok(firstRule.startsWith('@font-face{'), 'root styles.css opens (after its one header comment) with the @font-face rule');
+const shippedUri = firstRule.match(/^@font-face\{[^}]*url\("?data:font\/woff2;base64,([A-Za-z0-9+/=]+)"?\)/);
+ok(shippedUri && Buffer.from(shippedUri[1], 'base64').equals(bytes(FONTS[0].file)),
+  `the shipped face's data URI decodes to exactly ${FONTS[0].file}`);
+{
+  const header = (built.match(/^\/\*[\s\S]*?\*\//) || [''])[0];
+  const copyright = read('assets/fonts/OFL-Geist.txt').split('\n')[0].trim();
+  ok(header.includes(copyright) && /SIL Open Font License, Version 1\.1/.test(header),
+    'root styles.css still opens with Geist\'s copyright line and licence — it is published without NOTICE beside it');
+}
 
 console.log(`PASS fonts — generated sheet current, ${FONTS.length} face matches its file and axis, credited in NOTICE (${checks} checks)`);

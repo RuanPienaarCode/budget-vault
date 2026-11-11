@@ -1,10 +1,10 @@
 'use strict';
 /* THE STYLESHEET HAS ONE DECLARED ASSEMBLY, AND EVERYTHING SHIPPED IS IN IT.
 
-   Root styles.css is the plain concatenation of scripts/css-sources.cjs's list,
-   in that order, and every CSS guard test reads the same list through
-   tests/helpers/css-sources.cjs. Four things must stay true for that to mean
-   anything:
+   Root styles.css is built from scripts/css-sources.cjs's list — concatenated in
+   that order, then stripped of comments and whitespace — and every CSS guard
+   test reads the same list through tests/helpers/css-sources.cjs. Four things
+   must stay true for that to mean anything:
 
      1. THE ORDER IS THE CASCADE, AS DECLARED: fonts, the legacy sheet, the
         statement foundation, the page lanes, the generated palettes LAST.
@@ -37,7 +37,7 @@ let checks = 0;
 const ok = (c, m) => { assert.ok(c, m); checks++; };
 const eq = (a, b, m) => { assert.deepStrictEqual(a, b, m); checks++; };
 
-const { CSS_SOURCES, assemble, readSources } = require('../scripts/css-sources.cjs');
+const { CSS_SOURCES, assemble, readSources, shipped } = require('../scripts/css-sources.cjs');
 const helper = require('./helpers/css-sources.cjs');
 
 /* ---- 1. the declared order ---- */
@@ -77,8 +77,10 @@ for (const s of readSources()) {
 }
 eq(assemble(), readSources().map(s => s.text).join(''), 'assemble() is the bare concatenation');
 
-/* ---- the root file is that concatenation (also pinned by css-class-coverage) ---- */
-ok(fs.readFileSync(path.join(ROOT, 'styles.css'), 'utf8') === assemble(), 'root styles.css is the assembled sources — run npm run build');
+/* ---- the root file is that concatenation as the build ships it (also pinned
+   by css-class-coverage). `shipped()` strips comments and whitespace and
+   nothing else — tests/css-shipped-minified.test.cjs proves that half. ---- */
+ok(fs.readFileSync(path.join(ROOT, 'styles.css'), 'utf8') === shipped(assemble()), 'root styles.css is the assembled sources as the build ships them — run npm run build');
 
 /* ---- the shared helper sees every file, in order, with true line numbers ---- */
 const sources = helper.sources();
