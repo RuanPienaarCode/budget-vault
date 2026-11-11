@@ -286,13 +286,19 @@ module.exports = function registerPeriod(ctx) {
   /* ADR-0007 · Implied balances are as of now, on new objects. ISSUE 44 —
      reconcile() is the one definition of "what this account should read now";
      S.accounts is never mutated, a stated balance being a claim with an age. */
-  function impliedAccounts(todayArg) {
-    const idx = accountIndex();
+  /* `verdicts` (account → its reconcile() result) lets a caller that has JUST
+     reconciled every account hand that pass over instead of paying for it
+     twice: bookFigures() did, on every call — 24 reconcile() calls per
+     Dashboard paint over three accounts (2026-11-11 audit, task 9). The rule
+     for what a verdict makes of a balance stays here, in one place; a
+     verdict map is only ever the same reconcile(), run a line earlier. */
+  function impliedAccounts(todayArg, verdicts) {
+    const idx = verdicts ? null : accountIndex();
     /* Passed straight through to reconcile, which has always taken `today` as
        its third argument — this function simply stopped supplying one. */
     const today = DATE_KEY.test(todayArg || '') ? todayArg : undefined;
     return (S.accounts || []).map(a => {
-      const rec = reconcile(a, (idx.get(a) || {}).rows || [], today);
+      const rec = (verdicts && verdicts.get(a)) || reconcile(a, ((idx || accountIndex()).get(a) || {}).rows || [], today);
       return rec.state === 'drift' ? { ...a, balance: rec.implied } : a;
     });
   }

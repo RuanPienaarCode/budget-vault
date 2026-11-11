@@ -366,7 +366,12 @@ module.exports = function registerFigures(ctx) {
       if (!foreign) driftUnplaced += rec.unreadable || 0;
       if (rec.state === 'drift') { if (foreign) driftForeign++; else drift += rec.delta; }
     }
-    const balances = balanceBook();
+    /* The pass above IS the implied book's: balanceBook used to call
+       impliedAccounts(), which reconciled every account a second time with
+       the same rows and the same clock (2026-11-11 audit, task 9 — half the
+       reconcile() calls in a paint). Handed over rather than recomputed; the
+       rule that turns a verdict into a balance is still impliedAccounts'. */
+    const balances = balanceBook(reconciled);
     return {
       reconciled, unplacedBy, confirmDayBy,
       drift: { drift, driftForeign, driftUnplaced },
@@ -404,7 +409,7 @@ module.exports = function registerFigures(ctx) {
      BOTH bases, matching the Accounts hero's own rule: a figure that cannot
      be read cannot be added. Types are case-folded through accountType();
      owners through netByOwner(), the Accounts page's own rule. */
-  function balanceBook() {
+  function balanceBook(reconciled) {
     const cur = S.settings.currency;
     const declared = Array.isArray(S.settings.owners) ? S.settings.owners : [];
     const summarise = (accounts, all) => {
@@ -430,7 +435,7 @@ module.exports = function registerFigures(ctx) {
       };
     };
     const statedAll = S.accounts.filter(balanceReadable);
-    const impliedAll = impliedAccounts().filter(balanceReadable);
+    const impliedAll = impliedAccounts(undefined, reconciled).filter(balanceReadable);
     const stated = summarise(splitByCurrency(statedAll, cur).primary, statedAll);
     const implied = summarise(splitByCurrency(impliedAll, cur).primary, impliedAll);
     const driftByType = {};
