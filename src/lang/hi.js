@@ -1666,6 +1666,13 @@ module.exports = {
   'assets.hero.heldAbroad': "साथ ही {list} विदेश में रखी गई, जो बदली नहीं गई",
   'assets.hero.largestAbroad': "विदेश में सबसे बड़ी {list}, जो बदली नहीं गई",
 
+  /* Accessible names (audit of 11 Nov 2026, task 19) — machine-assisted, not native-reviewed. */
+  'assets.aria.kind': '{name} का प्रकार',
+  'assets.aria.value': '{name} का मूल्य',
+  'assets.aria.valued': '{name} के मूल्यांकन की तारीख़',
+  'assets.aria.notes': '{name} के नोट्स',
+  'assets.aria.remove': '{name} हटाएँ',
+
   /* ------------------------- plan view (mobile redesign) ------------------------- */
   'plan.hero.leftToPlace': "रखना बाक़ी",
   'plan.hero.overPlaced': "इस प्लान में मौजूद राशि से ज़्यादा रखा गया",
@@ -1708,6 +1715,19 @@ module.exports = {
 
   /* Accessible names (audit of 11 Nov 2026, task 19) — machine-assisted, not native-reviewed. */
   'plan.pickerAria': 'प्लान चुनें',
+  'plan.split.aria.free': '{pot} में से: {spent} पहले ही ख़र्च हुआ, {committed} आवंटित, {free} अभी आवंटित नहीं।',
+  'plan.split.aria.overPlaced': '{pot} में से: {spent} पहले ही ख़र्च हुआ, {committed} आवंटित, इस प्लान में मौजूद राशि से {over} ज़्यादा रखा गया।',
+  'plan.split.aria.left': 'खर्च करने के लिए अब भी {left} बचा, उसमें से {placeable} रखना बाक़ी।',
+  'plan.split.aria.overSpent': 'इस प्लान में मौजूद राशि से {over} ज़्यादा खर्च हुआ।',
+  'plan.split.aria.pastBucket': 'बकेट में मौजूद राशि से {amount} ज़्यादा खर्च हुआ।',
+  'plan.env.overBy': '{amount} ज़्यादा',
+  'plan.env.sliderAria': '{name} में रखी रकम',
+  'plan.env.typeAria': '{name} की रकम टाइप करके तय करें',
+  'plan.env.renameAria': 'ख़र्च बकेट {name} का नाम बदलें',
+  'plan.item.aria.planned': '{name}: नियोजित — आगे बढ़ाने के लिए क्लिक करें',
+  'plan.item.aria.part': '{name}: कुछ ख़रीदा गया — आगे बढ़ाने के लिए क्लिक करें',
+  'plan.item.aria.done': '{name}: पूरा — आगे बढ़ाने के लिए क्लिक करें',
+  'plan.item.cycleTip': 'नियोजित → कुछ ख़रीदा गया → पूरा',
 
   'io.stale.message': "{file} लोड होने के बाद इस पेज के बाहर बदली गई, इसलिए कुछ भी नहीं लिखा गया",
   'io.stale.notice': "बजट: {file} लोड होने के बाद इस पेज के बाहर (दूसरे डिवाइस या मार्कडाउन व्यू में) बदली गई, इसलिए आपका सेव नहीं लिखा गया। पेज ने अब डिस्क पर जो है उसे फिर से लोड कर लिया है — कृपया बदलाव दोबारा करें।",

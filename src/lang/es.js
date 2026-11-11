@@ -1653,6 +1653,13 @@ module.exports = {
   'assets.hero.heldAbroad': "más {list} en el extranjero, sin convertir",
   'assets.hero.largestAbroad': "mayor en el extranjero {list}, sin convertir",
 
+  /* Accessible names (audit of 11 Nov 2026, task 19) — machine-assisted, not native-reviewed. */
+  'assets.aria.kind': 'Tipo de {name}',
+  'assets.aria.value': 'Valor de {name}',
+  'assets.aria.valued': 'Fecha de valoración de {name}',
+  'assets.aria.notes': 'Notas de {name}',
+  'assets.aria.remove': 'Quitar {name}',
+
   /* ------------------------- plan view (mobile redesign) ------------------------- */
   'plan.hero.leftToPlace': "Por asignar",
   'plan.hero.overPlaced': "Se asignó más de lo que contiene este plan",
@@ -1695,6 +1702,19 @@ module.exports = {
 
   /* Accessible names (audit of 11 Nov 2026, task 19) — machine-assisted, not native-reviewed. */
   'plan.pickerAria': 'Elegir un plan',
+  'plan.split.aria.free': 'De {pot}: {spent} ya gastado, {committed} asignado, {free} sin asignar.',
+  'plan.split.aria.overPlaced': 'De {pot}: {spent} ya gastado, {committed} asignado, se asignaron {over} más de lo que contiene este plan.',
+  'plan.split.aria.left': 'Aún quedan {left} por gastar, de los cuales {placeable} por asignar.',
+  'plan.split.aria.overSpent': 'Se gastaron {over} más de lo que contiene este plan.',
+  'plan.split.aria.pastBucket': 'Se gastaron {amount} por encima de lo que contenía su bolsa.',
+  'plan.env.overBy': '{amount} de más',
+  'plan.env.sliderAria': 'Importe asignado a {name}',
+  'plan.env.typeAria': 'Fijar el importe de {name} escribiéndolo',
+  'plan.env.renameAria': 'Cambiar el nombre de la bolsa de gasto {name}',
+  'plan.item.aria.planned': '{name}: previsto — haz clic para avanzar',
+  'plan.item.aria.part': '{name}: comprado en parte — haz clic para avanzar',
+  'plan.item.aria.done': '{name}: hecho — haz clic para avanzar',
+  'plan.item.cycleTip': 'previsto → comprado en parte → hecho',
 
   'io.stale.message': "{file} se cambió fuera de esta página después de cargarse, así que no se escribió nada",
   'io.stale.notice': "Presupuesto: {file} se cambió fuera de esta página (otro dispositivo o la vista markdown) después de cargarse, así que no se escribió tu guardado. La página volvió a cargar lo que hay ahora en el disco — vuelve a hacer el cambio.",

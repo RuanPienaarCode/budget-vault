@@ -1596,6 +1596,13 @@ module.exports = {
   'assets.hero.heldAbroad': "ditambah {list} disimpan di luar negeri, tanpa konversi",
   'assets.hero.largestAbroad': "terbesar di luar negeri {list}, tanpa konversi",
 
+  /* Accessible names (audit of 11 Nov 2026, task 19) — machine-assisted, not native-reviewed. */
+  'assets.aria.kind': 'Jenis {name}',
+  'assets.aria.value': 'Nilai {name}',
+  'assets.aria.valued': 'Tanggal penilaian {name}',
+  'assets.aria.notes': 'Catatan untuk {name}',
+  'assets.aria.remove': 'Hapus {name}',
+
   /* ------------------------- plan view (mobile redesign) ------------------------- */
   'plan.hero.leftToPlace': "Belum dialokasikan",
   'plan.hero.overPlaced': "Dialokasikan lebih dari yang dimiliki rencana ini",
@@ -1638,6 +1645,19 @@ module.exports = {
 
   /* Accessible names (audit of 11 Nov 2026, task 19) — machine-assisted, not native-reviewed. */
   'plan.pickerAria': 'Pilih rencana',
+  'plan.split.aria.free': 'Dari {pot}: {spent} sudah dibelanjakan, {committed} sudah dialokasikan, {free} belum dialokasikan.',
+  'plan.split.aria.overPlaced': 'Dari {pot}: {spent} sudah dibelanjakan, {committed} sudah dialokasikan, dialokasikan {over} lebih dari yang dimiliki rencana ini.',
+  'plan.split.aria.left': '{left} masih tersisa untuk dibelanjakan, {placeable} di antaranya belum dialokasikan.',
+  'plan.split.aria.overSpent': 'Dibelanjakan {over} lebih dari yang dimiliki rencana ini.',
+  'plan.split.aria.pastBucket': '{amount} dibelanjakan melebihi isi kantongnya.',
+  'plan.env.overBy': 'lebih {amount}',
+  'plan.env.sliderAria': 'Jumlah yang dialokasikan ke {name}',
+  'plan.env.typeAria': 'Atur jumlah untuk {name} dengan mengetiknya',
+  'plan.env.renameAria': 'Ganti nama kantong belanja {name}',
+  'plan.item.aria.planned': '{name}: direncanakan — klik untuk melanjutkan',
+  'plan.item.aria.part': '{name}: dibeli sebagian — klik untuk melanjutkan',
+  'plan.item.aria.done': '{name}: selesai — klik untuk melanjutkan',
+  'plan.item.cycleTip': 'direncanakan → dibeli sebagian → selesai',
 
   'io.stale.message': "{file} diubah di luar halaman ini setelah dimuat, jadi tidak ada yang ditulis",
   'io.stale.notice': "Anggaran: {file} diubah di luar halaman ini (perangkat lain atau tampilan markdown) setelah dimuat, jadi simpanan Anda tidak ditulis. Halaman sudah memuat ulang isi yang kini ada di disk — silakan ulangi perubahannya.",

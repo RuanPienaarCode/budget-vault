@@ -1679,6 +1679,13 @@ module.exports = {
   'assets.hero.heldAbroad': "ngokwengeza, {list} kugcinwe kwelinye izwe, ngaphandle kokuguqulwa",
   'assets.hero.largestAbroad': "enkulu kunazo zonke kwelinye izwe {list}, ngaphandle kokuguqulwa",
 
+  /* Accessible names (audit of 11 Nov 2026, task 19) — machine-assisted, not native-reviewed. */
+  'assets.aria.kind': 'Uhlobo luka-{name}',
+  'assets.aria.value': 'Inani lika-{name}',
+  'assets.aria.valued': 'Usuku u-{name} ahlolwa ngalo inani',
+  'assets.aria.notes': 'Amanothi ka-{name}',
+  'assets.aria.remove': 'Susa u-{name}',
+
   /* ------------------------- plan view (mobile redesign) ------------------------- */
   'plan.hero.leftToPlace': "Okusasele ukubekwa",
   'plan.hero.overPlaced': "Kubekwe okungaphezu kwalokho lolu hlelo olukubambile",
@@ -1721,6 +1728,19 @@ module.exports = {
 
   /* Accessible names (audit of 11 Nov 2026, task 19) — machine-assisted, not native-reviewed. */
   'plan.pickerAria': 'Khetha uhlelo',
+  'plan.split.aria.free': 'Ku-{pot}: {spent} sekuchithiwe, {committed} sekwabelwe, {free} akukabelwa.',
+  'plan.split.aria.overPlaced': 'Ku-{pot}: {spent} sekuchithiwe, {committed} sekwabelwe, kubekwe {over} ngaphezu kwalokho lolu hlelo olukubambile.',
+  'plan.split.aria.left': 'Kusasele {left} ukuthi kusetshenziswe, {placeable} kwakho kusasele ukubekwa.',
+  'plan.split.aria.overSpent': 'Kusetshenziswe {over} ngaphezu kwalokho lolu hlelo olukubambile.',
+  'plan.split.aria.pastBucket': 'Kusetshenziswe {amount} ngaphezu kwalokho ibhakede ebelikubambile.',
+  'plan.env.overBy': '{amount} ngokweqile',
+  'plan.env.sliderAria': 'Inani elibekwe ku-{name}',
+  'plan.env.typeAria': 'Misa inani lika-{name} ngokulithayipha',
+  'plan.env.renameAria': 'Qamba kabusha ibhakede yokuchitha {name}',
+  'plan.item.aria.planned': '{name}: kuhleliwe — chofoza ukuze uqhubekele phambili',
+  'plan.item.aria.part': '{name}: kuthengwe ingxenye — chofoza ukuze uqhubekele phambili',
+  'plan.item.aria.done': '{name}: kuqediwe — chofoza ukuze uqhubekele phambili',
+  'plan.item.cycleTip': 'kuhleliwe → kuthengwe ingxenye → kuqediwe',
 
   'io.stale.message': "{file} iguquliwe ngaphandle kwaleli khasi ngemuva kokuthi ilayishwe, ngakho akukho okubhaliwe",
   'io.stale.notice': "Ibhajethi: {file} iguquliwe ngaphandle kwaleli khasi (enye idivayisi noma ukubuka kwe-markdown) ngemuva kokuthi ilayishwe, ngakho ukulondoloza kwakho akubhalwanga. Ikhasi selilayishe kabusha okukhona manje kudiski — sicela uphinde wenze ushintsho.",

@@ -1652,6 +1652,13 @@ module.exports = {
   'assets.hero.heldAbroad': "plus {list} im Ausland gehalten, nicht umgerechnet",
   'assets.hero.largestAbroad': "größter im Ausland {list}, nicht umgerechnet",
 
+  /* Accessible names (audit of 11 Nov 2026, task 19) — machine-assisted, not native-reviewed. */
+  'assets.aria.kind': 'Art von {name}',
+  'assets.aria.value': 'Wert von {name}',
+  'assets.aria.valued': 'Bewertungsdatum von {name}',
+  'assets.aria.notes': 'Notizen zu {name}',
+  'assets.aria.remove': '{name} entfernen',
+
   /* ------------------------- plan view (mobile redesign) ------------------------- */
   'plan.hero.leftToPlace': "Noch zuzuweisen",
   'plan.hero.overPlaced': "Mehr zugewiesen, als dieser Plan enthält",
@@ -1694,6 +1701,19 @@ module.exports = {
 
   /* Accessible names (audit of 11 Nov 2026, task 19) — machine-assisted, not native-reviewed. */
   'plan.pickerAria': 'Plan auswählen',
+  'plan.split.aria.free': 'Von {pot}: {spent} bereits ausgegeben, {committed} verplant, {free} noch nicht verplant.',
+  'plan.split.aria.overPlaced': 'Von {pot}: {spent} bereits ausgegeben, {committed} verplant, {over} mehr zugewiesen, als dieser Plan enthält.',
+  'plan.split.aria.left': '{left} noch zum Ausgeben übrig, davon {placeable} noch zuzuweisen.',
+  'plan.split.aria.overSpent': '{over} mehr ausgegeben, als dieser Plan enthält.',
+  'plan.split.aria.pastBucket': '{amount} wurden über das hinaus ausgegeben, was der Topf enthielt.',
+  'plan.env.overBy': '{amount} drüber',
+  'plan.env.sliderAria': 'Zugewiesener Betrag für {name}',
+  'plan.env.typeAria': 'Betrag für {name} per Eingabe festlegen',
+  'plan.env.renameAria': 'Ausgabentopf {name} umbenennen',
+  'plan.item.aria.planned': '{name}: geplant — zum Weiterschalten klicken',
+  'plan.item.aria.part': '{name}: teilweise gekauft — zum Weiterschalten klicken',
+  'plan.item.aria.done': '{name}: erledigt — zum Weiterschalten klicken',
+  'plan.item.cycleTip': 'geplant → teilweise gekauft → erledigt',
 
   'io.stale.message': "{file} wurde nach dem Laden außerhalb dieser Seite geändert, daher wurde nichts geschrieben",
   'io.stale.notice': "Budget: {file} wurde nach dem Laden außerhalb dieser Seite geändert (anderes Gerät oder Markdown-Ansicht), daher wurde Ihr Speichern nicht geschrieben. Die Seite hat neu geladen, was jetzt auf dem Datenträger steht — bitte nehmen Sie die Änderung erneut vor.",

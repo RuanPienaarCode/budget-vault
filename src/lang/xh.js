@@ -1674,6 +1674,13 @@ module.exports = {
   'assets.hero.heldAbroad': "ukongeza, {list} igcinwe kwelinye ilizwe, ngaphandle kokuguqulwa",
   'assets.hero.largestAbroad': "enkulu kunazo zonke kwelinye ilizwe {list}, ngaphandle kokuguqulwa",
 
+  /* Accessible names (audit of 11 Nov 2026, task 19) — machine-assisted, not native-reviewed. */
+  'assets.aria.kind': 'Uhlobo luka-{name}',
+  'assets.aria.value': 'Ixabiso lika-{name}',
+  'assets.aria.valued': 'Umhla u-{name} axatyiswa ngawo',
+  'assets.aria.notes': 'Amanqaku ka-{name}',
+  'assets.aria.remove': 'Susa u-{name}',
+
   /* ------------------------- plan view (mobile redesign) ------------------------- */
   'plan.hero.leftToPlace': "Eseleyo ukubekwa",
   'plan.hero.overPlaced': "Kubekwe ngaphezu kwento le plan iyibambileyo",
@@ -1716,6 +1723,19 @@ module.exports = {
 
   /* Accessible names (audit of 11 Nov 2026, task 19) — machine-assisted, not native-reviewed. */
   'plan.pickerAria': 'Khetha i-plan',
+  'plan.split.aria.free': 'Ku-{pot}: {spent} sele ichithiwe, {committed} sele yabelwe, {free} ayikabelwa.',
+  'plan.split.aria.overPlaced': 'Ku-{pot}: {spent} sele ichithiwe, {committed} sele yabelwe, kubekwe {over} ngaphezu kwento le plan iyibambileyo.',
+  'plan.split.aria.left': 'Kusasele {left} ukuba kuchithwe, {placeable} kuyo iseleyo ukubekwa.',
+  'plan.split.aria.overSpent': 'Kuchithwe {over} ngaphezu kwento le plan iyibambileyo.',
+  'plan.split.aria.pastBucket': 'Kuchithwe {amount} ngaphezu kwento ibhakethe ebiyibambile.',
+  'plan.env.overBy': '{amount} ngaphezulu',
+  'plan.env.sliderAria': 'Isixa esibekwe ku-{name}',
+  'plan.env.typeAria': 'Misela isixa sika-{name} ngokusichwetheza',
+  'plan.env.renameAria': 'Thiya ngokutsha ibhakethe yokuchitha {name}',
+  'plan.item.aria.planned': '{name}: icwangcisiwe — cofa ukuze uqhubele phambili',
+  'plan.item.aria.part': '{name}: kuthengwe inxalenye — cofa ukuze uqhubele phambili',
+  'plan.item.aria.done': '{name}: igqityiwe — cofa ukuze uqhubele phambili',
+  'plan.item.cycleTip': 'icwangcisiwe → kuthengwe inxalenye → igqityiwe',
 
   'io.stale.message': "{file} iguqulwe ngaphandle kweli phepha emva kokuba ilayishiwe, ngoko akukho nto ibhaliweyo",
   'io.stale.notice': "Ibhajethi: {file} iguqulwe ngaphandle kweli phepha (enye ikhompyuter okanye imbonakalo ye-markdown) emva kokuba ilayishiwe, ngoko ukugcina kwakho akubhalwanga. Iphepha liphinde lalayisha oko kukhoyo ngoku kwidiski — nceda wenze utshintsho kwakhona.",

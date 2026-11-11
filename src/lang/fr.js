@@ -1665,6 +1665,13 @@ module.exports = {
   'assets.hero.heldAbroad': "plus {list} détenus à l'étranger, non convertis",
   'assets.hero.largestAbroad': "le plus important à l'étranger {list}, non converti",
 
+  /* Accessible names (audit of 11 Nov 2026, task 19) — machine-assisted, not native-reviewed. */
+  'assets.aria.kind': 'Type de {name}',
+  'assets.aria.value': 'Valeur de {name}',
+  'assets.aria.valued': "Date d'estimation de {name}",
+  'assets.aria.notes': 'Notes pour {name}',
+  'assets.aria.remove': 'Retirer {name}',
+
   /* ------------------------- plan view (mobile redesign) ------------------------- */
   'plan.hero.leftToPlace': "Reste à répartir",
   'plan.hero.overPlaced': "Plus réparti que ce que ce plan contient",
@@ -1707,6 +1714,19 @@ module.exports = {
 
   /* Accessible names (audit of 11 Nov 2026, task 19) — machine-assisted, not native-reviewed. */
   'plan.pickerAria': 'Choisir un plan',
+  'plan.split.aria.free': 'Sur {pot} : {spent} déjà dépensé, {committed} affecté, {free} non affecté.',
+  'plan.split.aria.overPlaced': 'Sur {pot} : {spent} déjà dépensé, {committed} affecté, {over} de plus réparti que ce que ce plan contient.',
+  'plan.split.aria.left': '{left} encore à dépenser, dont {placeable} reste à répartir.',
+  'plan.split.aria.overSpent': '{over} dépensé de plus que ce que ce plan contient.',
+  'plan.split.aria.pastBucket': '{amount} dépensé au-delà de ce que contenait son enveloppe.',
+  'plan.env.overBy': '{amount} de trop',
+  'plan.env.sliderAria': 'Montant réparti dans {name}',
+  'plan.env.typeAria': 'Définir le montant de {name} en le saisissant',
+  'plan.env.renameAria': "Renommer l'enveloppe {name}",
+  'plan.item.aria.planned': '{name} : prévu — cliquez pour avancer',
+  'plan.item.aria.part': '{name} : acheté en partie — cliquez pour avancer',
+  'plan.item.aria.done': '{name} : terminé — cliquez pour avancer',
+  'plan.item.cycleTip': 'prévu → acheté en partie → terminé',
 
   'io.stale.message': "{file} a été modifié en dehors de cette page après son chargement, donc rien n'a été écrit",
   'io.stale.notice': "Budget : {file} a été modifié en dehors de cette page (autre appareil ou vue markdown) après son chargement, donc votre enregistrement n'a pas été écrit. La page a rechargé ce qui est maintenant sur le disque — veuillez refaire la modification.",

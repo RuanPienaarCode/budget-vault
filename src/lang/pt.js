@@ -1667,6 +1667,13 @@ module.exports = {
   'assets.hero.heldAbroad': "mais {list} mantidos no exterior, sem conversão",
   'assets.hero.largestAbroad': "maior no exterior {list}, sem conversão",
 
+  /* Accessible names (audit of 11 Nov 2026, task 19) — machine-assisted, not native-reviewed. */
+  'assets.aria.kind': 'Tipo de {name}',
+  'assets.aria.value': 'Valor de {name}',
+  'assets.aria.valued': 'Data de avaliação de {name}',
+  'assets.aria.notes': 'Notas de {name}',
+  'assets.aria.remove': 'Remover {name}',
+
   /* ------------------------- plan view (mobile redesign) ------------------------- */
   'plan.hero.leftToPlace': "Falta alocar",
   'plan.hero.overPlaced': "Alocado mais do que este plano contém",
@@ -1709,6 +1716,19 @@ module.exports = {
 
   /* Accessible names (audit of 11 Nov 2026, task 19) — machine-assisted, not native-reviewed. */
   'plan.pickerAria': 'Escolher um plano',
+  'plan.split.aria.free': 'De {pot}: {spent} já gasto, {committed} reservado, {free} ainda não reservado.',
+  'plan.split.aria.overPlaced': 'De {pot}: {spent} já gasto, {committed} reservado, {over} alocado a mais do que este plano contém.',
+  'plan.split.aria.left': 'Ainda restam {left} para gastar, dos quais falta alocar {placeable}.',
+  'plan.split.aria.overSpent': '{over} gasto a mais do que este plano contém.',
+  'plan.split.aria.pastBucket': '{amount} gasto além do que o envelope continha.',
+  'plan.env.overBy': '{amount} a mais',
+  'plan.env.sliderAria': 'Valor alocado em {name}',
+  'plan.env.typeAria': 'Definir o valor de {name} digitando',
+  'plan.env.renameAria': 'Renomear o envelope de gasto {name}',
+  'plan.item.aria.planned': '{name}: planejado — clique para avançar',
+  'plan.item.aria.part': '{name}: comprado em parte — clique para avançar',
+  'plan.item.aria.done': '{name}: concluído — clique para avançar',
+  'plan.item.cycleTip': 'planejado → comprado em parte → concluído',
 
   'io.stale.message': "{file} foi alterado fora desta página depois de carregado, por isso nada foi escrito",
   'io.stale.notice': "Orçamento: {file} foi alterado fora desta página (outro dispositivo ou a vista markdown) depois de carregado, por isso a sua gravação não foi escrita. A página recarregou o que está agora no disco — volte a fazer a alteração.",

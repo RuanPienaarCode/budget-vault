@@ -1914,6 +1914,13 @@ module.exports = {
   'assets.hero.heldAbroad': "plus {list} held abroad, not converted",
   'assets.hero.largestAbroad': "largest abroad {list}, not converted",
 
+  /* The Assets table's control names — one per editable cell, and the row's Remove. */
+  'assets.aria.kind': 'Kind of {name}',
+  'assets.aria.value': 'Value of {name}',
+  'assets.aria.valued': 'Date {name} was valued',
+  'assets.aria.notes': 'Notes for {name}',
+  'assets.aria.remove': 'Remove {name}',
+
   /* ------------------------- plan view (mobile redesign) ------------------------- */
   'plan.hero.leftToPlace': "Left to place",
   'plan.hero.overPlaced': "Placed more than this plan holds",
@@ -1970,6 +1977,19 @@ module.exports = {
      remainder. An item's tick is a sentence per state, and cycleTip is its
      hover title — the order a tap moves it through. */
   'plan.pickerAria': 'Choose a plan',
+  'plan.split.aria.free': 'Of {pot}: {spent} already spent, {committed} spoken for, {free} not spoken for.',
+  'plan.split.aria.overPlaced': 'Of {pot}: {spent} already spent, {committed} spoken for, {over} more is placed than this plan holds.',
+  'plan.split.aria.left': '{left} still left to spend, {placeable} of it left to place.',
+  'plan.split.aria.overSpent': '{over} more spent than this plan holds.',
+  'plan.split.aria.pastBucket': '{amount} was spent past what its bucket held.',
+  'plan.env.overBy': '{amount} over',
+  'plan.env.sliderAria': 'Amount placed in {name}',
+  'plan.env.typeAria': 'Set the amount for {name} by typing it',
+  'plan.env.renameAria': 'Rename spending bucket {name}',
+  'plan.item.aria.planned': '{name}: planned — click to advance',
+  'plan.item.aria.part': '{name}: part — click to advance',
+  'plan.item.aria.done': '{name}: done — click to advance',
+  'plan.item.cycleTip': 'planned → part-bought → done',
 
   'io.stale.message': "{file} was changed outside this page after it loaded, so nothing was written",
   'io.stale.notice': "Budget: {file} was changed outside this page (another device, or the markdown view) after it loaded, so your save was not written. The page has reloaded what is on disk now — please make the edit again.",

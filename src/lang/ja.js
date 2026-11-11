@@ -1575,6 +1575,13 @@ module.exports = {
   'assets.hero.heldAbroad': "ほかに海外保有の {list}（換算なし）",
   'assets.hero.largestAbroad': "海外での最大 {list}（換算なし）",
 
+  /* Accessible names (audit of 11 Nov 2026, task 19) — machine-assisted, not native-reviewed. */
+  'assets.aria.kind': '{name} の種類',
+  'assets.aria.value': '{name} の評価額',
+  'assets.aria.valued': '{name} の評価日',
+  'assets.aria.notes': '{name} のメモ',
+  'assets.aria.remove': '{name} を削除',
+
   /* ------------------------- plan view (mobile redesign) ------------------------- */
   'plan.hero.leftToPlace': "未割り当て",
   'plan.hero.overPlaced': "このプランが持つ額より多く割り当てられています",
@@ -1617,6 +1624,19 @@ module.exports = {
 
   /* Accessible names (audit of 11 Nov 2026, task 19) — machine-assisted, not native-reviewed. */
   'plan.pickerAria': 'プランを選択',
+  'plan.split.aria.free': '{pot} のうち：使用済み {spent}、割り当て済み {committed}、未割り当て {free}。',
+  'plan.split.aria.overPlaced': '{pot} のうち：使用済み {spent}、割り当て済み {committed}。このプランが持つ額より {over} 多く割り当てられています。',
+  'plan.split.aria.left': 'まだ使える残りは {left}、そのうち未割り当ては {placeable}。',
+  'plan.split.aria.overSpent': 'このプランが持つ額より {over} 多く使われています。',
+  'plan.split.aria.pastBucket': 'バケットの額を超えて {amount} 使われました。',
+  'plan.env.overBy': '{amount} 超過',
+  'plan.env.sliderAria': '{name} に割り当てた金額',
+  'plan.env.typeAria': '{name} の金額を入力して設定',
+  'plan.env.renameAria': '支出バケット {name} の名前を変更',
+  'plan.item.aria.planned': '{name}：予定 — クリックして進める',
+  'plan.item.aria.part': '{name}：一部購入済み — クリックして進める',
+  'plan.item.aria.done': '{name}：完了 — クリックして進める',
+  'plan.item.cycleTip': '予定 → 一部購入済み → 完了',
 
   'io.stale.message': "{file} は読み込み後にこのページの外で変更されたため、何も書き込まれませんでした",
   'io.stale.notice': "予算: {file} は読み込み後にこのページの外（別の端末またはマークダウン表示）で変更されたため、保存は書き込まれませんでした。ページはディスク上の現在の内容を読み込み直しました。もう一度変更してください。",

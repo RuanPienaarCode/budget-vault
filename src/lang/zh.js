@@ -1575,6 +1575,13 @@ module.exports = {
   'assets.hero.heldAbroad': "另有 {list} 持有于海外，未换算",
   'assets.hero.largestAbroad': "海外最大 {list}，未换算",
 
+  /* Accessible names (audit of 11 Nov 2026, task 19) — machine-assisted, not native-reviewed. */
+  'assets.aria.kind': '{name} 的类型',
+  'assets.aria.value': '{name} 的价值',
+  'assets.aria.valued': '{name} 的估值日期',
+  'assets.aria.notes': '{name} 的备注',
+  'assets.aria.remove': '移除 {name}',
+
   /* ------------------------- plan view (mobile redesign) ------------------------- */
   'plan.hero.leftToPlace': "待分配",
   'plan.hero.overPlaced': "分配的金额超过了该计划持有的金额",
@@ -1617,6 +1624,19 @@ module.exports = {
 
   /* Accessible names (audit of 11 Nov 2026, task 19) — machine-assisted, not native-reviewed. */
   'plan.pickerAria': '选择计划',
+  'plan.split.aria.free': '在 {pot} 中：已花费 {spent}，已分配 {committed}，未分配 {free}。',
+  'plan.split.aria.overPlaced': '在 {pot} 中：已花费 {spent}，已分配 {committed}，分配的金额比该计划持有的多 {over}。',
+  'plan.split.aria.left': '仍可支出 {left}，其中 {placeable} 待分配。',
+  'plan.split.aria.overSpent': '支出比该计划持有的多 {over}。',
+  'plan.split.aria.pastBucket': '有 {amount} 的支出超出了信封里的金额。',
+  'plan.env.overBy': '超出 {amount}',
+  'plan.env.sliderAria': '分配给 {name} 的金额',
+  'plan.env.typeAria': '手动输入 {name} 的金额',
+  'plan.env.renameAria': '重命名支出信封 {name}',
+  'plan.item.aria.planned': '{name}：计划中 — 点击可推进',
+  'plan.item.aria.part': '{name}：已买一部分 — 点击可推进',
+  'plan.item.aria.done': '{name}：已完成 — 点击可推进',
+  'plan.item.cycleTip': '计划中 → 已买一部分 → 已完成',
 
   'io.stale.message': "{file} 在加载后被页面之外修改，因此没有写入任何内容",
   'io.stale.notice': "预算：{file} 在加载后被此页面之外（其他设备或 Markdown 视图）修改，因此你的保存没有写入。页面已重新加载磁盘上的当前内容——请重新进行修改。",

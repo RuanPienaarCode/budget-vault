@@ -1651,6 +1651,13 @@ module.exports = {
   'assets.hero.heldAbroad': "plus {list} in die buiteland gehou, nie omgeskakel nie",
   'assets.hero.largestAbroad': "grootste in die buiteland {list}, nie omgeskakel nie",
 
+  /* Accessible names (audit of 11 Nov 2026, task 19) — machine-assisted, not native-reviewed. */
+  'assets.aria.kind': 'Soort van {name}',
+  'assets.aria.value': 'Waarde van {name}',
+  'assets.aria.valued': 'Datum waarop {name} gewaardeer is',
+  'assets.aria.notes': 'Notas vir {name}',
+  'assets.aria.remove': 'Verwyder {name}',
+
   /* ------------------------- plan view (mobile redesign) ------------------------- */
   'plan.hero.leftToPlace': "Oor om te plaas",
   'plan.hero.overPlaced': "Meer geplaas as wat hierdie plan hou",
@@ -1693,6 +1700,19 @@ module.exports = {
 
   /* Accessible names (audit of 11 Nov 2026, task 19) — machine-assisted, not native-reviewed. */
   'plan.pickerAria': "Kies 'n plan",
+  'plan.split.aria.free': 'Van {pot}: {spent} reeds bestee, {committed} toegewys, {free} nog nie toegewys nie.',
+  'plan.split.aria.overPlaced': 'Van {pot}: {spent} reeds bestee, {committed} toegewys, {over} meer geplaas as wat hierdie plan hou.',
+  'plan.split.aria.left': '{left} nog oor om te bestee, waarvan {placeable} nog geplaas moet word.',
+  'plan.split.aria.overSpent': '{over} meer bestee as wat hierdie plan hou.',
+  'plan.split.aria.pastBucket': '{amount} is bestee bo wat die bak gehou het.',
+  'plan.env.overBy': '{amount} te veel',
+  'plan.env.sliderAria': 'Bedrag geplaas in {name}',
+  'plan.env.typeAria': 'Stel die bedrag vir {name} deur dit in te tik',
+  'plan.env.renameAria': 'Hernoem bestedingsbak {name}',
+  'plan.item.aria.planned': '{name}: beplan — klik om te vorder',
+  'plan.item.aria.part': '{name}: gedeeltelik gekoop — klik om te vorder',
+  'plan.item.aria.done': '{name}: klaar — klik om te vorder',
+  'plan.item.cycleTip': 'beplan → gedeeltelik gekoop → klaar',
 
   'io.stale.message': "{file} is buite hierdie bladsy verander nadat dit gelaai is, so niks is geskryf nie",
   'io.stale.notice': "Begroting: {file} is buite hierdie bladsy verander (ander toestel of die markdown-aansig) nadat dit gelaai is, so jou stoor is nie geskryf nie. Die bladsy het weer gelaai wat nou op skyf is — maak asseblief die wysiging weer.",
