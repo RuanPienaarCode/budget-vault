@@ -379,13 +379,20 @@ module.exports = function registerServices(ctx) {
   function svcNextHint(s, c, date, n) {
     const stale = !s.next || s.next < todayIso();
     const { last, first, skipped } = c.next;
-    const title = `Last charged ${last}, billed every ${CYCLE_NOUN[s.cycle] || 'month'}, so the next charge is due ${date}.`
-      + (skipped ? (c.paidFrom && c.paidFrom.through && c.paidFrom.through < first
+    /* A sentence per cycle rather than a noun dropped into one: "every week"
+       and "every fortnight" do not share a shape in most of the twelve
+       languages. An unknown cycle reads as monthly, as CYCLE_NOUN's fallback
+       always had it. */
+    const cycle = CYCLE_NOUN[s.cycle] ? s.cycle : 'monthly';
+    const title = [i18n.t('svc.aria.hint.' + cycle, { last, date }),
+      ...(skipped ? [c.paidFrom && c.paidFrom.through && c.paidFrom.through < first
         /* The records stop before the date: nothing says it did not happen. */
-        ? ` ${first} has passed, but ${c.paidFrom.name} is not imported yet that far (${c.paidFrom.byImport ? 'last import' : 'balance confirmed'} ${c.paidFrom.through}), so this is the next date after today.`
-        : ` ${first} has passed with no charge in your transactions yet, so this is the next date after today.`) : '');
+        ? (c.paidFrom.byImport
+          ? i18n.t('svc.aria.gap.import', { first, account: c.paidFrom.name, through: c.paidFrom.through })
+          : i18n.t('svc.aria.gap.confirmed', { first, account: c.paidFrom.name, through: c.paidFrom.through }))
+        : i18n.t('svc.aria.gap.noCharge', { first })] : [])].join(' ');
     const btn = el('button', { type: 'button', class: 'svc-next-hint', title, 'data-focus-key': `hint:${n}`,
-      'aria-label': `Set next billing for ${s.name} to ${date}` },
+      'aria-label': i18n.t('svc.aria.setNext', { name: s.name, date }) },
     icoEl(['calendar-check', 'calendar']), stale ? `due ${date}` : date);
     /* Taking the date removes the offer: the stored date now matches, so the
        redraw has no hint to draw and the button that was pressed is gone. The
@@ -435,7 +442,7 @@ module.exports = function registerServices(ctx) {
             el('td', { style: 'font-weight:600' }, s.name, ctx.noteButton('service', s.name), ...svcFlags(s, c)),
             el('td', { class: 'text-muted' }, s.provider),
             el('td', { class: 'num' }, el('input', { type: 'number', step: '0.01', class: 'form-control form-control-sm', value: s.amount || '',
-              'aria-label': `Amount for ${s.name}`,
+              'aria-label': i18n.t('svc.aria.amount', { name: s.name }),
               /* amountRaw = null: a number typed here supersedes the verbatim
                  text table-schema.js keeps for a cell it could not read. */
               /* normalizeAmount, not `parseFloat(...) || 0` — see the comment
@@ -452,13 +459,13 @@ module.exports = function registerServices(ctx) {
                offer one it can. The old two-option list was the visible half of
                a schema that only had two; a household with a weekly debit
                order had nowhere to say so. */
-            el('td', {}, el('select', { class: 'form-select form-select-sm', 'aria-label': `Billing cycle for ${s.name}`,
+            el('td', {}, el('select', { class: 'form-select form-select-sm', 'aria-label': i18n.t('svc.aria.cycle', { name: s.name }),
               onchange: e => { s.cycle = CYCLES.includes(e.target.value) ? e.target.value : 'monthly'; refresh(); } },
               ...CYCLES.map(c => el('option', { value: c, ...(s.cycle === c ? { selected: '' } : {}) }, c)))),
             // dateInput, not a bare type="date": a hand-edited "end of month"
             // renders blank in a date input, hiding a value that is still on disk.
             el('td', {}, dateInput(s.next, { class: 'form-control form-control-sm',
-              'aria-label': `Next billing date for ${s.name}` },
+              'aria-label': i18n.t('svc.aria.next', { name: s.name }) },
               v => { s.next = v; mark(); }),
             /* The typed date is a fossil the moment it passes — every value on
                the vault this was built against was months old. The charge
@@ -474,10 +481,10 @@ module.exports = function registerServices(ctx) {
                where the reader should be afterwards (dom.js refocus): on the
                same tick, and — after a removal — on the service that moved up
                into this one's place, else the one above, else New service. */
-            el('td', {}, el('label', { class: 'tbl-tick' }, el('input', { type: 'checkbox', 'aria-label': `${s.name} is active`, ...(s.active ? { checked: '' } : {}),
+            el('td', {}, el('label', { class: 'tbl-tick' }, el('input', { type: 'checkbox', 'aria-label': i18n.t('svc.aria.active', { name: s.name }), ...(s.active ? { checked: '' } : {}),
               'data-focus-key': `active:${at}`,
               onchange: e => { s.active = e.target.checked; mark(); renderServices(); refocus($('#svcTable'), `active:${at}`); } }))),
-            el('td', {}, el('button', { class: 'btn-ghost btn-ghost-sm', 'aria-label': `Remove ${s.name}`, 'data-focus-key': `del:${at}`,
+            el('td', {}, el('button', { class: 'btn-ghost btn-ghost-sm', 'aria-label': i18n.t('svc.aria.remove', { name: s.name }), 'data-focus-key': `del:${at}`,
               onclick: () => {
                 S.services.splice(S.services.indexOf(s), 1); mark(); renderServices();
                 refocus($('#svcTable'), [`del:${at}`, `del:${at - 1}`, $('#svcAdd')]);

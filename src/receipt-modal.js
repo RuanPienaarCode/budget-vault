@@ -118,7 +118,7 @@ class ReceiptModal extends Modal {
     const ta = el('textarea', {
       class: 'bv-receipt-paste', rows: '9', spellcheck: 'false', autocorrect: 'off', autocapitalize: 'off',
       placeholder: 'Paste the receipt text here',
-      'aria-label': 'Receipt text',
+      'aria-label': i18n.t('rc.aria.text'),
     });
     ta.value = this.pasted || '';
     ta.addEventListener('input', () => { this.pasted = ta.value; });
@@ -176,7 +176,12 @@ class ReceiptModal extends Modal {
     c.empty();
     const head = el('div', { class: 'bv-receipt-head' });
     const field = (label, key, attrs = {}) => {
-      const input = el('input', { class: 'form-control form-control-sm', value: this.r[key] ?? '', 'aria-label': label, ...attrs });
+      /* No aria-label: the <label> this returns wraps the input, so the
+         field is already named by the words printed above it. The attribute
+         repeated them, and would have had to stay English beside a visible
+         English label — a name that differs from its own label is worse than
+         either (it breaks "say what you see" for voice control). */
+      const input = el('input', { class: 'form-control form-control-sm', value: this.r[key] ?? '', ...attrs });
       input.addEventListener('input', () => {
         this.r[key] = key === 'total' ? toAmount(input.value) : input.value.trim();
         this.refresh();
@@ -228,7 +233,9 @@ class ReceiptModal extends Modal {
       el('span', {}, 'Item'), el('span', {}, 'Price'), el('span', {}, 'Discount'),
       el('span', {}, 'Category'), el('span', {}, 'Healthy'), el('span', {}, '')));
     this.r.items.forEach((it, i) => {
-      const name = el('input', { class: 'form-control form-control-sm', value: it.name || '', 'aria-label': `Line ${i + 1} item` });
+      /* data-line is how focusLine() finds this field. It used to look it up
+         by its aria-label, which is a translated sentence now. */
+      const name = el('input', { class: 'form-control form-control-sm', value: it.name || '', 'data-line': String(i), 'aria-label': i18n.t('rc.aria.item', { n: i + 1 }) });
       /* A line typed by hand files itself as the name is typed — HONEY goes
          to Pantry without a trip to the picker — until the reader picks a
          category themselves, after which their choice stands. */
@@ -245,18 +252,18 @@ class ReceiptModal extends Modal {
         }
         this.refresh();
       });
-      const amt = el('input', { class: 'form-control form-control-sm num', inputmode: 'decimal', value: it.amount == null ? '' : it.amount.toFixed(2), 'aria-label': `Line ${i + 1} price` });
+      const amt = el('input', { class: 'form-control form-control-sm num', inputmode: 'decimal', value: it.amount == null ? '' : it.amount.toFixed(2), 'aria-label': i18n.t('rc.aria.price', { n: i + 1 }) });
       amt.addEventListener('input', () => { it.amount = toAmount(amt.value); this.refresh(); });
-      const disc = el('input', { class: 'form-control form-control-sm num', inputmode: 'decimal', value: it.discount ? it.discount.toFixed(2) : '', placeholder: '0.00', 'aria-label': `Line ${i + 1} discount` });
+      const disc = el('input', { class: 'form-control form-control-sm num', inputmode: 'decimal', value: it.discount ? it.discount.toFixed(2) : '', placeholder: '0.00', 'aria-label': i18n.t('rc.aria.discount', { n: i + 1 }) });
       /* A discount is money off, so it is stored negative whichever way it
          was typed — "10" in the Discount box means R10 off, never R10 on. */
       disc.addEventListener('input', () => { const v = toAmount(disc.value); it.discount = v ? -Math.abs(v) : 0; this.refresh(); });
       const cat = this.categorySelect(it.category, v => { it.category = v; it.catPicked = true; });
-      cat.setAttribute('aria-label', `Line ${i + 1} category`);
-      const healthy = el('input', { type: 'checkbox', 'aria-label': `Line ${i + 1} healthy` });
+      cat.setAttribute('aria-label', i18n.t('rc.aria.category', { n: i + 1 }));
+      const healthy = el('input', { type: 'checkbox', 'aria-label': i18n.t('rc.aria.healthy', { n: i + 1 }) });
       healthy.checked = !!it.healthy;
       healthy.addEventListener('change', () => { it.healthy = healthy.checked; });
-      const del = el('button', { type: 'button', class: 'btn-ghost btn-ghost-sm', 'aria-label': `Remove line ${i + 1}` }, '✕');
+      const del = el('button', { type: 'button', class: 'btn-ghost btn-ghost-sm', 'aria-label': i18n.t('rc.aria.remove', { n: i + 1 }) }, '✕');
       del.addEventListener('click', () => { this.r.items.splice(i, 1); this.renderLines(); this.refresh(); });
       /* Enter walks down the list and, past the last line, starts a new
          one — typing a slip in by hand is item, price, Enter, item, price. */
@@ -273,7 +280,7 @@ class ReceiptModal extends Modal {
   }
 
   focusLine(i) {
-    const input = this.linesEl.querySelector(`[aria-label="Line ${i + 1} item"]`);
+    const input = this.linesEl.querySelector(`[data-line="${i}"]`);
     if (input) setTimeout(() => input.focus(), 0);
   }
 

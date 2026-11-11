@@ -1021,6 +1021,11 @@ module.exports = {
      description, and — through importRowWhy's {why} — the end of the tick
      box's name, so the reader hears why the box is empty before deciding.
      Kept as one string each so the three can never say different things. */
+  'imp.aria.importRow': 'Import {date} {desc}, {amount}',
+  'imp.aria.importRowWhy': 'Import {date} {desc}, {amount}. {why}',
+  'imp.aria.category': 'Category for {desc}',
+  'imp.near.why': 'Looks like the already-imported "{desc}" on {date} — the bank re-dates and re-words a charge when it settles. Tick to import anyway.',
+  'imp.pending.why': 'The bank still lists this as pending, so its date and amount can both change when it settles — and a settled row at a different amount would import as a second transaction. It will arrive on the next statement as a final figure. Tick to import it now anyway.',
   'imp.aria.cancelTip': 'Discard this statement without importing anything',
   'imp.aria.remapTip': 'Set which column is the date, description and amount',
   'imp.aria.newAccountTip': 'Create an account for these rows to land in',
@@ -1798,6 +1803,24 @@ module.exports = {
   'sav.aria.share.own': '{label}, {amount}, {share}% of what you own. Open {page}.',
   'sav.aria.share.owe': '{label}, {amount}, {share}% of what you owe. Open {page}.',
 
+  /* Services. `hint.*` is the hover title of the "use the date the charges
+     imply" button — one sentence per billing cycle, because "every week" and
+     "every fortnight" are not one frame with a noun swapped in. `gap.*` is the
+     sentence that follows it when the expected date has already passed. */
+  'svc.aria.amount': 'Amount for {name}',
+  'svc.aria.cycle': 'Billing cycle for {name}',
+  'svc.aria.next': 'Next billing date for {name}',
+  'svc.aria.active': '{name} is active',
+  'svc.aria.remove': 'Remove {name}',
+  'svc.aria.setNext': 'Set next billing for {name} to {date}',
+  'svc.aria.hint.weekly': 'Last charged {last}, billed every week, so the next charge is due {date}.',
+  'svc.aria.hint.fortnightly': 'Last charged {last}, billed every fortnight, so the next charge is due {date}.',
+  'svc.aria.hint.monthly': 'Last charged {last}, billed every month, so the next charge is due {date}.',
+  'svc.aria.hint.annual': 'Last charged {last}, billed every year, so the next charge is due {date}.',
+  'svc.aria.gap.import': '{first} has passed, but {account} is not imported yet that far (last import {through}), so this is the next date after today.',
+  'svc.aria.gap.confirmed': '{first} has passed, but {account} is not imported yet that far (balance confirmed {through}), so this is the next date after today.',
+  'svc.aria.gap.noCharge': '{first} has passed with no charge in your transactions yet, so this is the next date after today.',
+
   /* Tax. A status pill is a sentence per status (`step.*`, `doc.*` — the last
      segment is the stored status, with "n/a" spelled "na"). `{label}` in
      codeFor* is the country profile's own word for a figure's code (locale.js
@@ -1805,12 +1828,62 @@ module.exports = {
      too. figDescription / figSource keep the lower-case start they always had:
      they name a free-text field by the column it sits in. */
   'tax.aria.year': 'Tax year',
+  'tax.aria.createYear': 'Create a tax page for {year}, which already has documents',
+  'tax.aria.figDescription': 'description for figure {code}',
+  'tax.aria.figSource': 'source for figure {code}',
+  'tax.aria.codeFor': '{label} for {description}',
+  'tax.aria.codeForThis': '{label} for this figure',
+  'tax.aria.amountFor': 'Amount for {code}',
+  'tax.aria.amountForThis': 'Amount for this figure',
+  'tax.aria.figRemove': 'Remove figure {code}',
+  'tax.aria.step.todo': 'Status: To do — click to change',
+  'tax.aria.step.busy': 'Status: Busy — click to change',
+  'tax.aria.step.done': 'Status: Done — click to change',
+  'tax.aria.step.na': 'Status: N/A — click to change',
+  'tax.aria.stepDue': 'Due date for {step}',
+  'tax.aria.stepNotes': 'Notes for {step}',
+  'tax.aria.stepRemove': 'Remove step {step}',
+  'tax.aria.doc.needed': 'Status: Needed — click to change',
+  'tax.aria.doc.uploaded': 'Status: Uploaded — click to change',
+  'tax.aria.doc.na': 'Status: N/A — click to change',
+  'tax.aria.openFile': 'Open {name}',
+  'tax.aria.addFile': 'Add another file to {name}',
+  'tax.aria.uploadFile': 'Upload file for {name}',
+  'tax.aria.docNotes': 'Notes for {name}',
+  'tax.aria.docRemove': 'Remove document {name}',
+
+  /* Food, and the Add receipt dialog it opens (`rc.*`; {n} counts lines from
+     1). `food.aria.trend` is plural on the number of periods charted, and
+     {categories} is the list of lines drawn, already joined. */
+  'food.aria.range': 'Chart range',
+  'food.aria.trend': {
+    one: 'Food spend by category over {count} period; {categories}',
+    other: 'Food spend by category over {count} periods; {categories}',
+  },
+  'food.aria.price': '{name}: price at each purchase, {first} to {last}',
+  'food.aria.category': 'Category for {name}',
+  'food.aria.healthy': '{name} is healthy',
+  'rc.aria.text': 'Receipt text',
+  'rc.aria.item': 'Line {n} item',
+  'rc.aria.price': 'Line {n} price',
+  'rc.aria.discount': 'Line {n} discount',
+  'rc.aria.category': 'Line {n} category',
+  'rc.aria.healthy': 'Line {n} healthy',
+  'rc.aria.remove': 'Remove line {n}',
 
   /* Notes — including the note chip every other page draws beside an account,
      a debt, a person or a service (views/notes.js noteButton), which is why
      these are heard on translated pages too. {subject} is that thing's name.
      And the loan calculators. */
+  'notes.aria.delete': 'Delete {title}',
+  'notes.aria.count': {
+    one: '{count} note about {subject}',
+    other: '{count} notes about {subject}',
+  },
+  'notes.aria.write': 'Write a note about {subject}',
   'loans.aria.tabs': 'Choose a calculator',
+  'loans.aria.deposit': 'Deposit amount',
+  'loans.aria.depositPct': 'Deposit as a percentage of the price',
 
   /* --------------------------------- report -------------------------------
      views/report.js (the page) and src/report.js (the generated note's own

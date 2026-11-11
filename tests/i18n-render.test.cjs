@@ -235,7 +235,7 @@ for (const v of EXPECTED_ENGLISH_ONLY) {
 const VISIBLE_SRC = new Set(['text', 'attr:placeholder']);
 const visibleOf = runs => runs.filter(r => VISIBLE_SRC.has(r.src)).map(r => r.text).join('␟');
 const spokenOf = runs => runs.filter(r => !VISIBLE_SRC.has(r.src)).map(r => r.text).join('␟');
-const EXPECTED_NAMES_KEYED = ['savings', 'owed'];
+const EXPECTED_NAMES_KEYED = ['food', 'savings', 'owed', 'services', 'tax', 'loans'];
 for (const v of EXPECTED_NAMES_KEYED) {
   ok(EXPECTED_ENGLISH_ONLY.includes(v), `'${v}' is in EXPECTED_NAMES_KEYED, which only lists views still in EXPECTED_ENGLISH_ONLY — a translated view's names are covered by the switch ratchet itself`);
 }

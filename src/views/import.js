@@ -984,22 +984,22 @@ module.exports = function registerImport(ctx) {
       // user needs to know WHICH existing row it collided with to judge whether
       // this is the bank rewriting a pending charge or a real second purchase.
       const nearWhy = it.near
-        ? `Looks like the already-imported "${it.near.desc}" on ${it.near.date} — the bank re-dates and re-words a charge when it settles. Tick to import anyway.`
+        ? i18n.t('imp.near.why', { desc: it.near.desc, date: it.near.date })
         : '';
       /* Same shape as nearWhy, and said for the same reason: the row arrives
          unticked, so it has to say what made it so or the reader finds a
          missing purchase later with no trail back to this screen. */
       const pendingWhy = it.pending
-        ? 'The bank still lists this as pending, so its date and amount can both change when it settles — '
-          + 'and a settled row at a different amount would import as a second transaction. It will arrive on the next '
-          + 'statement as a final figure. Tick to import it now anyway.'
+        ? i18n.t('imp.pending.why')
         : '';
       // Keyed by position as the landing for "Show more" below (dom.js refocus).
       body.append(el('tr', { class: cls.trim(), 'data-focus-key': `row:${i}` },
         /* Both ticks sit in a <label> so the phone card can give them a 44px
            target (statement/phone-tables.css); inert on a desktop. */
         el('td', {}, it.dup ? el('span', { class: 'category-badge badge-dup' }, 'dup') :
-          el('label', { class: 'tbl-tick' }, el('input', { type: 'checkbox', 'aria-label': `Import ${it.date} ${it.desc}, ${previewMoney(it.amount)}${it.near ? '. ' + nearWhy : it.pending ? '. ' + pendingWhy : ''}`,
+          el('label', { class: 'tbl-tick' }, el('input', { type: 'checkbox', 'aria-label': it.near || it.pending
+            ? i18n.t('imp.aria.importRowWhy', { date: it.date, desc: it.desc, amount: previewMoney(it.amount), why: it.near ? nearWhy : pendingWhy })
+            : i18n.t('imp.aria.importRow', { date: it.date, desc: it.desc, amount: previewMoney(it.amount) }),
             // nearAuto stays TRUE once we have auto-unticked: it records that the
             // untick already happened, so a re-render (account switch, "show
             // more") leaves the user's decision — either way — alone.
@@ -1040,7 +1040,7 @@ module.exports = function registerImport(ctx) {
               'category-badge badge-transfer badge-chip'),
         ] : [])),
         el('td', { class: `num${it.amount >= 0 ? ' text-success' : ''}`, style: 'white-space:nowrap;font-weight:600' }, previewMoney(it.amount)),
-        el('td', {}, it.dup ? (it.cat || '') : deferredCatSelect(it.cat, v => { it.cat = v; it.manual = true; }, `Category for ${it.desc}`),
+        el('td', {}, it.dup ? (it.cat || '') : deferredCatSelect(it.cat, v => { it.cat = v; it.manual = true; }, i18n.t('imp.aria.category', { desc: it.desc })),
           // Named, not silent: a rule that fires wrong is only fixable if the
           // reader can tell WHICH rule fired — otherwise the only way to find
           // it is opening Data/Categorisation Rules.csv, which this screen
@@ -1051,7 +1051,7 @@ module.exports = function registerImport(ctx) {
             `matched "${it.matchedPattern}"`)] : [])),
         // `checked` reflects the model: after a partial-failure re-render the
         // ticks used to vanish while the rows stayed excluded.
-        el('td', {}, it.dup ? '' : el('label', { class: 'tbl-tick' }, el('input', { type: 'checkbox', 'aria-label': `Exclude ${it.desc} from budget totals`,
+        el('td', {}, it.dup ? '' : el('label', { class: 'tbl-tick' }, el('input', { type: 'checkbox', 'aria-label': i18n.t('tx.aria.exclude', { desc: it.desc }),
           // manualExclude is the same sticky bit as nearAuto above: once the
           // reader has ticked either way, switching account must not silently
           // undo it on the next render.
