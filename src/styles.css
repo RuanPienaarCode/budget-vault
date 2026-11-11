@@ -39,6 +39,15 @@
      would have shipped the one label on the page that was hardest to read. */
   --color-danger-ink:    #be123c;   /* AA on --surface (6.3:1); the fill rose was 3.7:1 */
   --color-info:          #0ea5e9;
+  /* The third fill to need an ink of its own — see the amber and the rose
+     above. --color-info is right behind a badge and inside a bar, and 2.77:1
+     on a white card (2.44:1 on the page), which is under the 3:1 even a glyph
+     is allowed. The Budget page's pressed "fixed bill" toggle was painted in
+     it (2026-11-11 audit). #0369a1 is the ink the light-mode Income and
+     Services badges further down already reach for by literal, so the two
+     now agree on what "info, as ink" is. The dark block points it straight
+     back at the fill, as it does for the other two. */
+  --color-info-ink:      #0369a1;   /* AA on --surface (5.93:1) and on --body-bg (5.23:1); the fill sky was 2.77:1 */
   --color-info-light:    #f0f9ff;
 
   /* The lighter endpoint of the warning/danger bar-fill gradients — .cat-bar-fill
@@ -147,6 +156,9 @@
      5.0:1 as text, while the darkened light-mode ink drops to 1.5:1 — the
      unreadable one here. Point it back at the fill. */
   --color-danger-ink:    var(--color-danger);
+  /* And the sky, the same way round: on #12162a the fill measures 6.45:1 as
+     ink, while the darkened light-mode ink drops to 3.01:1. */
+  --color-info-ink:      var(--color-info);
   --color-info-light:    rgba(14,165,233,0.12);
 
   --bg-0:              #04050b;
@@ -2526,8 +2538,14 @@ body.is-phone .budget-app-root .drawer-book:not(.hidden) { display: block; }
    arrive for this" against "this bill cannot be stopped" — so sharing an accent
    would leave a reader with two identical-looking pressed buttons and no way to
    tell which state they had just set. `aria-pressed` already distinguishes them
-   for a screen reader; this is the sighted half of the same job. */
-.budget-app-root .bud-fixed-on { color: var(--color-info); }
+   for a screen reader; this is the sighted half of the same job.
+
+   The info INK, not the info fill. --color-info is #0ea5e9, 2.77:1 on a white
+   card — too faint for the one glyph that says a bill is locked in.
+   --color-info-ink is #0369a1 in light (5.93:1) and the fill itself in dark
+   (6.26:1 or better on every palette's card). Still a different colour from
+   the accent beside it, which is the point of the paragraph above. */
+.budget-app-root .bud-fixed-on { color: var(--color-info-ink); }
 .budget-app-root .bud-pull { margin-top: 4px; font-size: 11.5px; white-space: nowrap; }
 
 /* Budget page: period totals strip, repeated above and below the table */

@@ -41,6 +41,8 @@
      7b. A GRADIENT BUTTON'S LABEL against the lightest point of its own
          gradient: 3.74:1 on vault-green and 3.68:1 on ocean, where 13.6px
          bold text needs 4.5:1.
+     7c. THE INFO INK of the Budget page's pressed "fixed bill" toggle,
+         painted in the info FILL: 2.77:1 on a white card.
 
    Each is read out of the stylesheet rather than restated here, so the gate
    measures the rule that ships, and each also refuses a second rule that
@@ -453,6 +455,37 @@ function norm(v) {
       ok(hovered >= AA, `${p.id}/${mode}: gradient-button label is ${hovered.toFixed(2)}:1 under the hover brightness(${hover[1]}), below AA ${AA}:1`);
     });
   }
+
+  /* -- 7c. the info ink ---------------------------------------------------
+
+     The pressed "fixed bill" toggle on the Budget page was painted in
+     --color-info, #0ea5e9 — a FILL, like the amber and the rose, and 2.77:1 on
+     a white card. It reads --color-info-ink now, the same move as
+     --color-warning-ink and --color-danger-ink: a darker ink in light mode,
+     pointed straight back at the fill in dark, where the fill already measures
+     6.26:1 or better on every palette's card.
+
+     Info is one of the colours a palette may NOT change (scripts/presets.cjs),
+     so the ink is one value per mode — but the surfaces under it are seeds, so
+     it is still measured against every palette's card and page. Held to the
+     text ratio rather than the 3:1 a glyph is allowed, because the toggle is
+     only the first thing to use it and an ink token gets reached for by text. */
+  {
+    const AA = 4.5;
+    const FIXED = ['.budget-app-root .bud-fixed-on', '.budget-app-root .bud-table .bud-act.bud-fixed-on'];
+    for (const sel of FIXED) eq(only(sel, 'color'), 'var(--color-info-ink)', `"${sel}" is painted in the info ink, not the info fill`);
+    eq(touching(['bud-fixed-on'], /^color$/), FIXED.map(s => `${s} { color }`).sort(),
+      'nothing else colours the pressed fixed-bill toggle');
+
+    each((p, mode, t) => {
+      const s = p[mode];
+      const ink = toHex(norm(resolve('var(--color-info-ink)', t)));
+      for (const [bg, name] of [[s.surface, 'surface'], [s.bodyBg, 'bodyBg']]) {
+        const r = contrast(ink, bg);
+        ok(r >= AA, `${p.id}/${mode}: info ink ${ink} on ${name} is ${r.toFixed(2)}:1, below AA ${AA}:1`);
+      }
+    });
+  }
 }
 
-console.log(`PASS — palette generator: reproduces Vault Green, AA in ${PRESETS.length * 2} blocks, dropdown parity, form-control edge / gradient-button label gated per palette (${checks} checks).`);
+console.log(`PASS — palette generator: reproduces Vault Green, AA in ${PRESETS.length * 2} blocks, dropdown parity, form-control edge / gradient-button label / info ink gated per palette (${checks} checks).`);
