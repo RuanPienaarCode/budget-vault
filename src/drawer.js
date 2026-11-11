@@ -30,18 +30,39 @@
    behind a locked gate back in the tab order on the next vault change. The
    drawer cannot be open while the gate is up (lockGate closes it first, and
    the button that opens it is behind the gate), so "was it open" is the whole
-   test, and it is the one the focus restore below already used. */
+   test, and it is the one the focus restore below already used.
 
-const { setInert } = require('./dom');
+   THE LOCK HOLDS THROUGH A REDRAW. On the engines with no `inert` (iOS
+   15.0-15.4) setInert stamps the controls that exist when it is called, and
+   the page does not stop redrawing because a menu is over it: a save that was
+   in flight finishes and rebuilds its table, a sync lands, a debounced search
+   fires — and the new controls were tabbable behind the overlay until the
+   drawer closed. So an open drawer watches what it covers (dom.js watchInert)
+   and brings anything drawn there under the same lock. The watch belongs to
+   the drawer element, so two panes each showing the app keep one apiece; it
+   is ended before the release on every close, and it only ever adds a lock —
+   see watchInert for why that is what keeps it away from the gate's. */
+
+const { setInert, watchInert } = require('./dom');
 
 /* What the overlay covers, as the selectors controller.js's `$` resolves. */
 const BEHIND = ['.topbar', '.main-content', '#bvDock'];
+
+/* drawer element -> the function that ends its watch. */
+const watching = new WeakMap();
+function unwatch(d) {
+  const stop = watching.get(d);
+  if (stop) stop();
+  watching.delete(d);
+}
 
 function openDrawer($) {
   const d = $('#appDrawer');
   d.classList.add('open');
   setInert(d, false);                         // re-enter the tab / AT order
   for (const sel of BEHIND) setInert($(sel), true);
+  unwatch(d);                                 // a repeated open keeps one watcher, not two
+  watching.set(d, watchInert(BEHIND.map(sel => $(sel)), () => d.classList.contains('open')));
   $('#drawerOverlay').classList.add('open');
   $('#menuBtn').setAttribute('aria-expanded', 'true');
   $('#drawerClose').focus();                  // move focus into the drawer
@@ -52,6 +73,10 @@ function closeDrawer($) {
   const wasOpen = d.classList.contains('open');
   d.classList.remove('open');
   setInert(d, true);                          // leave the tab / AT order
+  /* The watch ends first, and whether or not the drawer was open: once it is
+     gone nothing can re-lock what is released on the next line, and a record
+     still queued for it is dropped with it. */
+  unwatch(d);
   /* Released before the focus below, which lands on a button INSIDE one of
      them: an inert control refuses focus. */
   if (wasOpen) for (const sel of BEHIND) setInert($(sel), false);
