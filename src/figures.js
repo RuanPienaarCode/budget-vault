@@ -25,6 +25,7 @@ const { netByOwner } = require('./owners');
 const { normalizeAmount, parseNum } = require('./amount');
 const { todayIso } = require('./dates');
 const { largestRemainder } = require('./share-percents');
+const { fileOutsideWindow } = require('./misfiled');
 
 /* ADR-0007 · One readable-balance rule. The loader parses "about 300" to 0 and
    keeps the text in `balanceRaw`; only when normalizeAmount ALSO fails on that
@@ -32,6 +33,22 @@ const { largestRemainder } = require('./share-percents');
    balance book, the Dashboard's what's-left accounts and the Accounts page all
    hold an unreadable balance out on this one test. */
 const balanceReadable = a => !(a.balanceRaw != null && normalizeAmount(a.balanceRaw) === null);
+
+/* The figure the Accounts page leads with (GitHub discussion #124, 2 Oct
+   2026): what the transactions say, exactly as impliedAccounts() rolls it for
+   every other page — the implied balance when the account has drifted from
+   its stated one, the stated balance otherwise. `rec` is the account's
+   reconcile() verdict. An unreadable balance is handed back as it is: rolling
+   a fabricated zero forward would print a number nobody ever had.
+
+   Here, beside balanceReadable and the balance book it has to agree with,
+   since the 2026-11-11 audit (task 23); it sat in views/accounts.js, where no
+   bare-node guard could hold it to that. The page's own comment on why it
+   leads with this figure stays with the page. */
+function liveBalance(a, rec) {
+  if (!balanceReadable(a)) return a.balance;
+  return rec && rec.state === 'drift' ? rec.implied : a.balance;
+}
 
 /* The same rule for a row's AMOUNT cell (2026-10-14 audit, L8-02). The loader
    reads a cell it cannot parse as 0 and keeps the reader's own text in
@@ -332,7 +349,7 @@ module.exports = function registerFigures(ctx) {
     const out = { budget: (S.budgets[p] || []).filter(amountUnreadable).length, tx: 0 };
     const held = ctx.nonBudgetLabels();
     for (const f of Object.values(S.txFiles)) {
-      if (f.month < start.slice(0, 7) || f.month > end.slice(0, 7) || held.has(f.label)) continue;
+      if (fileOutsideWindow(f.month, start, end) || held.has(f.label)) continue;
       for (const r of f.rows) if (!r.excluded && r.date >= start && r.date <= end && amountUnreadable(r)) out.tx++;
     }
     out.count = out.budget + out.tx;
@@ -343,7 +360,17 @@ module.exports = function registerFigures(ctx) {
      cards derive from that pass. On 1.38.0 the Dashboard ran reconcile() over
      every account three times in one render (the what's-left card, the drift
      note and net worth), each with its own filter. */
+  /* Once per RENDER PASS (2026-11-11 audit, task 9b): the Dashboard asks four
+     times in one paint — the what's-left card, the position tiles, the Debt
+     tile's count and the drift note — and each was a reconcile() of every
+     account. Kept only for the length of one synchronous render
+     (src/render-pass.js); outside a pass, and on the next render, it is
+     computed again, so an edit that never reloads still moves it. Callers
+     share the object within a pass and only read it. */
   function bookFigures() {
+    return ctx.passMemo('bookFigures', computeBookFigures);
+  }
+  function computeBookFigures() {
     const cur = S.settings.currency;
     const idx = accountIndex();
     const reconciled = new Map();
@@ -454,6 +481,7 @@ module.exports = function registerFigures(ctx) {
   ctx.provide({ categoryActualsInRange, budgetVsActualRows, categorySpendRows, categoryGap, planFigures, periodFigures, bookFigures });
 };
 module.exports.balanceReadable = balanceReadable;
+module.exports.liveBalance = liveBalance;
 module.exports.amountUnreadable = amountUnreadable;
 module.exports.remainderDecimals = remainderDecimals;
 module.exports.printedRemainder = printedRemainder;

@@ -63,6 +63,7 @@ const HOST_SIDE = new Map([
   ['main.js',                'plugin entry — Obsidian Plugin subclass'],
   ['view.js',                'Obsidian ItemView'],
   ['controller.js',          'wires the views to the vault through Obsidian'],
+  ['wiring.js',              'the one ordered list of register(ctx) modules — requires every view'],
   ['api.js',                 'the sibling-plugin API — reaches io, load and the dashboard view'],
   ['settings-tab.js',        'Obsidian PluginSettingTab'],
   ['onboarding.js',          'renders the first-run flow; writes through Obsidian'],

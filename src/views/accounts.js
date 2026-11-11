@@ -13,7 +13,7 @@ const { createChart, arcPath, tip, themeColors } = require('../chart');
    load.js does, to tell a changed balance from one merely re-spelled. */
 const { normalizeAmount, parseNum } = require('../amount');
 /* The readable-balance rule is figures.js's, not this page's own copy. */
-const { balanceReadable } = require('../figures');
+const { balanceReadable, liveBalance } = require('../figures');
 /* A display symbol per account, and the disclosure when a total spans more
    than one of them. It converts nothing — see the module header. isForeign is
    used only by this view's own splitByCurrency() below — currency.js stays
@@ -987,11 +987,10 @@ module.exports = function registerAccounts(ctx) {
      still printed under it with its date and the movement since — the
      disagreement is on screen, nothing is overwritten, and confirming it is
      still the reader's call. An unreadable balance stays as it is: rolling a
-     fabricated zero forward would print a number nobody ever had. */
-  function liveBalance(a, rec) {
-    if (unreadableBalance(a)) return a.balance;
-    return rec && rec.state === 'drift' ? rec.implied : a.balance;
-  }
+     fabricated zero forward would print a number nobody ever had.
+
+     The rule is figures.js liveBalance(a, rec), beside the balance book this
+     page's hero sums — pure, so a guard can hold the two to one figure. */
   /* The account as the page reads it: the same object when the figure has not
      moved (so identity-keyed lookups still find it), a copy carrying the live
      balance when it has. Never handed to a writer — saveAccount and the

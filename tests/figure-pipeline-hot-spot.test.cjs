@@ -19,12 +19,15 @@
         be a date;
      3. bookFigures() reconciles each account exactly once, and the implied
         balance book it hands back is still impliedAccounts()'s own;
-     4. one Dashboard paint reconciles each account at most four times — a
-        ratchet (it was eight), which may only come down.
+     4. one Dashboard paint reconciles each account exactly ONCE — a ratchet
+        (it was eight, then four), at its floor since the pages share a
+        snapshot per render pass (src/render-pass.js).
 
    What is deliberately NOT here: a memo of bookFigures() across calls. The
    audit suggested "once per load and day"; section 5 pins why that is not
-   safe as things stand — a figure has to move on an edit that never reloads.
+   safe — a figure has to move on an edit that never reloads. The per-render
+   snapshot is dropped when the render ends, and tests/render-pass.test.cjs
+   holds it to that.
 
      node tests/figure-pipeline-hot-spot.test.cjs */
 const assert = require('assert');
@@ -161,11 +164,13 @@ const { householdVault } = require('../scripts/reconcile-page.cjs');
     reconciles = 0;
     ctx.renderDashboard();
     const perPaint = reconciles;
-    /* A RATCHET. Eight per account before this change; four now, one for each
-       of the four bookFigures() calls the Dashboard's cards make. The number
-       comes down when the views share one snapshot per render — it must not
-       go up. */
-    ok(perPaint <= accounts * 4, `one Dashboard paint reconciles each account at most 4 times (${perPaint} calls over ${accounts} accounts; it was ${accounts * 8})`);
+    /* A RATCHET, now at its floor. Eight per account before wave 1; four after
+       it, one for each of the four bookFigures() calls the Dashboard's cards
+       make; ONE since the views share a snapshot per render pass
+       (src/render-pass.js, task 9b) — a paint reconciles each account once. It
+       must not go up. Kept for the paint only: section 5 below still holds on
+       the very next call. */
+    eq(perPaint, accounts, `one Dashboard paint reconciles each account exactly once (${perPaint} calls over ${accounts} accounts; it was ${accounts * 4}, and ${accounts * 8} before that)`);
     ok(perPaint >= accounts, 'and it did reconcile, so the ceiling above was measured on a real paint');
 
     /* ---- 5. why bookFigures() is not memoised across calls ---------------- */

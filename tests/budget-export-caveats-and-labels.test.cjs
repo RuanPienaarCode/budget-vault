@@ -56,7 +56,6 @@ const ANSWER = { mode: 'months', range: '1', includeCurrent: true, content: 'ful
   const unpin = pinClock(TODAY);
   try {
     const M = await mountFor(SEED, { period: PERIOD, budgetFolder: B });
-    require('../src/views/budget-export')(M.ctx);
     const { ctx } = M;
     const money = v => ctx.money(v);
 

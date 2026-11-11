@@ -35,7 +35,7 @@
 
 const fs = require('fs');
 const path = require('path');
-const { makeCtx, loadInto } = require('./harness.cjs');
+const { makeCtx } = require('./harness.cjs');
 const { makeDom, readable } = require('./dom-stub.cjs');
 
 /* ---- the money recorder -------------------------------------------------
@@ -144,8 +144,7 @@ async function mountFor(files, { period, settings, budgetFolder } = {}) {
   if (settings) opts.settings = settings;
   if (budgetFolder) opts.budgetFolder = budgetFolder;
   const ctx = makeCtx(files, opts);
-  /* The DOM is wired BEFORE loadInto, not after. views/notes.js (registered by
-     loadInto, because it publishes the noteButton chip five other views render)
+  /* The DOM is wired BEFORE the modules register, not after. views/notes.js
      destructures `$` off the ctx at register time; with the swap done afterwards
      it kept the harness's inert stand-in, drew nothing, and every golden ledger
      carried an empty `## notes` section (audit L2b-10, 15 Oct 2026). */
@@ -154,8 +153,7 @@ async function mountFor(files, { period, settings, budgetFolder } = {}) {
   ctx.$$ = () => [];
   ctx.root = $('#root');
   ctx.view = { containerEl: $('#root') };
-  const S = await loadInto(ctx);
-  if (period) S.period = period;
+  const S = ctx.S;
 
   /* The real formatter, wired the way controller.js wires it: moneyIn takes an
      explicit symbol (an account prints its OWN currency), money defaults to the
@@ -185,15 +183,37 @@ async function mountFor(files, { period, settings, budgetFolder } = {}) {
   ctx.typeBadge = type => el('span', { class: `category-badge badge-${type}` }, type);
   ctx.plugin.settings = { ...ctx.plugin.settings, chartTrendRange: '6m' };
 
-  require('../../src/categories')(ctx);
-  /* 'report' immediately after 'dashboard': views/report.js destructures
-     budgetVsActualRows/categorySpendRows off ctx at register time and both are
-     published by dashboard.js's ctx.provide(). Same order controller.js uses,
-     load-bearing in both places. */
-  for (const f of ['dashboard', 'report', 'score', 'transactions', 'budgets', 'plan', 'accounts',
-    'savings', 'assets', 'debts', 'owed', 'services', 'tax', 'loans', 'import', 'food']) {
-    require(`../../src/views/${f}`)(ctx);
-  }
+  /* THE APP'S OWN MOUNT, not a list of it. Everything above is what
+     controller.js puts on the ctx by hand before it registers anything (the
+     formatter, the DOM, typeBadge); this is the registration itself, read from
+     the one list controller.js reads (src/wiring.js), in the one order.
+
+     Until the 2026-11-11 audit (task 23) this function spelled sixteen views
+     of its own after harness.cjs's seven-module loadInto. That was a third
+     declaration of the wiring order, and it had drifted twice: food was
+     registered last here and before the Dashboard in the app, and fx-live and
+     budget-export were not registered at all — so the reconciliation gate and
+     both golden ledgers, which all mount through here, ran on an app that had
+     no fxConvert, and the converted Accounts hero was outside the only test
+     that can catch two figures derived by different rules (task 8). A view
+     added to src/wiring.js is now in the gate by existing.
+
+     The formatter is on the ctx BEFORE the modules register, where it used to
+     go on between loadInto and the views: every module destructures off ctx at
+     register time, and in the app `money` is there before any of them. */
+  require('../../src/wiring').wire(ctx);
+  await ctx.loadVault();
+  /* controller.js asks for rates after every reload, so the mount does too.
+     With `exchange_rates` off — every fixture but the mixed-currency one —
+     this returns at once having read nothing. Switched on, it reads the
+     book's own Exchange Rates.md into memory, which is the only way a table
+     ever reaches fxConvert; a table that is due for a refresh would then try
+     the network, and harness.cjs's requestUrl stub throws on that, which
+     fx-fetch.js degrades to "keep the cached table". So nothing here can
+     reach the internet, and a fixture whose rates are dated on its own pinned
+     `today` never even tries. */
+  await ctx.refreshRates();
+  if (period) S.period = period;
   return { ctx, S, nodes, raws: recorder.seen, restore: recorder.restore };
 }
 

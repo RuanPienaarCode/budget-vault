@@ -27,6 +27,7 @@ const { budgetUsedShare, budgetSpent, assumedProvision } = require('./money-flow
 const { SET_ASIDE_TYPES, isPoolAccount } = require('./vocabulary');
 const { stamp, tally, LENSES, keeps } = require('./ledger');
 const { fileOutsideWindow, uncountedRows, summariseMisfiled } = require('./misfiled');
+const { makeRenderPass } = require('./render-pass');
 
 /* ADR-0007 · Pay cycle is a number of days. A word would need a dialect; absent
    or zero means the payday month; periodDaysOrZero bands it on load. */
@@ -42,6 +43,10 @@ const MONTH_KEY = /^(?:0[1-9]\d{2}|[1-9]\d{3})-(0[1-9]|1[0-2])$/;
 
 module.exports = function registerPeriod(ctx) {
   const { S } = ctx;
+
+  /* ADR-0007 · One stamped ledger per render pass. The pass itself — a snapshot
+     dropped when one synchronous render ends — is src/render-pass.js's. */
+  const renderPass = makeRenderPass();
 
   /* ADR-0007 · Anchor must be a real date. Only an ISO round-trip catches both
      2026-13-45 and a state built without the loader ('NaN-NaN-NaN'). */
@@ -198,7 +203,7 @@ module.exports = function registerPeriod(ctx) {
   function txInRange(start, end) {
     const out = [];
     for (const f of Object.values(S.txFiles)) {
-      if (f.month < start.slice(0, 7) || f.month > end.slice(0, 7)) continue;
+      if (fileOutsideWindow(f.month, start, end)) continue;
       for (const r of f.rows) if (r.date >= start && r.date <= end) out.push({ ...r, label: f.label, _file: f, _row: r });
     }
     out.sort((a, b) => a.date.localeCompare(b.date) || a.desc.localeCompare(b.desc));
@@ -550,7 +555,11 @@ module.exports = function registerPeriod(ctx) {
   }
   /* Every row in the window, stamped once. The one entry point a period
      figure should take. */
-  function ledger(start, end) { return stamp(txInRange(start, end), ledgerEnv()); }
+  /* ADR-0007 · One stamped ledger per render pass. Outside a pass (the headless
+     API, a handler) it stamps afresh; readers share the array and never write. */
+  function ledger(start, end) {
+    return renderPass.memo(`ledger|${start}|${end}`, () => stamp(txInRange(start, end), ledgerEnv()));
+  }
 
   /* ADR-0007 · Monthly income averages calendar months. For the Debt page's 36%
      threshold; scaling one period up breaks on a weekly cycle, and the payday
@@ -674,6 +683,10 @@ module.exports = function registerPeriod(ctx) {
     /* ADR-0006 Phase 2. The ledger and its lenses, for every consumer that
        needs a period figure the three named seams do not already hand back. */
     ledgerEnv, ledger, tally, LENSES,
+    /* The render pass. `figuresPass(fn)` runs fn inside one; `passMemo` keeps
+       a value for the length of it and for no longer; `renderPassState` is
+       the instance, for the guard test's recompute-on-every-hit hook. */
+    figuresPass: renderPass.run, passMemo: renderPass.memo, renderPassState: renderPass,
     /* The one reading of a budget row's type — views/dashboard.js's
        budgetVsActualRows reads it too, so the table, the hero and the Budget
        page cannot bucket one row three ways. */

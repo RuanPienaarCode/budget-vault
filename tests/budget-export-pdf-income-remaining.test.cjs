@@ -60,7 +60,6 @@ const xmlOf = bytes => Buffer.from(bytes).toString('utf8');
   const unpin = pinClock(TODAY);
   try {
     const M = await mountFor(FILES, { period: PERIOD, budgetFolder: B });
-    require('../src/views/budget-export')(M.ctx);
     const { ctx } = M;
     const money = v => readable(ctx.money(v));
     /* The Budget page's own function, read off the module — the words the

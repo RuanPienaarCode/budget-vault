@@ -38,7 +38,15 @@ If it can be pure, it is: no DOM, no `require('obsidian')`, `today` injected
 rather than read off the clock — so it runs in bare node under a guard test.
 Existing ones: `dates` `amount` `markdown` `csv` `debt-math` `loan-math`
 `savings-math` `owed-math` `reconcile` `recurring` `worth` `dedupe` `tx-role`
-`misfiled`.
+`misfiled` `render-pass`.
+
+**Nothing derived is kept across a moment the reader could have edited in.** A
+figure must move on an edit that never reloads (an unsaved row, an account
+pushed into `S.accounts`), so there is no "per load" cache of figures. The one
+snapshot is `src/render-pass.js`: alive for a single synchronous page render,
+dropped in `finally`. Memoise through `ctx.passMemo` or not at all, and only a
+value its readers do not write to — `tests/render-pass.test.cjs` recomputes on
+every hit to check.
 
 Views in `src/views/*.js` own the DOM and receive a shared `ctx`; they publish
 their own helpers back onto it with `ctx.provide({...})`.
@@ -70,7 +78,13 @@ more exotic than a household:
 ```
 npm run reconcile -- --obsidian-vault "<vault root>"   # writes a page, real data
 npm run reconcile:household                            # same, no private data
+npm run reconcile -- --household fx                    # same, exchange rates ON
 ```
+
+The third is `tests/figures/household-fx.cjs`: the first household with a fixed
+rate table, gated by `tests/reconcile-gate-fx.test.cjs`. It is the only fixture
+in which the converted Accounts hero exists, and it never reaches the network —
+the rates are a file in the fixture, and the gate fails if `requestUrl` is called.
 
 Never commit the output of the first: `tests/figures/live/` is gitignored
 because the page embeds real balances and rows.

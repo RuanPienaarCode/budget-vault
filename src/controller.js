@@ -19,32 +19,15 @@ const books = require('./books');
 const { renderBookSwitchers, settleBookSelect, pickBook } = require('./book-switcher');
 const drawer = require('./drawer');
 const { showToast } = require('./toast');
-const registerIo = require('./io');
-const registerFxLive = require('./fx-live');
-const registerPeriod = require('./period');
-const registerLoad = require('./load');
-const registerCategories = require('./categories');
-const registerTrendMath = require('./trend-math');
-const registerHealthData = require('./health-data');
-const registerFigures = require('./figures');
-const registerDashboard = require('./views/dashboard');
-const registerScore = require('./views/score');
-const registerTransactions = require('./views/transactions');
-const registerBudgets = require('./views/budgets');
-const registerBudgetExport = require('./views/budget-export');
-const registerPlan = require('./views/plan');
-const registerAccounts = require('./views/accounts');
-const registerSavings = require('./views/savings');
-const registerAssets = require('./views/assets');
-const registerDebts = require('./views/debts');
-const registerOwed = require('./views/owed');
-const registerServices = require('./views/services');
-const registerTax = require('./views/tax');
-const registerLoans = require('./views/loans');
-const registerImport = require('./views/import');
-const registerNotes = require('./views/notes');
-const registerFood = require('./views/food');
-const registerReport = require('./views/report');
+/* Every register(ctx) module, in the one order the app mounts them in. The
+   list used to be spelled in this file — twenty-six requires here and twenty-six
+   calls in mountApp — and again in two test helpers; src/wiring.js holds it
+   now (2026-11-11 audit, task 23) so the reconciliation gate mounts what this
+   file mounts. loadAll() evaluates them here, as those requires did: the list
+   itself is lazy for the test harness's sake, and the app should not start
+   evaluating its views at first mount because of that. */
+const { wire, loadAll } = require('./wiring');
+loadAll();
 
 /* The pure core of money formatting, pulled out of moneyIn() so it is
    testable without a live mount — see tests/controller-money.test.cjs.
@@ -731,57 +714,12 @@ function mountApp(view) {
   ctx.switchView = v => switchView(v);
   ctx.render = () => render();
 
-  /* Order is load-bearing: io before all (writeFile/readFile); period before
-     load/dashboard/transactions/budgets/import (currentPeriod, txInPeriod);
-     categories before transactions/budgets/import (lazyCatSelect); transactions
-     before import (serializeTxFile). Reordering these silently produces
-     "x is not a function" a whole screen away from the cause. */
-  registerIo(ctx);          // basePath, readFile, writeFile, mdFilesIn, …
-  registerPeriod(ctx);      // periodRange, currentPeriod, periodSummary, …
-  registerLoad(ctx);        // loadVault, txSegment
-  /* After load (it reads S.settings) and before every view that might print a
-     converted figure. Registering it does NOT touch the network — see its own
-     header; nothing happens at all until exchange_rates is switched on. */
-  registerFxLive(ctx);      // fxTable, refreshRates, fxConvert
-  registerCategories(ctx);  // catSelect, lazyCatSelect, promptCreateCategory
-  registerTrendMath(ctx);   // trendPeriods, historySpan, periodSpend, … (needs period)
-  // After trend-math, whose periodsForMonths it uses, and before the two views
-  // that read the snapshot it assembles.
-  /* figures BEFORE health-data, and the order is load-bearing. ISSUE 84 —
-     health-data.js reads periodFigures, and every module here destructures off
-     ctx at register time, so a provider registered afterwards binds undefined.
-     Safe in this direction: figures.js reads only period/load seams and nothing
-     health-data publishes. */
-  registerFigures(ctx);     // periodFigures, budgetVsActualRows, categorySpendRows, categoryGap (ADR-0006 Phase 3)
-  registerHealthData(ctx);  // healthSnapshot
-  /* Before the views, because five of them render its noteButton() chip — they
-     reach it through ctx at render time rather than by destructuring, so the
-     order is belt-and-braces rather than load-bearing. loadVault calls
-     ctx.loadNotes(), which is late-bound for the same reason. */
-  registerNotes(ctx);
-  /* After period (periodRange, currentPeriod, catType, dateText) and io;
-     loadVault calls ctx.loadReceipts, which load.js publishes itself. */
-  registerFood(ctx);
-  registerDashboard(ctx);
-  // After dashboard, whose budgetVsActualRows/categorySpendRows it reads —
-  // the report page's whole reason for existing is never re-deriving those.
-  registerReport(ctx);
-  registerScore(ctx);
-  registerTransactions(ctx);
-  registerBudgets(ctx);
-  // After figures (budgetVsActualRows) and trend-math (periodsForMonths,
-  // earliestDataMonth), which it destructures; budgetDirty it reads late.
-  registerBudgetExport(ctx);
-  registerPlan(ctx);
-  registerAccounts(ctx);
-  registerSavings(ctx);
-  registerAssets(ctx);
-  registerDebts(ctx);
-  registerOwed(ctx);
-  registerServices(ctx);
-  registerTax(ctx);
-  registerLoans(ctx);
-  registerImport(ctx);
+  /* Order is load-bearing, and declared once in src/wiring.js — with the
+     reason for each module's place beside it. Add a view THERE; a module
+     registered here by hand would be mounted in the app and missing from the
+     reconciliation gate, which is how fx-live and budget-export stayed outside
+     it until the 2026-11-11 audit. */
+  wire(ctx);
 
   /* ---------------------------- view switching --------------------------- */
   function switchView(v) {

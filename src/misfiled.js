@@ -45,11 +45,16 @@
 const { isRealIsoDate } = require('./dates');
 const { supersededBySplit } = require('./tx-role');
 
-/* The period walk's own veto, stated once for the detection: a month file is
-   not read for a window that does not touch its calendar month. The same
-   comparison txInRange and unreadableAmounts make inline; kept in step with
-   them by tests/misfiled-rows-disclosed.test.cjs, whose oracle is the real
-   txInPeriod and not this function. */
+/* The period walk's own veto, stated ONCE: a month file is not read for a
+   window that does not touch its calendar month. txInRange (period.js) and
+   unreadableAmounts (figures.js) call this, and so does the detection below —
+   so "which files a period reads" and "which rows no period reads" cannot
+   come apart. Until the 2026-11-11 audit (task 23) the two readers spelled
+   the comparison inline and this was a third copy, kept in step by a test;
+   the fast path it describes already lost one row class without a word
+   (task 5), and a fourth reader copying one of three spellings is how the
+   next would have gone. tests/misfiled-rows-disclosed.test.cjs still checks
+   it against the real txInPeriod. */
 function fileOutsideWindow(month, start, end) {
   return month < String(start).slice(0, 7) || month > String(end).slice(0, 7);
 }

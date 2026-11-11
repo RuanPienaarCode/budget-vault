@@ -266,28 +266,30 @@ function makeCtx(files = {}, { budgetFolder = 'Budget', settings = {} } = {}) {
    mountFor) must put its real DOM on the ctx BEFORE calling this (audit L2b-10,
    15 Oct 2026: the swap came after, and both golden ledgers had an empty notes
    section). */
+/* Which of the app's modules loadInto registers: the data layer and the one
+   view (notes, for the reason above) every page leans on. A SELECTION, not an
+   order — src/wiring.js holds the order, and wire() applies it whatever
+   sequence this array is written in. Two hundred suites register their own
+   views after loadInto, and ctx.provide throws on a second registration, so
+   this cannot simply be "everything"; a caller that wants the whole app the
+   way controller.js mounts it calls wire(ctx) with no selection
+   (tests/helpers/figures.cjs mountFor does).
+
+   Until the 2026-11-11 audit (task 23) this function spelled the sequence
+   itself and called the result "a SECOND declaration of the app's wiring
+   order — when controller.js's moves, this moves with it". It had not moved
+   with it: load was registered here after health-data, and third in the app. */
+const DATA_LAYER = ['io', 'period', 'load', 'trend-math', 'figures', 'health-data', 'notes'];
+
 async function loadInto(ctx) {
-  require('../../src/io')(ctx);
-  require('../../src/period')(ctx);
-  // After period (whose helpers it destructures at register time), before the
-  // views — the same slot controller.js gives it. The dashboard's trend chart
-  // and comparison column read these off ctx.
-  require('../../src/trend-math')(ctx);
-  /* After trend-math (whose periodsForMonths it uses) and before the views:
-     the Dashboard's health card and the Score page both read healthSnapshot off
-     ctx, so a harness without it renders neither — and the card's own guard
-     would swallow the reason. */
-  /* Same order as controller.js, and for the reason recorded there: every
-     module destructures off ctx at register time, so figures must publish
-     periodFigures before health-data reads it (ISSUE 84). This list is a
-     SECOND declaration of the app's wiring order — when controller.js's moves,
-     this moves with it. */
-  require('../../src/figures')(ctx);
-  require('../../src/health-data')(ctx);
-  require('../../src/load')(ctx);
-  require('../../src/views/notes')(ctx);
+  /* Required here rather than at the top of the file: stubObsidian() has to
+     have run before any src/ module is loaded, and tests/helpers/figures.cjs
+     purges the src module cache before each mount (so its money recorder wraps
+     a fresh currency.js) — a binding captured at the top would hold the
+     modules from before the purge. */
+  require('../../src/wiring').wire(ctx, DATA_LAYER);
   await ctx.loadVault();
   return ctx.S;
 }
 
-module.exports = { stubObsidian, makeVault, makeCtx, loadInto, bookSeam, TFile, TFolder };
+module.exports = { stubObsidian, makeVault, makeCtx, loadInto, DATA_LAYER, bookSeam, TFile, TFolder };

@@ -140,16 +140,22 @@ function provenFalse(desc, exactShape, mangled) {
   ok(live.savings.includes(TR_CALL_SAV), 'Growth: savings.js computes each account\'s return through the shared totalReturn()');
   ok(live.savingsMath.includes('growth += r.growth'), 'Growth: savings-math.js\'s growthTotals() sums growth off totalReturn()\'s own .growth field — the ONE place this sum happens now');
   ok(!live.savings.includes('growth += r.growth'), 'Growth: savings.js no longer sums growth itself — it calls growthTotals() instead (M4)');
-  /* The POOL is narrowed at this call site — `entries.filter(homeEntry)` —
-     and the gate matches on the shared function plus its shared argument
-     shape rather than on a literal `entries`. The narrowing is the issue-#28
-     fix reaching this page: growthTotals sums `growth` and `capitalIn` and
-     the tile divides one by the other, so a pool spanning two currencies
-     produced "+11,2% on Rp 903 000 put in" — a percentage of a quantity that
-     does not exist. What this gate protects is that savings.js calls the
-     SHARED function rather than re-deriving the sum, and that is unchanged. */
-  ok(/growthTotals\(entries(\.filter\(homeEntry\))?, poolType, \{ today: todayIso\(\) \}\)/.test(live.savings),
-    'Growth: savings.js\'s own growth tile calls the shared growthTotals()');
+  /* The POOL is narrowed before it is summed, and the gate matches on the
+     shared function plus its shared argument shape. The narrowing is the
+     issue-#28 fix reaching this page: growthTotals sums `growth` and
+     `capitalIn` and the tile divides one by the other, so a pool spanning two
+     currencies produced "+11,2% on Rp 903 000 put in" — a percentage of a
+     quantity that does not exist. What this gate protects is that savings.js
+     calls the SHARED function rather than re-deriving the sum. Since the
+     2026-11-11 audit (task 23) the tile reaches it through savings-math.js
+     growthTileFigures, which narrows the pool and calls growthTotals over it
+     — so the pin follows the call there (tests/view-maths-moved.test.cjs
+     compares it with the arithmetic that used to be spelled here). */
+  ok(/growthTileFigures\(entries, poolType, \{ today: todayIso\(\), currency: S\.settings\.currency \}\)/.test(live.savings),
+    'Growth: savings.js\'s own growth tile reads its pool from the shared growthTileFigures()');
+  ok(/const home = entries\.filter\(e => isHomeEntry\(e, currency\)\);/.test(live.savingsMath)
+    && /totals: growthTotals\(home, typeOf, \{ today \}\)/.test(live.savingsMath),
+    'Growth: which calls the shared growthTotals() over the home-currency pool');
   ok(live.savings.includes('entries.filter(homeEntry)'),
     'Growth: and it pools ONE currency — a rate whose numerator and denominator are in different currencies is not a rate');
   /* The POOL is narrowed at this call site too, with the SAME predicate name

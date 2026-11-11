@@ -7,7 +7,7 @@ const { typeOrder, typeRank } = require('../groups');
 /* Namespace import: this file binds `t` as a local (`const t = $('#dashBudget')`). */
 const i18n = require('../i18n');
 const { stalenessSummary, isStale } = require('../reconcile');
-const { whatsLeft, isSettleCard } = require('../committed');
+const { whatsLeft, printedChain, isSettleCard } = require('../committed');
 const { scoreBand, pillarRows, scoreScale } = require('../health-math');
 const { gapSentence, yearsNumber } = require('../health-copy');
 const { decimalText } = require('../locale');
@@ -985,7 +985,6 @@ module.exports = function registerDashboard(ctx) {
        A card NOT settled monthly stays here: a revolving balance genuinely is a
        claim, and `cycle` is null for it. So the fourth term appears exactly when
        the subtraction is true. */
-    const showCardTerm = L.cardDue > 0 && !L.cycle;
     /* The strip prints a literal equation with a rendered '−' and '=' between
        the terms, so it has to actually BALANCE at whatever precision it is
        printed at. Each of the four money(…, 0) calls used to round its own
@@ -999,9 +998,6 @@ module.exports = function registerDashboard(ctx) {
        `committedOther` there) — so the printed equation is exact by
        construction rather than four independent roundings that usually, but
        not always, happen to agree. */
-    const dCash = L.cashKnown ? Math.round(L.cash) : null;
-    const dCommitted = Math.round(L.committedOther);
-    const dCard = showCardTerm ? Math.round(L.cardDue) : 0;
     /* ISSUE 48. A TERM in the strip, not a subtraction hidden inside `free`.
 
        This chain is the one place on the page whose arithmetic has to survive
@@ -1011,9 +1007,10 @@ module.exports = function registerDashboard(ctx) {
        would have seen R41 800 − R500 = R18 300 and been right to distrust the
        card. Shown only when there IS one, so a household with no declared
        funds sees the same three-term strip it always did. */
-    const showEarmark = (L.earmarked || 0) >= 1;
-    const dEarmarked = showEarmark ? Math.round(L.earmarked) : 0;
-    const dFree = dCash === null ? null : dCash - dEarmarked - dCommitted - dCard;
+    /* The three rules above are committed.js printedChain's: which terms the
+       strip shows, each rounded once, and the result derived from the rounded
+       terms. Pure, so tests/printed-chain.test.cjs can reach the trade-off. */
+    const { showCardTerm, showEarmark, cash: dCash, earmarked: dEarmarked, committed: dCommitted, card: dCard, free: dFree } = printedChain(L);
     const op = () => el('div', { class: 'left-op', 'aria-hidden': 'true' }, '−');
     /* ISSUE 48. The strip can now hold three, four or five terms — cash, an
        optional earmark, committed, an optional card settlement, free — so the

@@ -72,7 +72,6 @@ const val = c => (c && typeof c === 'object' ? c.v : c);
   const unpin = pinClock(TODAY);
   try {
     const M = await mountFor(files, { period: PERIOD, budgetFolder: B });
-    require('../src/views/budget-export')(M.ctx);
     const { ctx } = M;
     const { model } = await ctx.runBudgetExport(ANSWER);
 
