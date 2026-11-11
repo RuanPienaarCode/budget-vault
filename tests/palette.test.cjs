@@ -355,31 +355,97 @@ function norm(v) {
       eq(only(sel, 'background-color'), 'var(--surface)', `"${sel}" is filled with --surface, which the edge is flattened onto`);
     }
 
-    /* Anything else that sets a border colour on these classes. Focus is
-       expected: it swaps the edge for the primary and adds the ring.
+    /* THE SWEEP: every other rule under the root that draws an edge on a field,
+       measured the same way — whether it names one of the three classes or
+       reaches a field as a bare `input`, `select` or `textarea`, and whichever
+       selectors it happens to share its declaration with. The base rules above
+       are only where a field's edge STARTS; a later rule on a page can repaint
+       it, and the first draft of this gate matched on the class alone and so
+       saw one selector of a four-selector rule (a review caught it: the
+       Transactions search box and the Note field on every row are
+       `.form-control` in the markup and `#txSearch` / `td input` in the CSS).
 
-       One entry is NOT expected, and is listed rather than hidden.
-       src/statement/transactions.css gives the Transactions filter selects a
-       "firmer edge" of --text-primary at 30%, written when a field's edge was
-       the hairline and 30% was the firmer of the two. It out-ranks the base
-       rule wherever color-mix() parses, so on that page the selects keep an
-       edge that measures 1.96:1 on vault-green light: firmer than the old
-       hairline, under 3:1, and now WEAKER than every other field in the app.
-       That file belonged to another lane in the audit-fix round this gate was
-       written in, so the rule is recorded here instead of edited. The entry
-       cannot rot — it fails when the rule is gone, and a new override anywhere
-       fails for not being listed. */
-    const KNOWN_OVERRIDES = [
-      '.budget-app-root #view-transactions .tx-filters .form-select-sm:not(:focus) { border-color }',
+       Only rules scoped under .budget-app-root: the dialogs mounted on
+       document.body are Obsidian's furniture and follow Obsidian's theme, on
+       purpose (tests/css-host-cascade.test.cjs says the same of its check 1).
+
+       A rule that draws no edge (`border: 0`, the checkbox reset, the book
+       switcher's select inside its pill) has nothing to measure and is skipped.
+       Everything else must clear 3:1 on every palette, or be listed below. */
+    const FIELD_CLASSES = ['form-control', 'form-control-sm', 'form-select', 'form-select-sm', 'category-select'];
+    const isField = sel => /^\.budget-app-root\b/.test(sel)
+      && (FIELD_CLASSES.some(c => hasClass(sel, c)) || /(^|[\s>+~])(input|select|textarea)(?![\w-])/.test(sel));
+    const EDGE = /^border(-(top|right|bottom|left|block|inline)(-(start|end))?)?(-color)?$/;
+    /* The colour a border declaration paints, as something over() can flatten:
+       null when it paints nothing. Reads the three spellings the sheet uses —
+       a token, a literal, and color-mix(<token> N%, transparent), which is that
+       token at alpha N. Anything else stops the gate rather than being guessed. */
+    const edgeColour = (value, t) => {
+      const v = value.trim();
+      if (/^(0|none|transparent)$/.test(v) || /^0(px)?\s/.test(v)) return null;
+      const c = v.replace(/^[\d.]+px\s+(solid|dashed|dotted)\s+/, '');
+      const mix = /^color-mix\(in srgb,\s*var\((--[a-z0-9-]+)\)\s+([\d.]+)%,\s*transparent\)$/.exec(c);
+      if (mix) {
+        const [r, g, b] = norm(resolve(`var(${mix[1]})`, t));
+        return `rgba(${r},${g},${b},${Number(mix[2]) / 100})`;
+      }
+      const flat = resolve(c, t);
+      ok(Array.isArray(norm(flat)), `the gate can read this edge colour: "${value}"`);
+      return flat;
+    };
+
+    /* STILL UNDER 3:1, and not this gate's to fix. Both rules belonged to
+       other lanes in the audit-fix round this gate was written in (2026-11-11),
+       so they are recorded here — with what they measure on vault-green light,
+       against the field's own fill — instead of edited or left unseen:
+
+         - The Transactions page's "firmer edge": --text-primary at 30%, written
+           when a field's edge was the hairline and 30% was the firmer of the
+           two. It carries an id, so nothing in the base rules can out-rank it,
+           and wherever color-mix() parses it holds the filter selects, the
+           search box and the Note field on every row at 1.96:1 — firmer than
+           the old hairline, under 3:1, and now WEAKER than every other field
+           in the app. (Its .btn-ghost selector is a button, not a field; it
+           rides along because it shares the declaration.)
+         - The Accounts search box, which is not a .form-control and still
+           draws the --border-color hairline: 1.20:1.
+
+       An entry cannot rot. It fails when its rule is gone or renamed, and it
+       fails when its rule is brought up to 3:1 — either way the fix is to
+       delete the entry — and a rule that is under 3:1 and NOT listed fails
+       for that. */
+    const STILL_FAILING = [
+      '.budget-app-root #view-transactions .tx-filters .form-select-sm:not(:focus), '
+        + '.budget-app-root #view-transactions .tx-filters #txSearch:not(:focus), '
+        + '.budget-app-root #view-transactions .tx-actions .btn-ghost:not(:hover), '
+        + '.budget-app-root #view-transactions .table tbody td:nth-child(7) input:not(:focus)',
+      '.budget-app-root .acct-search input',
     ];
-    const isFocus = s => /:focus/.test(s.replace(/:not\([^)]*\)/g, ''));
-    const base = new Set(CONTROLS.map(s => `${s} { border }`));
-    const overrides = touching(
-      ['form-control', 'form-control-sm', 'form-select', 'form-select-sm', 'category-select'],
-      /^border(-(top|right|bottom|left|block|inline)(-(start|end))?)?(-color)?$/,
-    ).filter(x => !base.has(x) && !isFocus(x.slice(0, x.indexOf(' {'))));
-    eq(overrides, KNOWN_OVERRIDES,
-      'the only rules repainting a form control\'s edge are the ones this gate knows about — measure a new one here, or delete a stale entry');
+    const swept = new Map();
+    for (const r of rules) {
+      if (!r.selectors.some(isField)) continue;
+      for (const d of r.decls.filter(x => EDGE.test(x.prop))) {
+        let worst = Infinity;
+        each((p, mode, t) => {
+          const colour = edgeColour(d.value, t);
+          if (colour === null) return;
+          const edge = over(colour, p[mode].surface);
+          worst = Math.min(worst, contrast(edge, p[mode].surface), contrast(edge, p[mode].bodyBg));
+        });
+        if (worst === Infinity) continue;   // draws no edge
+        const key = r.selectors.join(', ');
+        if (!swept.has(key) || worst < swept.get(key).worst) swept.set(key, { worst, at: where(r) });
+      }
+    }
+    ok(swept.size >= CONTROLS.length, 'the sweep found the field rules it exists to measure');
+    for (const [key, { worst, at }] of swept) {
+      if (STILL_FAILING.includes(key)) {
+        ok(worst < NON_TEXT, `${at}: "${key}" now clears ${NON_TEXT}:1 (worst ${worst.toFixed(2)}:1) — delete its STILL_FAILING entry`);
+      } else {
+        ok(worst >= NON_TEXT, `${at}: "${key}" draws a field's edge at ${worst.toFixed(2)}:1 on its worst palette, below ${NON_TEXT}:1`);
+      }
+    }
+    for (const key of STILL_FAILING) ok(swept.has(key), `STILL_FAILING lists a rule that no longer exists — delete the entry: "${key}"`);
 
     each((p, mode, t) => {
       const s = p[mode];
