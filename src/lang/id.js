@@ -1438,6 +1438,19 @@ module.exports = {
   /* --- Debt page: "Interest this month" says what it covers, because a debt
      with a blank rate is unknown rather than zero (the why is in en.js) --- */
   'owed.repaid.chip': '{amount} kembali',
+
+  /* Accessible names (audit of 11 Nov 2026, task 19) — machine-assisted, not native-reviewed. */
+  'owed.aria.statusPaid': '{person}: Lunas — klik untuk mengubah',
+  'owed.aria.statusLeft': '{person}: sisa {amount} — klik untuk mengubah',
+  'owed.aria.statusOutstanding': '{person}: Belum lunas — klik untuk mengubah',
+  'owed.aria.description': 'Keterangan untuk {person}',
+  'owed.aria.amount': 'Jumlah untuk {person}',
+  'owed.aria.lent': 'Tanggal meminjamkan kepada {person}',
+  'owed.aria.due': 'Tanggal jatuh tempo untuk {person}',
+  'owed.aria.repay': 'Catat pengembalian dari {person}',
+  'owed.aria.repayTip': 'Catat uang yang sudah kembali',
+  'owed.aria.remove': 'Hapus {person}',
+
   'debt.interest.noRates': 'tambahkan suku bunga pada salah satu utang untuk melihat ini',
   'debt.interest.partial': {
     other: 'mencakup {shown} dari {total} utang · {missing} tanpa suku bunga',
@@ -1447,8 +1460,37 @@ module.exports = {
   'debt.curve.aria.owed': '{plan}: masih terutang {amount} pada {month}.',
 
   /* Accessible names (audit of 11 Nov 2026, task 19) — machine-assisted, not native-reviewed. */
+  'debt.aria.reviewCards': 'Tinjau rekening kartu kredit di halaman Rekening',
+  'debt.aria.statusSettled': '{name}: Lunas — klik untuk mengubah',
+  'debt.aria.statusActive': '{name}: Aktif — klik untuk mengubah',
+  'debt.aria.balance': 'Saldo terutang pada {name}',
+  'debt.aria.rate': 'Suku bunga tahunan {name}',
+  'debt.aria.payment': 'Cicilan bulanan {name}',
+  'debt.aria.extra': 'Tambahan yang dibayar tiap bulan untuk {name}',
+  'debt.aria.category': 'Kategori anggaran untuk {name}',
+  'debt.aria.remove': 'Hapus {name}',
   'debt.aria.strategy': 'Metode pelunasan',
   'debt.aria.range': 'Rentang grafik pelunasan',
+
+  /* Accessible names on the pages still written in English (audit of 11 Nov 2026, task 19) — machine-assisted, not native-reviewed. */
+  'sav.aria.reviewAssets': 'Tinjau penilaian aset di halaman Aset',
+  'sav.aria.goalAccounts': 'Buka halaman Rekening untuk menetapkan target tabungan',
+  'sav.aria.addAccounts': 'Buka halaman Rekening untuk menambah rekening tabungan atau investasi',
+  'sav.aria.row': '{name}, {amount}. Tampilkan tindakan rekening.',
+  'sav.aria.balance': 'Perbarui saldo {name}, saat ini {amount}',
+  'sav.aria.addStart': 'Tambahkan jumlah awal dan tanggal pembukaan untuk {name}',
+  'sav.aria.barGrowth': '{putIn} disetor · {earned} hasil',
+  'sav.aria.barLoss': 'sisa {left} dari {putIn} yang disetor',
+  'sav.aria.growth.capital': 'Pembentuk saldo {closing} ini: {capital} disetor. Dari {from} sampai {to}.',
+  'sav.aria.growth.posted': 'Pembentuk saldo {closing} ini: {capital} disetor, {posted} pertumbuhan yang tercatat. Dari {from} sampai {to}.',
+  'sav.aria.growth.undated': 'Pembentuk saldo {closing} ini: {capital} disetor, dan {undated} pertumbuhan tanpa tanggal. Dari {from} sampai {to}.',
+  'sav.aria.growth.both': 'Pembentuk saldo {closing} ini: {capital} disetor, {posted} pertumbuhan yang tercatat, dan {undated} pertumbuhan tanpa tanggal. Dari {from} sampai {to}.',
+  'sav.aria.worth': 'Kekayaan bersih {net}: aset {assets} berbanding utang {debts}',
+  'sav.aria.worth.owned': 'Kekayaan bersih {net}: aset {assets} berbanding utang {debts}. Dimiliki: {owned}',
+  'sav.aria.worth.owed': 'Kekayaan bersih {net}: aset {assets} berbanding utang {debts}. Terutang: {owed}',
+  'sav.aria.worth.both': 'Kekayaan bersih {net}: aset {assets} berbanding utang {debts}. Dimiliki: {owned}. Terutang: {owed}',
+  'sav.aria.share.own': '{label}, {amount}, {share}% dari yang Anda miliki. Buka {page}.',
+  'sav.aria.share.owe': '{label}, {amount}, {share}% dari utang Anda. Buka {page}.',
 
   'tax.aria.year': 'Tahun pajak',
 

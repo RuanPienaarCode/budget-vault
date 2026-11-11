@@ -1700,6 +1700,20 @@ module.exports = {
      come back. Its tap reveals the whole sum (lent, back, outstanding). */
   'owed.repaid.chip': '{amount} back',
 
+  /* The Owed money table's control names. The status pill is one sentence per
+     state rather than a status word dropped into a frame: "paid", "{amount}
+     left" and "outstanding" do not take the same grammar in most languages. */
+  'owed.aria.statusPaid': '{person}: Paid — click to change',
+  'owed.aria.statusLeft': '{person}: {amount} left — click to change',
+  'owed.aria.statusOutstanding': '{person}: Outstanding — click to change',
+  'owed.aria.description': 'Description for {person}',
+  'owed.aria.amount': 'Amount for {person}',
+  'owed.aria.lent': 'Date lent to {person}',
+  'owed.aria.due': 'Due date for {person}',
+  'owed.aria.repay': 'Record a repayment from {person}',
+  'owed.aria.repayTip': 'Record money that came back',
+  'owed.aria.remove': 'Remove {person}',
+
   /* ------------------------------- Debt page ------------------------------
      "Interest this month" on the Debt page. Both strings exist because a debt
      with a BLANK rate is unknown, not zero: summing only the debts that state
@@ -1733,8 +1747,56 @@ module.exports = {
   /* The Debt table's control names, the two selects above the payoff chart
      (shell.js, through data-i18n-aria), and the button on the card-overlap
      caveat. As on Owed money, the status pill is a sentence per state. */
+  'debt.aria.reviewCards': 'Review credit-card accounts on the Accounts page',
+  'debt.aria.statusSettled': '{name}: Settled — click to change',
+  'debt.aria.statusActive': '{name}: Active — click to change',
+  'debt.aria.balance': 'Balance owed on {name}',
+  'debt.aria.rate': 'Annual interest rate on {name}',
+  'debt.aria.payment': 'Monthly payment on {name}',
+  'debt.aria.extra': 'Extra paid each month on {name}',
+  'debt.aria.category': 'Budget category for {name}',
+  'debt.aria.remove': 'Remove {name}',
   'debt.aria.strategy': 'Payoff method',
   'debt.aria.range': 'Payoff chart range',
+
+  /* ------------- accessible names on pages still written in English -------------
+     Savings, Services, Tax, Food, Notes and the loan calculators have not had
+     their translation pass: their headings, table text and buttons are English
+     in every language, on purpose, until each page is done as a whole (the
+     ratchets are EXPECTED_ENGLISH_ONLY in tests/i18n-render.test.cjs and
+     invariant 9 of tests/i18n.test.cjs). What follows is NOT that pass. It is
+     the part of those pages that is only ever spoken: the aria-label on a
+     field with no visible label, the name of a chart, the hover title of an
+     icon button. A sighted reader on a half-English page can see which half
+     is which; a name that is only heard arrives with no such context, so it is
+     keyed on every page (audit of 11 Nov 2026, task 19;
+     tests/accessible-names-keyed.test.cjs keeps it that way).
+
+     Every key here has `.aria.` in it. That is how invariant 9 tells a page
+     whose names are keyed from a page that has been translated — keep to it.
+
+     Savings. `sav.aria.growth.*` and `sav.aria.worth*` are the whole of what a
+     screen reader gets from the two charts (both are role="img"), one complete
+     sentence per combination of what there is to say. `{page}` in share.* is
+     the page's name as the drawer prints it (nav.*). */
+  'sav.aria.reviewAssets': 'Review asset valuations on the Assets page',
+  'sav.aria.goalAccounts': 'Go to the Accounts page to set a savings goal',
+  'sav.aria.addAccounts': 'Go to the Accounts page to add a savings or investment account',
+  'sav.aria.row': '{name}, {amount}. Show account actions.',
+  'sav.aria.balance': 'Update the balance of {name}, currently {amount}',
+  'sav.aria.addStart': 'Add a starting amount and opening date for {name}',
+  'sav.aria.barGrowth': '{putIn} put in · {earned} earned',
+  'sav.aria.barLoss': '{left} left of {putIn} put in',
+  'sav.aria.growth.capital': 'What built this balance of {closing}: {capital} put in. From {from} to {to}.',
+  'sav.aria.growth.posted': 'What built this balance of {closing}: {capital} put in, {posted} of recorded growth. From {from} to {to}.',
+  'sav.aria.growth.undated': 'What built this balance of {closing}: {capital} put in, and {undated} of growth carrying no date. From {from} to {to}.',
+  'sav.aria.growth.both': 'What built this balance of {closing}: {capital} put in, {posted} of recorded growth, and {undated} of growth carrying no date. From {from} to {to}.',
+  'sav.aria.worth': 'Net worth {net}: assets {assets} against debts {debts}',
+  'sav.aria.worth.owned': 'Net worth {net}: assets {assets} against debts {debts}. Owned: {owned}',
+  'sav.aria.worth.owed': 'Net worth {net}: assets {assets} against debts {debts}. Owed: {owed}',
+  'sav.aria.worth.both': 'Net worth {net}: assets {assets} against debts {debts}. Owned: {owned}. Owed: {owed}',
+  'sav.aria.share.own': '{label}, {amount}, {share}% of what you own. Open {page}.',
+  'sav.aria.share.owe': '{label}, {amount}, {share}% of what you owe. Open {page}.',
 
   /* Tax. A status pill is a sentence per status (`step.*`, `doc.*` — the last
      segment is the stored status, with "n/a" spelled "na"). `{label}` in

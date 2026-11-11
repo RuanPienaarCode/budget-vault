@@ -1504,6 +1504,19 @@ module.exports = {
   /* --- Debt page: "Interest this month" says what it covers, because a debt
      with a blank rate is unknown rather than zero (the why is in en.js) --- */
   'owed.repaid.chip': '{amount} devolvido',
+
+  /* Accessible names (audit of 11 Nov 2026, task 19) — machine-assisted, not native-reviewed. */
+  'owed.aria.statusPaid': '{person}: Pago — clique para alterar',
+  'owed.aria.statusLeft': '{person}: restam {amount} — clique para alterar',
+  'owed.aria.statusOutstanding': '{person}: Em aberto — clique para alterar',
+  'owed.aria.description': 'Descrição de {person}',
+  'owed.aria.amount': 'Valor de {person}',
+  'owed.aria.lent': 'Data do empréstimo a {person}',
+  'owed.aria.due': 'Data de vencimento de {person}',
+  'owed.aria.repay': 'Registrar uma devolução de {person}',
+  'owed.aria.repayTip': 'Registrar dinheiro que voltou',
+  'owed.aria.remove': 'Remover {person}',
+
   'debt.interest.noRates': 'adicione uma taxa a alguma dívida para ver isto',
   'debt.interest.partial': {
     one: 'cobre {shown} de {total} dívidas · {missing} não tem taxa',
@@ -1514,8 +1527,37 @@ module.exports = {
   'debt.curve.aria.owed': '{plan}: ainda {amount} em dívida em {month}.',
 
   /* Accessible names (audit of 11 Nov 2026, task 19) — machine-assisted, not native-reviewed. */
+  'debt.aria.reviewCards': 'Revisar as contas de cartão de crédito na página Contas',
+  'debt.aria.statusSettled': '{name}: Quitada — clique para alterar',
+  'debt.aria.statusActive': '{name}: Ativa — clique para alterar',
+  'debt.aria.balance': 'Saldo devedor de {name}',
+  'debt.aria.rate': 'Taxa de juros anual de {name}',
+  'debt.aria.payment': 'Parcela mensal de {name}',
+  'debt.aria.extra': 'Valor extra pago por mês em {name}',
+  'debt.aria.category': 'Categoria do orçamento para {name}',
+  'debt.aria.remove': 'Remover {name}',
   'debt.aria.strategy': 'Método de quitação',
   'debt.aria.range': 'Intervalo do gráfico de quitação',
+
+  /* Accessible names on the pages still written in English (audit of 11 Nov 2026, task 19) — machine-assisted, not native-reviewed. */
+  'sav.aria.reviewAssets': 'Revisar as avaliações dos bens na página Bens',
+  'sav.aria.goalAccounts': 'Ir à página Contas para definir uma meta de poupança',
+  'sav.aria.addAccounts': 'Ir à página Contas para adicionar uma conta de poupança ou de investimento',
+  'sav.aria.row': '{name}, {amount}. Mostrar as ações da conta.',
+  'sav.aria.balance': 'Atualizar o saldo de {name}, atualmente {amount}',
+  'sav.aria.addStart': 'Adicionar um valor inicial e uma data de abertura para {name}',
+  'sav.aria.barGrowth': '{putIn} aportado · {earned} de rendimento',
+  'sav.aria.barLoss': 'restam {left} de {putIn} aportado',
+  'sav.aria.growth.capital': 'Do que é feito este saldo de {closing}: {capital} aportado. De {from} a {to}.',
+  'sav.aria.growth.posted': 'Do que é feito este saldo de {closing}: {capital} aportado, {posted} de rendimento registrado. De {from} a {to}.',
+  'sav.aria.growth.undated': 'Do que é feito este saldo de {closing}: {capital} aportado e {undated} de rendimento sem data. De {from} a {to}.',
+  'sav.aria.growth.both': 'Do que é feito este saldo de {closing}: {capital} aportado, {posted} de rendimento registrado e {undated} de rendimento sem data. De {from} a {to}.',
+  'sav.aria.worth': 'Patrimônio líquido {net}: bens {assets} contra dívidas {debts}',
+  'sav.aria.worth.owned': 'Patrimônio líquido {net}: bens {assets} contra dívidas {debts}. O que você tem: {owned}',
+  'sav.aria.worth.owed': 'Patrimônio líquido {net}: bens {assets} contra dívidas {debts}. O que você deve: {owed}',
+  'sav.aria.worth.both': 'Patrimônio líquido {net}: bens {assets} contra dívidas {debts}. O que você tem: {owned}. O que você deve: {owed}',
+  'sav.aria.share.own': '{label}, {amount}, {share}% do que você tem. Abrir {page}.',
+  'sav.aria.share.owe': '{label}, {amount}, {share}% do que você deve. Abrir {page}.',
 
   'tax.aria.year': 'Ano fiscal',
 

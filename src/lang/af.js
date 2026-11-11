@@ -1483,6 +1483,19 @@ module.exports = {
   /* --- Debt page: "Interest this month" says what it covers, because a debt
      with a blank rate is unknown rather than zero (the why is in en.js) --- */
   'owed.repaid.chip': '{amount} terug',
+
+  /* Accessible names (audit of 11 Nov 2026, task 19) — machine-assisted, not native-reviewed. */
+  'owed.aria.statusPaid': '{person}: Betaal — klik om te verander',
+  'owed.aria.statusLeft': '{person}: {amount} oor — klik om te verander',
+  'owed.aria.statusOutstanding': '{person}: Uitstaande — klik om te verander',
+  'owed.aria.description': 'Beskrywing vir {person}',
+  'owed.aria.amount': 'Bedrag vir {person}',
+  'owed.aria.lent': 'Datum waarop aan {person} geleen is',
+  'owed.aria.due': 'Vervaldatum vir {person}',
+  'owed.aria.repay': "Teken 'n terugbetaling van {person} aan",
+  'owed.aria.repayTip': 'Teken geld aan wat teruggekom het',
+  'owed.aria.remove': 'Verwyder {person}',
+
   'debt.interest.noRates': 'voeg \'n koers by enige skuld om dit te sien',
   'debt.interest.partial': {
     one: 'dek {shown} van {total} skulde · {missing} sonder koers',
@@ -1493,8 +1506,37 @@ module.exports = {
   'debt.curve.aria.owed': '{plan}: {amount} steeds verskuldig in {month}.',
 
   /* Accessible names (audit of 11 Nov 2026, task 19) — machine-assisted, not native-reviewed. */
+  'debt.aria.reviewCards': 'Gaan kredietkaartrekeninge op die Rekeninge-bladsy na',
+  'debt.aria.statusSettled': '{name}: Vereffen — klik om te verander',
+  'debt.aria.statusActive': '{name}: Aktief — klik om te verander',
+  'debt.aria.balance': 'Saldo verskuldig op {name}',
+  'debt.aria.rate': 'Jaarlikse rentekoers op {name}',
+  'debt.aria.payment': 'Maandelikse paaiement op {name}',
+  'debt.aria.extra': 'Ekstra wat elke maand op {name} betaal word',
+  'debt.aria.category': 'Begrotingskategorie vir {name}',
+  'debt.aria.remove': 'Verwyder {name}',
   'debt.aria.strategy': 'Afbetalingsmetode',
   'debt.aria.range': 'Reeks vir die afbetalingsgrafiek',
+
+  /* Accessible names on the pages still written in English (audit of 11 Nov 2026, task 19) — machine-assisted, not native-reviewed. */
+  'sav.aria.reviewAssets': 'Gaan batewaardasies op die Bates-bladsy na',
+  'sav.aria.goalAccounts': "Gaan na die Rekeninge-bladsy om 'n spaardoelwit te stel",
+  'sav.aria.addAccounts': "Gaan na die Rekeninge-bladsy om 'n spaar- of beleggingsrekening by te voeg",
+  'sav.aria.row': '{name}, {amount}. Wys rekeningaksies.',
+  'sav.aria.balance': 'Werk die saldo van {name} by, tans {amount}',
+  'sav.aria.addStart': "Voeg 'n beginbedrag en begindatum vir {name} by",
+  'sav.aria.barGrowth': '{putIn} ingesit · {earned} verdien',
+  'sav.aria.barLoss': '{left} oor van {putIn} ingesit',
+  'sav.aria.growth.capital': 'Waaruit hierdie saldo van {closing} bestaan: {capital} ingesit. Van {from} tot {to}.',
+  'sav.aria.growth.posted': 'Waaruit hierdie saldo van {closing} bestaan: {capital} ingesit, {posted} aangetekende groei. Van {from} tot {to}.',
+  'sav.aria.growth.undated': 'Waaruit hierdie saldo van {closing} bestaan: {capital} ingesit, en {undated} groei sonder datum. Van {from} tot {to}.',
+  'sav.aria.growth.both': 'Waaruit hierdie saldo van {closing} bestaan: {capital} ingesit, {posted} aangetekende groei, en {undated} groei sonder datum. Van {from} tot {to}.',
+  'sav.aria.worth': 'Netto waarde {net}: bates {assets} teenoor skuld {debts}',
+  'sav.aria.worth.owned': 'Netto waarde {net}: bates {assets} teenoor skuld {debts}. Besit: {owned}',
+  'sav.aria.worth.owed': 'Netto waarde {net}: bates {assets} teenoor skuld {debts}. Verskuldig: {owed}',
+  'sav.aria.worth.both': 'Netto waarde {net}: bates {assets} teenoor skuld {debts}. Besit: {owned}. Verskuldig: {owed}',
+  'sav.aria.share.own': '{label}, {amount}, {share}% van wat jy besit. Maak {page} oop.',
+  'sav.aria.share.owe': '{label}, {amount}, {share}% van wat jy skuld. Maak {page} oop.',
 
   'tax.aria.year': 'Belastingjaar',
 

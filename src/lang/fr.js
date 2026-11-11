@@ -1497,6 +1497,19 @@ module.exports = {
   /* --- Debt page: "Interest this month" says what it covers, because a debt
      with a blank rate is unknown rather than zero (the why is in en.js) --- */
   'owed.repaid.chip': '{amount} remboursé',
+
+  /* Accessible names (audit of 11 Nov 2026, task 19) — machine-assisted, not native-reviewed. */
+  'owed.aria.statusPaid': '{person} : Payé — cliquez pour modifier',
+  'owed.aria.statusLeft': '{person} : reste {amount} — cliquez pour modifier',
+  'owed.aria.statusOutstanding': '{person} : En attente — cliquez pour modifier',
+  'owed.aria.description': 'Description pour {person}',
+  'owed.aria.amount': 'Montant pour {person}',
+  'owed.aria.lent': 'Date du prêt à {person}',
+  'owed.aria.due': "Date d'échéance pour {person}",
+  'owed.aria.repay': 'Enregistrer un remboursement de {person}',
+  'owed.aria.repayTip': "Enregistrer de l'argent qui est revenu",
+  'owed.aria.remove': 'Retirer {person}',
+
   'debt.interest.noRates': 'ajoutez un taux à une dette pour voir ce chiffre',
   'debt.interest.partial': {
     one: 'couvre {shown} dettes sur {total} · {missing} n\'a pas de taux',
@@ -1507,8 +1520,37 @@ module.exports = {
   'debt.curve.aria.owed': '{plan} : {amount} encore dus en {month}.',
 
   /* Accessible names (audit of 11 Nov 2026, task 19) — machine-assisted, not native-reviewed. */
+  'debt.aria.reviewCards': 'Vérifier les comptes de carte de crédit sur la page Comptes',
+  'debt.aria.statusSettled': '{name} : Soldée — cliquez pour modifier',
+  'debt.aria.statusActive': '{name} : Active — cliquez pour modifier',
+  'debt.aria.balance': 'Solde dû pour {name}',
+  'debt.aria.rate': "Taux d'intérêt annuel de {name}",
+  'debt.aria.payment': 'Mensualité de {name}',
+  'debt.aria.extra': 'Supplément versé chaque mois pour {name}',
+  'debt.aria.category': 'Catégorie budgétaire pour {name}',
+  'debt.aria.remove': 'Retirer {name}',
   'debt.aria.strategy': 'Méthode de remboursement',
   'debt.aria.range': 'Plage du graphique de remboursement',
+
+  /* Accessible names on the pages still written in English (audit of 11 Nov 2026, task 19) — machine-assisted, not native-reviewed. */
+  'sav.aria.reviewAssets': 'Vérifier les estimations des actifs sur la page Actifs',
+  'sav.aria.goalAccounts': "Aller à la page Comptes pour définir un objectif d'épargne",
+  'sav.aria.addAccounts': "Aller à la page Comptes pour ajouter un compte d'épargne ou de placement",
+  'sav.aria.row': '{name}, {amount}. Afficher les actions du compte.',
+  'sav.aria.balance': 'Mettre à jour le solde de {name}, actuellement {amount}',
+  'sav.aria.addStart': "Ajouter un montant de départ et une date d'ouverture pour {name}",
+  'sav.aria.barGrowth': '{putIn} versé · {earned} gagné',
+  'sav.aria.barLoss': 'reste {left} sur {putIn} versé',
+  'sav.aria.growth.capital': 'Ce qui compose ce solde de {closing} : {capital} versé. De {from} à {to}.',
+  'sav.aria.growth.posted': 'Ce qui compose ce solde de {closing} : {capital} versé, {posted} de croissance enregistrée. De {from} à {to}.',
+  'sav.aria.growth.undated': 'Ce qui compose ce solde de {closing} : {capital} versé et {undated} de croissance sans date. De {from} à {to}.',
+  'sav.aria.growth.both': 'Ce qui compose ce solde de {closing} : {capital} versé, {posted} de croissance enregistrée et {undated} de croissance sans date. De {from} à {to}.',
+  'sav.aria.worth': 'Valeur nette {net} : actifs {assets} face à des dettes de {debts}',
+  'sav.aria.worth.owned': 'Valeur nette {net} : actifs {assets} face à des dettes de {debts}. Détenu : {owned}',
+  'sav.aria.worth.owed': 'Valeur nette {net} : actifs {assets} face à des dettes de {debts}. Dû : {owed}',
+  'sav.aria.worth.both': 'Valeur nette {net} : actifs {assets} face à des dettes de {debts}. Détenu : {owned}. Dû : {owed}',
+  'sav.aria.share.own': '{label}, {amount}, {share}% de ce que vous détenez. Ouvrir {page}.',
+  'sav.aria.share.owe': '{label}, {amount}, {share}% de ce que vous devez. Ouvrir {page}.',
 
   'tax.aria.year': 'Année fiscale',
 

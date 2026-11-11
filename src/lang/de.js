@@ -1484,6 +1484,19 @@ module.exports = {
   /* --- Debt page: "Interest this month" says what it covers, because a debt
      with a blank rate is unknown rather than zero (the why is in en.js) --- */
   'owed.repaid.chip': '{amount} zurück',
+
+  /* Accessible names (audit of 11 Nov 2026, task 19) — machine-assisted, not native-reviewed. */
+  'owed.aria.statusPaid': '{person}: Bezahlt — zum Ändern klicken',
+  'owed.aria.statusLeft': '{person}: noch {amount} offen — zum Ändern klicken',
+  'owed.aria.statusOutstanding': '{person}: Offen — zum Ändern klicken',
+  'owed.aria.description': 'Beschreibung für {person}',
+  'owed.aria.amount': 'Betrag für {person}',
+  'owed.aria.lent': 'Verleihdatum für {person}',
+  'owed.aria.due': 'Fälligkeitsdatum für {person}',
+  'owed.aria.repay': 'Rückzahlung von {person} erfassen',
+  'owed.aria.repayTip': 'Zurückgekommenes Geld erfassen',
+  'owed.aria.remove': '{person} entfernen',
+
   'debt.interest.noRates': 'hinterlege bei einer Schuld einen Zinssatz, um das hier zu sehen',
   'debt.interest.partial': {
     one: 'deckt {shown} von {total} Schulden ab · bei {missing} fehlt der Zinssatz',
@@ -1494,8 +1507,37 @@ module.exports = {
   'debt.curve.aria.owed': '{plan}: im {month} noch {amount} offen.',
 
   /* Accessible names (audit of 11 Nov 2026, task 19) — machine-assisted, not native-reviewed. */
+  'debt.aria.reviewCards': 'Kreditkartenkonten auf der Konten-Seite prüfen',
+  'debt.aria.statusSettled': '{name}: Beglichen — zum Ändern klicken',
+  'debt.aria.statusActive': '{name}: Aktiv — zum Ändern klicken',
+  'debt.aria.balance': 'Offener Saldo von {name}',
+  'debt.aria.rate': 'Jahreszinssatz von {name}',
+  'debt.aria.payment': 'Monatliche Rate für {name}',
+  'debt.aria.extra': 'Zusätzliche monatliche Zahlung für {name}',
+  'debt.aria.category': 'Budgetkategorie für {name}',
+  'debt.aria.remove': '{name} entfernen',
   'debt.aria.strategy': 'Tilgungsmethode',
   'debt.aria.range': 'Zeitraum des Tilgungsdiagramms',
+
+  /* Accessible names on the pages still written in English (audit of 11 Nov 2026, task 19) — machine-assisted, not native-reviewed. */
+  'sav.aria.reviewAssets': 'Bewertungen auf der Vermögenswerte-Seite prüfen',
+  'sav.aria.goalAccounts': 'Zur Konten-Seite gehen, um ein Sparziel festzulegen',
+  'sav.aria.addAccounts': 'Zur Konten-Seite gehen, um ein Spar- oder Anlagekonto hinzuzufügen',
+  'sav.aria.row': '{name}, {amount}. Kontoaktionen anzeigen.',
+  'sav.aria.balance': 'Kontostand von {name} aktualisieren, derzeit {amount}',
+  'sav.aria.addStart': 'Anfangsbetrag und Startdatum für {name} hinzufügen',
+  'sav.aria.barGrowth': '{putIn} eingezahlt · {earned} Ertrag',
+  'sav.aria.barLoss': '{left} übrig von {putIn} eingezahlt',
+  'sav.aria.growth.capital': 'Woraus dieser Kontostand von {closing} besteht: {capital} eingezahlt. Von {from} bis {to}.',
+  'sav.aria.growth.posted': 'Woraus dieser Kontostand von {closing} besteht: {capital} eingezahlt, {posted} verbuchter Wertzuwachs. Von {from} bis {to}.',
+  'sav.aria.growth.undated': 'Woraus dieser Kontostand von {closing} besteht: {capital} eingezahlt und {undated} Wertzuwachs ohne Datum. Von {from} bis {to}.',
+  'sav.aria.growth.both': 'Woraus dieser Kontostand von {closing} besteht: {capital} eingezahlt, {posted} verbuchter Wertzuwachs und {undated} Wertzuwachs ohne Datum. Von {from} bis {to}.',
+  'sav.aria.worth': 'Nettovermögen {net}: Vermögen {assets} gegen Schulden {debts}',
+  'sav.aria.worth.owned': 'Nettovermögen {net}: Vermögen {assets} gegen Schulden {debts}. Besitz: {owned}',
+  'sav.aria.worth.owed': 'Nettovermögen {net}: Vermögen {assets} gegen Schulden {debts}. Schulden: {owed}',
+  'sav.aria.worth.both': 'Nettovermögen {net}: Vermögen {assets} gegen Schulden {debts}. Besitz: {owned}. Schulden: {owed}',
+  'sav.aria.share.own': '{label}, {amount}, {share}% von dem, was du besitzt. {page} öffnen.',
+  'sav.aria.share.owe': '{label}, {amount}, {share}% von dem, was du schuldest. {page} öffnen.',
 
   'tax.aria.year': 'Steuerjahr',
 

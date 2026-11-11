@@ -1506,6 +1506,19 @@ module.exports = {
   /* --- Debt page: "Interest this month" says what it covers, because a debt
      with a blank rate is unknown rather than zero (the why is in en.js) --- */
   'owed.repaid.chip': '{amount} ibuyile',
+
+  /* Accessible names (audit of 11 Nov 2026, task 19) — machine-assisted, not native-reviewed. */
+  'owed.aria.statusPaid': '{person}: Ihlawulwe — cofa ukuze utshintshe',
+  'owed.aria.statusLeft': '{person}: kusele {amount} — cofa ukuze utshintshe',
+  'owed.aria.statusOutstanding': '{person}: Isatyalwa — cofa ukuze utshintshe',
+  'owed.aria.description': 'Inkcazelo ka-{person}',
+  'owed.aria.amount': 'Isixa sika-{person}',
+  'owed.aria.lent': 'Umhla ekwabolekwa ngawo u-{person}',
+  'owed.aria.due': 'Umhla wokuhlawula ka-{person}',
+  'owed.aria.repay': 'Bhala imali ebuyiswe ngu-{person}',
+  'owed.aria.repayTip': 'Bhala imali ebuyileyo',
+  'owed.aria.remove': 'Susa u-{person}',
+
   'debt.interest.noRates': 'yongeza izinga kulo naliphi na ityala ukuze ubone oku',
   'debt.interest.partial': {
     one: 'ibandakanya {shown} kumatyala angu-{total} · {missing} alinazinga',
@@ -1516,8 +1529,37 @@ module.exports = {
   'debt.curve.aria.owed': '{plan}: kusatyalwa {amount} ngo-{month}.',
 
   /* Accessible names (audit of 11 Nov 2026, task 19) — machine-assisted, not native-reviewed. */
+  'debt.aria.reviewCards': 'Hlola iiakhawunti zamakhadi etyala kwiphepha leeAkhawunti',
+  'debt.aria.statusSettled': '{name}: Lihlawulwe — cofa ukuze utshintshe',
+  'debt.aria.statusActive': '{name}: Liyasebenza — cofa ukuze utshintshe',
+  'debt.aria.balance': 'Ibhalansi etyalwayo ku-{name}',
+  'debt.aria.rate': 'Izinga lenzala lonyaka lika-{name}',
+  'debt.aria.payment': 'Intlawulo yenyanga ka-{name}',
+  'debt.aria.extra': 'Okongezelelweyo okuhlawulwa nyanga nganye ku-{name}',
+  'debt.aria.category': 'Udidi lwebhajethi luka-{name}',
+  'debt.aria.remove': 'Susa u-{name}',
   'debt.aria.strategy': 'Indlela yokuhlawula amatyala',
   'debt.aria.range': 'Uluhlu lwetshathi yokuhlawula',
+
+  /* Accessible names on the pages still written in English (audit of 11 Nov 2026, task 19) — machine-assisted, not native-reviewed. */
+  'sav.aria.reviewAssets': 'Hlola uhlaziyo lwexabiso lweeasethi kwiphepha leeAsethi',
+  'sav.aria.goalAccounts': 'Yiya kwiphepha leeAkhawunti ukuze umisele injongo yokonga',
+  'sav.aria.addAccounts': 'Yiya kwiphepha leeAkhawunti ukuze wongeze iakhawunti yokonga okanye yotyalo-mali',
+  'sav.aria.row': '{name}, {amount}. Bonisa izenzo zeakhawunti.',
+  'sav.aria.balance': 'Hlaziya ibhalansi ka-{name}, okwangoku {amount}',
+  'sav.aria.addStart': 'Yongeza isixa sokuqala nomhla wokuvula ka-{name}',
+  'sav.aria.barGrowth': '{putIn} okufakiweyo · {earned} okuzuziweyo',
+  'sav.aria.barLoss': 'kusele {left} ku-{putIn} okufakiweyo',
+  'sav.aria.growth.capital': 'Okwakhe le bhalansi ka-{closing}: {capital} okufakiweyo. Ukusuka ku-{from} ukuya ku-{to}.',
+  'sav.aria.growth.posted': 'Okwakhe le bhalansi ka-{closing}: {capital} okufakiweyo, {posted} wokukhula okubhaliweyo. Ukusuka ku-{from} ukuya ku-{to}.',
+  'sav.aria.growth.undated': 'Okwakhe le bhalansi ka-{closing}: {capital} okufakiweyo, kunye no-{undated} wokukhula okungenamhla. Ukusuka ku-{from} ukuya ku-{to}.',
+  'sav.aria.growth.both': 'Okwakhe le bhalansi ka-{closing}: {capital} okufakiweyo, {posted} wokukhula okubhaliweyo, kunye no-{undated} wokukhula okungenamhla. Ukusuka ku-{from} ukuya ku-{to}.',
+  'sav.aria.worth': 'Ubuncwane obucocekileyo {net}: iiasethi {assets} ngokuchasene namatyala {debts}',
+  'sav.aria.worth.owned': 'Ubuncwane obucocekileyo {net}: iiasethi {assets} ngokuchasene namatyala {debts}. Onako: {owned}',
+  'sav.aria.worth.owed': 'Ubuncwane obucocekileyo {net}: iiasethi {assets} ngokuchasene namatyala {debts}. Okutyalayo: {owed}',
+  'sav.aria.worth.both': 'Ubuncwane obucocekileyo {net}: iiasethi {assets} ngokuchasene namatyala {debts}. Onako: {owned}. Okutyalayo: {owed}',
+  'sav.aria.share.own': '{label}, {amount}, {share}% yoko unako. Vula {page}.',
+  'sav.aria.share.owe': '{label}, {amount}, {share}% yoko ukutyalayo. Vula {page}.',
 
   'tax.aria.year': 'Unyaka werhafu',
 

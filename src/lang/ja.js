@@ -1412,6 +1412,19 @@ module.exports = {
   /* --- Debt page: "Interest this month" says what it covers, because a debt
      with a blank rate is unknown rather than zero (the why is in en.js) --- */
   'owed.repaid.chip': '{amount} 返済済み',
+
+  /* Accessible names (audit of 11 Nov 2026, task 19) — machine-assisted, not native-reviewed. */
+  'owed.aria.statusPaid': '{person}：返済済み — クリックして変更',
+  'owed.aria.statusLeft': '{person}：残り {amount} — クリックして変更',
+  'owed.aria.statusOutstanding': '{person}：未回収 — クリックして変更',
+  'owed.aria.description': '{person} の内容',
+  'owed.aria.amount': '{person} の金額',
+  'owed.aria.lent': '{person} に貸した日',
+  'owed.aria.due': '{person} の返済期日',
+  'owed.aria.repay': '{person} からの返済を記録',
+  'owed.aria.repayTip': '戻ってきたお金を記録',
+  'owed.aria.remove': '{person} を削除',
+
   'debt.interest.noRates': 'いずれかの負債に金利を記録すると表示されます',
   'debt.interest.partial': {
     other: '{total} 件中 {shown} 件が対象 · {missing} 件に金利の記録なし',
@@ -1421,8 +1434,37 @@ module.exports = {
   'debt.curve.aria.owed': '{plan}：{month}時点で残り {amount}。',
 
   /* Accessible names (audit of 11 Nov 2026, task 19) — machine-assisted, not native-reviewed. */
+  'debt.aria.reviewCards': '口座ページでクレジットカード口座を確認',
+  'debt.aria.statusSettled': '{name}：完済 — クリックして変更',
+  'debt.aria.statusActive': '{name}：有効 — クリックして変更',
+  'debt.aria.balance': '{name} の残高',
+  'debt.aria.rate': '{name} の年利',
+  'debt.aria.payment': '{name} の毎月の返済額',
+  'debt.aria.extra': '{name} の毎月の追加返済額',
+  'debt.aria.category': '{name} の予算カテゴリ',
+  'debt.aria.remove': '{name} を削除',
   'debt.aria.strategy': '返済方法',
   'debt.aria.range': '返済グラフの期間',
+
+  /* Accessible names on the pages still written in English (audit of 11 Nov 2026, task 19) — machine-assisted, not native-reviewed. */
+  'sav.aria.reviewAssets': '資産ページで資産の評価額を確認',
+  'sav.aria.goalAccounts': '口座ページで貯蓄目標を設定',
+  'sav.aria.addAccounts': '口座ページで貯蓄口座または投資口座を追加',
+  'sav.aria.row': '{name}、{amount}。口座の操作を表示。',
+  'sav.aria.balance': '{name} の残高を更新（現在 {amount}）',
+  'sav.aria.addStart': '{name} の開始時の金額と開設日を追加',
+  'sav.aria.barGrowth': '投入額 {putIn} · 増加分 {earned}',
+  'sav.aria.barLoss': '投入額 {putIn} のうち残り {left}',
+  'sav.aria.growth.capital': 'この残高 {closing} の内訳：投入額 {capital}。{from} から {to} まで。',
+  'sav.aria.growth.posted': 'この残高 {closing} の内訳：投入額 {capital}、記録された増加分 {posted}。{from} から {to} まで。',
+  'sav.aria.growth.undated': 'この残高 {closing} の内訳：投入額 {capital}、日付のない増加分 {undated}。{from} から {to} まで。',
+  'sav.aria.growth.both': 'この残高 {closing} の内訳：投入額 {capital}、記録された増加分 {posted}、日付のない増加分 {undated}。{from} から {to} まで。',
+  'sav.aria.worth': '純資産 {net}：資産 {assets} に対し負債 {debts}',
+  'sav.aria.worth.owned': '純資産 {net}：資産 {assets} に対し負債 {debts}。資産の内訳：{owned}',
+  'sav.aria.worth.owed': '純資産 {net}：資産 {assets} に対し負債 {debts}。負債の内訳：{owed}',
+  'sav.aria.worth.both': '純資産 {net}：資産 {assets} に対し負債 {debts}。資産の内訳：{owned}。負債の内訳：{owed}',
+  'sav.aria.share.own': '{label}、{amount}、資産の {share}%。{page}を開きます。',
+  'sav.aria.share.owe': '{label}、{amount}、負債の {share}%。{page}を開きます。',
 
   'tax.aria.year': '税年度',
 

@@ -176,7 +176,10 @@ async function mount() {
     const svg = $('#savingsWorth').querySelectorAll('svg')[0]
       || require('./helpers/dom-stub.cjs').descend($('#savingsWorth')).find(e => e.tag === 'svg');
     ok(svg, 'the composition chart rendered');
-    const label = svg.attrs['aria-label'];
+    /* Through `readable`: the label is a translated sentence now
+       (sav.aria.worth.*), and i18n.t() glues a figure's own spaces with
+       U+00A0 so it cannot wrap — which "assets R (\d+)" below would not match. */
+    const label = require('./helpers/dom-stub.cjs').readable(svg.attrs['aria-label']);
     /* The decimals are matched explicitly rather than with a lazy [\d.]+ —
        the sentence separator is a full stop, so a greedy character class
        swallows it and turns "R 500000.00." into NaN. */

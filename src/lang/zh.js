@@ -1412,6 +1412,19 @@ module.exports = {
   /* --- Debt page: "Interest this month" says what it covers, because a debt
      with a blank rate is unknown rather than zero (the why is in en.js) --- */
   'owed.repaid.chip': '已还 {amount}',
+
+  /* Accessible names (audit of 11 Nov 2026, task 19) — machine-assisted, not native-reviewed. */
+  'owed.aria.statusPaid': '{person}：已还清 — 点击可更改',
+  'owed.aria.statusLeft': '{person}：还剩 {amount} — 点击可更改',
+  'owed.aria.statusOutstanding': '{person}：未收回 — 点击可更改',
+  'owed.aria.description': '{person} 的说明',
+  'owed.aria.amount': '{person} 的金额',
+  'owed.aria.lent': '借给 {person} 的日期',
+  'owed.aria.due': '{person} 的到期日',
+  'owed.aria.repay': '记录 {person} 的还款',
+  'owed.aria.repayTip': '记录收回的钱',
+  'owed.aria.remove': '移除 {person}',
+
   'debt.interest.noRates': '为任一债务记录利率后才会显示',
   'debt.interest.partial': {
     other: '涵盖 {total} 笔债务中的 {shown} 笔 · {missing} 笔没有利率',
@@ -1421,8 +1434,37 @@ module.exports = {
   'debt.curve.aria.owed': '{plan}：到 {month} 仍欠 {amount}。',
 
   /* Accessible names (audit of 11 Nov 2026, task 19) — machine-assisted, not native-reviewed. */
+  'debt.aria.reviewCards': '在账户页面查看信用卡账户',
+  'debt.aria.statusSettled': '{name}：已结清 — 点击可更改',
+  'debt.aria.statusActive': '{name}：在还 — 点击可更改',
+  'debt.aria.balance': '{name} 的欠款余额',
+  'debt.aria.rate': '{name} 的年利率',
+  'debt.aria.payment': '{name} 的每月还款额',
+  'debt.aria.extra': '{name} 每月额外还款',
+  'debt.aria.category': '{name} 的预算分类',
+  'debt.aria.remove': '移除 {name}',
   'debt.aria.strategy': '还款方式',
   'debt.aria.range': '还款图表的时间范围',
+
+  /* Accessible names on the pages still written in English (audit of 11 Nov 2026, task 19) — machine-assisted, not native-reviewed. */
+  'sav.aria.reviewAssets': '在资产页面查看资产估值',
+  'sav.aria.goalAccounts': '前往账户页面设定储蓄目标',
+  'sav.aria.addAccounts': '前往账户页面添加储蓄或投资账户',
+  'sav.aria.row': '{name}，{amount}。显示账户操作。',
+  'sav.aria.balance': '更新 {name} 的余额，当前为 {amount}',
+  'sav.aria.addStart': '为 {name} 添加起始金额和开户日期',
+  'sav.aria.barGrowth': '投入 {putIn} · 收益 {earned}',
+  'sav.aria.barLoss': '投入 {putIn}，还剩 {left}',
+  'sav.aria.growth.capital': '这笔 {closing} 余额的构成：投入 {capital}。从 {from} 到 {to}。',
+  'sav.aria.growth.posted': '这笔 {closing} 余额的构成：投入 {capital}，已记录的增长 {posted}。从 {from} 到 {to}。',
+  'sav.aria.growth.undated': '这笔 {closing} 余额的构成：投入 {capital}，以及没有日期的增长 {undated}。从 {from} 到 {to}。',
+  'sav.aria.growth.both': '这笔 {closing} 余额的构成：投入 {capital}，已记录的增长 {posted}，以及没有日期的增长 {undated}。从 {from} 到 {to}。',
+  'sav.aria.worth': '净资产 {net}：资产 {assets}，负债 {debts}',
+  'sav.aria.worth.owned': '净资产 {net}：资产 {assets}，负债 {debts}。拥有：{owned}',
+  'sav.aria.worth.owed': '净资产 {net}：资产 {assets}，负债 {debts}。欠款：{owed}',
+  'sav.aria.worth.both': '净资产 {net}：资产 {assets}，负债 {debts}。拥有：{owned}。欠款：{owed}',
+  'sav.aria.share.own': '{label}，{amount}，占你所拥有的 {share}%。打开{page}。',
+  'sav.aria.share.owe': '{label}，{amount}，占你所欠的 {share}%。打开{page}。',
 
   'tax.aria.year': '纳税年度',
 

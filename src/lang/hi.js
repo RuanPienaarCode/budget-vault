@@ -1503,6 +1503,19 @@ module.exports = {
   /* --- Debt page: "Interest this month" says what it covers, because a debt
      with a blank rate is unknown rather than zero (the why is in en.js) --- */
   'owed.repaid.chip': '{amount} वापस',
+
+  /* Accessible names (audit of 11 Nov 2026, task 19) — machine-assisted, not native-reviewed. */
+  'owed.aria.statusPaid': '{person}: चुकता — बदलने के लिए क्लिक करें',
+  'owed.aria.statusLeft': '{person}: {amount} बाकी — बदलने के लिए क्लिक करें',
+  'owed.aria.statusOutstanding': '{person}: बकाया — बदलने के लिए क्लिक करें',
+  'owed.aria.description': '{person} का विवरण',
+  'owed.aria.amount': '{person} की रकम',
+  'owed.aria.lent': '{person} को उधार देने की तारीख़',
+  'owed.aria.due': '{person} की देय तारीख़',
+  'owed.aria.repay': '{person} से मिली वापसी दर्ज करें',
+  'owed.aria.repayTip': 'वापस आया पैसा दर्ज करें',
+  'owed.aria.remove': '{person} हटाएँ',
+
   'debt.interest.noRates': 'यह देखने के लिए किसी कर्ज़ पर दर दर्ज करें',
   'debt.interest.partial': {
     one: '{total} में से {shown} कर्ज़ शामिल · {missing} पर दर नहीं',
@@ -1513,8 +1526,37 @@ module.exports = {
   'debt.curve.aria.owed': '{plan}: {month} में अब भी {amount} बकाया।',
 
   /* Accessible names (audit of 11 Nov 2026, task 19) — machine-assisted, not native-reviewed. */
+  'debt.aria.reviewCards': 'खाते पेज पर क्रेडिट कार्ड खाते देखें',
+  'debt.aria.statusSettled': '{name}: चुकता — बदलने के लिए क्लिक करें',
+  'debt.aria.statusActive': '{name}: चालू — बदलने के लिए क्लिक करें',
+  'debt.aria.balance': '{name} पर बकाया रकम',
+  'debt.aria.rate': '{name} की सालाना ब्याज दर',
+  'debt.aria.payment': '{name} की मासिक क़िस्त',
+  'debt.aria.extra': '{name} पर हर महीने अतिरिक्त भुगतान',
+  'debt.aria.category': '{name} की बजट श्रेणी',
+  'debt.aria.remove': '{name} हटाएँ',
   'debt.aria.strategy': 'कर्ज़ चुकाने का तरीका',
   'debt.aria.range': 'चुकौती चार्ट की सीमा',
+
+  /* Accessible names on the pages still written in English (audit of 11 Nov 2026, task 19) — machine-assisted, not native-reviewed. */
+  'sav.aria.reviewAssets': 'संपत्ति पेज पर संपत्ति के मूल्यांकन देखें',
+  'sav.aria.goalAccounts': 'बचत लक्ष्य तय करने के लिए खाते पेज पर जाएँ',
+  'sav.aria.addAccounts': 'बचत या निवेश खाता जोड़ने के लिए खाते पेज पर जाएँ',
+  'sav.aria.row': '{name}, {amount}। खाते के विकल्प दिखाएँ।',
+  'sav.aria.balance': '{name} का बैलेंस अपडेट करें, अभी {amount}',
+  'sav.aria.addStart': '{name} के लिए शुरुआती रकम और खुलने की तारीख़ जोड़ें',
+  'sav.aria.barGrowth': '{putIn} जमा किया · {earned} कमाया',
+  'sav.aria.barLoss': '{putIn} जमा में से {left} बचा',
+  'sav.aria.growth.capital': '{closing} का यह बैलेंस किससे बना: {capital} जमा किया। {from} से {to} तक।',
+  'sav.aria.growth.posted': '{closing} का यह बैलेंस किससे बना: {capital} जमा किया, {posted} दर्ज बढ़त। {from} से {to} तक।',
+  'sav.aria.growth.undated': '{closing} का यह बैलेंस किससे बना: {capital} जमा किया, और {undated} बिना तारीख़ की बढ़त। {from} से {to} तक।',
+  'sav.aria.growth.both': '{closing} का यह बैलेंस किससे बना: {capital} जमा किया, {posted} दर्ज बढ़त, और {undated} बिना तारीख़ की बढ़त। {from} से {to} तक।',
+  'sav.aria.worth': 'कुल संपत्ति {net}: {debts} कर्ज़ के सामने {assets} संपत्ति',
+  'sav.aria.worth.owned': 'कुल संपत्ति {net}: {debts} कर्ज़ के सामने {assets} संपत्ति। अपना: {owned}',
+  'sav.aria.worth.owed': 'कुल संपत्ति {net}: {debts} कर्ज़ के सामने {assets} संपत्ति। देनदारी: {owed}',
+  'sav.aria.worth.both': 'कुल संपत्ति {net}: {debts} कर्ज़ के सामने {assets} संपत्ति। अपना: {owned}। देनदारी: {owed}',
+  'sav.aria.share.own': '{label}, {amount}, आपके पास जो है उसका {share}%। {page} खोलें।',
+  'sav.aria.share.owe': '{label}, {amount}, आप पर जो देनदारी है उसका {share}%। {page} खोलें।',
 
   'tax.aria.year': 'कर वर्ष',
 

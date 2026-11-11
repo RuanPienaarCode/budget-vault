@@ -659,7 +659,7 @@ module.exports = function registerDebts(ctx) {
       `Credit-card accounts tracked: ${overlap.cardAccounts} · card debts tracked: ${overlap.cardDebts} — ` +
       'if the same card is on both, it is counted twice in net worth.');
     const btn = el('button', { type: 'button', class: 'kpi-caveat-btn',
-      'aria-label': 'Review credit-card accounts on the Accounts page' }, 'Review accounts');
+      'aria-label': i18n.t('debt.aria.reviewCards') }, 'Review accounts');
     btn.addEventListener('click', () => ctx.switchView('accounts'));
 
     container.insertBefore(
@@ -835,7 +835,7 @@ module.exports = function registerDebts(ctx) {
 
         const paidPill = d.status === 'paid';
         const pill = el('button', { class: `status-pill status-${paidPill ? 'paid' : 'outstanding'}`, 'data-focus-key': `pill:${i}`,
-          'aria-label': `${d.name}: ${paidPill ? 'Settled' : 'Active'} — click to change` },
+          'aria-label': paidPill ? i18n.t('debt.aria.statusSettled', { name: d.name }) : i18n.t('debt.aria.statusActive', { name: d.name }) },
           icoEl(paidPill ? ['circle-check', 'check-circle'] : ['hourglass']), paidPill ? 'Settled' : 'Active');
         pill.addEventListener('click', () => {
           const row = S.debts.indexOf(d);
@@ -861,22 +861,22 @@ module.exports = function registerDebts(ctx) {
              draw through shownFigure, so a figure kept below zero is redrawn
              as itself rather than as the blank its floored 0 would give. */
           el('td', { class: 'num' }, el('input', { type: 'number', step: '0.01', class: 'form-control form-control-sm', value: shownFigure(d, 'balance'),
-            'aria-label': `Balance owed on ${d.name}`,
+            'aria-label': i18n.t('debt.aria.balance', { name: d.name }),
             onchange: e => editMoney(d, 'balance', 'Balance', e, refreshAll) }), belowZero.balance),
           el('td', { class: 'num' }, el('input', { type: 'number', step: '0.01', class: 'form-control form-control-sm', value: shownFigure(d, 'rate'),
-            'aria-label': `Annual interest rate on ${d.name}`,
+            'aria-label': i18n.t('debt.aria.rate', { name: d.name }),
             onchange: e => editMoney(d, 'rate', 'Rate', e, refreshAll) }), belowZero.rate),
           el('td', { class: 'num' }, el('input', { type: 'number', step: '0.01', class: 'form-control form-control-sm', value: shownFigure(d, 'payment'),
-            'aria-label': `Monthly payment on ${d.name}`,
+            'aria-label': i18n.t('debt.aria.payment', { name: d.name }),
             onchange: e => editMoney(d, 'payment', 'Payment', e, refreshAll) }), belowZero.payment),
           el('td', { class: 'num' }, el('input', { type: 'number', step: '0.01', class: 'form-control form-control-sm', value: shownFigure(d, 'extra'),
-            'aria-label': `Extra paid each month on ${d.name}`,
+            'aria-label': i18n.t('debt.aria.extra', { name: d.name }),
             onchange: e => editMoney(d, 'extra', 'Extra', e, refreshAll) }), belowZero.extra),
           // A category that no longer exists in Categories/ (renamed, or a
           // hand-edited Debts.md) still gets an option of its own. Without it
           // the select falls back to "— none —" and shows a link that IS on
           // disk as absent — the reader then "fixes" it and loses the value.
-          el('td', {}, el('select', { class: 'form-select form-select-sm', 'aria-label': `Budget category for ${d.name}`,
+          el('td', {}, el('select', { class: 'form-select form-select-sm', 'aria-label': i18n.t('debt.aria.category', { name: d.name }),
             onchange: e => { d.category = e.target.value; mark(); renderDebtPayments(); } },
             el('option', { value: '', ...(d.category ? {} : { selected: '' }) }, '— none —'),
             ...(d.category && !S.categories.some(c => c.name === d.category)
@@ -884,7 +884,7 @@ module.exports = function registerDebts(ctx) {
             ...S.categories.map(c => el('option', { value: c.name, ...(c.name === d.category ? { selected: '' } : {}) }, c.name)))),
           payoffCell, clearCell, interestCell,
           el('td', {}, pill),
-          el('td', {}, el('button', { class: 'btn-ghost btn-ghost-sm', 'aria-label': `Remove ${d.name}`, 'data-focus-key': `del:${i}`,
+          el('td', {}, el('button', { class: 'btn-ghost btn-ghost-sm', 'aria-label': i18n.t('debt.aria.remove', { name: d.name }), 'data-focus-key': `del:${i}`,
             /* The pill had a focus restore and this did not, so removing a
                debt left the reader on <body> (audit of 11 Nov 2026, task 16).
                The debt that moved up, else the one above, else New debt. */
