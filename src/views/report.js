@@ -103,7 +103,7 @@ module.exports = function registerReport(ctx) {
     S, $, app, plugin, money, moneyIn, locale, toast,
     fileAtVaultPath, folderAtVaultPath, readVaultFile, writeVaultFile, ensureVaultFolder, destinationProblem, vaultPathTaken,
     currentPeriod, periodRange, periodMonthName, dayLabel, shiftPeriod,
-    periodsForMonths, earliestDataMonth, periodSummary, catKnown,
+    periodsForMonths, periodsBack, periodSummary, catKnown,
     accountIndex, planFigures, healthSnapshot, txInPeriod,
     budgetVsActualRows, categorySpendRows, categoryGap,
     budgetUsed, movedToFunds, periodFigures,
@@ -141,46 +141,24 @@ module.exports = function registerReport(ctx) {
 
      All three branches now anchor on currentPeriod() — the wall clock, which
      is what "Current month" / "Last 3 months" / "Last 12 months" actually
-     promise in their own labels (report.period.current/3m/12m.desc). This
-     duplicates trendPeriods()'s own walk (periodsFromAnchor below) rather
-     than reaching into trend-math.js to change what it anchors on:
-     trendPeriods() is the Dashboard trend's own contract, read there off
-     S.period on purpose (chartTrendRange overlays the period ON SCREEN), and
-     a second caller wanting a different anchor is not a reason to loosen
-     that contract for the one that does. */
+     promise in their own labels (report.period.current/3m/12m.desc).
+
+     The WALK is trend-math.js periodsBack(), the one the Dashboard trend
+     makes; the ANCHOR is the argument, and it is not the trend's.
+     trendPeriods() reads S.period on purpose (chartTrendRange overlays the
+     period ON SCREEN), and this page must not answer to that pill. The walk
+     was a copy here until the 2026-11-11 audit (task 23) — kept apart so as
+     not to loosen trendPeriods()'s contract, and it carried that function's
+     own bug with it: on a genuinely empty vault the `earliest &&` guard never
+     broke, so the first report a brand-new household generated held twelve
+     invented zero-months (M2, 2026-08-29 audit; fixed in both copies then,
+     and there is one copy now). A vault younger than the chosen span reports
+     on what it has. */
   function selectedPeriods() {
     const anchor = currentPeriod();
     if (period === 'current') return [anchor];
     const months = period === '3m' ? 3 : 12;
-    return periodsFromAnchor(anchor, periodsForMonths(months));
-  }
-
-  /* Same walk trendPeriods() (trend-math.js) performs — oldest first, `want`
-     of them at most, stopping at the earliest month the vault actually has
-     data for (a vault younger than the chosen span reports on what it
-     actually has rather than inventing zero-filled history) — but anchored
-     on the `anchor` the caller passes instead of S.period. See
-     selectedPeriods()'s own comment for why this is a deliberate, small
-     duplication rather than a change to trendPeriods()'s contract.
-
-     M2, 2026-08-29 audit — this had trendPeriods()'s OWN bug, carried over
-     verbatim by the duplication above: `earliest && i > 0` never breaks on a
-     genuinely empty vault (earliestDataMonth() returns null, so the `earliest
-     &&` guard was always false), so every `want` period got pushed — twelve
-     invented zero-months on the very first report a brand-new household
-     generated. Fixed the same way trend-math.js's own copy was: no data at
-     all means no floor to test against, which is the same as "before
-     whatever floor there is" — `!earliest` breaks here exactly where a real
-     earliest date immediately would. */
-  function periodsFromAnchor(anchor, want) {
-    const earliest = earliestDataMonth();
-    const out = [];
-    for (let i = 0; i < want; i++) {
-      const p = shiftPeriod(anchor, -i);
-      if (i > 0 && (!earliest || periodRange(p).end.slice(0, 7) < earliest)) break;
-      out.push(p);
-    }
-    return out.reverse();
+    return periodsBack(anchor, periodsForMonths(months));
   }
 
   function periodLabelFor(periods) {

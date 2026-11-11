@@ -223,10 +223,15 @@ source of every module below is byte-identical to the commit before it.
 **Why:** Extracted from views/dashboard.js, where ~100 lines of pure period arithmetic sat inside a DOM module against the house rule that if it can be pure, it is. Reading `S` and the period helpers off ctx makes every function testable in bare node through the same harness, without mounting the dashboard. The DOM, the range pills, the i18n labels and the colour floor all stay in the view; what lives here is every function whose output is a number, a list of periods, or a map of category totals. `today` is injectable throughout, per the repo rule: a test that reads the wall clock asserts something different every morning.
 **Pinned by:** —
 
-### An empty vault has no trend history  (`trend-math.js` → `trendPeriods`)
-**Decision:** `trendPeriods(want)` stops after the current period when `earliestDataMonth()` is null, exactly where it stops before the earliest month when one exists; the current period (i === 0) is always pushed first.
+### One walk back from an anchor  (`trend-math.js` → `walkPeriodsBack`, `periodsBack`)
+**Decision:** There is one walk over past periods — oldest first, `want` of them at most, the anchor always kept, never reaching before the first month with data — and it takes its ANCHOR as an argument. `trendPeriods(want)` hands it `S.period`; the Report page's `selectedPeriods()` hands it `currentPeriod()`. `walkPeriodsBack` is the pure loop with the period arithmetic injected; `periodsBack(anchor, want)` binds it to the vault in memory.
+**Why:** The two anchors differ on purpose. The Dashboard trend overlays the period ON SCREEN, so it follows the header pill; the Report's pills say "Current month" / "Last 3 months" / "Last 12 months" and so answer to the wall clock (C1, 2026-08-29 audit: with the pill parked on May, "Last 3 months" produced a single-month report for May). When that was fixed the walk was copied into `views/report.js` as `periodsFromAnchor` rather than parametrised, so as not to loosen `trendPeriods()`'s contract — and the copy carried the original's bug with it (the entry below), which then had to be fixed twice. 2026-11-11 audit, task 23: one walk, the anchor a parameter. `budget-export.js exportPeriods` is a third, differently-shaped walk (it may start at the last FINISHED period) and is not folded in.
+**Pinned by:** `tests/period-walk-one-rule.test.cjs`
+
+### An empty vault has no trend history  (`trend-math.js` → `walkPeriodsBack`)
+**Decision:** The walk stops after the anchor when `earliestDataMonth()` is null, exactly where it stops before the earliest month when one exists; the anchor (i === 0) is always pushed first.
 **Why:** M2, 2026-08-29 audit. `earliest` is null on a vault that has imported nothing at all (an imported-but-empty file is not history either), and the old `earliest &&` guard only ever fired when it was truthy — so on a genuinely empty vault the break never ran and all `want` periods got pushed: twelve months of invented zero-spend history on the very first report a brand-new household ever generated, directly contradicting the function's own rule that periods before the data are not "months you spent nothing" but months never imported. No data at all means there is no floor to test a period against, which is the same answer as "before the earliest month there is".
-**Pinned by:** —
+**Pinned by:** `tests/period-walk-one-rule.test.cjs` · `tests/trend-math.test.cjs`
 
 ### Elapsed days of the period on screen  (`trend-math.js` → `elapsedDays`)
 **Decision:** `elapsedDays(today)` is how many days of the on-screen period have happened (at least 1), or null when the period is not the current one or today is its last day.

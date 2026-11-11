@@ -25,6 +25,7 @@ const { netByOwner } = require('./owners');
 const { normalizeAmount, parseNum } = require('./amount');
 const { todayIso } = require('./dates');
 const { largestRemainder } = require('./share-percents');
+const { fileOutsideWindow } = require('./misfiled');
 
 /* ADR-0007 · One readable-balance rule. The loader parses "about 300" to 0 and
    keeps the text in `balanceRaw`; only when normalizeAmount ALSO fails on that
@@ -332,7 +333,7 @@ module.exports = function registerFigures(ctx) {
     const out = { budget: (S.budgets[p] || []).filter(amountUnreadable).length, tx: 0 };
     const held = ctx.nonBudgetLabels();
     for (const f of Object.values(S.txFiles)) {
-      if (f.month < start.slice(0, 7) || f.month > end.slice(0, 7) || held.has(f.label)) continue;
+      if (fileOutsideWindow(f.month, start, end) || held.has(f.label)) continue;
       for (const r of f.rows) if (!r.excluded && r.date >= start && r.date <= end && amountUnreadable(r)) out.tx++;
     }
     out.count = out.budget + out.tx;

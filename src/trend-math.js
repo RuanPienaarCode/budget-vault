@@ -13,6 +13,21 @@
 
 const { todayIso, isoDayNumber, isoFromDayNumber } = require('./dates');
 
+/* ADR-0007 · One walk back from an anchor. Oldest first, `want` at most, never
+   past the first month with data; the anchor itself is always kept. Pure — the
+   period arithmetic is handed in, so the anchor is the caller's to choose. */
+function walkPeriodsBack({ anchor, want, shiftPeriod, periodEndMonth, earliest }) {
+  const out = [];
+  for (let i = 0; i < want; i++) {
+    const p = shiftPeriod(anchor, -i);
+    /* ADR-0007 · An empty vault has no trend history. M2, 2026-08-29 audit — a
+       null `earliest` breaks exactly where a real earliest month would. */
+    if (i > 0 && (!earliest || periodEndMonth(p) < earliest)) break;
+    out.push(p);
+  }
+  return out.reverse();
+}
+
 module.exports = function registerTrendMath(ctx) {
   const { S, shiftPeriod, periodRange, currentPeriod, txInPeriod, nonBudgetLabels, foreignLabels, catType, ledger, tally, LENSES } = ctx;
 
@@ -39,20 +54,19 @@ module.exports = function registerTrendMath(ctx) {
     return min;
   }
 
+  /* ADR-0007 · One walk back from an anchor. The Dashboard trend and the Report
+     page share it and differ only in what they hand it as `anchor`. */
+  function periodsBack(anchor, want) {
+    return walkPeriodsBack({ anchor, want, shiftPeriod, earliest: earliestDataMonth(),
+      periodEndMonth: p => periodRange(p).end.slice(0, 7) });
+  }
   /* Periods to plot, oldest first — `want` of them at most, fewer if the data
-     runs out. The current period is always included even when it is empty,
-     because a chart that silently drops "now" reads as broken. */
+     runs out. Anchored on the period ON SCREEN (S.period), on purpose: the
+     trend overlays whatever the header pill is showing. The current period is
+     always included even when it is empty, because a chart that silently
+     drops "now" reads as broken. */
   function trendPeriods(want) {
-    const earliest = earliestDataMonth();
-    const out = [];
-    for (let i = 0; i < want; i++) {
-      const p = shiftPeriod(S.period, -i);
-      /* ADR-0007 · An empty vault has no trend history. M2, 2026-08-29 audit — a
-         null `earliest` breaks exactly where a real earliest month would. */
-      if (i > 0 && (!earliest || periodRange(p).end.slice(0, 7) < earliest)) break;
-      out.push(p);
-    }
-    return out.reverse();
+    return periodsBack(S.period, want);
   }
 
   /* Calendar months of history the vault actually holds, counting the month on
@@ -120,6 +134,7 @@ module.exports = function registerTrendMath(ctx) {
   }
 
   ctx.provide({
-    periodsForMonths, earliestDataMonth, trendPeriods, historySpan, elapsedDays, periodSpend, compareTotals,
+    periodsForMonths, earliestDataMonth, periodsBack, trendPeriods, historySpan, elapsedDays, periodSpend, compareTotals,
   });
 };
+module.exports.walkPeriodsBack = walkPeriodsBack;

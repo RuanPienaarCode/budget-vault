@@ -203,7 +203,7 @@ module.exports = function registerPeriod(ctx) {
   function txInRange(start, end) {
     const out = [];
     for (const f of Object.values(S.txFiles)) {
-      if (f.month < start.slice(0, 7) || f.month > end.slice(0, 7)) continue;
+      if (fileOutsideWindow(f.month, start, end)) continue;
       for (const r of f.rows) if (r.date >= start && r.date <= end) out.push({ ...r, label: f.label, _file: f, _row: r });
     }
     out.sort((a, b) => a.date.localeCompare(b.date) || a.desc.localeCompare(b.desc));
