@@ -655,17 +655,40 @@ body.is-tablet .budget-app-root button:where(.fs-hide) { padding: 4px; }   /* fi
 .budget-app-root .header-period-pill .pnav-label { font-size: 0.8rem; font-weight: 600; color: var(--text-primary); white-space: nowrap; }
 .budget-app-root .pnav-dot { width: 7px; height: 7px; border-radius: 50%; flex: none; background: var(--color-accent); box-shadow: 0 0 12px var(--color-accent); }
 
+/* The household's initials, white on the brand gradient — 13px bold, so text
+   and not "large text", and owed 4.5:1 against the LIGHTEST point of the fill.
+   Run from 0% the fill began on the accent itself: 3.74:1 on vault-green and
+   3.68:1 on ocean (2026-11-11 audit, task 17). The same move as .btn-gradient
+   (BUTTONS, below, where the reasoning is set out in full): the accent stop
+   goes to -100%, so the same accent-to-primary run shows its second half and
+   the avatar begins on the even mix of the two — 5.26:1 on vault-green,
+   5.76:1 on ocean, and plum and slate, which already passed, at 6.82:1 and
+   8.86:1. Not by darkening the accent seed, which is also a data colour.
+
+   The hover comes down from brightness(1.1) to the button's 1.06 with it. A
+   brightness lightens the fill under a label that is already white and
+   cannot follow, and at 1.1 the shifted fill measured 4.50:1 on vault-green
+   — on the line, with nothing to spare; at 1.06 it is 4.80:1.
+   Held per palette, at rest and hovered, by tests/palette.test.cjs (7b). */
 .budget-app-root .topbar-avatar {
   width: 36px; height: 36px; border-radius: 50%; flex: none;
   display: grid; place-items: center;
   font-size: 13px; font-weight: 700; letter-spacing: .3px; color: #fff;
-  background: linear-gradient(135deg, var(--color-accent), var(--color-primary));
+  background: linear-gradient(135deg, var(--color-accent) -100%, var(--color-primary) 100%);
   padding: 0; border: none; cursor: pointer; box-shadow: none;
   -webkit-tap-highlight-color: transparent;
 }
-.budget-app-root .topbar-avatar:hover { filter: brightness(1.1); }
+.budget-app-root .topbar-avatar:hover { filter: brightness(1.06); }
 .budget-app-root .topbar-avatar:focus-visible { outline: 2px solid var(--color-primary); outline-offset: 2px; }
-.budget-app-root.bud-dark .topbar-avatar { color: var(--ink-on-accent); }
+/* Dark keeps the whole run, as the dark gradient button does: its initials are
+   the near-black --ink-on-accent, against which the bright accent end is the
+   STRONG one, and the weakest point is the primary end (7.61:1 at worst, on
+   plum). Nothing here was failing, so the dark avatar looks exactly as it
+   did — which is why the fill is restated rather than inherited. */
+.budget-app-root.bud-dark .topbar-avatar {
+  color: var(--ink-on-accent);
+  background: linear-gradient(135deg, var(--color-accent), var(--color-primary));
+}
 .budget-app-root .topbar .ml-auto { margin-left: auto; display: flex; align-items: center; gap: 0.5rem; }
 
 /* Header shortcut to the Import CSV view — same footprint as the avatar so the
@@ -6376,7 +6399,20 @@ body.is-phone .budget-app-root .drawer-book:not(.hidden) { display: block; }
 }
 /* Save sits last, past a hairline, in the app's primary gradient while there
    is something to save; dimmed (but still there, so the dock keeps one width
-   across every page and under the thumb mid-edit) while there is not. */
+   across every page and under the thumb mid-edit) while there is not.
+
+   Its label is 11px at weight 600 — the smallest text on the brand gradient
+   anywhere in the app — so it is owed 4.5:1 against the lightest point of the
+   fill, and run from 0% it had 3.74:1 on vault-green and 3.68:1 on ocean
+   (2026-11-11 audit, task 17). The same move as .btn-gradient and the
+   avatar: the accent stop at -100%, so the light fill begins on the even mix
+   of accent and primary (5.26:1 and 5.76:1; 6.82:1 on plum, 8.86:1 on slate)
+   and ends where it always did. The icon beside the label is owed 3:1 and
+   clears it by the same figures. There is no brightness() on hover to
+   allow for: the hover restates this same fill and label, to out-rank the
+   dock's own hover tint. Dark keeps the whole run under its near-black
+   label (7.61:1 at worst), restated so the dark dock looks as it did.
+   Held per palette, at rest and hovered, by tests/palette.test.cjs (7b). */
 .budget-app-root .dock-save { position: relative; margin-left: 9px; }
 .budget-app-root .dock-save::before {
   content: ''; position: absolute; left: -6px; top: 10px; bottom: 10px;
@@ -6385,10 +6421,13 @@ body.is-phone .budget-app-root .drawer-book:not(.hidden) { display: block; }
 .budget-app-root .dock-save:not(:disabled),
 .budget-app-root .dock-save:not(:disabled):hover {
   color: #fff;
-  background: linear-gradient(135deg, var(--color-accent), var(--color-primary));
+  background: linear-gradient(135deg, var(--color-accent) -100%, var(--color-primary) 100%);
 }
 .budget-app-root.bud-dark .dock-save:not(:disabled),
-.budget-app-root.bud-dark .dock-save:not(:disabled):hover { color: var(--ink-on-accent); }
+.budget-app-root.bud-dark .dock-save:not(:disabled):hover {
+  color: var(--ink-on-accent);
+  background: linear-gradient(135deg, var(--color-accent), var(--color-primary));
+}
 .budget-app-root .dock-save:disabled { opacity: 0.45; cursor: default; }
 
 /* Clear the dock: the last row of every page scrolls up past it, and a toast
