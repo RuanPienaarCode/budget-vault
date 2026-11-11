@@ -698,8 +698,16 @@ class BudgetSettingTab extends PluginSettingTab {
      book's Settings.md (settingsMdPath), so counting the home book's files
      would warn about a different book's budgets than the one whose period is
      being changed. */
+  /* The open book's Budgets/ as a path prefix, for the three counts below.
+     Through normalizePath, not `${activeFolder()}/Budgets/`: a book at the
+     vault root is '/' (io.js, "a book at the vault root"), and the bare
+     template made that '//Budgets/' — a prefix no file has, so a root book
+     was never warned that a period change strands its budgets. */
+  budgetsPrefix() {
+    return `${normalizePath(`${this.plugin.activeFolder()}/Budgets`)}/`;
+  }
   datedBudgetCount() {
-    const base = `${this.plugin.activeFolder()}/Budgets/`;
+    const base = this.budgetsPrefix();
     return this.app.vault.getMarkdownFiles()
       .filter(f => f.path.startsWith(base) && ISO_DATE.test(f.basename)).length;
   }
@@ -714,7 +722,7 @@ class BudgetSettingTab extends PluginSettingTab {
     const anchor = (this.mdSettings().period_anchor ?? '').toString().trim();
     if (!days || !isRealIsoDate(anchor)) return 0;
     const a = isoDayNumber(anchor);
-    const base = `${this.plugin.activeFolder()}/Budgets/`;
+    const base = this.budgetsPrefix();
     return this.app.vault.getMarkdownFiles().filter(f =>
       f.path.startsWith(base) && ISO_DATE.test(f.basename) &&
       (isoDayNumber(f.basename) - a) % days !== 0).length;
@@ -741,7 +749,7 @@ class BudgetSettingTab extends PluginSettingTab {
     new Notice(i18n.t('settings.budgetsKept', { count: n }), 10000);
   }
   monthBudgetCount() {
-    const base = `${this.plugin.activeFolder()}/Budgets/`;
+    const base = this.budgetsPrefix();
     return this.app.vault.getMarkdownFiles()
       .filter(f => f.path.startsWith(base) && /^\d{4}-\d{2}$/.test(f.basename)).length;
   }

@@ -352,7 +352,7 @@ module.exports = function registerLoad(ctx) {
         /* Budget-folder-relative, because that is the currency readFile and
            writeFile deal in — file.path is absolute within the vault and would
            be re-prefixed by relPath into a path that does not exist. */
-        rel: file.path.slice(R.basePath().length + 1),   // ISSUE 97 — READ from, never assembled
+        rel: R.relOf(file.path),   // ISSUE 97 — READ from, never assembled
       });
     }
     const order = typeOrder(T.settings.groups);
@@ -375,14 +375,13 @@ module.exports = function registerLoad(ctx) {
     /* ADR-0007 · Two accounts claiming one transaction folder. ISSUE 72: keyed the way
        accountForLabel keys; filled after the accounts loop below. */
     T.accountsDuplicated = [];
-    const acctBase = R.basePath();
     for (const { file: f, text: acctText } of await read(acctFiles)) {
       const { fm, body, raw } = parseFrontmatter(acctText);
       /* An account file that OPENS a frontmatter block and never closes it:
          the fence is lost, not absent. A note with no `---` at all is a
          hand-made account and legitimately has no properties (L3-07). */
       if (startsFence(acctText) && !hasFrontmatterBlock(acctText)) {
-        unreadable.push({ rel: f.path.slice(acctBase.length + 1), why: 'frontmatter' });
+        unreadable.push({ rel: R.relOf(f.path), why: 'frontmatter' });
       }
       T.accounts.push({
         name: f.basename,
@@ -393,7 +392,7 @@ module.exports = function registerLoad(ctx) {
            assembled path for every account loaded today, so nothing moves —
            see the ADR-0007 register, "An account carries the path it was read
            from", for why the writers must adopt it before the loader recurses. */
-        rel: f.path.slice(acctBase.length + 1),
+        rel: R.relOf(f.path),
         fmRaw: raw,   // verbatim frontmatter, for lossless write-back of unmodeled keys
         type: fm.type || 'other', institution: fm.institution || '',
         account_number: fm.account_number || '', tx_label: fm.tx_label || '',
@@ -505,7 +504,7 @@ module.exports = function registerLoad(ctx) {
       }
       T.budgets[period] = rows;
       T.budgetMeta[period] = {
-        raw, rel: f.path.slice(R.basePath().length + 1), leadRaw: before, trailRaw: after,
+        raw, rel: R.relOf(f.path), leadRaw: before, trailRaw: after,
         extraCols: extraColsOf(4, header, sep, dataRows), order, unnamed,
       };
     }
@@ -535,7 +534,7 @@ module.exports = function registerLoad(ctx) {
     const txFiles = [];
     for (const folder of R.subfoldersUnder('Transactions')) {
       const months = folder.children.filter(f => f instanceof TFile && f.extension === 'md' && /^\d{4}-\d{2}$/.test(f.basename));
-      const rel = folder.path.slice(R.basePath().length + 1);
+      const rel = R.relOf(folder.path);
       const depth = rel.split('/').length - 1;          // Transactions/Cheque -> 1
       if (T.txFolderPaths[folder.name] !== undefined) {
         // A shallower folder already claimed this label. Only say so if this
@@ -575,7 +574,7 @@ module.exports = function registerLoad(ctx) {
       const known = hasSplitHeader ? 7 : 6;
       T.txFiles[`${acct.name}/${month}`] = {
         label: acct.name, month, dirty: false, fmRaw: raw,
-        rel: f.path.slice(R.basePath().length + 1),   // ISSUE 97 — the path it was READ from
+        rel: R.relOf(f.path),   // ISSUE 97 — the path it was READ from
         /* CONTRACT 1, the loader's half: the prose around the table and the
            file's own separator, which the next write of the month deleted or
            rewrote (L3-02, L3-22). Exactly what each holds: verbatimAroundTable;
@@ -740,7 +739,7 @@ module.exports = function registerLoad(ctx) {
         /* ADR-0007 · Plans are keyed by basename, not display name. The file is the identity;
            writers derive the path from `file`. */
         file: f.basename,
-        rel: f.path.slice(R.basePath().length + 1),   // ISSUE 97 — READ from, never assembled
+        rel: R.relOf(f.path),   // ISSUE 97 — READ from, never assembled
         name: (fm.plan || '').toString().trim() || f.basename,
         fmRaw: raw,   // verbatim frontmatter, for lossless write-back
         leadRaw: plan67.lead, extras: plan67.extras,
@@ -832,7 +831,7 @@ module.exports = function registerLoad(ctx) {
       }));
       T.tax[f.basename] = {
         fmRaw: raw,   // verbatim frontmatter, for lossless write-back of unmodeled keys
-        rel: f.path.slice(R.basePath().length + 1),   // ISSUE 97 — READ from, never assembled
+        rel: R.relOf(f.path),   // ISSUE 97 — READ from, never assembled
         leadRaw: tax67.lead, extras: tax67.extras, sectionLeads: tax67.leads,
         extraCols: { steps: steps.extraCols, docs: docs.extraCols, figures: figures.extraCols },
         /* The two frontmatter vocabularies go through cellVocab, the reader
@@ -897,7 +896,11 @@ module.exports = function registerLoad(ctx) {
      and views/food.js call these after their own writes): the book the state
      in memory was read from, so a note list re-read in the window between a
      switch and its reload is the same book's as everything beside it. */
-  const committedReaders = () => (committed ? ctx.readersAt(committed.folder) : ctx);
+  /* Before any load has committed there is no such book yet: the open one,
+     through the same readersAt() — never the bare ctx, whose readers carry no
+     relOf, the one spelling of "what is this file called inside the book"
+     that is right for a book at the vault root (io.js relUnder). */
+  const committedReaders = () => ctx.readersAt(committed ? committed.folder : ctx.basePath());
 
   /* Receipts/ — one file per till slip, read the way Notes are: under, not
      in (a household files them by month), in parallel, and a slip that
@@ -911,12 +914,11 @@ module.exports = function registerLoad(ctx) {
   async function loadReceipts(into = S, R = committedReaders()) {
     const files = R.mdFilesUnder(RECEIPTS_DIR);
     const texts = await Promise.all(files.map(f => vault.cachedRead(f).catch(() => null)));
-    const base = R.basePath();
     const receipts = [];
     into.foodItems = new Map();
     files.forEach((f, i) => {
       if (texts[i] == null) return;
-      const rel = f.path.slice(base.length + 1);
+      const rel = R.relOf(f.path);
       if (rel === FOOD_ITEMS_FILE) {
         into.foodItems = parseFoodItems(texts[i]);
         return;
@@ -938,14 +940,13 @@ module.exports = function registerLoad(ctx) {
        blank because of it. See mdFilesUnder in io.js. */
     const files = R.mdFilesUnder(NOTES_DIR);
     const texts = await Promise.all(files.map(f => vault.cachedRead(f).catch(() => null)));
-    const base = R.basePath();
     const notes = [];
     files.forEach((f, i) => {
       if (texts[i] == null) return;
       /* Derived from the file's OWN path rather than assembled from the folder
          and the name — the note may be several levels down, and every writer
          (readFile, writeFile, fileAt) takes a budget-folder-relative path. */
-      const rel = f.path.slice(base.length + 1);
+      const rel = R.relOf(f.path);
       notes.push({ rel, name: f.name, ...parseNote(texts[i], rel) });
     });
     into.notes = sortNotes(notes);
