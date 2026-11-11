@@ -76,6 +76,11 @@ module.exports = {
   'topbar.reportTitle': 'Gerar um relatório financeiro',
   'topbar.settings': 'Abrir as configurações do orçamento',
 
+  /* Accessible names (audit of 11 Nov 2026, task 19) — machine-assisted, not native-reviewed. */
+  'topbar.settingsFor': 'Configurações do orçamento — {name}',
+  'topbar.settingsTitle': 'Configurações do orçamento',
+  'topbar.settingsTitleFor': '{name} · configurações do orçamento',
+
   /* ------------------------------- settings -------------------------------- */
   'settings.folder.name': 'Pasta do orçamento',
   'settings.folder.desc': 'Caminho, dentro do cofre, da pasta que contém Categories/, Accounts/, Budgets/, Transactions/, Settings.md, etc.',
@@ -602,6 +607,13 @@ module.exports = {
   'tx.split.chip': 'dividida em {count}',
   'tx.split.chipGap': '{amount} não atribuído',
   'tx.aria.splitChip': 'Opções de divisão para {desc} em {date}',
+
+  /* Accessible names (audit of 11 Nov 2026, task 19) — machine-assisted, not native-reviewed. */
+  'tx.split.aria.amount': 'Valor da parte {n}',
+  'tx.split.aria.category': 'Categoria da parte {n}',
+  'tx.split.aria.note': 'Nota da parte {n}',
+  'tx.split.aria.remove': 'Remover a parte {n}',
+
   'tx.unsplit.action': 'Desfazer divisão',
   'tx.unsplit.title': 'Desfazer a divisão desta transação?',
   'tx.unsplit.msg': {
@@ -813,6 +825,11 @@ module.exports = {
   'acct.err.notNumber': '{field} não é um número',
   'acct.err.nameRequired': 'O nome da conta é obrigatório',
   'cat.err.nameRequired': 'O nome da categoria é obrigatório',
+
+  /* Accessible names (audit of 11 Nov 2026, task 19) — machine-assisted, not native-reviewed. */
+  'cat.aria.current': '{label} — atualmente {value}',
+  'cat.aria.currentNone': '{label} — atualmente sem categoria',
+
   'acct.err.exists': 'Essa conta já existe',
   'acct.err.save': 'Não foi possível salvar {name} ({error}) — nada foi gravado no arquivo; tente a mesma ação de novo.',
 
@@ -931,6 +948,12 @@ module.exports = {
   'acct.hero.elsewhere': ' Bens e dívidas registrados nas páginas deles não entram nesta conta.',
   'imp.dateReading.dayFirst': 'As datas deste ficheiro foram lidas como dia/mês, porque lê-las ao contrário as deixava fora de ordem.',
   'imp.dateReading.monthFirst': 'As datas deste ficheiro foram lidas como mês/dia, porque lê-las ao contrário as deixava fora de ordem.',
+
+  /* Accessible names (audit of 11 Nov 2026, task 19) — machine-assisted, not native-reviewed. */
+  'imp.aria.cancelTip': 'Descartar este extrato sem importar nada',
+  'imp.aria.remapTip': 'Definir qual coluna é a data, a descrição e o valor',
+  'imp.aria.newAccountTip': 'Criar uma conta para receber estas linhas',
+
   'acct.duplicateFolders': {
     one: '{count} pasta de movimentos é reclamada por duas contas ({names}); só a primeira é lida. Dê a cada conta o seu próprio nome de pasta.',
     other: '{count} pastas de movimentos são reclamadas por duas contas cada ({names}); só a primeira é lida. Dê a cada conta o seu próprio nome de pasta.',
@@ -1490,6 +1513,14 @@ module.exports = {
   'debt.curve.aria.cleared': '{plan}: liquidado em {month}.',
   'debt.curve.aria.owed': '{plan}: ainda {amount} em dívida em {month}.',
 
+  /* Accessible names (audit of 11 Nov 2026, task 19) — machine-assisted, not native-reviewed. */
+  'debt.aria.strategy': 'Método de quitação',
+  'debt.aria.range': 'Intervalo do gráfico de quitação',
+
+  'tax.aria.year': 'Ano fiscal',
+
+  'loans.aria.tabs': 'Escolher um simulador',
+
   /* --------------------------------- report ------------------------------- */
   'report.pageSub': 'Uma nota em Markdown · leia no Obsidian, compartilhe, ou cole num chat de IA',
   'report.options.title': 'Opções do relatório',
@@ -1675,6 +1706,9 @@ module.exports = {
   'plan.env.collapseAria': "Recolher {name}",
   'plan.env.deleteAria': "Remover o envelope de gasto {name}",
   'plan.actions.deleteAria': "Excluir plano",
+
+  /* Accessible names (audit of 11 Nov 2026, task 19) — machine-assisted, not native-reviewed. */
+  'plan.pickerAria': 'Escolher um plano',
 
   'io.stale.message': "{file} foi alterado fora desta página depois de carregado, por isso nada foi escrito",
   'io.stale.notice': "Orçamento: {file} foi alterado fora desta página (outro dispositivo ou a vista markdown) depois de carregado, por isso a sua gravação não foi escrita. A página recarregou o que está agora no disco — volte a fazer a alteração.",

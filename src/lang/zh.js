@@ -62,6 +62,11 @@ module.exports = {
   'topbar.importTitle': '导入银行对账单 CSV',
   'topbar.settings': '打开预算设置',
 
+  /* Accessible names (audit of 11 Nov 2026, task 19) — machine-assisted, not native-reviewed. */
+  'topbar.settingsFor': '预算设置 — {name}',
+  'topbar.settingsTitle': '预算设置',
+  'topbar.settingsTitleFor': '{name} · 预算设置',
+
   /* ------------------------------- settings -------------------------------- */
   'settings.folder.name': '预算文件夹',
   'settings.folder.desc': '存放 Categories/、Accounts/、Budgets/、Transactions/、Settings.md 等内容的文件夹在仓库中的路径。',
@@ -559,6 +564,13 @@ module.exports = {
   'tx.split.chip': '拆分为 {count} 笔',
   'tx.split.chipGap': '{amount} 未分配',
   'tx.aria.splitChip': '{date} {desc} 的拆分选项',
+
+  /* Accessible names (audit of 11 Nov 2026, task 19) — machine-assisted, not native-reviewed. */
+  'tx.split.aria.amount': '第 {n} 部分的金额',
+  'tx.split.aria.category': '第 {n} 部分的分类',
+  'tx.split.aria.note': '第 {n} 部分的备注',
+  'tx.split.aria.remove': '移除第 {n} 部分',
+
   'tx.unsplit.action': '取消拆分',
   'tx.unsplit.title': '要取消这笔交易的拆分吗？',
   'tx.unsplit.msg': {
@@ -761,6 +773,11 @@ module.exports = {
   'acct.err.notNumber': '{field} 不是数字',
   'acct.err.nameRequired': '账户名称为必填项',
   'cat.err.nameRequired': '类别名称为必填项',
+
+  /* Accessible names (audit of 11 Nov 2026, task 19) — machine-assisted, not native-reviewed. */
+  'cat.aria.current': '{label} — 当前为 {value}',
+  'cat.aria.currentNone': '{label} — 当前未分类',
+
   'acct.err.exists': '该账户已存在',
   'acct.err.save': '无法保存 {name}（{error}）— 文件未写入任何内容；请重试同一操作。',
 
@@ -871,6 +888,12 @@ module.exports = {
   'acct.hero.elsewhere': ' 记录在各自页面上的资产与债务不计入此处。',
   'imp.dateReading.dayFirst': '此文件中的日期按日/月读取，因为按另一种方式读取会使其顺序错乱。',
   'imp.dateReading.monthFirst': '此文件中的日期按月/日读取，因为按另一种方式读取会使其顺序错乱。',
+
+  /* Accessible names (audit of 11 Nov 2026, task 19) — machine-assisted, not native-reviewed. */
+  'imp.aria.cancelTip': '放弃这份对账单，不导入任何内容',
+  'imp.aria.remapTip': '指定哪一列是日期、说明和金额',
+  'imp.aria.newAccountTip': '新建一个账户来存放这些记录',
+
   'acct.duplicateFolders': {
     other: '{count} 个交易文件夹被两个账户同时使用（{names}）；仅读取第一个。请为每个账户设置独立的文件夹名。',
   },
@@ -1397,6 +1420,14 @@ module.exports = {
   'debt.curve.aria.cleared': '{plan}：{month} 前还清。',
   'debt.curve.aria.owed': '{plan}：到 {month} 仍欠 {amount}。',
 
+  /* Accessible names (audit of 11 Nov 2026, task 19) — machine-assisted, not native-reviewed. */
+  'debt.aria.strategy': '还款方式',
+  'debt.aria.range': '还款图表的时间范围',
+
+  'tax.aria.year': '纳税年度',
+
+  'loans.aria.tabs': '选择计算器',
+
   /* --- report.* / nav.report / shell.tx.report — machine-assisted, added
      alongside the Report feature (views/report.js, src/report.js). --- */
   'nav.report': '报告',
@@ -1583,6 +1614,9 @@ module.exports = {
   'plan.env.collapseAria': "收起 {name}",
   'plan.env.deleteAria': "移除支出信封 {name}",
   'plan.actions.deleteAria': "删除计划",
+
+  /* Accessible names (audit of 11 Nov 2026, task 19) — machine-assisted, not native-reviewed. */
+  'plan.pickerAria': '选择计划',
 
   'io.stale.message': "{file} 在加载后被页面之外修改，因此没有写入任何内容",
   'io.stale.notice': "预算：{file} 在加载后被此页面之外（其他设备或 Markdown 视图）修改，因此你的保存没有写入。页面已重新加载磁盘上的当前内容——请重新进行修改。",

@@ -75,6 +75,11 @@ module.exports = {
   'topbar.reportTitle': 'वित्तीय रिपोर्ट बनाएँ',
   'topbar.settings': 'बजट सेटिंग्स खोलें',
 
+  /* Accessible names (audit of 11 Nov 2026, task 19) — machine-assisted, not native-reviewed. */
+  'topbar.settingsFor': 'बजट सेटिंग्स — {name}',
+  'topbar.settingsTitle': 'बजट सेटिंग्स',
+  'topbar.settingsTitleFor': '{name} · बजट सेटिंग्स',
+
   /* ------------------------------- settings -------------------------------- */
   'settings.folder.name': 'बजट फ़ोल्डर',
   'settings.folder.desc': 'उस फ़ोल्डर का वॉल्ट-पथ जिसमें Categories/, Accounts/, Budgets/, Transactions/, Settings.md वगैरह रखे हैं।',
@@ -601,6 +606,13 @@ module.exports = {
   'tx.split.chip': '{count} हिस्सों में बँटी',
   'tx.split.chipGap': '{amount} का हिसाब नहीं',
   'tx.aria.splitChip': '{date} के {desc} के लिए बँटवारे के विकल्प',
+
+  /* Accessible names (audit of 11 Nov 2026, task 19) — machine-assisted, not native-reviewed. */
+  'tx.split.aria.amount': 'हिस्सा {n} की रकम',
+  'tx.split.aria.category': 'हिस्सा {n} की श्रेणी',
+  'tx.split.aria.note': 'हिस्सा {n} का नोट',
+  'tx.split.aria.remove': 'हिस्सा {n} हटाएँ',
+
   'tx.unsplit.action': 'बँटवारा हटाएँ',
   'tx.unsplit.title': 'इस लेन-देन का बँटवारा हटाएँ?',
   'tx.unsplit.msg': {
@@ -812,6 +824,11 @@ module.exports = {
   'acct.err.notNumber': '{field} कोई संख्या नहीं है',
   'acct.err.nameRequired': 'खाते का नाम ज़रूरी है',
   'cat.err.nameRequired': 'श्रेणी का नाम ज़रूरी है',
+
+  /* Accessible names (audit of 11 Nov 2026, task 19) — machine-assisted, not native-reviewed. */
+  'cat.aria.current': '{label} — अभी {value}',
+  'cat.aria.currentNone': '{label} — अभी बिना श्रेणी',
+
   'acct.err.exists': 'यह खाता पहले से मौजूद है',
   'acct.err.save': '{name} सहेजा नहीं जा सका ({error}) — फ़ाइल में कुछ भी नहीं लिखा गया; वही क्रिया दोबारा आज़माएँ।',
 
@@ -930,6 +947,12 @@ module.exports = {
   'acct.hero.elsewhere': ' अपने-अपने पेजों पर दर्ज संपत्ति और कर्ज़ यहाँ नहीं गिने जाते।',
   'imp.dateReading.dayFirst': 'इस फ़ाइल की तारीखें दिन/माह के रूप में पढ़ी गईं, क्योंकि दूसरे क्रम में वे बेतरतीब हो जाती थीं।',
   'imp.dateReading.monthFirst': 'इस फ़ाइल की तारीखें माह/दिन के रूप में पढ़ी गईं, क्योंकि दूसरे क्रम में वे बेतरतीब हो जाती थीं।',
+
+  /* Accessible names (audit of 11 Nov 2026, task 19) — machine-assisted, not native-reviewed. */
+  'imp.aria.cancelTip': 'कुछ भी आयात किए बिना यह स्टेटमेंट छोड़ दें',
+  'imp.aria.remapTip': 'बताएँ कि कौन-सा कॉलम तारीख़, विवरण और रकम है',
+  'imp.aria.newAccountTip': 'इन पंक्तियों के लिए एक खाता बनाएँ',
+
   'acct.duplicateFolders': {
     one: '{count} लेनदेन फ़ोल्डर पर दो खातों का दावा है ({names}); केवल पहला पढ़ा जाता है। हर खाते को अपना फ़ोल्डर नाम दें।',
     other: '{count} लेनदेन फ़ोल्डरों पर दो-दो खातों का दावा है ({names}); केवल पहला पढ़ा जाता है। हर खाते को अपना फ़ोल्डर नाम दें।',
@@ -1489,6 +1512,14 @@ module.exports = {
   'debt.curve.aria.cleared': '{plan}: {month} तक चुकता।',
   'debt.curve.aria.owed': '{plan}: {month} में अब भी {amount} बकाया।',
 
+  /* Accessible names (audit of 11 Nov 2026, task 19) — machine-assisted, not native-reviewed. */
+  'debt.aria.strategy': 'कर्ज़ चुकाने का तरीका',
+  'debt.aria.range': 'चुकौती चार्ट की सीमा',
+
+  'tax.aria.year': 'कर वर्ष',
+
+  'loans.aria.tabs': 'कैलकुलेटर चुनें',
+
   /* --------------------------------- report ------------------------------- */
   'report.pageSub': 'एक Markdown नोट · इसे Obsidian में पढ़ें, साझा करें, या किसी AI चैट में चिपका दें',
   'report.options.title': 'रिपोर्ट के विकल्प',
@@ -1674,6 +1705,9 @@ module.exports = {
   'plan.env.collapseAria': "{name} समेटें",
   'plan.env.deleteAria': "ख़र्च बकेट {name} हटाएँ",
   'plan.actions.deleteAria': "प्लान हटाएँ",
+
+  /* Accessible names (audit of 11 Nov 2026, task 19) — machine-assisted, not native-reviewed. */
+  'plan.pickerAria': 'प्लान चुनें',
 
   'io.stale.message': "{file} लोड होने के बाद इस पेज के बाहर बदली गई, इसलिए कुछ भी नहीं लिखा गया",
   'io.stale.notice': "बजट: {file} लोड होने के बाद इस पेज के बाहर (दूसरे डिवाइस या मार्कडाउन व्यू में) बदली गई, इसलिए आपका सेव नहीं लिखा गया। पेज ने अब डिस्क पर जो है उसे फिर से लोड कर लिया है — कृपया बदलाव दोबारा करें।",

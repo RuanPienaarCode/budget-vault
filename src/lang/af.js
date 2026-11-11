@@ -58,6 +58,11 @@ module.exports = {
   'topbar.importTitle': 'Voer \'n bankstaat-CSV in',
   'topbar.settings': 'Maak begrotingsinstellings oop',
 
+  /* Accessible names (audit of 11 Nov 2026, task 19) — machine-assisted, not native-reviewed. */
+  'topbar.settingsFor': 'Begrotingsinstellings — {name}',
+  'topbar.settingsTitle': 'Begrotingsinstellings',
+  'topbar.settingsTitleFor': '{name} · begrotingsinstellings',
+
   /* ------------------------------- settings -------------------------------- */
   'settings.folder.name': 'Begrotingsvouer',
   'settings.folder.desc': 'Kluispad van die vouer wat Categories/, Accounts/, Budgets/, Transactions/, Settings.md, ens. hou.',
@@ -585,6 +590,13 @@ module.exports = {
   'tx.split.chip': 'verdeel in {count}',
   'tx.split.chipGap': '{amount} onverklaar',
   'tx.aria.splitChip': 'Verdeelopsies vir {desc} op {date}',
+
+  /* Accessible names (audit of 11 Nov 2026, task 19) — machine-assisted, not native-reviewed. */
+  'tx.split.aria.amount': 'Bedrag vir deel {n}',
+  'tx.split.aria.category': 'Kategorie vir deel {n}',
+  'tx.split.aria.note': 'Nota vir deel {n}',
+  'tx.split.aria.remove': 'Verwyder deel {n}',
+
   'tx.unsplit.action': 'Verdeling ongedaan maak',
   'tx.unsplit.title': 'Maak hierdie transaksie se verdeling ongedaan?',
   'tx.unsplit.msg': {
@@ -796,6 +808,11 @@ module.exports = {
   'acct.err.notNumber': '{field} is nie \'n getal nie',
   'acct.err.nameRequired': 'Rekeningnaam is verpligtend',
   'cat.err.nameRequired': 'Kategoriename is verpligtend',
+
+  /* Accessible names (audit of 11 Nov 2026, task 19) — machine-assisted, not native-reviewed. */
+  'cat.aria.current': '{label} — tans {value}',
+  'cat.aria.currentNone': '{label} — tans ongekategoriseer',
+
   'acct.err.exists': 'Rekening bestaan reeds',
   'acct.err.save': 'Kon nie {name} stoor nie ({error}) — niks is na die lêer geskryf nie; probeer weer.',
 
@@ -913,6 +930,12 @@ module.exports = {
   'acct.hero.elsewhere': ' Bates en skulde wat op hul eie bladsye aangeteken is, tel nie hier nie.',
   'imp.dateReading.dayFirst': 'Datums in hierdie lêer is as dag/maand gelees, omdat die ander volgorde hulle deurmekaar gesit het.',
   'imp.dateReading.monthFirst': 'Datums in hierdie lêer is as maand/dag gelees, omdat die ander volgorde hulle deurmekaar gesit het.',
+
+  /* Accessible names (audit of 11 Nov 2026, task 19) — machine-assisted, not native-reviewed. */
+  'imp.aria.cancelTip': 'Gooi hierdie staat weg sonder om enigiets in te voer',
+  'imp.aria.remapTip': 'Stel watter kolom die datum, beskrywing en bedrag is',
+  'imp.aria.newAccountTip': "Skep 'n rekening waarin hierdie rye kan beland",
+
   'acct.duplicateFolders': {
     one: '{count} transaksiegids word deur twee rekeninge opgeëis ({names}); net die eerste word gelees. Gee elke rekening sy eie gidsnaam.',
     other: '{count} transaksiegidse word elk deur twee rekeninge opgeëis ({names}); net die eerste word gelees. Gee elke rekening sy eie gidsnaam.',
@@ -1469,6 +1492,14 @@ module.exports = {
   'debt.curve.aria.cleared': '{plan}: afbetaal teen {month}.',
   'debt.curve.aria.owed': '{plan}: {amount} steeds verskuldig in {month}.',
 
+  /* Accessible names (audit of 11 Nov 2026, task 19) — machine-assisted, not native-reviewed. */
+  'debt.aria.strategy': 'Afbetalingsmetode',
+  'debt.aria.range': 'Reeks vir die afbetalingsgrafiek',
+
+  'tax.aria.year': 'Belastingjaar',
+
+  'loans.aria.tabs': "Kies 'n berekenaar",
+
   /* --- report.* / nav.report / shell.tx.report — machine-assisted, added
      alongside the Report feature (views/report.js, src/report.js). --- */
   'nav.report': 'Verslag',
@@ -1659,6 +1690,9 @@ module.exports = {
   'plan.env.collapseAria': "Vou {name} toe",
   'plan.env.deleteAria': "Verwyder bestedingsbak {name}",
   'plan.actions.deleteAria': "Verwyder plan",
+
+  /* Accessible names (audit of 11 Nov 2026, task 19) — machine-assisted, not native-reviewed. */
+  'plan.pickerAria': "Kies 'n plan",
 
   'io.stale.message': "{file} is buite hierdie bladsy verander nadat dit gelaai is, so niks is geskryf nie",
   'io.stale.notice': "Begroting: {file} is buite hierdie bladsy verander (ander toestel of die markdown-aansig) nadat dit gelaai is, so jou stoor is nie geskryf nie. Die bladsy het weer gelaai wat nou op skyf is — maak asseblief die wysiging weer.",

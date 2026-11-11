@@ -60,6 +60,11 @@ module.exports = {
   'topbar.importTitle': 'Importar un extracto bancario en CSV',
   'topbar.settings': 'Abrir los ajustes del presupuesto',
 
+  /* Accessible names (audit of 11 Nov 2026, task 19) — machine-assisted, not native-reviewed. */
+  'topbar.settingsFor': 'Ajustes del presupuesto — {name}',
+  'topbar.settingsTitle': 'Ajustes del presupuesto',
+  'topbar.settingsTitleFor': '{name} · ajustes del presupuesto',
+
   /* ------------------------------- settings -------------------------------- */
   'settings.folder.name': 'Carpeta del presupuesto',
   'settings.folder.desc': 'Ruta en la bóveda de la carpeta que contiene Categories/, Accounts/, Budgets/, Transactions/, Settings.md, etc.',
@@ -587,6 +592,13 @@ module.exports = {
   'tx.split.chip': 'dividida en {count}',
   'tx.split.chipGap': '{amount} sin asignar',
   'tx.aria.splitChip': 'Opciones de división para {desc} del {date}',
+
+  /* Accessible names (audit of 11 Nov 2026, task 19) — machine-assisted, not native-reviewed. */
+  'tx.split.aria.amount': 'Importe de la parte {n}',
+  'tx.split.aria.category': 'Categoría de la parte {n}',
+  'tx.split.aria.note': 'Nota de la parte {n}',
+  'tx.split.aria.remove': 'Quitar la parte {n}',
+
   'tx.unsplit.action': 'Deshacer división',
   'tx.unsplit.title': '¿Deshacer la división de esta transacción?',
   'tx.unsplit.msg': {
@@ -798,6 +810,11 @@ module.exports = {
   'acct.err.notNumber': '{field} no es un número',
   'acct.err.nameRequired': 'El nombre de la cuenta es obligatorio',
   'cat.err.nameRequired': 'El nombre de la categoría es obligatorio',
+
+  /* Accessible names (audit of 11 Nov 2026, task 19) — machine-assisted, not native-reviewed. */
+  'cat.aria.current': '{label} — actualmente {value}',
+  'cat.aria.currentNone': '{label} — actualmente sin categoría',
+
   'acct.err.exists': 'La cuenta ya existe',
   'acct.err.save': 'No se pudo guardar {name} ({error}) — no se escribió nada en el archivo; inténtalo de nuevo.',
 
@@ -915,6 +932,12 @@ module.exports = {
   'acct.hero.elsewhere': ' Los bienes y las deudas registrados en sus propias páginas no se cuentan aquí.',
   'imp.dateReading.dayFirst': 'Las fechas de este archivo se leyeron como día/mes, porque leerlas al revés las dejaba desordenadas.',
   'imp.dateReading.monthFirst': 'Las fechas de este archivo se leyeron como mes/día, porque leerlas al revés las dejaba desordenadas.',
+
+  /* Accessible names (audit of 11 Nov 2026, task 19) — machine-assisted, not native-reviewed. */
+  'imp.aria.cancelTip': 'Descartar este extracto sin importar nada',
+  'imp.aria.remapTip': 'Indicar qué columna es la fecha, la descripción y el importe',
+  'imp.aria.newAccountTip': 'Crear una cuenta donde vayan estas filas',
+
   'acct.duplicateFolders': {
     one: '{count} carpeta de movimientos está reclamada por dos cuentas ({names}); solo se lee la primera. Dé a cada cuenta su propio nombre de carpeta.',
     other: '{count} carpetas de movimientos están reclamadas por dos cuentas cada una ({names}); solo se lee la primera. Dé a cada cuenta su propio nombre de carpeta.',
@@ -1471,6 +1494,14 @@ module.exports = {
   'debt.curve.aria.cleared': '{plan}: saldado en {month}.',
   'debt.curve.aria.owed': '{plan}: aún se deben {amount} en {month}.',
 
+  /* Accessible names (audit of 11 Nov 2026, task 19) — machine-assisted, not native-reviewed. */
+  'debt.aria.strategy': 'Método de pago de deudas',
+  'debt.aria.range': 'Rango del gráfico de pago de deudas',
+
+  'tax.aria.year': 'Año fiscal',
+
+  'loans.aria.tabs': 'Elegir una calculadora',
+
   /* --- report.* / nav.report / shell.tx.report — machine-assisted, added
      alongside the Report feature (views/report.js, src/report.js). --- */
   'nav.report': 'Informe',
@@ -1661,6 +1692,9 @@ module.exports = {
   'plan.env.collapseAria': "Contraer {name}",
   'plan.env.deleteAria': "Quitar la bolsa de gasto {name}",
   'plan.actions.deleteAria': "Eliminar plan",
+
+  /* Accessible names (audit of 11 Nov 2026, task 19) — machine-assisted, not native-reviewed. */
+  'plan.pickerAria': 'Elegir un plan',
 
   'io.stale.message': "{file} se cambió fuera de esta página después de cargarse, así que no se escribió nada",
   'io.stale.notice': "Presupuesto: {file} se cambió fuera de esta página (otro dispositivo o la vista markdown) después de cargarse, así que no se escribió tu guardado. La página volvió a cargar lo que hay ahora en el disco — vuelve a hacer el cambio.",

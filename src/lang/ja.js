@@ -62,6 +62,11 @@ module.exports = {
   'topbar.importTitle': '銀行明細の CSV を取り込む',
   'topbar.settings': '予算の設定を開く',
 
+  /* Accessible names (audit of 11 Nov 2026, task 19) — machine-assisted, not native-reviewed. */
+  'topbar.settingsFor': '予算の設定 — {name}',
+  'topbar.settingsTitle': '予算の設定',
+  'topbar.settingsTitleFor': '{name} · 予算の設定',
+
   /* ------------------------------- settings -------------------------------- */
   'settings.folder.name': '予算フォルダ',
   'settings.folder.desc': 'Categories/、Accounts/、Budgets/、Transactions/、Settings.md などを格納しているフォルダの保管庫内パス。',
@@ -559,6 +564,13 @@ module.exports = {
   'tx.split.chip': '{count} 件に分割',
   'tx.split.chipGap': '{amount} が未計上',
   'tx.aria.splitChip': '{date} の {desc} の分割オプション',
+
+  /* Accessible names (audit of 11 Nov 2026, task 19) — machine-assisted, not native-reviewed. */
+  'tx.split.aria.amount': '{n} 件目の金額',
+  'tx.split.aria.category': '{n} 件目のカテゴリ',
+  'tx.split.aria.note': '{n} 件目のメモ',
+  'tx.split.aria.remove': '{n} 件目を削除',
+
   'tx.unsplit.action': '分割を解除',
   'tx.unsplit.title': 'この取引の分割を解除しますか？',
   'tx.unsplit.msg': {
@@ -761,6 +773,11 @@ module.exports = {
   'acct.err.notNumber': '{field} が数値ではありません',
   'acct.err.nameRequired': '口座名は必須です',
   'cat.err.nameRequired': 'カテゴリ名は必須です',
+
+  /* Accessible names (audit of 11 Nov 2026, task 19) — machine-assisted, not native-reviewed. */
+  'cat.aria.current': '{label} — 現在は {value}',
+  'cat.aria.currentNone': '{label} — 現在はカテゴリなし',
+
   'acct.err.exists': 'その口座はすでに存在します',
   'acct.err.save': '{name} を保存できませんでした（{error}）— ファイルには何も書き込まれていません。もう一度お試しください。',
 
@@ -871,6 +888,12 @@ module.exports = {
   'acct.hero.elsewhere': ' それぞれのページに記録された資産と負債はここには含まれません。',
   'imp.dateReading.dayFirst': 'このファイルの日付は日/月として読み取りました。逆に読むと順序が崩れるためです。',
   'imp.dateReading.monthFirst': 'このファイルの日付は月/日として読み取りました。逆に読むと順序が崩れるためです。',
+
+  /* Accessible names (audit of 11 Nov 2026, task 19) — machine-assisted, not native-reviewed. */
+  'imp.aria.cancelTip': 'この明細を何も取り込まずに破棄します',
+  'imp.aria.remapTip': 'どの列が日付・内容・金額かを指定します',
+  'imp.aria.newAccountTip': 'これらの行を入れる口座を作成します',
+
   'acct.duplicateFolders': {
     other: '{count} 件の取引フォルダが2つの口座に割り当てられています（{names}）。最初の口座のみ読み込まれます。各口座に固有のフォルダ名を付けてください。',
   },
@@ -1397,6 +1420,14 @@ module.exports = {
   'debt.curve.aria.cleared': '{plan}：{month}までに完済。',
   'debt.curve.aria.owed': '{plan}：{month}時点で残り {amount}。',
 
+  /* Accessible names (audit of 11 Nov 2026, task 19) — machine-assisted, not native-reviewed. */
+  'debt.aria.strategy': '返済方法',
+  'debt.aria.range': '返済グラフの期間',
+
+  'tax.aria.year': '税年度',
+
+  'loans.aria.tabs': '計算機を選択',
+
   /* --- report.* / nav.report / shell.tx.report — machine-assisted, added
      alongside the Report feature (views/report.js, src/report.js). --- */
   'nav.report': 'レポート',
@@ -1583,6 +1614,9 @@ module.exports = {
   'plan.env.collapseAria': "{name} を折りたたむ",
   'plan.env.deleteAria': "支出バケット {name} を削除",
   'plan.actions.deleteAria': "プランを削除",
+
+  /* Accessible names (audit of 11 Nov 2026, task 19) — machine-assisted, not native-reviewed. */
+  'plan.pickerAria': 'プランを選択',
 
   'io.stale.message': "{file} は読み込み後にこのページの外で変更されたため、何も書き込まれませんでした",
   'io.stale.notice': "予算: {file} は読み込み後にこのページの外（別の端末またはマークダウン表示）で変更されたため、保存は書き込まれませんでした。ページはディスク上の現在の内容を読み込み直しました。もう一度変更してください。",

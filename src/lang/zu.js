@@ -72,6 +72,11 @@ module.exports = {
   'topbar.importTitle': 'Ngenisa i-CSV yesitatimende sebhange',
   'topbar.settings': 'Vula izilungiselelo zesabelomali',
 
+  /* Accessible names (audit of 11 Nov 2026, task 19) — machine-assisted, not native-reviewed. */
+  'topbar.settingsFor': 'Izilungiselelo zesabelomali — {name}',
+  'topbar.settingsTitle': 'Izilungiselelo zesabelomali',
+  'topbar.settingsTitleFor': '{name} · izilungiselelo zesabelomali',
+
   /* ------------------------------- settings -------------------------------- */
   'settings.folder.name': 'Ifolda yesabelomali',
   'settings.folder.desc': 'Indlela yevolti eya efoldeni equkethe i-Categories/, i-Accounts/, i-Budgets/, i-Transactions/, i-Settings.md, njalonjalo.',
@@ -605,6 +610,13 @@ module.exports = {
   'tx.split.chip': 'kuhlukaniswe kwaba ngu-{count}',
   'tx.split.chipGap': '{amount} engabalwanga',
   'tx.aria.splitChip': 'Izinketho zokuhlukanisa {desc} ngomhla {date}',
+
+  /* Accessible names (audit of 11 Nov 2026, task 19) — machine-assisted, not native-reviewed. */
+  'tx.split.aria.amount': 'Inani lengxenye {n}',
+  'tx.split.aria.category': 'Isigaba sengxenye {n}',
+  'tx.split.aria.note': 'Inothi lengxenye {n}',
+  'tx.split.aria.remove': 'Susa ingxenye {n}',
+
   'tx.unsplit.action': 'Khansela ukuhlukanisa',
   'tx.unsplit.title': 'Khansela ukuhlukaniswa kwalo msebenzi wemali?',
   'tx.unsplit.msg': {
@@ -816,6 +828,11 @@ module.exports = {
   'acct.err.notNumber': 'U-{field} akulona inani',
   'acct.err.nameRequired': 'Igama le-akhawunti liyadingeka',
   'cat.err.nameRequired': 'Igama lesigaba liyadingeka',
+
+  /* Accessible names (audit of 11 Nov 2026, task 19) — machine-assisted, not native-reviewed. */
+  'cat.aria.current': '{label} — okwamanje {value}',
+  'cat.aria.currentNone': '{label} — okwamanje akunasigaba',
+
   'acct.err.exists': 'I-akhawunti isivele ikhona',
   'acct.err.save': 'Ayikwazanga ukulondoloza u-{name} ({error})',
 
@@ -934,6 +951,12 @@ module.exports = {
   'acct.hero.elsewhere': ' Amafa nezikweletu ezibhalwe emakhasini awo awabalwa lapha.',
   'imp.dateReading.dayFirst': 'Izinsuku kuleli fayela zifundwe njengosuku/inyanga, ngoba ukuzifunda ngenye indlela kuzibeke ngaphandle kohlelo.',
   'imp.dateReading.monthFirst': 'Izinsuku kuleli fayela zifundwe njengenyanga/usuku, ngoba ukuzifunda ngenye indlela kuzibeke ngaphandle kohlelo.',
+
+  /* Accessible names (audit of 11 Nov 2026, task 19) — machine-assisted, not native-reviewed. */
+  'imp.aria.cancelTip': 'Lahla lesi sitatimende ngaphandle kokungenisa lutho',
+  'imp.aria.remapTip': 'Khetha ukuthi iyiphi ikholomu ewusuku, incazelo nenani',
+  'imp.aria.newAccountTip': 'Dala i-akhawunti le migqa ezongena kuyo',
+
   'acct.duplicateFolders': {
     one: 'Ifolda yokuthengiselana engu-{count} ifunwa ama-akhawunti amabili ({names}); kufundwa eyokuqala kuphela. Nika i-akhawunti ngayinye igama layo lefolda.',
     other: 'Amafolda okuthengiselana angu-{count} afunwa ama-akhawunti amabili ngalinye ({names}); kufundwa eyokuqala kuphela. Nika i-akhawunti ngayinye igama layo lefolda.',
@@ -1497,6 +1520,14 @@ module.exports = {
   'debt.curve.aria.cleared': '{plan}: sikhokhwe sonke ngo-{month}.',
   'debt.curve.aria.owed': '{plan}: kusakweletwa {amount} ngo-{month}.',
 
+  /* Accessible names (audit of 11 Nov 2026, task 19) — machine-assisted, not native-reviewed. */
+  'debt.aria.strategy': 'Indlela yokukhokha izikweletu',
+  'debt.aria.range': 'Ububanzi beshadi lokukhokha',
+
+  'tax.aria.year': 'Unyaka wentela',
+
+  'loans.aria.tabs': 'Khetha isibali',
+
   /* --- report.* / nav.report / shell.tx.report — machine-assisted, added
      alongside the Report feature (views/report.js, src/report.js). --- */
   'nav.report': 'Umbiko',
@@ -1687,6 +1718,9 @@ module.exports = {
   'plan.env.collapseAria': "Goqa u-{name}",
   'plan.env.deleteAria': "Susa ibhakede yokuchitha {name}",
   'plan.actions.deleteAria': "Susa uhlelo",
+
+  /* Accessible names (audit of 11 Nov 2026, task 19) — machine-assisted, not native-reviewed. */
+  'plan.pickerAria': 'Khetha uhlelo',
 
   'io.stale.message': "{file} iguquliwe ngaphandle kwaleli khasi ngemuva kokuthi ilayishwe, ngakho akukho okubhaliwe",
   'io.stale.notice': "Ibhajethi: {file} iguquliwe ngaphandle kwaleli khasi (enye idivayisi noma ukubuka kwe-markdown) ngemuva kokuthi ilayishwe, ngakho ukulondoloza kwakho akubhalwanga. Ikhasi selilayishe kabusha okukhona manje kudiski — sicela uphinde wenze ushintsho.",

@@ -62,6 +62,11 @@ module.exports = {
   'topbar.importTitle': 'Importer un relevé bancaire au format CSV',
   'topbar.settings': 'Ouvrir les paramètres du budget',
 
+  /* Accessible names (audit of 11 Nov 2026, task 19) — machine-assisted, not native-reviewed. */
+  'topbar.settingsFor': 'Paramètres du budget — {name}',
+  'topbar.settingsTitle': 'Paramètres du budget',
+  'topbar.settingsTitleFor': '{name} · paramètres du budget',
+
   /* ------------------------------- settings -------------------------------- */
   'settings.folder.name': 'Dossier du budget',
   'settings.folder.desc': 'Chemin dans le coffre du dossier contenant Categories/, Accounts/, Budgets/, Transactions/, Settings.md, etc.',
@@ -591,6 +596,13 @@ module.exports = {
   'tx.split.chip': 'répartie en {count}',
   'tx.split.chipGap': '{amount} non affecté',
   'tx.aria.splitChip': 'Options de ventilation pour {desc} du {date}',
+
+  /* Accessible names (audit of 11 Nov 2026, task 19) — machine-assisted, not native-reviewed. */
+  'tx.split.aria.amount': 'Montant de la part {n}',
+  'tx.split.aria.category': 'Catégorie de la part {n}',
+  'tx.split.aria.note': 'Note de la part {n}',
+  'tx.split.aria.remove': 'Retirer la part {n}',
+
   'tx.unsplit.action': 'Annuler la ventilation',
   'tx.unsplit.title': 'Annuler la ventilation de cette transaction ?',
   'tx.unsplit.msg': {
@@ -810,6 +822,11 @@ module.exports = {
   'acct.err.notNumber': '{field} n\'est pas un nombre',
   'acct.err.nameRequired': 'Le nom du compte est obligatoire',
   'cat.err.nameRequired': 'Le nom de la catégorie est obligatoire',
+
+  /* Accessible names (audit of 11 Nov 2026, task 19) — machine-assisted, not native-reviewed. */
+  'cat.aria.current': '{label} — actuellement {value}',
+  'cat.aria.currentNone': '{label} — actuellement sans catégorie',
+
   'acct.err.exists': 'Ce compte existe déjà',
   'acct.err.save': 'Impossible d\'enregistrer {name} ({error}) — rien n\'a été écrit dans le fichier ; réessayez la même action.',
 
@@ -927,6 +944,12 @@ module.exports = {
   'acct.hero.elsewhere': ' Les biens et les dettes enregistrés sur leurs propres pages ne sont pas comptés ici.',
   'imp.dateReading.dayFirst': 'Les dates de ce fichier ont été lues jour/mois, car l’autre lecture les mettait dans le désordre.',
   'imp.dateReading.monthFirst': 'Les dates de ce fichier ont été lues mois/jour, car l’autre lecture les mettait dans le désordre.',
+
+  /* Accessible names (audit of 11 Nov 2026, task 19) — machine-assisted, not native-reviewed. */
+  'imp.aria.cancelTip': 'Abandonner ce relevé sans rien importer',
+  'imp.aria.remapTip': 'Indiquer quelle colonne contient la date, le libellé et le montant',
+  'imp.aria.newAccountTip': 'Créer un compte où ces lignes seront enregistrées',
+
   'acct.duplicateFolders': {
     one: '{count} dossier d’opérations est revendiqué par deux comptes ({names}) ; seul le premier est lu. Donnez à chaque compte son propre nom de dossier.',
     other: '{count} dossiers d’opérations sont revendiqués par deux comptes chacun ({names}) ; seul le premier est lu. Donnez à chaque compte son propre nom de dossier.',
@@ -1483,6 +1506,14 @@ module.exports = {
   'debt.curve.aria.cleared': '{plan} : soldé en {month}.',
   'debt.curve.aria.owed': '{plan} : {amount} encore dus en {month}.',
 
+  /* Accessible names (audit of 11 Nov 2026, task 19) — machine-assisted, not native-reviewed. */
+  'debt.aria.strategy': 'Méthode de remboursement',
+  'debt.aria.range': 'Plage du graphique de remboursement',
+
+  'tax.aria.year': 'Année fiscale',
+
+  'loans.aria.tabs': 'Choisir un simulateur',
+
   /* --- report.* / nav.report / shell.tx.report — machine-assisted, added
      alongside the Report feature (views/report.js, src/report.js). --- */
   'nav.report': 'Rapport',
@@ -1673,6 +1704,9 @@ module.exports = {
   'plan.env.collapseAria': "Replier {name}",
   'plan.env.deleteAria': "Retirer l'enveloppe {name}",
   'plan.actions.deleteAria': "Supprimer le plan",
+
+  /* Accessible names (audit of 11 Nov 2026, task 19) — machine-assisted, not native-reviewed. */
+  'plan.pickerAria': 'Choisir un plan',
 
   'io.stale.message': "{file} a été modifié en dehors de cette page après son chargement, donc rien n'a été écrit",
   'io.stale.notice': "Budget : {file} a été modifié en dehors de cette page (autre appareil ou vue markdown) après son chargement, donc votre enregistrement n'a pas été écrit. La page a rechargé ce qui est maintenant sur le disque — veuillez refaire la modification.",

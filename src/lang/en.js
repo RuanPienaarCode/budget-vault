@@ -65,6 +65,13 @@ module.exports = {
   'topbar.reportTitle': 'Generate a financial report',
   'topbar.settings': 'Open budget settings',
 
+  /* The avatar button once the household has a name (controller.js
+     applyIdentity): its accessible name, and its hover title with and without
+     the name. Unnamed, the name is topbar.settings above. */
+  'topbar.settingsFor': 'Budget settings — {name}',
+  'topbar.settingsTitle': 'Budget settings',
+  'topbar.settingsTitleFor': '{name} · budget settings',
+
   /* ------------------------------- settings -------------------------------- */
   'settings.folder.name': 'Budget folder',
   'settings.folder.desc': 'Vault path of the folder holding Categories/, Accounts/, Budgets/, Transactions/, Settings.md, etc.',
@@ -639,6 +646,15 @@ module.exports = {
   'tx.split.chip': 'split into {count}',
   'tx.split.chipGap': '{amount} unaccounted',
   'tx.aria.splitChip': 'Split options for {desc} on {date}',
+
+  /* The split dialog (modal.js SplitModal). Its three fields per part carry no
+     visible label — the row is amount, category, note — so these are the only
+     names they have. {n} counts from 1. */
+  'tx.split.aria.amount': 'Amount for part {n}',
+  'tx.split.aria.category': 'Category for part {n}',
+  'tx.split.aria.note': 'Note for part {n}',
+  'tx.split.aria.remove': 'Remove part {n}',
+
   'tx.unsplit.action': 'Un-split',
   'tx.unsplit.title': 'Un-split this transaction?',
   'tx.unsplit.msg': {
@@ -869,6 +885,14 @@ module.exports = {
   'acct.err.notNumber': '{field} is not a number',
   'acct.err.nameRequired': 'Account name required',
   'cat.err.nameRequired': 'Category name required',
+
+  /* The category cell before it becomes a real <select> (categories.js
+     deferredCatSelect): {label} is the name the caller gives the control, then
+     what it is set to. Two keys, because "currently uncategorised" is a
+     sentence, not a category called "uncategorised" dropped into one. */
+  'cat.aria.current': '{label} — currently {value}',
+  'cat.aria.currentNone': '{label} — currently uncategorised',
+
   'acct.err.exists': 'Account already exists',
   'acct.err.save': 'Could not save {name} ({error}) — nothing was written to the file; try the same action again.',
 
@@ -987,6 +1011,20 @@ module.exports = {
   'acct.hero.elsewhere': ' Assets and debts recorded on their own pages are not counted here.',
   'imp.dateReading.dayFirst': 'Dates in this file were read as day/month, because reading them the other way put them out of order.',
   'imp.dateReading.monthFirst': 'Dates in this file were read as month/day, because reading them the other way put them out of order.',
+
+  /* The import review table. The page is otherwise still English (see
+     EXPECTED_ENGLISH_ONLY in tests/i18n-render.test.cjs); these are the names
+     of its controls, and the two reasons a row arrives unticked.
+
+     imp.near.why and imp.pending.why are printed beside the row as well as
+     spoken: each is the hover title of its badge, the line under the
+     description, and — through importRowWhy's {why} — the end of the tick
+     box's name, so the reader hears why the box is empty before deciding.
+     Kept as one string each so the three can never say different things. */
+  'imp.aria.cancelTip': 'Discard this statement without importing anything',
+  'imp.aria.remapTip': 'Set which column is the date, description and amount',
+  'imp.aria.newAccountTip': 'Create an account for these rows to land in',
+
   'acct.duplicateFolders': {
     one: '{count} transaction folder is claimed by two accounts ({names}); only the first is read. Give each account its own folder name.',
     other: '{count} transaction folders are claimed by two accounts each ({names}); only the first is read. Give each account its own folder name.',
@@ -1692,6 +1730,26 @@ module.exports = {
   'debt.curve.aria.cleared': '{plan}: cleared by {month}.',
   'debt.curve.aria.owed': '{plan}: {amount} still owed in {month}.',
 
+  /* The Debt table's control names, the two selects above the payoff chart
+     (shell.js, through data-i18n-aria), and the button on the card-overlap
+     caveat. As on Owed money, the status pill is a sentence per state. */
+  'debt.aria.strategy': 'Payoff method',
+  'debt.aria.range': 'Payoff chart range',
+
+  /* Tax. A status pill is a sentence per status (`step.*`, `doc.*` — the last
+     segment is the stored status, with "n/a" spelled "na"). `{label}` in
+     codeFor* is the country profile's own word for a figure's code (locale.js
+     figureCodeLabel — "Source code" for SARS), which the column header prints
+     too. figDescription / figSource keep the lower-case start they always had:
+     they name a free-text field by the column it sits in. */
+  'tax.aria.year': 'Tax year',
+
+  /* Notes — including the note chip every other page draws beside an account,
+     a debt, a person or a service (views/notes.js noteButton), which is why
+     these are heard on translated pages too. {subject} is that thing's name.
+     And the loan calculators. */
+  'loans.aria.tabs': 'Choose a calculator',
+
   /* --------------------------------- report -------------------------------
      views/report.js (the page) and src/report.js (the generated note's own
      words — headings, table columns, section labels) share this prefix.
@@ -1903,6 +1961,15 @@ module.exports = {
   'plan.env.collapseAria': "Collapse {name}",
   'plan.env.deleteAria': "Remove spending bucket {name}",
   'plan.actions.deleteAria': "Delete plan",
+
+  /* The Plan page's remaining spoken-only strings (audit of 11 Nov 2026, task
+     19). `plan.split.aria.*` is the split bar's name, read as two or three
+     whole sentences joined by a space: the first is free OR overPlaced, the
+     second left OR overSpent, and pastBucket follows when a bucket was
+     overspent. `plan.env.overBy` is also printed, as an overspent bucket's
+     remainder. An item's tick is a sentence per state, and cycleTip is its
+     hover title — the order a tap moves it through. */
+  'plan.pickerAria': 'Choose a plan',
 
   'io.stale.message': "{file} was changed outside this page after it loaded, so nothing was written",
   'io.stale.notice': "Budget: {file} was changed outside this page (another device, or the markdown view) after it loaded, so your save was not written. The page has reloaded what is on disk now — please make the edit again.",

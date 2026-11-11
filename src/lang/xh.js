@@ -67,6 +67,11 @@ module.exports = {
   'topbar.importTitle': 'Ngenisa i-CSV yesitheyitmenti sebhanki',
   'topbar.settings': 'Vula iisetingi zebhajethi',
 
+  /* Accessible names (audit of 11 Nov 2026, task 19) — machine-assisted, not native-reviewed. */
+  'topbar.settingsFor': 'Iisetingi zebhajethi — {name}',
+  'topbar.settingsTitle': 'Iisetingi zebhajethi',
+  'topbar.settingsTitleFor': '{name} · iisetingi zebhajethi',
+
   /* ------------------------------- settings -------------------------------- */
   'settings.folder.name': 'Ifolda yebhajethi',
   'settings.folder.desc': 'Indlela yevolti eya kwifolda equlethe iCategories/, iAccounts/, iBudgets/, iTransactions/, iSettings.md, njalo njalo.',
@@ -600,6 +605,13 @@ module.exports = {
   'tx.split.chip': 'yahlulwe yaba ngu-{count}',
   'tx.split.chipGap': '{amount} engabalwanga',
   'tx.aria.splitChip': 'Iindlela zokwahlula {desc} ngomhla {date}',
+
+  /* Accessible names (audit of 11 Nov 2026, task 19) — machine-assisted, not native-reviewed. */
+  'tx.split.aria.amount': 'Isixa senxalenye {n}',
+  'tx.split.aria.category': 'Udidi lwenxalenye {n}',
+  'tx.split.aria.note': 'Inqaku lenxalenye {n}',
+  'tx.split.aria.remove': 'Susa inxalenye {n}',
+
   'tx.unsplit.action': 'Rhoxisa ukwahlula',
   'tx.unsplit.title': 'Rhoxisa ukwahlulwa kwale ntengiselwano?',
   'tx.unsplit.msg': {
@@ -811,6 +823,11 @@ module.exports = {
   'acct.err.notNumber': 'U-{field} ayilonani',
   'acct.err.nameRequired': 'Igama leakhawunti liyafuneka',
   'cat.err.nameRequired': 'Igama ledidi liyafuneka',
+
+  /* Accessible names (audit of 11 Nov 2026, task 19) — machine-assisted, not native-reviewed. */
+  'cat.aria.current': '{label} — okwangoku {value}',
+  'cat.aria.currentNone': '{label} — okwangoku akunadidi',
+
   'acct.err.exists': 'Iakhawunti sele ikho',
   'acct.err.save': 'Ayikwazanga ukugcina u-{name} ({error})',
 
@@ -929,6 +946,12 @@ module.exports = {
   'acct.hero.elsewhere': ' Iiasethi namatyala abhalwe kumaphepha awo awabalwa apha.',
   'imp.dateReading.dayFirst': 'Imihla kule fayile ifundwe njengosuku/inyanga, kuba ukuyifunda ngenye indlela kuyibeke ngaphandle kolandelelwano.',
   'imp.dateReading.monthFirst': 'Imihla kule fayile ifundwe njengenyanga/usuku, kuba ukuyifunda ngenye indlela kuyibeke ngaphandle kolandelelwano.',
+
+  /* Accessible names (audit of 11 Nov 2026, task 19) — machine-assisted, not native-reviewed. */
+  'imp.aria.cancelTip': 'Lahla esi sitheyitmenti ngaphandle kokungenisa nto',
+  'imp.aria.remapTip': 'Khetha ukuba yeyiphi ikholam engumhla, inkcazelo nesixa',
+  'imp.aria.newAccountTip': 'Yenza iakhawunti apho le migca iza kungena khona',
+
   'acct.duplicateFolders': {
     one: 'Ifolda yeentengiselwano engu-{count} ibangwa ziiakhawunti ezimbini ({names}); kufundwa eyokuqala kuphela. Nika iakhawunti nganye igama layo lefolda.',
     other: 'Iifolda zeentengiselwano ezingu-{count} zibangwa ziiakhawunti ezimbini nganye ({names}); kufundwa eyokuqala kuphela. Nika iakhawunti nganye igama layo lefolda.',
@@ -1492,6 +1515,14 @@ module.exports = {
   'debt.curve.aria.cleared': '{plan}: lihlawulwe lonke ngo-{month}.',
   'debt.curve.aria.owed': '{plan}: kusatyalwa {amount} ngo-{month}.',
 
+  /* Accessible names (audit of 11 Nov 2026, task 19) — machine-assisted, not native-reviewed. */
+  'debt.aria.strategy': 'Indlela yokuhlawula amatyala',
+  'debt.aria.range': 'Uluhlu lwetshathi yokuhlawula',
+
+  'tax.aria.year': 'Unyaka werhafu',
+
+  'loans.aria.tabs': 'Khetha isibali',
+
   /* --- report.* / nav.report / shell.tx.report — machine-assisted, added
      alongside the Report feature (views/report.js, src/report.js). --- */
   'nav.report': 'Ingxelo',
@@ -1682,6 +1713,9 @@ module.exports = {
   'plan.env.collapseAria': "Songa {name}",
   'plan.env.deleteAria': "Susa ibhakethe yokuchitha {name}",
   'plan.actions.deleteAria': "Cima i-plan",
+
+  /* Accessible names (audit of 11 Nov 2026, task 19) — machine-assisted, not native-reviewed. */
+  'plan.pickerAria': 'Khetha i-plan',
 
   'io.stale.message': "{file} iguqulwe ngaphandle kweli phepha emva kokuba ilayishiwe, ngoko akukho nto ibhaliweyo",
   'io.stale.notice': "Ibhajethi: {file} iguqulwe ngaphandle kweli phepha (enye ikhompyuter okanye imbonakalo ye-markdown) emva kokuba ilayishiwe, ngoko ukugcina kwakho akubhalwanga. Iphepha liphinde lalayisha oko kukhoyo ngoku kwidiski — nceda wenze utshintsho kwakhona.",

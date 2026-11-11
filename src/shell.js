@@ -398,7 +398,7 @@ const SHELL_HTML = `
 
         <div id="planContent">
           <div class="plan-strip mb-4">
-            <div class="plan-segs hidden" id="planPickerWrap" role="group" aria-label="Choose a plan">
+            <div class="plan-segs hidden" id="planPickerWrap" role="group" aria-label="Choose a plan" data-i18n-aria="plan.pickerAria">
               <span id="planPicker"></span>
             </div>
             <div class="row ml-auto">
@@ -621,7 +621,7 @@ const SHELL_HTML = `
             <div class="card-h" style="align-items:center">
               <div><h2>Season</h2><div class="sub">Taxpayer status, assessment &amp; deadlines</div></div>
               <div class="row">
-                <select id="taxYearSel" class="form-select form-select-sm" aria-label="Tax year"></select>
+                <select id="taxYearSel" class="form-select form-select-sm" aria-label="Tax year" data-i18n-aria="tax.aria.year"></select>
                 <button class="btn-ghost" id="taxNewYear"><span class="ico" data-ico="plus"></span> New tax year</button>
                 <button class="btn-ghost" id="taxDeleteYear"><span class="ico" data-ico="trash-2|trash"></span> Delete year</button>
               </div>
@@ -805,11 +805,11 @@ const SHELL_HTML = `
                 Extra per month
                 <input type="number" step="1" min="0" id="debtExtra" class="form-control form-control-sm" value="0" style="width:110px">
               </label>
-              <select id="debtStrategy" class="form-select form-select-sm" aria-label="Payoff method">
+              <select id="debtStrategy" class="form-select form-select-sm" aria-label="Payoff method" data-i18n-aria="debt.aria.strategy">
                 <option value="avalanche">Avalanche — highest rate first</option>
                 <option value="snowball">Snowball — smallest balance first</option>
               </select>
-              <select id="debtRange" class="form-select form-select-sm" aria-label="Payoff chart range"></select>
+              <select id="debtRange" class="form-select form-select-sm" aria-label="Payoff chart range" data-i18n-aria="debt.aria.range"></select>
             </div>
           </div>
           <div class="body-pad"><div class="trend-svg-wrap" id="debtCurve"></div></div>
@@ -884,7 +884,7 @@ const SHELL_HTML = `
           <div class="sub-note" id="loansSubNote"></div>
         </div>
 
-        <div class="loan-tabs" id="loanTabs" role="group" aria-label="Choose a calculator">
+        <div class="loan-tabs" id="loanTabs" role="group" aria-label="Choose a calculator" data-i18n-aria="loans.aria.tabs">
           <button type="button" class="loan-tab is-on" id="loanTabHome" aria-pressed="true">
             <span class="ico" data-ico="house|home"></span> Home loan
           </button>
@@ -1018,10 +1018,10 @@ const SHELL_HTML = `
               <div class="sub imp-acct-check hidden" id="impAcctCheck" role="alert"></div>
             </div>
             <div class="row">
-              <button class="btn-ghost" id="impCancel" title="Discard this statement without importing anything">Cancel import</button>
-              <button class="btn-ghost" id="impRemap" title="Set which column is the date, description and amount">Columns wrong?</button>
+              <button class="btn-ghost" id="impCancel" title="Discard this statement without importing anything" data-i18n-title="imp.aria.cancelTip">Cancel import</button>
+              <button class="btn-ghost" id="impRemap" title="Set which column is the date, description and amount" data-i18n-title="imp.aria.remapTip">Columns wrong?</button>
               <select id="impAccount" class="form-select form-select-sm"></select>
-              <button class="btn-ghost" id="impNewAccount" title="Create an account for these rows to land in"><span class="ico" data-ico="plus"></span> New account</button>
+              <button class="btn-ghost" id="impNewAccount" title="Create an account for these rows to land in" data-i18n-title="imp.aria.newAccountTip"><span class="ico" data-ico="plus"></span> New account</button>
               <label class="text-muted" style="font-size:13px;display:inline-flex;align-items:center;gap:6px">
                 <input type="checkbox" id="impRemember" checked> remember new categorisations
               </label>

@@ -59,6 +59,11 @@ module.exports = {
   'topbar.importTitle': 'Einen Kontoauszug als CSV importieren',
   'topbar.settings': 'Budget-Einstellungen öffnen',
 
+  /* Accessible names (audit of 11 Nov 2026, task 19) — machine-assisted, not native-reviewed. */
+  'topbar.settingsFor': 'Budget-Einstellungen — {name}',
+  'topbar.settingsTitle': 'Budget-Einstellungen',
+  'topbar.settingsTitleFor': '{name} · Budget-Einstellungen',
+
   /* ------------------------------- settings -------------------------------- */
   'settings.folder.name': 'Budget-Ordner',
   'settings.folder.desc': 'Vault-Pfad des Ordners mit Categories/, Accounts/, Budgets/, Transactions/, Settings.md usw.',
@@ -586,6 +591,13 @@ module.exports = {
   'tx.split.chip': 'auf {count} aufgeteilt',
   'tx.split.chipGap': '{amount} nicht zugeordnet',
   'tx.aria.splitChip': 'Aufteilungsoptionen für {desc} vom {date}',
+
+  /* Accessible names (audit of 11 Nov 2026, task 19) — machine-assisted, not native-reviewed. */
+  'tx.split.aria.amount': 'Betrag für Teil {n}',
+  'tx.split.aria.category': 'Kategorie für Teil {n}',
+  'tx.split.aria.note': 'Notiz zu Teil {n}',
+  'tx.split.aria.remove': 'Teil {n} entfernen',
+
   'tx.unsplit.action': 'Aufteilung aufheben',
   'tx.unsplit.title': 'Aufteilung dieser Transaktion aufheben?',
   'tx.unsplit.msg': {
@@ -797,6 +809,11 @@ module.exports = {
   'acct.err.notNumber': '{field} ist keine Zahl',
   'acct.err.nameRequired': 'Kontoname erforderlich',
   'cat.err.nameRequired': 'Kategoriename erforderlich',
+
+  /* Accessible names (audit of 11 Nov 2026, task 19) — machine-assisted, not native-reviewed. */
+  'cat.aria.current': '{label} — derzeit {value}',
+  'cat.aria.currentNone': '{label} — derzeit ohne Kategorie',
+
   'acct.err.exists': 'Konto existiert bereits',
   'acct.err.save': '{name} konnte nicht gespeichert werden ({error}) — es wurde nichts in die Datei geschrieben; versuch es noch einmal.',
 
@@ -914,6 +931,12 @@ module.exports = {
   'acct.hero.elsewhere': ' Vermögen und Schulden, die auf ihren eigenen Seiten erfasst sind, zählen hier nicht mit.',
   'imp.dateReading.dayFirst': 'Die Daten in dieser Datei wurden als Tag/Monat gelesen, weil sie andersherum außer der Reihe lagen.',
   'imp.dateReading.monthFirst': 'Die Daten in dieser Datei wurden als Monat/Tag gelesen, weil sie andersherum außer der Reihe lagen.',
+
+  /* Accessible names (audit of 11 Nov 2026, task 19) — machine-assisted, not native-reviewed. */
+  'imp.aria.cancelTip': 'Diesen Auszug verwerfen, ohne etwas zu importieren',
+  'imp.aria.remapTip': 'Festlegen, welche Spalte Datum, Beschreibung und Betrag enthält',
+  'imp.aria.newAccountTip': 'Ein Konto anlegen, in dem diese Zeilen landen',
+
   'acct.duplicateFolders': {
     one: '{count} Buchungsordner wird von zwei Konten beansprucht ({names}); nur das erste wird gelesen. Geben Sie jedem Konto einen eigenen Ordnernamen.',
     other: '{count} Buchungsordner werden von je zwei Konten beansprucht ({names}); nur das erste wird gelesen. Geben Sie jedem Konto einen eigenen Ordnernamen.',
@@ -1470,6 +1493,14 @@ module.exports = {
   'debt.curve.aria.cleared': '{plan}: getilgt bis {month}.',
   'debt.curve.aria.owed': '{plan}: im {month} noch {amount} offen.',
 
+  /* Accessible names (audit of 11 Nov 2026, task 19) — machine-assisted, not native-reviewed. */
+  'debt.aria.strategy': 'Tilgungsmethode',
+  'debt.aria.range': 'Zeitraum des Tilgungsdiagramms',
+
+  'tax.aria.year': 'Steuerjahr',
+
+  'loans.aria.tabs': 'Rechner auswählen',
+
   /* --- report.* / nav.report / shell.tx.report — machine-assisted, added
      alongside the Report feature (views/report.js, src/report.js). --- */
   'nav.report': 'Bericht',
@@ -1660,6 +1691,9 @@ module.exports = {
   'plan.env.collapseAria': "{name} einklappen",
   'plan.env.deleteAria': "Ausgabentopf {name} entfernen",
   'plan.actions.deleteAria': "Plan löschen",
+
+  /* Accessible names (audit of 11 Nov 2026, task 19) — machine-assisted, not native-reviewed. */
+  'plan.pickerAria': 'Plan auswählen',
 
   'io.stale.message': "{file} wurde nach dem Laden außerhalb dieser Seite geändert, daher wurde nichts geschrieben",
   'io.stale.notice': "Budget: {file} wurde nach dem Laden außerhalb dieser Seite geändert (anderes Gerät oder Markdown-Ansicht), daher wurde Ihr Speichern nicht geschrieben. Die Seite hat neu geladen, was jetzt auf dem Datenträger steht — bitte nehmen Sie die Änderung erneut vor.",

@@ -387,14 +387,14 @@ class SplitModal extends Modal {
         type: 'text', class: 'budget-split-amt', inputmode: 'decimal',
         autocomplete: 'off', autocorrect: 'off', spellcheck: 'false',
         value: p.mag ? p.mag.toFixed(2) : '',
-        placeholder: '0.00', 'aria-label': `Amount for part ${i + 1}`,
+        placeholder: '0.00', 'aria-label': i18n.t('tx.split.aria.amount', { n: i + 1 }),
       });
       amt.addEventListener('input', () => {
         p.mag = Math.abs(normalizeAmount(amt.value) ?? 0);
         this.refresh();
       });
 
-      const cat = el('select', { class: 'budget-split-cat', 'aria-label': `Category for part ${i + 1}` });
+      const cat = el('select', { class: 'budget-split-cat', 'aria-label': i18n.t('tx.split.aria.category', { n: i + 1 }) });
       cat.append(el('option', { value: '' }, '— none —'));
       for (const name of this.opts.categories) cat.append(el('option', { value: name }, name));
       cat.value = p.cat;
@@ -402,7 +402,7 @@ class SplitModal extends Modal {
 
       const note = el('input', {
         type: 'text', class: 'budget-split-note', value: p.note,
-        placeholder: 'Note (optional)', 'aria-label': `Note for part ${i + 1}`,
+        placeholder: 'Note (optional)', 'aria-label': i18n.t('tx.split.aria.note', { n: i + 1 }),
       });
       note.addEventListener('input', () => { p.note = note.value; });
 
@@ -410,7 +410,7 @@ class SplitModal extends Modal {
       // Two parts is the floor — below that it isn't a split.
       if (this.parts.length > 2) {
         const del = el('button', {
-          type: 'button', class: 'budget-split-del', 'aria-label': `Remove part ${i + 1}`,
+          type: 'button', class: 'budget-split-del', 'aria-label': i18n.t('tx.split.aria.remove', { n: i + 1 }),
         }, '✕');
         del.addEventListener('click', () => {
           this.parts.splice(i, 1);

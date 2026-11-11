@@ -74,6 +74,11 @@ module.exports = {
   'topbar.reportTitle': 'Buat laporan keuangan',
   'topbar.settings': 'Buka pengaturan anggaran',
 
+  /* Accessible names (audit of 11 Nov 2026, task 19) — machine-assisted, not native-reviewed. */
+  'topbar.settingsFor': 'Pengaturan anggaran — {name}',
+  'topbar.settingsTitle': 'Pengaturan anggaran',
+  'topbar.settingsTitleFor': '{name} · pengaturan anggaran',
+
   /* ------------------------------- settings -------------------------------- */
   'settings.folder.name': 'Folder anggaran',
   'settings.folder.desc': 'Jalur di dalam vault menuju folder yang memuat Categories/, Accounts/, Budgets/, Transactions/, Settings.md, dan seterusnya.',
@@ -572,6 +577,13 @@ module.exports = {
   'tx.split.chip': 'dipecah menjadi {count}',
   'tx.split.chipGap': '{amount} belum tercatat',
   'tx.aria.splitChip': 'Opsi pecahan untuk {desc} pada {date}',
+
+  /* Accessible names (audit of 11 Nov 2026, task 19) — machine-assisted, not native-reviewed. */
+  'tx.split.aria.amount': 'Jumlah untuk bagian {n}',
+  'tx.split.aria.category': 'Kategori untuk bagian {n}',
+  'tx.split.aria.note': 'Catatan untuk bagian {n}',
+  'tx.split.aria.remove': 'Hapus bagian {n}',
+
   'tx.unsplit.action': 'Batalkan pecahan',
   'tx.unsplit.title': 'Batalkan pecahan transaksi ini?',
   'tx.unsplit.msg': {
@@ -774,6 +786,11 @@ module.exports = {
   'acct.err.notNumber': '{field} bukan bilangan',
   'acct.err.nameRequired': 'Nama rekening wajib diisi',
   'cat.err.nameRequired': 'Nama kategori wajib diisi',
+
+  /* Accessible names (audit of 11 Nov 2026, task 19) — machine-assisted, not native-reviewed. */
+  'cat.aria.current': '{label} — saat ini {value}',
+  'cat.aria.currentNone': '{label} — saat ini tanpa kategori',
+
   'acct.err.exists': 'Rekening itu sudah ada',
   'acct.err.save': '{name} tidak bisa disimpan ({error}) — tidak ada yang tertulis ke berkasnya; coba tindakan yang sama sekali lagi.',
 
@@ -887,6 +904,12 @@ module.exports = {
   'acct.hero.elsewhere': ' Aset dan utang yang dicatat di halamannya masing-masing tidak dihitung di sini.',
   'imp.dateReading.dayFirst': 'Tanggal dalam berkas ini dibaca sebagai hari/bulan, karena cara sebaliknya membuatnya tidak berurutan.',
   'imp.dateReading.monthFirst': 'Tanggal dalam berkas ini dibaca sebagai bulan/hari, karena cara sebaliknya membuatnya tidak berurutan.',
+
+  /* Accessible names (audit of 11 Nov 2026, task 19) — machine-assisted, not native-reviewed. */
+  'imp.aria.cancelTip': 'Buang rekening koran ini tanpa mengimpor apa pun',
+  'imp.aria.remapTip': 'Tentukan kolom mana yang berisi tanggal, keterangan, dan jumlah',
+  'imp.aria.newAccountTip': 'Buat rekening untuk menampung baris-baris ini',
+
   'acct.duplicateFolders': {
     other: '{count} folder transaksi diklaim oleh dua akun ({names}); hanya yang pertama dibaca. Beri setiap akun nama folder sendiri.',
   },
@@ -1423,6 +1446,14 @@ module.exports = {
   'debt.curve.aria.cleared': '{plan}: lunas pada {month}.',
   'debt.curve.aria.owed': '{plan}: masih terutang {amount} pada {month}.',
 
+  /* Accessible names (audit of 11 Nov 2026, task 19) — machine-assisted, not native-reviewed. */
+  'debt.aria.strategy': 'Metode pelunasan',
+  'debt.aria.range': 'Rentang grafik pelunasan',
+
+  'tax.aria.year': 'Tahun pajak',
+
+  'loans.aria.tabs': 'Pilih kalkulator',
+
   /* --------------------------------- report ------------------------------- */
   'report.pageSub': 'Satu catatan Markdown · baca di Obsidian, bagikan, atau tempelkan ke obrolan AI',
   'report.options.title': 'Pilihan laporan',
@@ -1604,6 +1635,9 @@ module.exports = {
   'plan.env.collapseAria': "Ciutkan {name}",
   'plan.env.deleteAria': "Hapus kantong belanja {name}",
   'plan.actions.deleteAria': "Hapus rencana",
+
+  /* Accessible names (audit of 11 Nov 2026, task 19) — machine-assisted, not native-reviewed. */
+  'plan.pickerAria': 'Pilih rencana',
 
   'io.stale.message': "{file} diubah di luar halaman ini setelah dimuat, jadi tidak ada yang ditulis",
   'io.stale.notice': "Anggaran: {file} diubah di luar halaman ini (perangkat lain atau tampilan markdown) setelah dimuat, jadi simpanan Anda tidak ditulis. Halaman sudah memuat ulang isi yang kini ada di disk — silakan ulangi perubahannya.",
