@@ -293,7 +293,7 @@ module.exports = function registerNotes(ctx) {
   async function addNote(about = '') {
     const options = aboutOptions();
     const preset = options.some(o => o.value === about) ? about : `general${SEP}`;
-    const op = opWriterOf(ctx);   // the state this dialog was opened over (io.js opWriter)
+    const op = opWriterOf(ctx, { book: true });   // bound to the BOOK, not the exact load: this only creates from what is typed (io.js opWriter({ book: true }))
     const r = await askFields(app, 'New note', [
       { key: 'title', label: 'Title', type: 'text', placeholder: 'What is this about?' },
       { key: 'about', label: 'About', type: 'select', options, value: preset,

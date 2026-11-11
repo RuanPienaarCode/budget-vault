@@ -949,7 +949,7 @@ module.exports = function registerDebts(ctx) {
   }
 
   async function addDebt() {
-    const op = opWriterOf(ctx);   // the state this dialog was opened over (io.js opWriter)
+    const op = opWriterOf(ctx, { book: true });   // bound to the BOOK, not the exact load: this only creates from what is typed (io.js opWriter({ book: true }))
     const r = await askFields(app, 'New debt', [
       { key: 'name', label: 'What is it?', type: 'text' },
       { key: 'lender', label: 'Lender', type: 'text' },

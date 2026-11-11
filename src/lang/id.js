@@ -1598,6 +1598,7 @@ module.exports = {
   'io.reloaded.message': "Anggaran: anggaran dibaca ulang saat menunggu jawaban Anda (buku lain dibuka, atau file-filenya berubah), jadi tidak ada yang diubah. Lihat halaman lagi dan ulangi jika memang masih itu yang Anda inginkan.",
   'io.reloadedWrite.message': "Anggaran dibaca ulang setelah ini dimulai (file-filenya berubah, atau buku lain dibuka), jadi {file} tidak ditulis",
   'tx.bulk.logKept': "{path} sudah mencantumkan baris-baris ini, meskipun yang masih ada di file-nya tidak dihapus.",
+  'tx.savedNotLearned': "Kategori yang Anda pilih tidak dipelajari sebagai aturan, karena anggaran dibaca ulang saat menyimpan.",
   'load.unreadable.head': "Beberapa berkas tidak dapat dibaca: {list}.",
   'load.unreadable.item': "{file} ({why})",
   'load.unreadable.why.missing': "tidak ada",

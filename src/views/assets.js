@@ -430,7 +430,7 @@ module.exports = function registerAssets(ctx) {
   }
 
   async function addAsset() {
-    const op = opWriterOf(ctx);   // the state this dialog was opened over (io.js opWriter)
+    const op = opWriterOf(ctx, { book: true });   // bound to the BOOK, not the exact load: this only creates from what is typed (io.js opWriter({ book: true }))
     const r = await askFields(app, 'New asset', [
       { key: 'name', label: 'What is it?', type: 'text', placeholder: 'e.g. The house' },
       { key: 'type', label: 'Kind', type: 'select', value: 'property',

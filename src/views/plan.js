@@ -975,7 +975,7 @@ module.exports = function registerPlan(ctx) {
     /* Before the dialog, not after it: asking for a name and then refusing to
        use it would make the reader type it twice. */
     if (refuseWhileDirty()) return;
-    const op = opWriterOf(ctx);   // the state this dialog was opened over (io.js opWriter)
+    const op = opWriterOf(ctx, { book: true });   // bound to the BOOK, not the exact load: this only creates from what is typed (io.js opWriter({ book: true }))
     const r = await askFields(app, 'New plan', [
       { key: 'name', label: 'What is this money for?', type: 'text',
         placeholder: 'Baby & catch-up',

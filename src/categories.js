@@ -45,7 +45,7 @@ module.exports = function registerCategories(ctx) {
   async function promptCreateCategory() {
     /* The category is typed for the book on screen; a switch while the dialog
        is open must not create it in the next one (io.js opWriter). */
-    const op = opWriterOf(ctx);
+    const op = opWriterOf(ctx, { book: true });   // bound to the BOOK, not the exact load: this only creates from what is typed (io.js opWriter({ book: true }))
     const r = await askFields(app, 'New category', [
       { key: 'name', label: 'Name', type: 'text', placeholder: 'e.g. Coffee budget' },
       { key: 'type', label: 'Type', type: 'select', options: typeOrder(S.settings.groups), value: 'expense' },
@@ -289,9 +289,11 @@ module.exports = function registerCategories(ctx) {
   /* `op`, when given, is the calling operation's writer (io.js opWriter): the
      pairs were read from ITS load, so if another load has replaced it since —
      another book opened while the save or import was writing — nothing is
-     learned into the state that won. */
+     learned into the state that won, and the answer is null rather than 0, so
+     the caller can say the rules were NOT learned instead of reporting a save
+     with none to learn (2026-11 final review). */
   async function learnRules(pairs, op) {
-    if (op && op.replaced()) return 0;
+    if (op && op.replaced()) return null;
     if (!rulesWritable()) return 0;
     // ruleText: the matcher's own normalisation, so "already have it" means
     // exactly what prepareRules will make of the pattern.

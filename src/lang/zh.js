@@ -1577,6 +1577,7 @@ module.exports = {
   'io.reloaded.message': "预算：在等待你回答期间，预算被重新读取（打开了另一本账簿，或其文件已更改），因此没有做任何更改。请重新查看页面，如果仍然需要，请再次操作。",
   'io.reloadedWrite.message': "此操作开始后预算被重新读取（其文件已更改，或打开了另一本账簿），因此没有写入 {file}",
   'tx.bulk.logKept': "{path} 已列出这些行，但仍在其文件中的行并未被删除。",
+  'tx.savedNotLearned': "你设置的类别没有被学习为规则，因为保存时预算被重新读取。",
   'load.unreadable.head': "有些文件无法读取：{list}。",
   'load.unreadable.item': "{file}（{why}）",
   'load.unreadable.why.missing': "缺失",

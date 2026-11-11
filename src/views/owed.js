@@ -264,7 +264,7 @@ module.exports = function registerOwed(ctx) {
   }
 
   async function addOwed() {
-    const op = opWriterOf(ctx);   // the state this dialog was opened over (io.js opWriter)
+    const op = opWriterOf(ctx, { book: true });   // bound to the BOOK, not the exact load: this only creates from what is typed (io.js opWriter({ book: true }))
     const r = await askFields(app, 'New owed entry', [
       /* One direction only, because that is all this page can count:
          owedSummary() treats every entry as a receivable and worth.js adds

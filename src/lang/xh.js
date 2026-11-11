@@ -1673,6 +1673,7 @@ module.exports = {
   'io.reloaded.message': "Ibhajethi: ibhajethi iphinde yafundwa ngoxa ibilinde impendulo yakho (enye incwadi ivuliwe, okanye iifayile zayo zitshintshile), ngoko akukho nto itshintshiweyo. Phinda ujonge iphepha uze uyiphinde ukuba useyiyo into oyifunayo.",
   'io.reloadedWrite.message': "Ibhajethi iphinde yafundwa emva kokuba oku kuqalile (iifayile zayo zitshintshile, okanye enye incwadi ivuliwe), ngoko {file} ayibhalwanga",
   'tx.bulk.logKept': "{path} sele idwelisa le migca, nangona leyo isekwiifayile zayo ingacinywanga.",
+  'tx.savedNotLearned': "Iindidi ozikhethileyo azifundwanga njengemithetho, kuba ibhajethi iphinde yafundwa ngoxa igcina.",
   'load.unreadable.head': "Iifayile ezithile azikwazanga ukufundwa: {list}.",
   'load.unreadable.item': "{file} ({why})",
   'load.unreadable.why.missing': "ayikho",

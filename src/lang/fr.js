@@ -1664,6 +1664,7 @@ module.exports = {
   'io.reloaded.message': "Budget : le budget a été relu pendant qu'il attendait votre réponse (un autre livre a été ouvert, ou ses fichiers ont changé), donc rien n'a été modifié. Regardez de nouveau la page et recommencez si c'est toujours ce que vous voulez.",
   'io.reloadedWrite.message': "Le budget a été relu après le début de cette opération (ses fichiers ont changé, ou un autre livre a été ouvert), donc {file} n'a pas été écrit",
   'tx.bulk.logKept': "{path} liste déjà ces lignes, bien que celles encore présentes dans leurs fichiers n'aient pas été supprimées.",
+  'tx.savedNotLearned': "Les catégories choisies n'ont pas été apprises comme règles, car le budget a été relu pendant l'enregistrement.",
   'load.unreadable.head': "Certains fichiers n'ont pas pu être lus : {list}.",
   'load.unreadable.item': "{file} ({why})",
   'load.unreadable.why.missing': "manquant",

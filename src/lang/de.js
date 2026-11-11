@@ -1651,6 +1651,7 @@ module.exports = {
   'io.reloaded.message': "Budget: Das Budget wurde neu gelesen, während auf Ihre Antwort gewartet wurde (ein anderes Buch wurde geöffnet oder seine Dateien haben sich geändert), daher wurde nichts geändert. Sehen Sie sich die Seite erneut an und wiederholen Sie den Vorgang, wenn er noch gewünscht ist.",
   'io.reloadedWrite.message': "Das Budget wurde neu gelesen, nachdem dies begonnen hatte (seine Dateien haben sich geändert oder ein anderes Buch wurde geöffnet), daher wurde {file} nicht geschrieben",
   'tx.bulk.logKept': "{path} führt diese Zeilen bereits auf, obwohl die, die noch in ihren Dateien stehen, nicht gelöscht wurden.",
+  'tx.savedNotLearned': "Die gewählten Kategorien wurden nicht als Regeln gelernt, weil das Budget während des Speicherns neu gelesen wurde.",
   'load.unreadable.head': "Einige Dateien konnten nicht gelesen werden: {list}.",
   'load.unreadable.item': "{file} ({why})",
   'load.unreadable.why.missing': "fehlt",

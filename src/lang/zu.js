@@ -1678,6 +1678,7 @@ module.exports = {
   'io.reloaded.message': "Ibhajethi: ibhajethi iphinde yafundwa ngesikhathi ilinde impendulo yakho (enye incwadi ivuliwe, noma amafayela ayo ashintshile), ngakho akukho okushintshiwe. Phinda ubheke ikhasi bese uyaphinda uma kuseyikho okufunayo.",
   'io.reloadedWrite.message': "Ibhajethi iphinde yafundwa ngemuva kokuthi lokhu kuqale (amafayela ayo ashintshile, noma enye incwadi ivuliwe), ngakho {file} ayibhalwanga",
   'tx.bulk.logKept': "{path} isivele ibala le migqa, nakuba leyo esesemafayeleni ayo ingasusiwe.",
+  'tx.savedNotLearned': "Izigaba ozikhethile azifundwanga njengemithetho, ngoba ibhajethi iphinde yafundwa ngesikhathi ilondoloza.",
   'load.unreadable.head': "Amanye amafayela awakwazanga ukufundwa: {list}.",
   'load.unreadable.item': "{file} ({why})",
   'load.unreadable.why.missing': "ayikho",

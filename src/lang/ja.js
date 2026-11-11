@@ -1577,6 +1577,7 @@ module.exports = {
   'io.reloaded.message': "予算: 回答を待っている間に予算が読み込み直されました（別の帳簿が開かれたか、そのファイルが変更されました）。そのため何も変更されていません。ページを確認し、必要ならもう一度実行してください。",
   'io.reloadedWrite.message': "この操作の開始後に予算が読み込み直されたため（ファイルが変更されたか、別の帳簿が開かれました）、{file} は書き込まれませんでした",
   'tx.bulk.logKept': "{path} にはすでにこれらの行が記録されていますが、まだファイルに残っている行は削除されていません。",
+  'tx.savedNotLearned': "保存中に予算が読み込み直されたため、設定したカテゴリはルールとして学習されませんでした。",
   'load.unreadable.head': "読み取れなかったファイルがあります: {list}。",
   'load.unreadable.item': "{file}（{why}）",
   'load.unreadable.why.missing': "見つかりません",

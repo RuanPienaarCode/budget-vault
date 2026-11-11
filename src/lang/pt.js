@@ -1666,6 +1666,7 @@ module.exports = {
   'io.reloaded.message': "Orçamento: o orçamento foi lido de novo enquanto esperava pela sua resposta (outro livro foi aberto, ou os seus ficheiros mudaram), por isso nada foi alterado. Veja a página de novo e repita se ainda for o que pretende.",
   'io.reloadedWrite.message': "O orçamento foi lido de novo depois de isto começar (os seus ficheiros mudaram, ou outro livro foi aberto), por isso {file} não foi escrito",
   'tx.bulk.logKept': "{path} já lista estas linhas, embora as que continuam nos seus ficheiros não tenham sido eliminadas.",
+  'tx.savedNotLearned': "As categorias que escolheu não foram aprendidas como regras, porque o orçamento foi lido de novo durante a gravação.",
   'load.unreadable.head': "Alguns ficheiros não puderam ser lidos: {list}.",
   'load.unreadable.item': "{file} ({why})",
   'load.unreadable.why.missing': "em falta",

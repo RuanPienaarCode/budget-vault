@@ -1213,9 +1213,19 @@ module.exports = function registerImport(ctx) {
       // The rows that DID land are still undoable — the receipt is written on
       // this path too, or a partial import would be the one nobody can take
       // back. Left of the toast so it exists before the early return.
-      if (landed.length && !op.replaced()) S.lastImport = receipt(p, label, landed, done);
+      const rows = `${done} row${done === 1 ? '' : 's'}`;
+      /* No receipt when the state was replaced under the import: its rows are
+         objects of a load nobody is looking at, so there is nothing an Undo
+         could take back — and the toast must not offer one (2026-11 final
+         review). The review screen went with that reload too. */
+      if (op.replaced()) {
+        return toast(`Import stopped after ${rows} (${err.message || err}). `
+          + (done ? 'Those rows are saved in their month files, but the budget was read again meanwhile, so this import cannot be undone from here — check the Transactions page and delete any that should not be there.'
+            : 'Nothing was imported.'), true);
+      }
+      if (landed.length) S.lastImport = receipt(p, label, landed, done);
       renderImportReview();   // reflect what already landed; the rest stays selectable
-      return toast(`Import stopped after ${done} row${done === 1 ? '' : 's'} (${err.message || err}). Saved rows kept — click Import rows again to retry the rest, or Undo it on the Transactions page.`, true);
+      return toast(`Import stopped after ${rows} (${err.message || err}). Saved rows kept — click Import rows again to retry the rest, or Undo it on the Transactions page.`, true);
     }
     S.lastImport = receipt(p, label, landed, done);
     const touched = additions;
@@ -1225,8 +1235,11 @@ module.exports = function registerImport(ctx) {
     }
     S.pendingImport = null;
     $('#importReview').classList.add('hidden');
+    /* learnRules says null when it learned nothing because the state was
+       replaced since this import read it — said, rather than left out. */
     toast(`Imported ${toAdd.length} transactions into ${touched.size} file${touched.size === 1 ? '' : 's'}` +
-          (newRules ? `, saved ${newRules} new rules` : ''));
+          (newRules ? `, saved ${newRules} new rules` : '')
+          + (newRules === null ? '. ' + i18n.t('tx.savedNotLearned') : ''));
     ctx.switchView('transactions');
   }
 

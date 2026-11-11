@@ -1652,6 +1652,7 @@ module.exports = {
   'io.reloaded.message': "Presupuesto: el presupuesto se volvió a leer mientras esperaba tu respuesta (se abrió otro libro o cambiaron sus archivos), así que no se cambió nada. Vuelve a mirar la página y repítelo si sigue siendo lo que quieres.",
   'io.reloadedWrite.message': "El presupuesto se volvió a leer después de empezar esto (cambiaron sus archivos o se abrió otro libro), así que no se escribió {file}",
   'tx.bulk.logKept': "{path} ya incluye estas filas, aunque las que siguen en sus archivos no se eliminaron.",
+  'tx.savedNotLearned': "Las categorías que elegiste no se aprendieron como reglas, porque el presupuesto se volvió a leer mientras se guardaba.",
   'load.unreadable.head': "Algunos archivos no se pudieron leer: {list}.",
   'load.unreadable.item': "{file} ({why})",
   'load.unreadable.why.missing': "falta",

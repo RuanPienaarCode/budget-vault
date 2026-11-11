@@ -557,7 +557,7 @@ module.exports = function registerAccounts(ctx) {
        zero. Blank is the honest starting point: the reader types the real
        figure, same as they would for a brand-new account. */
     const balancePrefill = unreadableBalance(a) ? '' : a.balance.toFixed(2);
-    const op = opWriterOf(ctx);   // `a` is this load's account — see afterDialog
+    let op = opWriterOf(ctx);   // `a` is this load's account — see below
     const r = await askFields(app, i18n.t('acct.balance.title', { name: a.name }), [
       { key: 'balance', label: i18n.t('acct.balance.field'), type: 'number', value: balancePrefill,
         // Which currency the figure being typed is IN. Nothing converts it, so
@@ -576,7 +576,22 @@ module.exports = function registerAccounts(ctx) {
       { key: 'as_at', label: i18n.t('acct.balance.asAt'), type: 'date', value: todayIso(),
         desc: i18n.t('acct.balance.asAtDesc') },
     ]);
-    if (!r || afterDialog(op)) return;
+    if (!r) return;
+    /* What is written is the dialog's own two answers — the figure and its
+       date — patched onto the account's frontmatter. So a SAME-book reload
+       while the dialog was open (a phone's sync of an unrelated month, the
+       ordinary case on a single-book vault) is no reason to throw the typed
+       figure away: the account is looked up again in the state now in memory,
+       by the path it was read from, and the figure lands on that — on its
+       current frontmatter, not the snapshot the dialog was opened over (2026-11
+       final review). Another book is still refused (afterDialog). */
+    if (op.reason() === 'book') { afterDialog(op); return; }
+    if (op.reason() === 'reload') {
+      const cur = S.accounts.find(x => x.rel === a.rel) || S.accounts.find(x => x.name === a.name);
+      if (!cur) { ctx.render(); return toast(i18n.t('acct.delete.gone', { name: a.name }), true); }
+      a = cur;
+      op = opWriterOf(ctx);
+    }
     const num = parseAmount(r.balance);
     /* TODO(i18n): reword acct.err.nan from "Not a number" to "{field} isn't a
        number — try a plain figure like {example}." Both params are passed at
@@ -2843,7 +2858,7 @@ module.exports = function registerAccounts(ctx) {
        set lives; a create form that asked eleven questions would be a worse
        trade than a second click. */
     const opt = fieldsForType(preType, null);
-    const op = opWriterOf(ctx);
+    const op = opWriterOf(ctx, { book: true });   // bound to the BOOK, not the exact load: this only creates from what is typed (io.js opWriter({ book: true }))
     const r = await askFields(app, i18n.t('acct.new.title'), [
       { key: 'name', label: i18n.t('acct.field.name'), type: 'text', placeholder: i18n.t('acct.new.namePlaceholder'), value: pre('name') },
       { key: 'type', label: i18n.t('acct.field.type'), type: 'select', options: acctTypeOptions(), value: preType },

@@ -394,6 +394,12 @@ function makeIo(deps, { view = false } = {}) {
   const currentLoad = () => (typeof deps.loadedBook === 'function' ? deps.loadedBook() : null);
   function assertStamp(rel, stamp) {
     if (stamp === undefined) return;
+    /* A BOOK stamp (opWriter({ book: true }), below): only the book matters. */
+    if (stamp && typeof stamp.book === 'string') {
+      const lf = loadedFolder();
+      if (stamp.book !== basePath() || (lf !== null && lf !== stamp.book)) throw bookChangedError(rel);
+      return;
+    }
     if (stamp && stamp.folder !== basePath()) throw bookChangedError(rel);
     if (currentLoad() !== stamp) {
       const now = currentLoad();
@@ -404,12 +410,44 @@ function makeIo(deps, { view = false } = {}) {
      replaced(): null while the stamp still holds, else the sentence to show
      for an operation that has not written anything yet (after a dialog). */
   const via = (name, own) => (typeof deps[name] === 'function' ? deps[name] : own);
-  function opWriter(stamp = currentLoad()) {
-    const opt = { stamp };
+  /* opWriter({ book: true }) — bound to the BOOK, not the exact load (the
+     2026-11 final review). For a flow that only CREATES from what the reader
+     typed — a note, a receipt slip, a category, an account, a row added to a
+     list — and reads whatever state it needs AFTER its dialog closes, from the
+     state in memory then. A same-book reload under the dialog (a phone's sync
+     of an unrelated month, which the watcher reloads for while a plugin modal
+     is up) replaced nothing that flow holds, and refusing it threw away what
+     the reader had just typed: on a single-book vault — every vault today —
+     that was the only way the stamp could fire. A switch to another book is
+     still refused (BOOK_CHANGED): the typing was for the book on screen.
+
+     reason(): null, 'book' (another book is open, or its state is), or
+     'reload' (the same book was re-read — never for a book-bound writer). */
+  function opWriter(mode) {
+    if (mode && mode.book === true) {
+      const book = loadedFolder();
+      const opt = { stamp: book === null ? undefined : { book } };
+      const reason = () => {
+        if (book === null) return null;
+        const lf = loadedFolder();
+        return book !== basePath() || (lf !== null && lf !== book) ? 'book' : null;
+      };
+      return writersFor(opt, reason, opt.stamp);
+    }
+    const stamp = mode === undefined ? currentLoad() : mode;
+    const reason = () => {
+      const now = currentLoad();
+      if (now === stamp && (!stamp || stamp.folder === basePath())) return null;
+      return (stamp && stamp.folder !== basePath()) || (now && stamp && now.folder !== stamp.folder) ? 'book' : 'reload';
+    };
+    return writersFor({ stamp }, reason, stamp);
+  }
+  function writersFor(opt, reason, stamp) {
     return {
       stamp,
+      reason,
       replaced() {
-        if (currentLoad() === stamp && (!stamp || stamp.folder === basePath())) return null;
+        if (!reason()) return null;
         let m = null;
         try { m = require('./i18n').t('io.reloaded.message'); } catch (e) { m = null; }
         return m && m !== 'io.reloaded.message' ? m : 'The budget was read again while this was waiting, so nothing was changed.';
@@ -1020,10 +1058,10 @@ function makeIo(deps, { view = false } = {}) {
    stamp, so it gets that ctx's own writers, never refusing: there is no
    second book in such a ctx for a write to land in. Views call this rather
    than ctx.opWriter() so those harnesses keep driving the real view code. */
-function opWriterOf(ctx) {
-  if (ctx && typeof ctx.opWriter === 'function') return ctx.opWriter();
+function opWriterOf(ctx, mode) {
+  if (ctx && typeof ctx.opWriter === 'function') return ctx.opWriter(mode);
   const call = name => (...a) => ctx[name](...a);
-  return { stamp: undefined, replaced: () => null,
+  return { stamp: undefined, reason: () => null, replaced: () => null,
     writeFile: call('writeFile'), writeBinary: call('writeBinary'), patchFile: call('patchFile'), trashFile: call('trashFile') };
 }
 

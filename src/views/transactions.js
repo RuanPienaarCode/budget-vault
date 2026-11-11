@@ -1427,7 +1427,7 @@ module.exports = function registerTransactions(ctx) {
     const kept = (key, fallback) => (draft && draft[key] != null ? draft[key] : fallback);
     /* The row is typed against the book on screen; a switch while the form is
        open must not file it in the next one (afterDialog). */
-    const op = opWriterOf(ctx);
+    const op = opWriterOf(ctx, { book: true });   // bound to the BOOK, not the exact load: this only creates from what is typed (io.js opWriter({ book: true }))
     const r = await askFields(app, i18n.t('tx.add.title'), [
       { key: 'date', label: i18n.t('tx.field.date'), type: 'date', value: kept('date', todayIso()) },
       { key: 'desc', label: i18n.t('tx.field.desc'), type: 'text', placeholder: i18n.t('tx.field.descPlaceholder'), value: kept('desc', undefined) },
@@ -1532,10 +1532,16 @@ module.exports = function registerTransactions(ctx) {
     let learned = 0;
     if (pendingLearns.size) {
       learned = await learnRules([...pendingLearns].map(([desc, cat]) => ({ desc, cat })), op);
+      /* Cleared either way: null means the state was replaced while this save
+         was writing (another book, or the same one re-read), and these pairs
+         were read off rows of a load nobody is looking at — keeping them for
+         the next Save could teach them to another book. Said, not dropped. */
       pendingLearns.clear();
     }
     clearSaveButton();
-    toast(i18n.t('tx.saved', { count: n }) + (learned ? i18n.t('tx.savedLearned', { count: learned }) : ''));
+    toast(i18n.t('tx.saved', { count: n })
+      + (learned ? i18n.t('tx.savedLearned', { count: learned }) : '')
+      + (learned === null ? '. ' + i18n.t('tx.savedNotLearned') : ''));
   }
 
   /* Write the current selection out as four files: CSV for a spreadsheet,

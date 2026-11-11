@@ -134,6 +134,14 @@ function failedLoadShowsConnect(loaded, openFolder) {
   return !loaded || loaded.folder !== openFolder;
 }
 
+/* Is an Obsidian modal open in any of these documents? Obsidian mounts each
+   Modal as a `.modal-container` on the body and removes it on close. Several
+   documents because a Budget view can live in a popout window, whose dialogs
+   open in that window's document. Pure over its argument, for bare node. */
+function modalOpenIn(docs) {
+  return docs.some(d => !!d && typeof d.querySelector === 'function' && !!d.querySelector('.modal-container'));
+}
+
 function fsChangeInBudget(basePath, file, oldPath) {
   const under = p => typeof p === 'string' && p !== '' && (p === basePath || p.startsWith(basePath + '/'));
   return under(file && file.path) || under(oldPath);
@@ -1135,6 +1143,14 @@ function mountApp(view) {
     // indefinitely after a value is picked, so treating it as "mid-edit" would
     // suppress reloads forever for anyone who touched a filter and walked away.
     if (a && root.contains(a) && /^(INPUT|TEXTAREA)$/.test(a.tagName)) return true;
+    /* A dialog is up. Every dialog this app opens (modal.js, receipt-modal.js,
+       the export and books dialogs) is an Obsidian Modal, which mounts on the
+       document body — outside `root`, so the focus test above never saw a
+       reader typing a note or a receipt slip into one. A sync of an unrelated
+       month then reloaded the vault under the open dialog (2026-11 final
+       review). Waiting for it to close costs a 1.5s retry; any modal counts,
+       ours or not, because telling them apart buys nothing worth the guess. */
+    if (modalOpenIn([document, root.ownerDocument])) return true;
     return Date.now() - lastInputAt < 3000;
   }
 
@@ -1532,4 +1548,4 @@ function mountApp(view) {
   };
 }
 
-module.exports = { mountApp, formatMoney, classifyRename, fsChangeInBudget, failedLoadShowsConnect, reloadFromDisk, applyInputMode, wireDropZone, makeReloadScheduler, makeRefusalHandler, unreadableSummary, visibleUnreadable, unreadableBannerText };
+module.exports = { mountApp, formatMoney, classifyRename, fsChangeInBudget, failedLoadShowsConnect, modalOpenIn, reloadFromDisk, applyInputMode, wireDropZone, makeReloadScheduler, makeRefusalHandler, unreadableSummary, visibleUnreadable, unreadableBannerText };

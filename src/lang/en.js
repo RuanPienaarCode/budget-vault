@@ -1886,6 +1886,7 @@ module.exports = {
   'io.reloaded.message': "Budget: the budget was read again while this was waiting for your answer (another book was opened, or its files changed), so nothing was changed. Look at the page again and repeat it if it is still what you want.",
   'io.reloadedWrite.message': "The budget was read again after this began (its files changed, or another book was opened), so {file} was not written",
   'tx.bulk.logKept': "{path} already lists these rows, although the ones still in their files were not deleted.",
+  'tx.savedNotLearned': "The categories you set were not learned as rules, because the budget was read again while saving.",
   'load.unreadable.head': "Some files could not be read: {list}.",
   'load.unreadable.item': "{file} ({why})",
   'load.unreadable.why.missing': "missing",

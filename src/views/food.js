@@ -416,7 +416,7 @@ module.exports = function registerFood(ctx) {
   async function addReceipt() {
     /* The slip is typed for the book on screen: the dialog, the receipt write
        and the Food Items write are bound to this load (io.js opWriter). */
-    const op = opWriterOf(ctx);
+    const op = opWriterOf(ctx, { book: true });   // bound to the BOOK, not the exact load: this only creates from what is typed (io.js opWriter({ book: true }))
     const got = await askReceipt(app, { money, foodItems: S.foodItems, categories: categoryChoices() });
     if (!got) return;
     if (op.replaced()) return toast(op.replaced(), true);
