@@ -29,7 +29,7 @@
 
 const { isSetAsideType } = require('./vocabulary');
 const { roundCents } = require('./amount');
-const { splitRole, SPLIT_PARENT, SPLIT_PART } = require('./tx-role');
+const { supersededBySplit, isSplitPart } = require('./tx-role');
 
 /* ------------------------------------------------------------------------
    Stamps
@@ -94,7 +94,6 @@ function stamp(rows, env) {
     const amount = typeof r.amount === 'number' ? r.amount : Number(r.amount) || 0;
     const cat = r.cat || '';
     const type = catType(r.cat);
-    const role = splitRole(r.split);
     out.push({
       row: r,
       label: r.label, date: r.date, amount, cat, type,
@@ -108,8 +107,18 @@ function stamp(rows, env) {
          INTO the fund is still counted. */
       earmarkedOut: amount < 0 && earmarked.has(r.label),
       transfer: type === 'transfer',
-      splitPart: role === SPLIT_PART,
-      splitParent: role === SPLIT_PARENT,
+      /* Both split stamps are tx-role's own predicates, never the Split cell
+         read here (2026-11-11 audit, task 6). `splitParent` was stamped from
+         the role alone until then, which made this the last raw-row reader to
+         ignore the Excluded tick: a split reversed by hand as documented
+         (Excluded unticked, parts deleted, `parent` left in the Split cell)
+         was counted by the Budget page and reconcile() — R1 000 on the
+         audit's repro — and dropped by ACCOUNT and HOUSEHOLD, so the Accounts
+         flow chips and the Score read R0 for it. supersededBySplit requires
+         the role AND the tick, so no lens can skip a row the period totals
+         count. tests/ledger-split-parent-needs-excluded.test.cjs. */
+      splitPart: isSplitPart(r),
+      splitParent: supersededBySplit(r),
       passthrough: paired.has(r),
       setAside: amount < 0 && isSetAsideType(type),
       fixed: fixed.has(cat),
