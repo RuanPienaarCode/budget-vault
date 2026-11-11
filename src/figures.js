@@ -343,7 +343,17 @@ module.exports = function registerFigures(ctx) {
      cards derive from that pass. On 1.38.0 the Dashboard ran reconcile() over
      every account three times in one render (the what's-left card, the drift
      note and net worth), each with its own filter. */
+  /* Once per RENDER PASS (2026-11-11 audit, task 9b): the Dashboard asks four
+     times in one paint — the what's-left card, the position tiles, the Debt
+     tile's count and the drift note — and each was a reconcile() of every
+     account. Kept only for the length of one synchronous render
+     (src/render-pass.js); outside a pass, and on the next render, it is
+     computed again, so an edit that never reloads still moves it. Callers
+     share the object within a pass and only read it. */
   function bookFigures() {
+    return ctx.passMemo('bookFigures', computeBookFigures);
+  }
+  function computeBookFigures() {
     const cur = S.settings.currency;
     const idx = accountIndex();
     const reconciled = new Map();

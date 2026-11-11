@@ -34,7 +34,15 @@ If it can be pure, it is: no DOM, no `require('obsidian')`, `today` injected
 rather than read off the clock — so it runs in bare node under a guard test.
 Existing ones: `dates` `amount` `markdown` `csv` `debt-math` `loan-math`
 `savings-math` `owed-math` `reconcile` `recurring` `worth` `dedupe` `tx-role`
-`misfiled`.
+`misfiled` `render-pass`.
+
+**Nothing derived is kept across a moment the reader could have edited in.** A
+figure must move on an edit that never reloads (an unsaved row, an account
+pushed into `S.accounts`), so there is no "per load" cache of figures. The one
+snapshot is `src/render-pass.js`: alive for a single synchronous page render,
+dropped in `finally`. Memoise through `ctx.passMemo` or not at all, and only a
+value its readers do not write to — `tests/render-pass.test.cjs` recomputes on
+every hit to check.
 
 Views in `src/views/*.js` own the DOM and receive a shared `ctx`; they publish
 their own helpers back onto it with `ctx.provide({...})`.

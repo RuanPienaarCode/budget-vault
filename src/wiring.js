@@ -91,6 +91,12 @@ const WIRING = [
   { id: 'tax', load: () => require('./views/tax') },
   { id: 'loans', load: () => require('./views/loans') },
   { id: 'import', load: () => require('./views/import') },
+  /* LAST, after every view has published its renderers: it wraps each one so
+     a page paints inside one render pass (see its header). Registered before
+     a view, it would find nothing to wrap and that view would paint outside
+     any pass — correct figures, computed many times over. Not controller.js's
+     order: this module is new with the 2026-11-11 audit, task 9(b). */
+  { id: 'render-pass', load: () => require('./render-pass') },
 ];
 
 /* Register the modules onto a ctx, in the one order.
