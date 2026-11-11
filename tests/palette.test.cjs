@@ -394,33 +394,32 @@ function norm(v) {
       return flat;
     };
 
-    /* STILL UNDER 3:1, and not this gate's to fix. Both rules belonged to
-       other lanes in the audit-fix round this gate was written in (2026-11-11),
-       so they are recorded here — with what they measure on vault-green light,
-       against the field's own fill — instead of edited or left unseen:
+    /* STILL UNDER 3:1 — nothing, and the list stays.
 
-         - The Transactions page's "firmer edge": --text-primary at 30%, written
-           when a field's edge was the hairline and 30% was the firmer of the
-           two. It carries an id, so nothing in the base rules can out-rank it,
-           and wherever color-mix() parses it holds the filter selects, the
-           search box and the Note field on every row at 1.96:1 — firmer than
-           the old hairline, under 3:1, and now WEAKER than every other field
-           in the app. (Its .btn-ghost selector is a button, not a field; it
-           rides along because it shares the declaration.)
+       It held two rules when this gate was written (2026-11-11), each in a
+       file the lane that wrote it did not own, each recorded with what it
+       measured rather than edited or left unseen:
+
+         - The Transactions page's "firmer edge": --text-primary at 30%,
+           written when a field's edge was the hairline and 30% was the firmer
+           of the two. It carried an id, so nothing in the base rules could
+           out-rank it, and it held the filter selects, the search box and the
+           Note field on every row at 1.96:1 against their own fill and
+           1.72:1 against the worst page — WEAKER than every other field in
+           the app once those moved to --control-border.
          - The Accounts search box, which is not a .form-control and still
-           draws the --border-color hairline: 1.20:1.
+           drew the --border-color hairline: 1.20:1, and 1.06:1 on the page.
 
-       An entry cannot rot. It fails when its rule is gone or renamed, and it
-       fails when its rule is brought up to 3:1 — either way the fix is to
-       delete the entry — and a rule that is under 3:1 and NOT listed fails
-       for that. */
-    const STILL_FAILING = [
-      '.budget-app-root #view-transactions .tx-filters .form-select-sm:not(:focus), '
-        + '.budget-app-root #view-transactions .tx-filters #txSearch:not(:focus), '
-        + '.budget-app-root #view-transactions .tx-actions .btn-ghost:not(:hover), '
-        + '.budget-app-root #view-transactions .table tbody td:nth-child(7) input:not(:focus)',
-      '.budget-app-root .acct-search input',
-    ];
+       Both read --control-border now (3.79:1 at worst against the fill,
+       3.51:1 against the page), so the sweep below holds them like any other
+       field and the list is empty on purpose. It stays for the reason
+       GRANDFATHERED does in section 2: the mechanism is the valuable part.
+       An entry cannot rot — it fails when its rule is gone or renamed, and
+       it fails when its rule is brought up to 3:1, and either way the fix is
+       to delete the entry — and a rule that is under 3:1 and NOT listed
+       fails for that. Adding one is a decision to ship a field nobody can
+       find the edge of, and should read like one. */
+    const STILL_FAILING = [];
     const swept = new Map();
     for (const r of rules) {
       if (!r.selectors.some(isField)) continue;

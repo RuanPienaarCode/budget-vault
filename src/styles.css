@@ -2031,9 +2031,16 @@ body.is-phone .budget-app-root .drawer-book:not(.hidden) { display: block; }
   background: var(--color-primary-light); border-color: var(--color-primary); color: var(--color-primary);
 }
 .budget-app-root .acct-search { flex: 1; min-width: 170px; }
+/* --control-border, like every other field (FORMS, above). This box is not a
+   .form-control, so it was missed when those moved off the hairline, and it
+   drew --border-color: 1.20:1 against its own fill and 1.06:1 against the
+   page it sits on, where WCAG 1.4.11 asks 3:1 of the edge a control is found
+   by (2026-11-11 audit, task 17). Now 3.79:1 at worst against the fill and
+   3.51:1 against the page, on every palette in both modes — held by the sweep
+   in tests/palette.test.cjs 7a, which reads this rule. */
 .budget-app-root .acct-search input {
   width: 100%; font: inherit; font-size: 13px; padding: 9px 14px; border-radius: 999px;
-  border: 1px solid var(--border-color); background: var(--surface); color: var(--text-primary);
+  border: 1px solid var(--control-border); background: var(--surface); color: var(--text-primary);
 }
 .budget-app-root .acct-search input:focus { outline: 2px solid var(--color-primary); outline-offset: 1px; }
 

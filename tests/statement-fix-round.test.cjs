@@ -16,7 +16,11 @@
      2. A FIELD OR BUTTON KEEPS ITS FOCUS / HOVER BORDER. The firmer color-mix()
         edge on the Transactions controls out-ranks .form-control:focus and
         .btn-ghost:hover (src/styles.css), so it must be switched off in exactly
-        those states.
+        those states. Since the second round of the 11 Nov 2026 audit the rule
+        names the action buttons only — the fields left it for the base rule's
+        --control-border, which that edge was weaker than — so the field half
+        is held the other way round: put a field back in, and it must yield to
+        focus.
      3. A FIGURE NEVER WRAPS MID-NUMBER, and a five-up KPI row steps its size
         down instead.
      4. A BUDGET FIGURE OF SEVEN DIGITS OR MORE STEPS DOWN (.is-long), and the
@@ -143,7 +147,9 @@ broke('amountSignStaysWithFigure', /(#view-transactions \.table td\.num:not\(\.t
 broke('amountSignStaysWithFigure', /(#view-transactions \.table td\.num\.text-success \{)/,
   "#view-transactions .table td.num.text-success::before { content: '+'; }\n.budget-app-root $1");
 broke('firmEdgeYieldsToFocusAndHover', '.btn-ghost:not(:hover)', '.btn-ghost');
-broke('firmEdgeYieldsToFocusAndHover', '#txSearch:not(:focus)', '#txSearch');
+/* A field put back into the firm-edge rule without its :not(:focus). */
+broke('firmEdgeYieldsToFocusAndHover', /(\.budget-app-root #view-transactions \.tx-actions \.btn-ghost:not\(:hover\) \{)/,
+  '.budget-app-root #view-transactions .tx-filters #txSearch,\n  $1');
 broke('figuresNeverWrap', /(\.budget-app-root \.score-flow-in,[^{]*\.lo-big \{\s*)white-space: nowrap;/, '$1');
 broke('figuresNeverWrap', /\.budget-app-root \.mini-kpis-5 \.mini \.v \{ font-size: [^}]*\}/, '');
 broke('budgetLongFigureStepsDown', /(#budTotalsTop \.bud-total-v\.is-left\.is-long \{[^}]*?)--st-cur-gap: var\(--st-cur-gap-figure\);/, '$1');
