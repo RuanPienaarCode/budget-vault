@@ -516,6 +516,94 @@ const keysOf = (root, prefix) => descend(root).map(e => e.getAttribute('data-foc
       await written();
       eq(focus.at(), $('#foodAdd'), 'opening the only receipt, gone too, lands on Add receipt');
     }
+
+    /* ================= Report ============================================= */
+    {
+      const M = await mount();
+      M.view = 'Report';
+      const $ = M.ctx.$;
+      M.ctx.renderReport();
+      // Period and detail are chart.js range pills, restored there; held here
+      // for the page all the same.
+      await press(need($('#reportPeriodPills'), 'range:3m'));
+      landed('range:3m', 'picking a report period lands on the pill that was pressed');
+      await press(need($('#reportDetailPills'), 'range:detail'));
+      landed('range:detail', 'and so does picking the level of detail');
+      // Format is the page's own group: a multi-select, so not a range pill.
+      const formats = $('#reportFormatPills');
+      await press(need(formats, 'format:json'));
+      landed('format:json', 'turning a format on lands back on that format');
+      eq(focus.at().getAttribute('aria-pressed'), 'true', 'which is now the pressed one');
+      await press(focus.at());
+      landed('format:json', 'and so does turning it off again');
+      eq(focus.at().getAttribute('aria-pressed'), 'false', 'which is no longer pressed');
+      // The last format standing cannot be turned off, so nothing is redrawn.
+      const md = need(formats, 'format:md');
+      await press(md);
+      eq(focus.at(), md, 'pressing the only selected format redraws nothing and leaves focus where it was');
+    }
+
+    /* ================= Loans (the negative) =============================== */
+    /* Both forms are built once and only the output boxes are redrawn, none of
+       which holds a control. So every field keeps focus through its own edit —
+       no landing to restore, and this is what says so. */
+    {
+      const M = await mount();
+      M.view = 'Loans';
+      const $ = M.ctx.$;
+      /* The tabs are wired when the view registers, so they are made real
+         buttons in place instead of being swapped for new ones. */
+      for (const id of ['#loanTabHome', '#loanTabCar']) $(id).tagName = 'BUTTON';
+      M.ctx.renderLoans();
+      const stays = async (node, type, set, what) => {
+        focus.on(node);
+        eq(focus.at(), node, `precondition: ${what} can take focus`);
+        set(node); node._fire(type); await settle();
+        eq(focus.at(), node, `${what} keeps focus through its own edit`);
+      };
+      const fields = root => descend(root).filter(e => /^(INPUT|SELECT)$/.test(e.tagName));
+      const home = fields($('#loanHomeForm'));
+      ok(home.length >= 4, 'the home-loan form is drawn');
+      const outBefore = $('#loanHomeOut').children[0];
+      for (const f of home) {
+        const type = f.tagName === 'SELECT' || f.getAttribute('type') === 'checkbox' ? 'change' : 'input';
+        await stays(f, type, n => { if (n.getAttribute('type') === 'checkbox') n.checked = true; else n.value = '12'; },
+          `a home-loan ${f.getAttribute('type') || 'select'} field`);
+      }
+      ok($('#loanHomeOut').children[0] !== outBefore, 'while the result under it WAS redrawn');
+      await press($('#loanTabCar'));
+      eq(focus.at(), $('#loanTabCar'), 'switching calculator leaves focus on the tab that was pressed');
+      const car = fields($('#loanCarForm'));
+      ok(car.length >= 5, 'the car-finance form is drawn');
+      for (const f of car) {
+        const type = f.tagName === 'SELECT' || f.getAttribute('type') === 'checkbox' ? 'change' : 'input';
+        await stays(f, type, n => { if (n.getAttribute('type') === 'checkbox') n.checked = true; else n.value = '12'; },
+          `a car-finance ${f.getAttribute('type') || 'select'} field`);
+      }
+    }
+
+    /* ================= Score (the negative) =============================== */
+    /* The ring's legend and its centre repaint IN PLACE: a press dims the
+       other segments and swaps the figure inside the centre button, and no
+       container above either control is emptied. The one button that leaves
+       the page ("go to Accounts") goes through switchView, which puts focus
+       on the new page's heading itself. */
+    {
+      const M = await mount();
+      M.view = 'Score';
+      const $ = M.ctx.$;
+      M.ctx.renderScore();
+      const hero = $('#scoreHero');
+      const rows = byClass(hero, 'score-ring-row');
+      const mid = byClass(hero, 'score-ring-mid')[0];
+      ok(rows.length >= 2 && mid, 'the ring is drawn with its legend and its centre');
+      await press(rows[1]);
+      eq(focus.at(), rows[1], 'focusing a part of the score leaves focus on that part\'s row');
+      eq(rows[1].getAttribute('aria-pressed'), 'true', 'which now reads pressed');
+      await press(mid);
+      eq(focus.at(), mid, 'and the centre keeps focus when it clears the part');
+      eq(rows[1].getAttribute('aria-pressed'), 'false', 'having cleared it');
+    }
   } finally {
     unpin();
   }
