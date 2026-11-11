@@ -194,7 +194,15 @@ module.exports = function registerLoad(ctx) {
      whose load was superseded follows the switch. `committed` is the folder
      the state in S was read from (basePath() form) and the load's sequence
      number — io.js refuses a write into any other folder (loadedBook). */
-  let committed = null;     // { folder, seq } — frozen; replaced, never mutated
+  /* `staleMark` is WHEN that load began, on io.js's stale sequence: every
+     change somebody else made that was marked at or before it, this load read
+     after. It is the only honest bound for lifting those marks, and it travels
+     with the load rather than with whoever asked for it, because the asker may
+     have JOINED (2026-11-11 audit, task 1). controller.js's reloadFromDisk took
+     its own mark; joined onto a load that had already read a month file, it
+     lifted the mark for a phone row that load never saw, and the next Save
+     deleted the row (tests/save-refuses-stale-joined-reload.test.cjs). */
+  let committed = null;    // { folder, seq, staleMark } — frozen; replaced, never mutated
   let seq = 0;
   let inFlight = null;      // { folder, promise } — the load a same-folder caller joins
   const openFolder = () => ctx.basePath();
@@ -224,7 +232,7 @@ module.exports = function registerLoad(ctx) {
   }
 
   /* The book the state in memory was read from, or null before the first load:
-     { folder, seq }, one frozen object per committed load, so a caller holding
+     { folder, seq, staleMark }, one frozen object per committed load, so a caller holding
      one across an await can tell "still the same load" by identity.
      ADR-0007 · A confirmation dialog takes a load stamp. io.js opWriter() takes
      this before the operation's first await and binds every write to it. */
@@ -239,6 +247,10 @@ module.exports = function registerLoad(ctx) {
   }
 
   async function doLoadVault(folder, mySeq) {
+    /* Taken before the first read, and before anything is awaited: what was
+       marked stale up to here is older than every byte this load will hold.
+       A ctx assembled without io.js's ledger has nothing to bound. */
+    const began = typeof ctx.staleMark === 'function' ? ctx.staleMark() : 0;
     // Every read below goes through R, rooted at `folder`; T is committed at the end.
     const R = ctx.readersAt(folder);
     const T = { settings: JSON.parse(JSON.stringify(SETTINGS_DEFAULTS)) };
@@ -863,7 +875,7 @@ module.exports = function registerLoad(ctx) {
        to the end, so no render, write or second load can see half of it. */
     if (folder !== openFolder() || (committed && mySeq < committed.seq)) return false;
     Object.assign(S, T);
-    committed = Object.freeze({ folder, seq: mySeq });
+    committed = Object.freeze({ folder, seq: mySeq, staleMark: began });
     setLanguage(language);
     /* The three selections that survive a reload — the open plan, the open
        tax year, the period on screen — are the reader's, kept when the

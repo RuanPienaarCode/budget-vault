@@ -419,14 +419,32 @@ async function reloadFromDisk(ctx, S, $, disableSaveButtons) {
   S.pendingImport = null;
   $('#importReview').classList.add('hidden');
   /* The write-side stale record (io.js, the ledger above makeIo) is bracketed
-     by this reload: marks made before it began are lifted once it COMPLETES —
-     the state in memory is then the disk's — and marks made while it was
-     reading survive, because they are newer than what it read. A reload that
-     throws lifts nothing: the state underneath is unknown. */
-  const staleMark = typeof ctx.staleMark === 'function' ? ctx.staleMark() : 0;
+     by this reload: marks made before the LOAD began are lifted once it
+     COMPLETES — the state in memory is then the disk's — and marks made while
+     it was reading survive, because they are newer than what it read. A reload
+     that throws lifts nothing: the state underneath is unknown.
+
+     "Before the load began" is the load's to say, not this function's
+     (2026-11-11 audit, task 1). loadVault() is single-flight, so the load
+     awaited here may be one that was already running — and had already read a
+     month file — when the change this reload was scheduled for landed. Clearing
+     up to a mark taken HERE lifted that change's mark over a state that did not
+     contain it; nothing scheduled another reload, and the next Save wrote the
+     page's old rows over the phone's. So the bound is the committed load's own
+     (load.js, loadedBook().staleMark), and a reload that finds itself holding a
+     load older than a change it was asked for reads again — once: the load it
+     joined has finished, so this one is its own, begun after everything marked
+     before this call. A ctx whose loader does not say when it began (a
+     harness's stand-in) is bracketed from here, as it always was. */
+  const asked = typeof ctx.staleMark === 'function' ? ctx.staleMark() : 0;
+  const began = () => {
+    const lb = typeof ctx.loadedBook === 'function' ? ctx.loadedBook() : null;
+    return lb && typeof lb.staleMark === 'number' ? lb.staleMark : asked;
+  };
   try {
     await ctx.loadVault();
-    if (typeof ctx.staleClear === 'function') ctx.staleClear(staleMark);
+    if (began() < asked) await ctx.loadVault();
+    if (typeof ctx.staleClear === 'function') ctx.staleClear(began());
   } finally {
     disableSaveButtons();
   }

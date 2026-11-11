@@ -547,10 +547,12 @@ function makeIo(deps, { view = false } = {}) {
     p.then(done, done);
     return p;
   }
-  /* A full reload brackets itself: staleMark() before it reads anything,
+  /* A full load brackets itself: staleMark() before it reads anything,
      staleClear(mark) once it has completed. Only marks made BEFORE the mark
-     are cleared — a change that lands while the reload is reading is newer
-     than what the reload read and must survive it. */
+     are cleared — a change that lands while the load is reading is newer
+     than what the load read and must survive it. The mark is taken by the
+     LOAD (load.js, kept on loadedBook()), never by a caller that may only
+     have joined one already reading: see controller.js reloadFromDisk. */
   const staleMark = () => rec.seq;
   function staleClear(mark) {
     for (const [k, v] of Array.from(rec.stale)) if (v.seq <= mark) rec.stale.delete(k);
