@@ -17,6 +17,7 @@ const { PALETTE_PRESETS, DEFAULT_PALETTE } = require('./constants');
 
 const books = require('./books');
 const { renderBookSwitchers, pickBook } = require('./book-switcher');
+const drawer = require('./drawer');
 const registerIo = require('./io');
 const registerFxLive = require('./fx-live');
 const registerPeriod = require('./period');
@@ -883,23 +884,11 @@ function mountApp(view) {
     : null;
   if (dockObserver) dockObserver.observe(root, { subtree: true, attributes: true, attributeFilter: ['disabled'] });
   /* ---------------------- drawer + theme (app shell) --------------------- */
-  function openDrawer() {
-    const d = $('#appDrawer');
-    d.classList.add('open');
-    setInert(d, false);                         // re-enter the tab / AT order
-    $('#drawerOverlay').classList.add('open');
-    $('#menuBtn').setAttribute('aria-expanded', 'true');
-    $('#drawerClose').focus();                  // move focus into the drawer
-  }
-  function closeDrawer() {
-    const d = $('#appDrawer');
-    const wasOpen = d.classList.contains('open');
-    d.classList.remove('open');
-    setInert(d, true);                          // leave the tab / AT order
-    $('#drawerOverlay').classList.remove('open');
-    $('#menuBtn').setAttribute('aria-expanded', 'false');
-    if (wasOpen) $('#menuBtn').focus();         // restore focus only on a real close
-  }
+  /* What each state does to the drawer AND to the app behind it lives in
+     src/drawer.js, where a guard test can reach it: the open drawer is modal,
+     and a close releases only what an open locked. */
+  function openDrawer() { drawer.openDrawer($); }
+  function closeDrawer() { drawer.closeDrawer($); }
   /* Topbar personalisation from Settings.md `household` — brand subtitle and
      avatar initials (first + last word, e.g. "Jane & John Smith" → JS). */
   function applyIdentity() {
