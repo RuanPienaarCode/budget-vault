@@ -471,6 +471,15 @@ module.exports = {
     other: '{count} baris dari rekening di luar anggaran disembunyikan',
   },
   'tx.outside.show': 'Tampilkan',
+  'tx.misfiled.file': {
+    other: '{file} berisi {count} transaksi bertanggal di luar bulan yang menjadi nama berkas itu, jadi tidak ada periode yang menampilkan atau menghitungnya.',
+  },
+  'tx.misfiled.more': {
+    other: 'dan {count} berkas lainnya',
+  },
+  'tx.misfiled.why': {
+    other: 'Saldo rekening tetap menghitungnya. Pindahkan setiap baris ke berkas bulannya sendiri, atau perbaiki tanggalnya.',
+  },
   'tx.future.hidden': {
     other: '{count} baris bertanggal setelah hari ini disembunyikan',
   },
@@ -1611,6 +1620,9 @@ module.exports = {
   'bud.amount.unreadable': '"{raw}" tidak bisa dibaca — dihitung sebagai 0 sampai Anda mengetik ulang jumlahnya',
   'dash.hero.unreadable': {
     other: '{count} jumlah tidak bisa dibaca dan dihitung sebagai 0',
+  },
+  'dash.hero.misfiled': {
+    other: '{count} transaksi bertanggal dalam periode ini disimpan di berkas bulan lain dan tidak dihitung ({files})',
   },
   'dash.split.otherSlice': 'Lainnya ({count})',
   'bud.err.toggle': 'Tidak bisa memperbarui catatan {category} ({error})',

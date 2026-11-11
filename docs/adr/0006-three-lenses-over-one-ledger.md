@@ -27,7 +27,7 @@ name here, and each will be stamped on the row exactly once by the ledger:
 | `foreign` | the account's `currency:` differing from the household's | not household money; never summed into a rand figure |
 | `earmarkedOut` | an outflow from an account whose type is savings/investment | money leaving a fund, not spending from the budget |
 | `transfer` | the category's type | money moving between the reader's own pockets |
-| `splitParent` | the split marker, `parent` | a row superseded by its parts; excluded by construction |
+| `splitParent` | the split marker `parent` AND the row's Excluded tick (`supersededBySplit`, tx-role.js) | a row superseded by its parts; a `parent` cell on a row whose tick was removed by hand is an ordinary row again (2026-11-11) |
 | `splitPart` | the split marker, `part` | one of the parts that carry a split row's money |
 | `passthrough` | a matching opposite leg in another account in the same window | the second leg of money already counted once |
 | `setAside` | an outflow under a savings/investment-typed category | money the household kept, not consumed |

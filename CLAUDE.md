@@ -33,7 +33,8 @@ by sha256. Copying by hand skips the proof, and the proof is the point.
 If it can be pure, it is: no DOM, no `require('obsidian')`, `today` injected
 rather than read off the clock — so it runs in bare node under a guard test.
 Existing ones: `dates` `amount` `markdown` `csv` `debt-math` `loan-math`
-`savings-math` `owed-math` `reconcile` `recurring` `worth` `dedupe` `tx-role`.
+`savings-math` `owed-math` `reconcile` `recurring` `worth` `dedupe` `tx-role`
+`misfiled`.
 
 Views in `src/views/*.js` own the DOM and receive a shared `ctx`; they publish
 their own helpers back onto it with `ctx.provide({...})`.

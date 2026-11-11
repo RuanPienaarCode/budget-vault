@@ -478,7 +478,8 @@ function currencyLine(pairs, key = 'acct.hero.otherCurrencies', moneyIn) {
    ALREADY COUNTED — 2026-10-20 audit, M2-02. The figure this sits under is
    the IMPLIED net worth: each stated balance carried forward by the rows dated
    after it. "Transactions since then add up to R X more" is the sentence for
-   a STATED balance (the Savings page's KPI), where those rows are not in the
+   a STATED balance (the Savings page's KPI, until it too went implied on
+   2026-11-11), where those rows are not in the
    figure; under an implied one they are, and a reader adds them a second
    time — on the vault this was found on, a five-figure drift read as money
    still to come on top of a total that already held it. So this says

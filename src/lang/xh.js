@@ -482,6 +482,18 @@ module.exports = {
     other: 'imiqolo engu-{count} evela kwiiakhawunti ezingaphandle kwebhajethi ifihliwe',
   },
   'tx.outside.show': 'Zibonise',
+  'tx.misfiled.file': {
+    one: '{file} inentengiselwano engu-{count} enomhla ongaphandle kwenyanga ifayile ethiywe ngayo, ngoko akukho xesha liyidwelisayo okanye liyibalayo.',
+    other: '{file} ineentengiselwano ezingu-{count} ezinemihla engaphandle kwenyanga ifayile ethiywe ngayo, ngoko akukho xesha lizidwelisayo okanye lizibalayo.',
+  },
+  'tx.misfiled.more': {
+    one: 'nenye ifayile engu-{count}',
+    other: 'nezinye iifayile ezingu-{count}',
+  },
+  'tx.misfiled.why': {
+    one: 'Ibhalansi yeakhawunti isayibala. Susa umqolo uwuse kwifayile yenyanga yawo, okanye ulungise umhla wawo.',
+    other: 'Ibhalansi yeakhawunti isazibala. Susa umqolo ngamnye uwuse kwifayile yenyanga yawo, okanye ulungise umhla wawo.',
+  },
   'tx.future.hidden': {
     one: 'umqolo ongu-{count} onomhla emva kwanamhlanje ufihliwe',
     other: 'imiqolo engu-{count} enemihla emva kwanamhlanje ifihliwe',
@@ -1687,6 +1699,10 @@ module.exports = {
   'dash.hero.unreadable': {
     one: 'Inani eli-{count} alikwazanga ukufundwa kwaye libalwa njenge-0',
     other: 'Amanani angama-{count} awakwazanga ukufundwa kwaye abalwa njenge-0',
+  },
+  'dash.hero.misfiled': {
+    one: 'Intengiselwano engu-{count} enomhla okweli xesha igcinwe phantsi kwenye inyanga kwaye ayibalwa ({files})',
+    other: 'Iintengiselwano ezingu-{count} ezinemihla ekweli xesha zigcinwe phantsi kwenye inyanga kwaye azibalwa ({files})',
   },
   'dash.split.otherSlice': 'Ezinye ({count})',
   'bud.err.toggle': 'Ayikwazanga ukuhlaziya inqaku le-{category} ({error})',

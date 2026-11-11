@@ -70,6 +70,15 @@ A single dated row of money in or out of an account. Stored under the calendar
 month it fell in, regardless of which period it belongs to.
 _Avoid_: entry, line, row
 
+**Misfiled row**:
+A transaction whose date falls in another calendar month than the file it sits
+in — a hand edit, or a row pasted across a month boundary. A period reads a
+month's file only when it touches that month, so a misfiled row can be in no
+period at all while the account's implied balance still counts it. The plugin
+names the file and the number of rows and leaves both where the reader put
+them; it neither moves the row nor counts it by date.
+_Avoid_: orphan row, lost row, stray transaction
+
 **Budget**:
 The set of per-category target amounts for one period. Targets only — a budget
 never holds actual spend.

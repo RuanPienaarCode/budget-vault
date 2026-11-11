@@ -123,7 +123,10 @@ async function render(theme) {
   /* ---- D2-03: the KPI drift line in cents, under a cents tile ---- */
   const kpis = byCls(nodes.get('#savingsKpis'), 'mini').map(flat);
   const inv = kpis.find(t => t.startsWith('Investments'));
-  ok(/Transactions since then add up to R 250,00 more/.test(inv), `the drift line is in cents (got "${inv}")`);
+  /* The sentence changed with the 2026-11-11 audit (task 7): the tile leads
+     with the implied figure now, so it names what the stated balances read
+     instead of rows "still to add". The cents rule this pins is unchanged. */
+  ok(/Your stated balances read R 250,00 less\./.test(inv), `the drift line is in cents (got "${inv}")`);
 
   /* ---- D1-15: the Net worth tile's sentences ---- */
   const net = kpis.find(t => t.startsWith('Net worth'));

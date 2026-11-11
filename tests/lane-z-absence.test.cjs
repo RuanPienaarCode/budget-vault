@@ -43,7 +43,7 @@ const one = (checks, page, re) => {
   const cases = [
     ['score', /^Ring: fixed bills % of income/], ['score', /^Ring: budget used \(six-period average\)/],
     ['score', /^Budget chip "budget used" \(this period\) vs ring/],
-    ['savings', /^Worth chart: "Investments" segment/], ['savings', /^KPI "Investments" \(stated\) vs chart/],
+    ['savings', /^Worth chart: "Investments" segment/], ['savings', /^KPI "Investments" = chart/],
     ['accounts', /^Group "Investments"/],
   ];
   for (const [page, re] of cases) eq(one(r.checks, page, re).status, 'pass', `${page}: ${re} is a pass - absence is the correct reading`);

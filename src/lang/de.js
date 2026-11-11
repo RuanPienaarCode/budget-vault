@@ -468,6 +468,18 @@ module.exports = {
     other: '{count} Zeilen von Konten außerhalb des Budgets sind ausgeblendet',
   },
   'tx.outside.show': 'Anzeigen',
+  'tx.misfiled.file': {
+    one: '{file} enthält {count} Transaktion mit einem Datum außerhalb des Monats, nach dem die Datei benannt ist; kein Zeitraum listet oder zählt sie.',
+    other: '{file} enthält {count} Transaktionen mit Daten außerhalb des Monats, nach dem die Datei benannt ist; kein Zeitraum listet oder zählt sie.',
+  },
+  'tx.misfiled.more': {
+    one: 'und {count} weitere Datei',
+    other: 'und {count} weitere Dateien',
+  },
+  'tx.misfiled.why': {
+    one: 'Der Kontostand zählt sie weiterhin. Verschiebe die Zeile in die Datei ihres eigenen Monats oder korrigiere ihr Datum.',
+    other: 'Der Kontostand zählt sie weiterhin. Verschiebe jede Zeile in die Datei ihres eigenen Monats oder korrigiere ihr Datum.',
+  },
   'tx.future.hidden': {
     one: '{count} Zeile mit Datum nach heute ist ausgeblendet',
     other: '{count} Zeilen mit Datum nach heute sind ausgeblendet',
@@ -1665,6 +1677,10 @@ module.exports = {
   'dash.hero.unreadable': {
     one: '{count} Betrag konnte nicht gelesen werden und zählt als 0',
     other: '{count} Beträge konnten nicht gelesen werden und zählen als 0',
+  },
+  'dash.hero.misfiled': {
+    one: '{count} Transaktion mit Datum in diesem Zeitraum liegt in der Datei eines anderen Monats und wird nicht gezählt ({files})',
+    other: '{count} Transaktionen mit Datum in diesem Zeitraum liegen in der Datei eines anderen Monats und werden nicht gezählt ({files})',
   },
   'dash.split.otherSlice': 'Sonstige ({count})',
   'bud.err.toggle': 'Die Notiz für {category} konnte nicht aktualisiert werden ({error})',

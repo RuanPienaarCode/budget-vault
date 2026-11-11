@@ -33,10 +33,61 @@ const STOP = new Set([
 /* Lowercase, strip digits and punctuation, collapse whitespace. Digits go
    because a bank suffixes its own reference to the merchant name
    ("FIBRE CO123456789") and those change; the letters do not. */
-function normDesc(s) {
+function cleanDesc(s) {
   return String(s || '').toLowerCase().replace(/\d+/g, ' ')
     .replace(/[^a-z]+/g, ' ').replace(/\s+/g, ' ').trim();
 }
+
+/* The cleaned text, remembered per description (2026-11-11 audit, task 13a).
+
+   normsFor below already cleans each row once per rows ARRAY, but the Services
+   page builds a fresh array on every render, so every paint cleaned every
+   description again: three regex passes over 18 000 rows at five years of
+   history, about 24 ms of each Services paint. The answer depends on the
+   string and on nothing else, so it is kept against the string, and an entry
+   can never be stale — a row edited in place is simply a different key.
+
+   BOUNDED, and bounded so it cannot thrash. This is the second description
+   cache this file has had. The first reset itself at a 50k cap, and review
+   measured it SLOWER than no cache on a vault whose bank appends a unique
+   reference to every line: each services pass walked past the cap, the reset
+   evicted exactly the keys the next pass asked for, and 80k unique rows took
+   1.9 s against 1.2 s uncached. Two things are different now:
+
+     - it is asked once per row per array, behind normsFor, not once per
+       service per row, so a miss costs one lookup rather than forty;
+     - it never evicts. Once NORM_CACHE_MAX descriptions are held, a new one
+       is cleaned and not kept — exactly what happened before this existed —
+       so a vault past the bound is never worse off than it was, and what the
+       next paint asks for first is still there.
+
+   20 000 entries holds five years at 300 rows a month even when every line
+   is unique. A description longer than NORM_CACHE_MAX_CHARS is cleaned and
+   not kept either, so a paragraph pasted into a cell cannot sit here; with
+   both limits, and the key held as its own copy (see the insert below), the
+   cache tops out at a few megabytes on a vault whose own rows weigh several
+   times that. Entries outlive a reload on purpose: the same merchants come
+   back, and a description that does not is a key nobody asks for again. */
+const NORM_CACHE_MAX = 20000;
+const NORM_CACHE_MAX_CHARS = 200;
+const normCache = new Map();
+function normDesc(s) {
+  if (typeof s !== 'string' || s.length > NORM_CACHE_MAX_CHARS) return cleanDesc(s);
+  const known = normCache.get(s);
+  if (known !== undefined) return known;
+  const clean = cleanDesc(s);
+  /* The KEY is a flat copy, never the row's own string. An engine may hold a
+     cell cut out of a month file as a slice of that file's whole text (V8
+     does, from 13 characters up), and this cache outlives a reload: keyed on
+     the slice, 300 kept descriptions held 29 MB of file text nothing else
+     referenced; copied, 0.1 MB. Concatenating and slicing back is what makes
+     the engine write the characters out afresh. Paid once per description
+     kept, never on a hit. */
+  if (normCache.size < NORM_CACHE_MAX) normCache.set((' ' + s).slice(1), clean);
+  return clean;
+}
+/* For tests/recurring-norm-desc-cache.test.cjs, which holds the bound. */
+const normCacheSize = () => normCache.size;
 
 /* normDesc for every row of ONE rows array, computed once and reused by every
    later matchCharges call on the same array. matchCharges runs once PER
@@ -48,12 +99,9 @@ function normDesc(s) {
    this was built against (47 accounts, 12 years, 80k rows, 41 services) that
    was ~1.0 s of a 1.2 s Services render and ~0.9 s of the dashboard's 2.3 s.
 
-   Keyed on the ARRAY, held weakly, so the cache dies with the render that
-   built it and needs no cap. A first cut memoised on the description string
-   with a 50k cap, and review measured it slower than no cache at all on a
-   vault whose bank appends a unique reference to every line: each services
-   pass walked past the cap, the reset evicted exactly the keys the next pass
-   asked for, and 80k unique rows took 1.9 s against 1.2 s uncached.
+   Keyed on the ARRAY, held weakly, so this layer dies with the render that
+   built it and needs no cap. It is what keeps the per-description cache above
+   to one lookup per row: without it every service would ask again.
 
    Each row's raw description is checked against the one its answer was
    computed from, so a row edited in place, or an array grown since, cannot be
@@ -641,6 +689,7 @@ function findRecurringCredit(rows, today) {
 }
 
 module.exports = {
+  NORM_CACHE_MAX, NORM_CACHE_MAX_CHARS, normCacheSize,
   normDesc, serviceTokens, matchCharges, chargeStats, nextExpected, chargeStatus, comparePrice,
   /* ISSUE 33/47. Exported so committed.js walks the SAME cadence table
      nextExpected steps by — a second copy of "how long is a fortnight" is

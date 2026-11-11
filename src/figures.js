@@ -284,6 +284,7 @@ module.exports = function registerFigures(ctx) {
   function periodFigures(p) {
     const summary = periodSummary(p);
     const budget = budgetTotals(p);
+    let misfiled;
     return {
       period: p,
       range: periodRange(p),
@@ -300,6 +301,21 @@ module.exports = function registerFigures(ctx) {
       foreign: summary.foreign,
       uncountedIncome: (summary.uncatIncome || 0) + ((summary.unknown && summary.unknown.income) || 0),
       unreadable: unreadableAmounts(p),
+      /* Rows dated inside this period that sit in another month's file, which
+         the file-month fast path (period.js txInRange, and unreadableAmounts
+         below) never reads for it: counted by reconcile(), in none of the
+         figures above (2026-11-11 audit, task 5). A count and the files, for
+         the hero's sentence; src/misfiled.js holds the rule. Only the rows
+         the BUDGET lens would have kept, like `unreadable` above: a misfiled
+         row the figures would have held out anyway is not what they are
+         short by. (The Transactions page lists every one.)
+
+         Read on first use and kept for THIS snapshot only: finding them walks
+         every row in the vault, a Dashboard paint builds this snapshot several
+         times, and only the hero's qualifier list (and the API that carries
+         it) asks. Eagerly it cost 2.7 ms of a 77 ms paint at five years of
+         history — in the pipeline the same audit's task 9 was thinning. */
+      get misfiled() { return misfiled || (misfiled = ctx.misfiledTx(p, { budgetOnly: true })); },
     };
   }
 
@@ -350,7 +366,12 @@ module.exports = function registerFigures(ctx) {
       if (!foreign) driftUnplaced += rec.unreadable || 0;
       if (rec.state === 'drift') { if (foreign) driftForeign++; else drift += rec.delta; }
     }
-    const balances = balanceBook();
+    /* The pass above IS the implied book's: balanceBook used to call
+       impliedAccounts(), which reconciled every account a second time with
+       the same rows and the same clock (2026-11-11 audit, task 9 — half the
+       reconcile() calls in a paint). Handed over rather than recomputed; the
+       rule that turns a verdict into a balance is still impliedAccounts'. */
+    const balances = balanceBook(reconciled);
     return {
       reconciled, unplacedBy, confirmDayBy,
       drift: { drift, driftForeign, driftUnplaced },
@@ -377,7 +398,10 @@ module.exports = function registerFigures(ctx) {
      printed one invested figure above a chart segment reading another some
      R 17 000 higher, and nothing on that page said the gap between them was
      rows nobody had confirmed yet. Both bases live here so a page
-     that prints one is handed the other, and the drift, with it.
+     that prints one is handed the other, and the drift, with it. Since the
+     2026-11-11 audit no page LEADS with `stated`: Accounts went implied with
+     discussion #124 and the Savings KPIs, the last, with task 7 — each prints
+     what the stated balances read beneath its implied figure.
 
      Home currency only, the way every total in this app is (currency.js);
      the foreign accounts are `others`, named beside the book and never
@@ -385,7 +409,7 @@ module.exports = function registerFigures(ctx) {
      BOTH bases, matching the Accounts hero's own rule: a figure that cannot
      be read cannot be added. Types are case-folded through accountType();
      owners through netByOwner(), the Accounts page's own rule. */
-  function balanceBook() {
+  function balanceBook(reconciled) {
     const cur = S.settings.currency;
     const declared = Array.isArray(S.settings.owners) ? S.settings.owners : [];
     const summarise = (accounts, all) => {
@@ -411,7 +435,7 @@ module.exports = function registerFigures(ctx) {
       };
     };
     const statedAll = S.accounts.filter(balanceReadable);
-    const impliedAll = impliedAccounts().filter(balanceReadable);
+    const impliedAll = impliedAccounts(undefined, reconciled).filter(balanceReadable);
     const stated = summarise(splitByCurrency(statedAll, cur).primary, statedAll);
     const implied = summarise(splitByCurrency(impliedAll, cur).primary, impliedAll);
     const driftByType = {};

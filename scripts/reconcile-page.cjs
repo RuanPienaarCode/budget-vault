@@ -1343,8 +1343,13 @@ function runChecks(G, pages) {
   /* ---- savings -------------------------------------------------------- */
   const V = 'savings';
   dom({ page: V, name: 'KPI: net worth', formula: 'worth(impliedAccounts…).net', re: /^savingsKpis\/div\.mini\[0\]\/div\.v/, globalValue: W.implied.net, globalSource: 'worth().net' });
-  dom({ page: V, name: 'KPI "Savings" (stated balances)', formula: 'Σ stated balance of savings-type home accounts (views/savings.js homeOnly(accountsOfType savings))', re: /^savingsKpis\/div\.mini\[1\]\/div\.v/, globalValue: W.byTypeStated.savings || 0, globalSource: 'Σ stated, type savings' });
-  dom({ page: V, name: 'KPI "Investments" (stated balances)', formula: 'Σ stated balance of investment-type home accounts', re: /^savingsKpis\/div\.mini\[2\]\/div\.v/, globalValue: W.byTypeStated.investment || 0, globalSource: 'Σ stated, type investment' });
+  /* IMPLIED since the 2026-11-11 audit (task 7): the two KPIs lead with the
+     stated balance rolled through the transactions since, like the Dashboard
+     tile and the Accounts page (discussion #124), and print what the stated
+     balances read beneath. Until then both were checked against Σ STATED and
+     were expected to DIFFER from the chart segment under them. */
+  dom({ page: V, name: 'KPI "Savings" (implied balances)', formula: 'Σ implied balance of savings-type home accounts (views/savings.js reads bookFigures().balances.implied.byType)', re: /^savingsKpis\/div\.mini\[1\]\/div\.v/, globalValue: W.byTypeImplied.savings || 0, globalSource: 'Σ implied, type savings' });
+  dom({ page: V, name: 'KPI "Investments" (implied balances)', formula: 'Σ implied balance of investment-type home accounts', re: /^savingsKpis\/div\.mini\[2\]\/div\.v/, globalValue: W.byTypeImplied.investment || 0, globalSource: 'Σ implied, type investment' });
   /* The chart is TWO partitions, and neither of its bar totals is the net.
      This read the OWNED bar's total and compared it to worth().net, so it was
      always short by exactly the liabilities — which is the definition of net,
@@ -1396,15 +1401,19 @@ function runChecks(G, pages) {
       else if (absentByDesign) C.checks.push({ page: V, name: `Worth chart: "${label}" segment (implied)`, formula: 'worth(impliedAccounts…) — accountGroups over implied balances', pageValue: 0, pageSource: `no segment titled ${label} - the chart draws only types that hold money`, globalValue: 0, globalSource: `byTypeImplied.${type}`, status: 'pass', delta: null, why: [], kind: 'money', note: '' });
       else C.add({ page: V, name: `Worth chart: "${label}" segment (implied)`, formula: 'worth(impliedAccounts…) — accountGroups over implied balances', pageValue: figValue(f), pageSource: f ? f.address : `no segment titled ${label}`,
         globalValue: implied, globalSource: `byTypeImplied.${type}`, tol: figTol(f) });
-      /* The KPI above the chart reads STATED balances, the chart reads
-         IMPLIED ones. One page, two bases; the difference is the drift. */
+      /* The KPI above the chart and the chart's own segment: one page, ONE
+         base since the 2026-11-11 audit (task 7). This pair was the last
+         `expectDiff` on the page — the KPI read stated, the segment implied,
+         and they differed by the drift (R15 000 against R14 500 on the
+         committed household). They must agree now, to the segment's own
+         printed precision. */
       const kpi = C.fig(V, type === 'savings' ? /^savingsKpis\/div\.mini\[1\]\/div\.v/ : /^savingsKpis\/div\.mini\[2\]\/div\.v/);
-      C.add({ page: V, name: `KPI "${label}" (stated) vs chart "${label}" segment (implied)`, formula: 'the KPI sums S.accounts balances; the chart sums impliedAccounts() — same accounts, two bases', pageValue: figValue(kpi), pageSource: kpi ? kpi.address : 'no KPI',
+      C.add({ page: V, name: `KPI "${label}" = chart "${label}" segment (both implied)`, formula: 'the KPI and the chart both sum impliedAccounts() — same accounts, one base', pageValue: figValue(kpi), pageSource: kpi ? kpi.address : 'no KPI',
         /* No segment beside an implied total of nil is a chart segment worth 0. */
-        globalValue: f ? figValue(f) : (absentByDesign ? 0 : null), globalSource: f ? f.address : (absentByDesign ? `no segment drawn (implied ${type} total is nil)` : 'no segment'), tol: figTol(kpi), expectDiff: true });
+        globalValue: f ? figValue(f) : (absentByDesign ? 0 : null), globalSource: f ? f.address : (absentByDesign ? `no segment drawn (implied ${type} total is nil)` : 'no segment'), tol: Math.max(figTol(kpi), f ? figTol(f) : 0) });
     }
-    C.add({ page: V, name: 'KPI "Investments" (stated) vs Dashboard tile "invested" (implied)', formula: 'views/savings.js totalInvest reads stated balances; the Dashboard position tile reads implied ones', pageValue: figValue(C.fig(V, /^savingsKpis\/div\.mini\[2\]\/div\.v/)), pageSource: 'savingsKpis mini[2]',
-      globalValue: W.byTypeImplied.investment || 0, globalSource: 'byTypeImplied.investment (what the Dashboard prints)', expectDiff: true });
+    C.add({ page: V, name: 'KPI "Investments" = Dashboard tile "invested" (both implied)', formula: 'views/savings.js totalInvest and the Dashboard position tile both read the implied balance book', pageValue: figValue(C.fig(V, /^savingsKpis\/div\.mini\[2\]\/div\.v/)), pageSource: 'savingsKpis mini[2]',
+      globalValue: W.byTypeImplied.investment || 0, globalSource: 'byTypeImplied.investment (what the Dashboard prints)' });
   }
 
   /* ---- accounts -------------------------------------------------------- */

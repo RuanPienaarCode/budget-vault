@@ -96,32 +96,36 @@ module.exports = function registerSavings(ctx) {
   function renderSavings() {
     const savings = accountsOfType(S.accounts, 'savings');
     const investments = accountsOfType(S.accounts, 'investment');
-    /* Split BEFORE summing, and split BEFORE worth() — the same order
-       views/accounts.js's hero uses. worth()'s arithmetic is shared with the
-       Dashboard, the Report and the health score, so this view narrows the
-       account list it hands over rather than teaching worth() a rule those
-       callers never asked for. */
-    const sPlit = split(savings), iPlit = split(investments);
-    /* The balance book (figures.js): the two KPIs print the STATED base —
-       the balance the reader typed — and the chart below prints the IMPLIED
-       one, the same as-of the Dashboard's cash card (ISSUE 44). Both are
-       summed once, there; what this page adds is the sentence between them,
-       because on the vault this was built against the two read about
-       R 17 000 apart on one screen with nothing to say why. */
+    /* The balance book (figures.js): the two KPIs LEAD WITH THE IMPLIED base —
+       the stated balance rolled through the rows dated after it, the same
+       as-of the chart below, the Dashboard's tile and the Accounts page print
+       (ISSUE 44, discussion #124) — and say beneath it what the balances the
+       reader typed read instead. Until the 2026-11-11 audit (task 7) these two
+       tiles were the last figures in the app to lead with the typed claim: on
+       the vault this was built against they read about R 17 000 apart from
+       the chart segment under them, and on the committed fixture R15 000
+       above a segment of R14 500 — the one difference the reconciliation gate
+       still had to pin. Both bases are summed once, in figures.js; this page
+       adds only the sentence between them. */
     const { balances } = bookFigures();
-    const totalSavings = balances.stated.byType.savings || 0;
-    const totalInvest = balances.stated.byType.investment || 0;
+    const totalSavings = balances.implied.byType.savings || 0;
+    const totalInvest = balances.implied.byType.investment || 0;
     const homeAccounts = balances.implied.accounts, worthOthers = balances.implied.others;
-    /* The same sentence the Dashboard's stale note prints (dash.stale.driftUp),
-       inline because this page is on the English-only backlog. In CENTS now,
-       not rounded to the rand as the Dashboard rounds it: this line sits under
-       a tile printed in cents, and the cents rule (whole rands on the
-       Dashboard/Budget summary figures only) holds a figure beside a cents
-       twin to cents (2026-10-20 audit, D2-03). Under a rand there is still
-       nothing to say. */
+    /* The other-currency tag on each tile, on the tile's own basis: the
+       implied foreign accounts of that type, so "plus $ 1 500" beside an
+       implied total is not the typed $ 1 000 of a different reading. */
+    const othersOf = type => split(accountsOfType(balances.implied.foreignAccounts, type)).others;
+    /* The typed claim, beneath the figure it is measured against — the same
+       sentence the Dashboard's savings tile and the Accounts hero print
+       (dash.pos.savingsDriftUp / Down), inline because this page is on the
+       English-only backlog. driftByType is implied − stated, so a POSITIVE
+       drift means the stated balances read LESS than the tile. In CENTS, not
+       rounded to the rand as the Dashboard rounds it: this line sits under a
+       tile printed in cents (2026-10-20 audit, D2-03). Under a rand there is
+       still nothing to say. */
     const driftLine = type => {
       const d = balances.driftByType[type] || 0;
-      return Math.abs(d) >= 1 ? `Transactions since then add up to ${money(Math.abs(d))} ${d > 0 ? 'more' : 'less'}.` : '';
+      return Math.abs(d) >= 1 ? `Your stated balances read ${money(Math.abs(d))} ${d > 0 ? 'less' : 'more'}.` : '';
     };
     const kpiNote = (others, type) => [otherTag(others), driftLine(type)].filter(Boolean).join(' · ');
     /* The household symbol, passed at last: worth() has always computed a
@@ -177,8 +181,8 @@ module.exports = function registerSavings(ctx) {
       'what you own minus what you owe' + (held.shown.length ? '.' : '') + otherLine(held.shown)
       + (held.shown.length && held.differs
         ? ` That counts the transactions since the balance was last typed; as typed, ${otherList(held.other)}.` : ''));
-    tile('Savings', money(totalSavings), 'st-money', kpiNote(sPlit.others, 'savings'));
-    tile('Investments', money(totalInvest), 'st-money', kpiNote(iPlit.others, 'investment'));
+    tile('Savings', money(totalSavings), 'st-money', kpiNote(othersOf('savings'), 'savings'));
+    tile('Investments', money(totalInvest), 'st-money', kpiNote(othersOf('investment'), 'investment'));
     growthTile(tile, entries);
     /* NO DEBT TILE HERE, deliberately — it was removed rather than lost.
        This page is about what the household is putting away and what that has

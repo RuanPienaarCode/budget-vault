@@ -462,6 +462,15 @@ module.exports = {
     other: '已隐藏预算外账户的 {count} 笔记录',
   },
   'tx.outside.show': '显示',
+  'tx.misfiled.file': {
+    other: '{file} 中有 {count} 笔交易的日期不在文件名所指的月份内，因此任何周期都不会列出或计入它们。',
+  },
+  'tx.misfiled.more': {
+    other: '以及另外 {count} 个文件',
+  },
+  'tx.misfiled.why': {
+    other: '账户余额仍会计入它们。请将每一行移到其所属月份的文件中，或更正其日期。',
+  },
   'tx.future.hidden': {
     other: '已隐藏日期在今天之后的 {count} 笔记录',
   },
@@ -1590,6 +1599,9 @@ module.exports = {
   'bud.amount.unreadable': '无法读取“{raw}” — 在你重新输入金额之前按 0 计算',
   'dash.hero.unreadable': {
     other: '有 {count} 个金额无法读取，按 0 计算',
+  },
+  'dash.hero.misfiled': {
+    other: '本周期内有 {count} 笔交易存放在其他月份的文件中，未被计入（{files}）',
   },
   'dash.split.otherSlice': '其他（{count}）',
   'bud.err.toggle': '无法更新 {category} 的笔记（{error}）',

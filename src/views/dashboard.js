@@ -1613,9 +1613,11 @@ module.exports = function registerDashboard(ctx) {
     /* ISSUE 88 — figures.js's own contract: a page printing one base of the
        balance book must be handed the other's drift. This tile prints the
        IMPLIED savings+investment total (balances.implied.byType above) with
-       no caveat beside it, while the Savings page's own KPIs print STATED and
-       disclose the same gap — on the committed fixture R14 500 here against
-       R15 000 there, with nothing here explaining why. Read off
+       no caveat beside it, while the Savings page's own KPIs printed STATED
+       and disclosed the same gap — on the committed fixture R14 500 here
+       against R15 000 there, with nothing here explaining why. (Those KPIs
+       lead with implied too since the 2026-11-11 audit, task 7, and carry
+       this tile's sentence.) Read off
        balances.driftByType (figures.js), never recomputed: it is the exact
        figure the Savings page's own driftLine() sums, combined across both
        pool types because this tile prints them combined.
@@ -3097,6 +3099,19 @@ function heroQualifiers(F, money) {
   if (unreadable.count > 0) {
     add('unreadable', 'spent', i18n.t('dash.hero.unreadable', { count: unreadable.count }),
       { count: unreadable.count, budget: unreadable.budget || 0, tx: unreadable.tx || 0 });
+  }
+  /* Rows dated inside this period that are filed under another month's file
+     are read by no period (2026-11-11 audit, task 5): reconcile() counts them,
+     the spent figure beside this line does not. The app keeps the filename
+     fast path and says so here rather than moving a row the reader typed. One
+     file is named — the Transactions page lists them all — and `+N` stands
+     for the rest in every language. `count` selects the plural form. */
+  const misfiled = (F && F.misfiled) || {};
+  if (misfiled.count > 0) {
+    const files = (misfiled.files || []).map(f => f.rel);
+    add('misfiled', 'spent', i18n.t('dash.hero.misfiled', {
+      count: misfiled.count, files: files[0] + (files.length > 1 ? ` +${files.length - 1}` : ''),
+    }), { count: misfiled.count, files });
   }
   const sched = sum.scheduled || { income: 0, spend: 0 };
   const ahead = (sched.income || 0) + (sched.spend || 0);
