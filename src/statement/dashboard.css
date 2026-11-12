@@ -269,6 +269,13 @@
 .budget-app-root #leftBody .left-grid {
   grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr) auto minmax(0, 1.75fr);
   gap: 12px;
+  /* The strip is read as one equation, so its figures share ONE baseline.
+     The base rule centres each cell, and the terms carry different numbers
+     of sub-lines (cash had six on the vault this was fixed against, funds
+     one), so centring staggered the four figures down the card like steps.
+     Each cell's first line is its .lv figure, so first-baseline alignment
+     lines up the numbers themselves, whatever their size or padding. */
+  align-items: baseline;
 }
 .budget-app-root #leftBody .left-grid--n4 {
   grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr) auto minmax(0, 1fr) auto minmax(0, 1.75fr);
@@ -300,6 +307,10 @@
   line-height: 1;
   letter-spacing: 0;
   padding: 0;
+  /* On the shared baseline a '−' or '=' sits low beside the digits; lift it
+     to roughly their middle. */
+  position: relative;
+  top: -0.3em;
 }
 
 .budget-app-root #leftBody .left-fig.is-free,
