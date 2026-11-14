@@ -3,6 +3,86 @@
 All notable changes to Budget Vault. Versions match the plugin version in
 `manifest.json` and the release tag exactly (no `v` prefix).
 
+## 1.60.0 — 2026-11-13
+
+One vault can now hold several books, each a budget folder of its own, with
+one open per device. The rest of the release works through the 2026-11-11
+audit: a book at the vault root saves and reloads what is its own, the
+derived figures agree with each other, dialogs and the drawer behave for a
+keyboard and a screen reader, every accessible name is spoken in the
+reader's language, and three contrast failures are fixed on every palette.
+
+### Added
+
+- **Several books in one vault.** A book is one budget folder, with its own
+  Settings.md, categories, accounts and transactions. Keep a book per
+  client, or a personal and a business one, and switch between them from
+  the top bar (on a phone, from the menu drawer). Add one under Settings →
+  Books: a new or empty folder is set up by the setup wizard, and a folder
+  that already holds a budget is added as it is. Which book is open is
+  remembered on each device and never synced, so a phone and a laptop can
+  have different books open. A switch is refused while anything is unsaved.
+  Nothing is added up across books. Removing a book edits the list and
+  touches no files. A vault with one book looks exactly as it did.
+- **The headless API is at version 2.** `books()` lists the books and says
+  which is open, `setActiveBook(folder)` switches it under the same rules
+  as the top bar, and the figure from `currentPeriod()` now names the book
+  it is for. Version 2 only adds to version 1, so an existing consumer
+  keeps working; test `apiVersion >= 2` before calling the new functions.
+  While the privacy splash screen is closed, `books()` says only that it is
+  locked.
+- **The debt and savings charts state their figures**, and each point can be
+  read with the keyboard.
+
+### Changed
+
+- **Savings leads with the implied figure.** The KPIs show what the
+  transactions say a pot holds, with the balance you typed beneath it as a
+  claim with a date.
+- **A row filed under the wrong month is disclosed.** A transaction whose
+  date falls outside the month file it sits in used to drop out of every
+  period in silence while still moving the account's balance. Nothing is
+  moved or recounted; the dashboard says the spend is missing rows, and an
+  app-wide banner names them so you can move them.
+- **Faster reloads and renders.** A reload parses only the month files that
+  changed, each render works from one snapshot of the figures, a language
+  table loads the first time it is read, and the stylesheet ships without
+  its comments and whitespace.
+
+### Fixed
+
+- **A book at the vault root** is read from, saved to and watched at the
+  paths it is actually in, and can save and delete what is its own — and
+  nothing outside it.
+- **Each book keeps to itself.** A setting lands in the book it was typed
+  for, each book converts with its own exchange-rate table, a reload of the
+  same book keeps what you were typing, and no operation that writes
+  several files can finish in a different book from the one it began in.
+  Arrowing through the book switcher no longer opens every book on the way.
+- **Figures that disagreed.** The dashboard's money-left figures share one
+  baseline, and a split parent is dropped from the totals only while it
+  still carries its Excluded tick — including in the export.
+- **Dialogs.** Every field is named by its label and described by its hint,
+  and Enter on Cancel, a dropdown or a toggle no longer submits the dialog.
+- **The drawer is modal.** Nothing behind its overlay can be reached, and it
+  stays modal when the page behind it is redrawn.
+- **Focus stays where you acted.** On Budget, Plan, Food, Accounts and
+  Report, and after any handler that redraws the page under its own button,
+  the keyboard lands back on the row or control you used instead of the top
+  of the page.
+- **Screen readers.** The plugin says which language it is written in, every
+  accessible name is spoken in your language, status lines are written into
+  regions that were already listening, and an error toast interrupts. Nine
+  flags whose reason was only a hover tooltip now open on a tap or a Tab.
+- **Contrast.** Fields and dropdowns have an edge you can see: it was the
+  same hairline as a table rule (1.20:1 against the field) and is now 3.5:1
+  or better on every palette, in light and dark. The label on a gradient
+  button, the top bar's initials and the dock's Save were 3.74:1 at their
+  lightest point on Vault Green and now clear 4.5:1. The pressed "fixed
+  bill" lock on the Budget page was a pale blue (2.77:1 on a white card)
+  and is now 5.93:1.
+- The Food search no longer fires after you have left the page.
+
 ## 1.59.0 — 2026-11-08
 
 The Accounts page becomes a quiet list with one inspector beside it, and a
