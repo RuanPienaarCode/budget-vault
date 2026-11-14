@@ -27,7 +27,7 @@ const { isSplitPart } = require('../tx-role');
 const { splitAroundTable } = require('../markdown');
 const { SCHEMAS } = require('../table-schema');
 const {
-  FOOD_ITEMS_FILE, FOOD_CATEGORIES, itemKey, parseFoodItems, mergeFoodItems, coverage,
+  FOOD_ITEMS_FILE, FOOD_CATEGORIES, OTHER, itemKey, parseFoodItems, mergeFoodItems, coverage,
   serializeReceipt, serializeFoodItems, refileReceiptText, receiptPath,
   matchReceipts, foodSummary, receiptPaid, foodTrend, priceChange, versusLastPeriod,
 } = require('../receipt-file');
@@ -102,6 +102,12 @@ module.exports = function registerFood(ctx) {
     tile('Discounts', money(sum.saved), sum.saved > 0 ? 'text-success' : '', 'XTRASAVE, specials and till rounding');
     tile('Healthy', sum.spend > 0 ? `${Math.round(sum.healthyShare * 100)}%` : '—', '',
       sum.spend > 0 ? `${money(sum.healthy)} on (V) HealthyFood lines` : 'no receipts this period');
+    /* How much of the period's receipt spend is filed into a real category,
+       and how much still sits in Other (blank cells included) — the rand
+       figure the By category list cannot be trusted past until it is small. */
+    tile('Categorised', sum.spend > 0 ? money(sum.categorised) : '—',
+      sum.spend > 0 && sum.uncategorised < 0.005 ? 'text-success' : '',
+      sum.spend > 0 ? `${money(sum.uncategorised)} uncategorised (in ${OTHER})` : 'no receipts this period');
     const covTile = tile('With a receipt', foodSpend > 0 ? `${Math.round((covered / foodSpend) * 100)}%` : '—', '',
       foodSpend > 0 ? `${money(covered)} of ${money(foodSpend)} grocery spend` : 'no Food spend on the bank this period');
     if (foodSpend > 0 && covered < foodSpend - 0.005) {

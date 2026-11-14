@@ -463,7 +463,7 @@ const SHELL_HTML = `
           <h1 class="financial-period-banner-title" data-i18n="nav.food">Food</h1>
           <div class="sub-note">What your grocery receipts say you bought &middot; one markdown file per slip, in <code>Receipts/</code></div>
         </div>
-        <div class="mini-grid mini-kpis-4 mb-4" id="foodKpis"></div>
+        <div class="mini-grid mini-kpis-5 mb-4" id="foodKpis"></div>
         <div class="card mb-4">
           <div class="card-h" style="align-items:center">
             <div><h2>Over time</h2><div class="sub" id="foodTrendSub">What was paid per period, by category</div></div>

@@ -334,12 +334,17 @@ function foodSummary(receipts, start, end) {
   }
   const cats = new Map();
   const products = new Map();
-  let spend = 0, saved = 0, healthy = 0;
+  let spend = 0, saved = 0, healthy = 0, uncategorised = 0;
   for (const r of inRange) {
     for (const it of r.items) {
       const paid = paidOf(it);
       const cat = it.category || OTHER;
       spend += paid;
+      /* Other is the bucket guessCategory drops a product into when no rule
+         knows it, and a blank Category cell lands there too — both read to a
+         household as "nobody has filed this yet", which is what the Food
+         page's Categorised tile counts. */
+      if (cat === OTHER) uncategorised += paid;
       saved -= (it.discount || 0);
       if (it.healthy) healthy += paid;
       const c = cats.get(cat) || { category: cat, amount: 0, lines: 0 };
@@ -359,9 +364,15 @@ function foodSummary(receipts, start, end) {
   const items = [...products.values()].map(p =>
     ({ ...p, members: [...p.members.values()], amount: r2(p.amount), lastPrice: p.prices.length ? p.prices[p.prices.length - 1].amount : 0 })).sort((a, b) => b.amount - a.amount || a.name.localeCompare(b.name));
   spend = r2(spend);
+  uncategorised = r2(uncategorised);
   return {
     receipts: inRange.length,
     spend,
+    /* Categorised is spend less the Other bucket, not a second running sum:
+       two sums each rounded to the cent could leave the halves a cent apart
+       from the total they split. */
+    categorised: r2(spend - uncategorised),
+    uncategorised,
     saved: r2(saved),
     healthy: r2(healthy),
     healthyShare: spend > 0 ? healthy / spend : 0,

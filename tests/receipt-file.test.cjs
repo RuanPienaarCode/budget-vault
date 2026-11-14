@@ -166,6 +166,21 @@ const text = rf.serializeReceipt(receipt);
     ['Snacks & chocolate', 105], ['Bakery', 40], ['Dairy & eggs', 30], ['Fruit & veg', 30],
   ], '6: by category, biggest first, ties by name');
   eq(s.byCategory.reduce((a, c) => a + c.amount, 0), s.spend, '6: categories add up to spend');
+  eq([s.categorised, s.uncategorised], [205, 0], '6: every line filed — all of it categorised');
+
+  /* Uncategorised is the Other bucket: a line filed Other and a line whose
+     Category cell is blank are the same "nobody has filed this yet", and the
+     two halves always add back to spend — a split that leaked a cent would
+     read as money bought on no receipt. */
+  const loose = { ...r1, rel: 'loose', date: '2026-02-10', items: [
+    { barcode: '6000000000400', name: 'MYSTERY 1', amount: 20.01, discount: 0, category: 'Other', healthy: false },
+    { barcode: '6000000000401', name: 'MYSTERY 2', amount: 12.50, discount: -2.5, category: '', healthy: false },
+  ] };
+  const su = rf.foodSummary([r1, r2, loose], '2026-02-01', '2026-02-28');
+  eq([su.spend, su.categorised, su.uncategorised], [235.01, 205, 30.01], '6: Other and blank are uncategorised, paid after discount');
+  eq(Math.round((su.categorised + su.uncategorised) * 100), Math.round(su.spend * 100), '6: the halves add back to spend');
+  const none = rf.foodSummary([r1], '2027-01-01', '2027-01-31');
+  eq([none.categorised, none.uncategorised], [0, 0], '6: an empty period is zero on both sides');
   const choc = s.items.find(i => i.members.some(m => m.barcode === '6000000000035'));
   eq([choc.count, choc.amount, choc.lastPrice], [2, 105, 55], '6: one product across two slips, latest price');
 
