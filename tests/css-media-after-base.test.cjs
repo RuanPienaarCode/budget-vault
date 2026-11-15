@@ -56,10 +56,15 @@ const want = (path, prop, env, expect, why) => {
 const R = ROOT();
 const P = ROOT('phone');
 
-// D1-01: the Plan bucket row's bar is gone on a phone, so the name has room.
+// D1-01: the Plan bucket row's bar must not take width from the name on a
+// phone. It used to be removed there; since the layout of 15 Nov 2026 it sits
+// on its own line under the name instead (statement/plan.css, the phone block:
+// grid-area bar), so the name keeps the row and the bar is still drawn. What
+// is pinned is the audit's own point — the phone rule lands AFTER its base.
 const bar = [...R, node('button', ['env-sum']), node('div', ['env-sum-bar'])];
-want(bar, 'display', { width: 375 }, 'none', 'D1-01 the collapsed bucket bar is removed under 640px');
-want(bar, 'display', { width: 1280 }, 'flex', 'D1-01 and kept on a desktop');
+want(bar, 'grid-area', { width: 375 }, 'bar', 'D1-01 the bucket bar drops to its own line under 600px');
+want(bar, 'height', { width: 375 }, '6px', 'D1-01 and is the phone height there, not the base one');
+want(bar, 'height', { width: 1280 }, '8px', 'D1-01 and keeps its desktop height beside the name');
 want([...R, node('div', ['pot-figs'])], 'gap', { width: 375 }, '10px 26px', 'the Plan figures close up under 640px');
 want([...R, node('div', ['pot-figs'])], 'gap', { width: 1280 }, '10px 38px', 'and keep their wide gap on a desktop');
 

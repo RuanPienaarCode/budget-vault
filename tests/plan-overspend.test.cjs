@@ -416,26 +416,44 @@ const full = (file, name, extra) => ({ file, name, fmRaw: '', started: '2026-08-
 
     /* THE SECOND FIGURE, at a size a reader can see, and WHICH figure it is.
        "Still left to spend" used to be a small italic subtotal rendered only
-       when it disagreed with the hero — the thing reported as too small. It is
-       a hero figure of its own now, EXCEPT on an overspent plan, where the
-       slot carries the overspend instead: the second most important fact in
+       when it disagreed with the hero — the thing reported as too small. It
+       became a hero figure of its own, EXCEPT on an overspent plan, where the
+       slot carried the overspend instead: the second most important fact in
        that state, and the one that explains why the first figure is smaller
-       than the buckets suggest. */
-    const second = pot.querySelector('.pot-fig-2');
-    ok(second, 'the second hero figure is drawn');
-    ok(/8678/.test((second.textContent || '').replace(/\s/g, '')),
-      `an overspent plan puts the overspend in the second slot (got "${second.textContent}")`);
-    ok(!/11240/.test((second.textContent || '').replace(/\s/g, '')),
-      'and NOT the same number the first figure is already showing');
-    ok(second._cls.has('text-danger'), 'in danger red, because it is an alarm');
-    ok(!pot.querySelector('.sk2-left'),
-      'the old small italic subtotal row is gone — "Still left" is not in two places at once');
+       than the buckets suggest.
 
-    /* THE OVERSPEND, named in the key and again in the loud card. Before this
-       fix neither mentioned it, because both keyed off free < 0. */
-    ok(/8678/.test(hero.replace(/\s/g, '')), 'the R 8 678 overspend appears in the hero key');
-    ok(/3301/.test(hero.replace(/\s/g, '')),
-      'and "Spoken for" names the R 3 301 still in untouched buckets, rather than R 0,00');
+       Since the redesign of 15 Nov 2026 that slot is the note under the Spent
+       stat, and the swap is kept: on an overspent plan the note names the
+       overrun and the Spent figure itself turns danger red. */
+    const stats = pot.querySelectorAll('.pot-stat');
+    const statOf = label => stats.find(s => ((s.querySelector('.pot-stat-l') || {}).textContent || '') === label);
+    const spentStat = statOf(i18n.t('plan.stat.spent'));
+    ok(spentStat, 'the Spent stat is drawn');
+    const spentNote = ((spentStat.querySelector('.pot-stat-n') || {}).textContent || '').replace(/\s/g, '');
+    ok(/8678/.test(spentNote),
+      `an overspent plan puts the overspend under Spent (got "${spentNote}")`);
+    ok(!/11240/.test(spentNote),
+      'and NOT the same number the first figure is already showing');
+    ok(spentStat.querySelector('.pot-stat-v')._cls.has('text-danger'),
+      'the Spent figure is in danger red, because it is an alarm');
+    /* "Still left" in exactly one place. The old key printed it as a small
+       italic row AND the hero promoted it, and the fix was that it stood in
+       one. On an overspent plan the hero's note is the overrun, so the R 14 541
+       left is said once, by the words under the bar — never twice, never
+       nowhere. */
+    const leftCount = [$('#planPot'), $('#planFree')]
+      .map(n => (n.textContent.replace(/\s/g, '').match(/14541/g) || []).length)
+      .reduce((t, c) => t + c, 0);
+    eq(leftCount, 1, 'the R 14 541 still left is printed exactly once between the hero and the words under the bar');
+
+    /* THE OVERSPEND, named in the hero and again in the loud card. Before the
+       1.45.0 fix neither mentioned it, because both keyed off free < 0. */
+    ok(/8678/.test(hero.replace(/\s/g, '')), 'the R 8 678 overspend appears in the hero');
+    /* Deleted 15 Nov 2026: "Spoken for names the R 3 301 still in untouched
+       buckets, rather than R 0,00". The redesign prints no "Spoken for"
+       figure at all — the per-bucket committed sum is still pinned as
+       arithmetic in section 1, and a printed R 0,00 that reads as "nothing is
+       earmarked" can no longer appear because the row it appeared in is gone. */
     const loud = $('#planFree');
     ok(!loud._cls.has('hidden'), 'the loud card shows on an overspent plan');
     ok(/8678/.test((loud.textContent || '').replace(/\s/g, '')),
@@ -468,12 +486,20 @@ const full = (file, name, extra) => ({ file, name, fmRaw: '', started: '2026-08-
     const loud = $('#planFree');
     const loudText = loud.textContent || '';
     ok(loud._cls.has('is-over'), 'the loud card is in its alarmed state');
-    ok(!/is not spoken for/.test(loudText), `and no longer calls R 1 000 "not spoken for" (got "${loudText}")`);
+    /* The R 1 000 the buckets alone suggest may appear only as the contrast
+       ("not the R 1 000 the buckets alone suggest"), never as room. The words
+       were "not spoken for" until 15 Nov 2026; every phrasing the page now has
+       for unallocated room is refused here. */
+    ok(!/R 1000\.00 (is not allocated|can still be allocated|left to allocate)/.test(loudText),
+      `and never offers R 1 000 as room to allocate (got "${loudText}")`);
+    ok(/R 0\.00 can still be allocated/.test(loudText), `it says nothing more can be allocated (got "${loudText}")`);
     ok(/1500/.test(loudText.replace(/\s/g, '')), 'it names the R 1 500 that went past bucket A');
     ok(!/The buckets hold R 9000\.00 but R 5500\.00 has actually gone/.test(loudText),
       'and never claims more has gone than the buckets hold, when less has');
-    ok(!loud.querySelectorAll('BUTTON').some(b => /new spending bucket/.test(b.textContent)),
-      'nor offers to put money that is already gone into a new bucket');
+    /* By key, not by wording: free:place and free:addto are the two buttons
+       that write `placeable` into a bucket, and neither may exist here. */
+    ok(!loud.querySelectorAll('BUTTON').some(b => ['free:place', 'free:addto'].includes(b.attrs['data-focus-key'])),
+      'nor offers to put money that is already gone into a new or existing bucket');
     /* Last, because it reads a string that exists only once en.js carries the key. */
     eq(eyebrow, i18n.t('plan.hero.overClaimed'), 'it says the buckets now claim more than is left');
     ok(eyebrow !== 'plan.hero.overClaimed', 'in words, not a bare i18n key');
@@ -489,9 +515,11 @@ const full = (file, name, extra) => ({ file, name, fmRaw: '', started: '2026-08-
     const pot = $('#planPot');
     ok(/600/.test(((pot.querySelector('.pot-fig') || {}).textContent || '')),
       'a healthy plan still leads with free — R 600 of a R 1 000 pot, unchanged');
-    ok(/900/.test(((pot.querySelector('.pot-fig-2') || {}).textContent || '')),
-      'with R 900 still left to spend beside it, the two saying different things');
-    ok(!(pot.querySelector('.pot-fig-2') || { _cls: new Set() })._cls.has('text-danger'),
+    const spentStat = pot.querySelectorAll('.pot-stat')
+      .find(s => ((s.querySelector('.pot-stat-l') || {}).textContent || '') === i18n.t('plan.stat.spent'));
+    ok(/900/.test(((spentStat.querySelector('.pot-stat-n') || {}).textContent || '')),
+      'with R 900 still left to spend under Spent, the two saying different things');
+    ok(!spentStat.querySelector('.pot-stat-v')._cls.has('text-danger'),
       'and in ordinary ink — a healthy plan raises no alarm in the hero');
     ok(!/over/i.test(pot.textContent), 'and no overspend row anywhere on a healthy plan');
     ok(!$('#planFree')._cls.has('is-over'),
@@ -521,8 +549,10 @@ const full = (file, name, extra) => ({ file, name, fmRaw: '', started: '2026-08-
       ],
     }));
     /* The FIRST bucket is the expanded one (renderEnvelopes opens it by
-       default), so the three collapsed rows are the last three. */
-    const rows = $('#planEnvelopes').querySelectorAll('.env-sum');
+       default), so the three collapsed rows are the last three. The open
+       card's header is built as the same row (`env-sum is-open`) since
+       15 Nov 2026, so it is left out by that class. */
+    const rows = $('#planEnvelopes').querySelectorAll('.env-sum').filter(r => !r.classList.contains('is-open'));
     const rem = {};
     for (const r of rows) {
       const name = (r.querySelector('.env-sum-name') || {}).textContent || '';
@@ -545,41 +575,61 @@ const full = (file, name, extra) => ({ file, name, fmRaw: '', started: '2026-08-
     /* THE BAR beside each remainder. Present on every collapsed row, with its
        three segments — a row that lost it silently would take the at-a-glance
        reading with it and leave the words behind, which is the failure mode
-       nobody notices. */
+       nobody notices. Since 15 Nov 2026 the three sit inside one `.esb-len`,
+       as long as the bucket's claim is of the largest on the page
+       (bucketScale), so the segments are read through it. */
+    const segs = b => (b.querySelector('.esb-len') || { children: [] }).children;
     for (const r of rows) {
       const name = (r.querySelector('.env-sum-name') || {}).textContent || '';
       const b = r.querySelector('.env-sum-bar');
       ok(b, `${name}: the collapsed row carries its own split bar`);
-      eq(b.children.length, 3, `${name}: three segments — spent, left, over`);
+      eq(segs(b).length, 3, `${name}: three segments — spent, left, over`);
       ok(b.attrs['aria-hidden'] === 'true',
         `${name}: the bar is decorative — the remainder beside it is the accessible text`);
     }
     const barOf = n => rows.find(r =>
       ((r.querySelector('.env-sum-name') || {}).textContent || '') === n).querySelector('.env-sum-bar');
-    ok(/width:100%/.test(barOf('Overspent').children[0].attrs.style || '') === false,
+    ok(/width:100%/.test(segs(barOf('Overspent'))[0].attrs.style || '') === false,
       'the overspent bucket does not fill its green to the whole track');
-    ok(Number((barOf('Overspent').children[2].attrs.style || '').replace(/\D+/g, '')) > 0,
+    ok(Number((segs(barOf('Overspent'))[2].attrs.style || '').replace(/\D+/g, '')) > 0,
       'the overspent bucket draws a red overshoot segment');
-    ok((barOf('Untouched').children[1].attrs.style || '').includes('100'),
+    ok((segs(barOf('Untouched'))[1].attrs.style || '').includes('100'),
       'the untouched bucket is all "placed and unspent"');
-    ok((barOf('Emptied').children[0].attrs.style || '').includes('100'),
+    ok((segs(barOf('Emptied'))[0].attrs.style || '').includes('100'),
       'the emptied bucket is solid green');
 
     /* The open bucket, swapped in, proves the part-spent wording and — the
        reason envelopeRemainder takes a state rather than an envelope — that it
        agrees with the expanded card's own rail. */
     const collapsed = $('#planEnvelopes').querySelectorAll('.env-sum')
+      .filter(r => !r.classList.contains('is-open'))
       .map(r => (r.querySelector('.env-sum-name') || {}).textContent);
     ok(!collapsed.includes('Part spent'), 'precondition: "Part spent" is the open card, not a row');
   }
 
-  /* ---- a fresh plan must not print the pot twice ---- */
+  /* A FRESH PLAN MUST NOT RESTATE ITS POT AS "LEFT TO SPEND". The old hero
+     held its second figure (.pot-fig-2, "Still left") back until something
+     had been spent, because until then it is the pot printed twice. The
+     layout of 15 Nov 2026 has no second hero figure — "left to spend" is the
+     note under the Spent stat — and its first draft drew that note on every
+     plan, so a fresh one printed its pot three times: the big figure, Money
+     in, and the note. The rule is the same one, re-pointed: with nothing
+     spent the note says so, and the pot is printed once among the stats. */
   {
     const { $ } = await mountPlan(full('Fresh', 'Fresh', {
-      sources: [{ name: 'Bonus', kind: 'Bonus', amount: 1000, date: '2026-08-01', status: 'received', notes: '' }],
+      sources: [{ name: 'Bonus', kind: 'Bonus', amount: 2000, date: '2026-09-01', status: 'received', notes: '' }],
+      envelopes: [], items: [],
     }));
-    ok(!$('#planPot').querySelector('.pot-fig-2'),
-      'nothing spent yet means "Still left" would just restate the pot — so it is not drawn');
+    const stats = $('#planPot').querySelectorAll('.pot-stat');
+    const note = (stats[2].querySelector('.pot-stat-n') || {}).textContent || '';
+    eq(note, 'nothing spent yet', 'a fresh plan\'s Spent note says nothing has been spent');
+    ok(!/left to spend/.test($('#planPot').textContent), 'and does not restate the pot as "left to spend"');
+    // The pot as the page itself formats it, read off the Money in stat.
+    const potText = (stats[0].querySelector('.pot-stat-v') || {}).textContent || '';
+    ok(/2.?000/.test(potText), `precondition: Money in prints the pot (got "${potText}")`);
+    const printed = [...$('#planPot').querySelectorAll('.pot-stat-v'), ...$('#planPot').querySelectorAll('.pot-stat-n')]
+      .filter(n => n.textContent.includes(potText)).length;
+    eq(printed, 1, 'so the pot is printed once among the three stats, as Money in');
   }
 
   console.log(`plan-overspend: ${checks} checks passed`);
