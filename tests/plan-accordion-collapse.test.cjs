@@ -9,7 +9,7 @@
 
    Two controls fed that guard a value it read as "nothing chosen yet":
 
-     - the expanded card's Collapse button set the open bucket to null, which
+     - the expanded card's Collapse control set the open bucket to null, which
        the guard immediately turned back into the first bucket. Collapsing the
        first bucket left it open; collapsing any other opened the first one;
      - renaming the open bucket changed its name but not the view state, so the
@@ -21,6 +21,12 @@
    its own that the guard leaves alone, and a rename carries the open state
    with it. The guard's own job — a deleted bucket or a different plan opens the
    first bucket — is pinned here too, so the fix cannot quietly undo it.
+
+   The redesign of 15 Nov 2026 moved the controls and kept the semantics: the
+   open bucket's header is now its own collapsed row turned into the Collapse
+   control, rename is a pencil in the card's footer, and the hero's bar is cut
+   into one slice per bucket — a slice being a third way to open one, so it is
+   pinned here beside the row it stands in for.
 
    Driven through the REAL view over the REAL loader; synthetic plans only.
      node tests/plan-accordion-collapse.test.cjs        # non-zero exit on failure */
@@ -81,15 +87,24 @@ const tick = () => new Promise(r => setTimeout(r, 0));
   ctx.renderPlan();
 
   const host = () => $('#planEnvelopes');
-  /* The expanded card is `.env`; every other bucket is a `.env-sum` row. */
+  /* The expanded card is `.env`; every other bucket is a `.env-sum` row.
+
+     Since the redesign of 15 Nov 2026 the open card's header IS a collapsed
+     row turned into its Collapse button (`env-collapse env-sum is-open`), so
+     the bucket's name is read from that header's `.env-sum-name` — there is
+     no `.env-name` any more — and `.env-sum` alone would count the open
+     bucket among the collapsed rows. Every row query below leaves `is-open`
+     out, or "the first bucket is still a collapsed row" would be true of the
+     first bucket while it stood open, which is the bug it exists to catch. */
   const openName = () => {
     const card = host().querySelector('.env');
-    const n = card && card.querySelector('.env-name');
+    const n = card && card.querySelector('.env-sum-name');
     return n ? n.textContent : null;
   };
-  const rowNames = () => host().querySelectorAll('.env-sum')
+  const collapsedRows = () => host().querySelectorAll('.env-sum').filter(r => !r.classList.contains('is-open'));
+  const rowNames = () => collapsedRows()
     .map(r => (r.querySelector('.env-sum-name') || {}).textContent);
-  const row = name => host().querySelectorAll('.env-sum')
+  const row = name => collapsedRows()
     .find(r => (r.querySelector('.env-sum-name') || {}).textContent === name);
   const collapse = () => host().querySelector('.env-collapse').click();
 
@@ -111,11 +126,19 @@ const tick = () => new Promise(r => setTimeout(r, 0));
   collapse();
   eq(openName(), null, 'Collapse on it closes it rather than opening the first bucket instead');
 
+  /* ---- 2b. a slice of the hero's bar opens its own bucket, from fully collapsed ---- */
+  const slice = $('#planPot').querySelectorAll('.ps-seg').find(s => s.attrs['data-focus-key'] === 'slice:1');
+  ok(slice && slice.tagName === 'BUTTON', 'precondition: the bar has a pressable slice for the second bucket');
+  slice.click();
+  eq(openName(), 'Coming up', 'pressing a slice opens that slice\'s bucket — not the first, not none');
+  collapse();
+
   /* ---- 3. Rename the open bucket ---- */
   row('For us').click();
   eq(openName(), 'For us', 'precondition: For us is the open bucket');
   answers.push({ name: 'For the two of us', note: '' });
-  host().querySelector('.env').querySelector('.env-name').click();
+  // Rename is the pencil in the open card's footer now; the name itself is the Collapse header.
+  host().querySelector('.env').querySelector('.env-edit-ico').click();
   await tick();
   eq(openName(), 'For the two of us', 'a renamed bucket stays open under its new name');
   ok(rowNames().includes('Settle up'),

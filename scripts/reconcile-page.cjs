@@ -1690,25 +1690,36 @@ function runChecks(G, pages) {
   {
     const P = 'plan';
     const srcs = C.figs(P, /^planSources\/.*src2-amt/, 'money').map(figValue);
-    const pot = C.fig(P, /^planPot\/div\.pot-sub/);
-    C.add({ page: P, name: 'Σ sources = pot', formula: 'the pot is the sum of its sources', pageValue: srcs.reduce((a, b) => a + b, 0), pageSource: `Σ ${srcs.length} sources`, globalValue: figValue(pot), globalSource: 'planPot pot-sub', tol: figTol(pot) });
-    const envs = C.figs(P, /^planEnvelopes\/.*env-sum-amt|^planEnvelopes\/div\.env\/button\.env-amt-btn\/div\.env-amt/, 'money').map(figValue);
-    const free = C.fig(P, /^planFree\/h2/);
-    /* The Free card's heading holds a different figure in each of its three
-       states (views/plan.js renderFree): the free amount ("… is not spoken
-       for"), the over-placed amount as a positive magnitude ("… more is placed
-       than this plan holds", i.e. free is NEGATIVE), or — once any bucket has
-       run over, which the 7 Oct 2026 audit's per-bucket rule (L2a-08) makes
-       reachable whenever one does — the OVERSPEND ("… was spent past what its
-       bucket held"), with free not printed at all. Reading the heading as free
-       in every state added the overspend as if it were unplaced money. The card
-       is English-only today, so its own words tell the states apart. */
-    const freeCtx = free && free.context ? `${free.context.own || ''} ${free.context.parent || ''}` : '';
+    /* The pot is the hero's "Money in" figure since the layout of 15 Nov 2026
+       (it was the first figure of the sentence under the hero). */
+    const pot = C.fig(P, /^planPot\/.*div\.pot-stat\[0\]\/div\.pot-stat-v/);
+    C.add({ page: P, name: 'Σ sources = pot', formula: 'the pot is the sum of its sources', pageValue: srcs.reduce((a, b) => a + b, 0), pageSource: `Σ ${srcs.length} sources`, globalValue: figValue(pot), globalSource: 'planPot Money in', tol: figTol(pot) });
+    /* One amount per bucket: every row carries .env-sum-amt, the open bucket's
+       header included — so its amount box (.env-amt) is NOT read as well, or
+       the open bucket would be counted twice. */
+    const envs = C.figs(P, /^planEnvelopes\/.*env-sum-amt/, 'money').map(figValue);
+    const freeHeading = C.fig(P, /^planFree\/.*h2/);
+    const hero = C.fig(P, /^planPot\/.*div\.pot-fig\b/);
+    /* The words under the bar hold a different figure in each alarmed state
+       (views/plan.js renderFree): the over-placed amount as a positive
+       magnitude ("… more is allocated than the money in", i.e. free is
+       NEGATIVE), or — once any bucket has run over, which the 7 Oct 2026
+       audit's per-bucket rule (L2a-08) makes reachable whenever one does — the
+       OVERSPEND ("… was spent past what its bucket held"), with free not
+       printed at all. Reading that sentence as free in every state added the
+       overspend as if it were unallocated money. The gate runs in English, so
+       the sentence's own words tell the states apart. */
+    const freeCtx = freeHeading && freeHeading.context ? `${freeHeading.context.own || ''} ${freeHeading.context.parent || ''}` : '';
     const overspentCard = /spent past what its bucket held/.test(freeCtx);
-    const overplacedCard = /more is placed than this plan holds/.test(freeCtx);
+    const overplacedCard = /more is allocated than the money in/.test(freeCtx);
+    /* A healthy plan prints no sentence under the bar since 15 Nov 2026: its
+       free money is the hero's own figure ("Left to allocate"), which is free
+       exactly when no bucket has run over — the only state this branch reads
+       it in. Over-placed still reads the sentence's magnitude. */
+    const free = overplacedCard ? freeHeading : hero;
     if (!overspentCard) {
       const freeSigned = (figValue(free) || 0) * (overplacedCard ? -1 : 1);
-      C.add({ page: P, name: 'Σ envelopes + free = pot', formula: 'every rand in the pot has a job or is free', pageValue: envs.reduce((a, b) => a + b, 0) + freeSigned, pageSource: `Σ ${envs.length} envelopes ${overplacedCard ? '− over-placed' : '+ free'}`, globalValue: figValue(pot), globalSource: 'planPot pot-sub', tol: figTol(pot) });
+      C.add({ page: P, name: 'Σ envelopes + free = pot', formula: 'every rand in the pot has a job or is free', pageValue: envs.reduce((a, b) => a + b, 0) + freeSigned, pageSource: `Σ ${envs.length} envelopes ${overplacedCard ? '− over-placed' : '+ free'}`, globalValue: figValue(pot), globalSource: 'planPot Money in', tol: figTol(pot) });
     }
   }
   {

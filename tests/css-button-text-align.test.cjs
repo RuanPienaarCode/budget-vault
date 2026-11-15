@@ -60,7 +60,7 @@ for (const f of files) {
   for (const m of t.matchAll(/<button\b[^>]*\bclass="([^"]+)"/g)) buttons.set(m[1].trim().split(/\s+/).join(' '), at(m.index));
 }
 ok(buttons.size > 60, `sanity: the harvest should find the app's button classes, found ${buttons.size}`);
-for (const must of ['acct-bal num', 'src2-main', 'env-name', 'note-title']) {
+for (const must of ['acct-bal num', 'src2-main', 'env-collapse env-sum is-open', 'note-title']) {
   ok(buttons.has(must), `sanity: the harvest finds the audit's button "${must}"`);
 }
 
@@ -89,7 +89,11 @@ ok(judged >= 6, `sanity: at least the audit's flex buttons, at two widths, are j
 /* ---- the audit's four, by name ---- */
 const at1280 = (cls, prop) => computed([...ROOT(), node('button', cls)], prop, { width: 1280 });
 ok((at1280(['acct-bal', 'num', 'text-danger'], 'justify-content') || {}).value === 'flex-end', 'D1-02 the Accounts balance is right-aligned in its button, so decimals line up');
-for (const c of ['env-name', 'note-title']) {
+/* `.env-sum` is where a bucket's name sits since the Plan layout of 15 Nov
+   2026 — its row, and the open bucket's header. The audit's `.env-name` (the
+   name as its own rename button) went with that layout; rename is an icon in
+   the bucket's footer now, with no text to align. */
+for (const c of ['env-sum', 'note-title']) {
   ok((at1280([c], 'justify-content') || {}).value === 'flex-start', `D1-02 .${c} starts at its row's left edge`);
 }
 /* The money-in row is TWO lines (name and kind over date and status). As a

@@ -274,6 +274,100 @@ function envelopeBar(amount, spent) {
   return { spent: spentPct, left: round2(100 - spentPct - overPct), over: overPct };
 }
 
+/* THE POT AS ONE BAR, CUT INTO ITS BUCKETS — the widths the Plan hero draws.
+
+   barSegments above gives three bands of one rand's three states. This gives
+   the same pot one level down: a slice per bucket, as wide as that bucket's
+   CLAIM on the pot, then whatever no bucket claims. It is drawn from the same
+   per-bucket claim planSummary's `placeable` is taken from (bucketClaims), so
+   the last slice and the hero's big figure cannot disagree about room left:
+   the free slice is exactly max(0, placeable) of the bar, and there is none
+   the moment the buckets claim the whole pot or more.
+
+     slices[n]  one per bucket NAME, in the order the names first appear —
+                two rows with one name are one bucket, as in bucketClaims.
+                `width` is its share of the bar; `spent`, `left` and `over`
+                are envelopeBar's three widths INSIDE the slice (gone, still
+                held, gone past what it held), so each slice is its own
+                bucket's bar and the three always total 100.
+     orphan     money spent from no bucket at all (an item whose bucket was
+                renamed or deleted by hand in the file). It has gone, so it
+                takes room on the bar, and nobody holds it, so it is drawn as
+                overrun. Zero on every plan the page itself wrote.
+     free       what no bucket claims. `freeAmount` is the same slice in money
+                — max(0, placeable) — because a width is rounded to a
+                hundredth of the bar and cannot be turned back into rands.
+
+   THE BAR SPANS max(pot, claimed), NOT the pot. Buckets holding R 12 000
+   against R 10 000 in have no "120% of the bar"; scaled to the larger of the
+   two, the slices keep their true proportions to each other and the free
+   slice is simply absent. The hero says the overrun in words — the bar's job
+   is the shape, as it is for barSegments.
+
+   EVERY WIDTH TOTALS EXACTLY 100. The widest thing drawn takes what the
+   rounding left over rather than its own rounding — the discipline
+   barSegments and envelopeBar already keep, with the remainder: a
+   row of widths that summed to 100.01 wraps its last slice onto a second
+   line, which reads as a broken page rather than as a rounding. */
+function potSlices(plan) {
+  const sources = plan.sources || [];
+  const envelopes = plan.envelopes || [];
+  const items = plan.items || [];
+  const pot = round2(sum(sources, s => s.amount));
+
+  const order = [];
+  const buckets = new Map();
+  for (const e of envelopes) {
+    const key = String(e.name ?? '');
+    if (!buckets.has(key)) { buckets.set(key, { name: key, amount: 0, spent: 0 }); order.push(key); }
+    buckets.get(key).amount += Number(e.amount) || 0;
+  }
+  let orphan = 0;
+  for (const i of items) {
+    const b = buckets.get(String(i.envelope ?? ''));
+    if (b) b.spent += Number(i.spent) || 0;
+    else orphan += Number(i.spent) || 0;
+  }
+
+  const drawn = order.map(k => buckets.get(k))
+    .map(b => ({ name: b.name, amount: round2(b.amount), spent: round2(b.spent),
+      claim: round2(Math.max(b.amount, b.spent)) }))
+    .filter(b => b.claim > 0);
+  orphan = round2(Math.max(0, orphan));
+  const claimed = drawn.reduce((t, b) => t + b.claim, 0) + orphan;
+  const span = Math.max(pot, claimed);
+  if (!(span > 0)) return { span: 0, slices: [], orphan: 0, free: 0, freeAmount: 0 };
+
+  const free = Math.max(0, pot - claimed);
+  const parts = [...drawn.map(b => b.claim), ...(orphan > 0 ? [orphan] : []), ...(free > 0.005 ? [free] : [])];
+  const widths = parts.map(v => round2((v / span) * 100));
+  /* What rounding left over goes to the WIDEST part, so the row is 100 and not
+     99.99. Not to the last one: with many buckets the roundings can add up to
+     more than a sliver of a last part holds, and a width a hair below zero is
+     an invalid flex share that the browser answers by ignoring the whole
+     declaration. The widest part is at least 100 / n wide and absorbs it
+     unseen. */
+  const widest = widths.indexOf(Math.max(...widths));
+  widths[widest] = round2(widths[widest] + 100 - widths.reduce((t, w) => t + w, 0));
+
+  let n = 0;
+  const slices = drawn.map(b => ({ ...b, width: widths[n++], ...envelopeBar(b.amount, b.spent) }));
+  const orphanWidth = orphan > 0 ? widths[n++] : 0;
+  const freeWidth = free > 0.005 ? widths[n++] : 0;
+  return { span: round2(span), slices, orphan: orphanWidth, free: freeWidth, freeAmount: free > 0.005 ? round2(free) : 0 };
+}
+
+/* THE ONE SCALE every bucket row's bar is drawn against: the largest claim
+   any bucket makes. envelopeBar scales each bar to its OWN bucket, which made
+   the column unreadable downwards — a R 1 200 bucket and an R 18 000 one drew
+   bars of the same length. With a row's bar as long as its claim is of this,
+   a bucket twice the size draws a bar twice as long. Never below 1, so the
+   empty plan divides by something. */
+function bucketScale(plan) {
+  const { slices } = potSlices({ sources: [], envelopes: plan.envelopes, items: plan.items });
+  return Math.max(1, ...slices.map(b => b.claim));
+}
+
 /* One figure's share of the pot, as a whole number. Guards the empty plan: a
    pot of zero would otherwise make every envelope NaN%.
 
@@ -334,5 +428,5 @@ function envelopeOverState(amount, items, spent) {
   return { overAmt, isOverspent: overAmt > 0.005, gap, isOvercommitted: gap < -0.005 };
 }
 
-module.exports = { planSummary, barSegments, envelopeGap, envelopeBar, sharePct, envelopeShares, round2,
+module.exports = { planSummary, barSegments, potSlices, bucketScale, envelopeGap, envelopeBar, sharePct, envelopeShares, round2,
   isReceived, envelopeOverState, SOURCE_KINDS };

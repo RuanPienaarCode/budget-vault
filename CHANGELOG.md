@@ -3,6 +3,47 @@
 All notable changes to Budget Vault. Versions match the plugin version in
 `manifest.json` and the release tag exactly (no `v` prefix).
 
+## Unreleased
+
+### Added
+
+- **Food shows how much is filed.** A fifth tile on the Food page states how
+  much receipt spend sits in a real category and how much is still in Other
+  (or has no category). The two always add back to the total.
+
+### Changed
+
+- **The Plan page is laid out around money in and allocated.** The top of
+  the page says what is left to allocate, with money in, allocated and
+  spent beside it. Under that the plan is drawn as one bar cut into its
+  spending buckets: each slice is a bucket, as wide as its share, with the
+  dark part already spent and the hatched end not yet allocated. Press a
+  slice to open its bucket. The buckets and Money in sit side by side on a
+  wide pane and stack on a phone, buckets first.
+- **Bucket bars share one scale**, so a bucket twice the size draws a bar
+  twice as long and the column can be read downwards. On a phone the bar
+  sits on its own line under the bucket's name.
+- **An open bucket does more in place.** Step its amount up or down by 100,
+  drag the slider (the figure at the top of the page now follows the
+  drag), or tap the amount to type it. When it applies, one button adds
+  everything left to allocate to this bucket, raises an overspent bucket to
+  what was spent, or matches the bucket to its items.
+- **Add an item by typing a line and pressing Enter.** No dialog; the line
+  stays put for the next one. Tap an item's name to set its category,
+  notes or what was spent, as before.
+- **A source's status is one tap.** "Expected" and "In the account" are a
+  button on each Money in row. Removing a source is in its edit sheet; the
+  row's own remove button is gone.
+- **Money no bucket holds is dealt with under the bar**: allocate it to a new
+  bucket, or add it to an existing one. The separate card at the foot of
+  the page is gone. An overspent plan says so in the same place and offers
+  to open the bucket that ran over.
+- **The Plan page's words changed**, in all twelve languages: "Left to
+  allocate", "Money in", "Allocated", "Spent" and "Not allocated" replace
+  "Left to place", "Spoken for", "Not spoken for" and "Already spent".
+  "Spoken for" (allocated and not yet spent) is no longer shown as a
+  figure. No figure is calculated differently and plan files are unchanged.
+
 ## 1.60.0 — 2026-11-13
 
 One vault can now hold several books, each a budget folder of its own, with

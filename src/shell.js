@@ -408,53 +408,52 @@ const SHELL_HTML = `
             </div>
           </div>
 
-          <div class="card mb-4">
+          <!-- The hero: what is left to allocate, the pot as one bar cut into
+               its buckets, and under it what to do about money no bucket
+               holds. #planFree used to be a loud card of its own at the foot of
+               the page; it is the hero's last block now, rendered empty and
+               hidden by renderFree when the split balances, so a finished plan
+               gets no shelf standing there saying "R 0.00 left". -->
+          <div class="card mb-4 plan-hero">
             <div class="pot" id="planPot"></div>
+            <div class="plan-free hidden" id="planFree"></div>
           </div>
 
-          <div class="card mb-4">
-            <div class="card-h" style="align-items:center">
-              <div>
-                <h2>Money in</h2>
-                <div class="sub">Anything that funds this plan — name it yourself, or pick a kind</div>
+          <!-- Two columns on a wide pane: the buckets, which are the work, and
+               beside them where the money came from. The buckets come FIRST in
+               the markup, so a narrow pane and a phone stack them above Money
+               in without any reordering. -->
+          <div class="plan-cols">
+            <div class="card plan-buckets">
+              <!-- The button is a SIBLING of .section-h, not a child of the div
+                   that holds the heading. #planEnvSub is a .sub, and the rule
+                   ".section-h .sub:empty { display:none }" removes it whenever
+                   renderEnvelopes has nothing to say.
+                   (No backticks anywhere in this file: SHELL_HTML is a template
+                   literal, so one in a comment ends the string.) -->
+              <div class="plan-env-head">
+                <div class="section-h">
+                  <h2>Spending buckets</h2>
+                  <div class="sub" id="planEnvSub"></div>
+                </div>
+                <button class="btn-ghost btn-sm" id="planAddEnvelope"><span class="ico" data-ico="plus"></span> <span data-i18n="plan.env.newBucket">New bucket</span></button>
               </div>
-              <div class="row">
-                <button class="btn-ghost" id="planAddSource"><span class="ico" data-ico="plus"></span> Add a source</button>
+              <div class="mini-grid" id="planEnvelopes"></div>
+            </div>
+
+            <div class="card plan-money-in">
+              <div class="card-h">
+                <div>
+                  <h2 data-i18n="plan.stat.moneyIn">Money in</h2>
+                  <div class="sub">Everything that funds this plan</div>
+                </div>
+              </div>
+              <div class="body-pad" id="planSources"></div>
+              <div class="plan-src-foot">
+                <button class="btn-ghost btn-sm" id="planAddSource"><span class="ico" data-ico="plus"></span> Add a source</button>
               </div>
             </div>
-            <div class="body-pad" id="planSources"></div>
           </div>
-
-          <!-- Envelopes sit bare on the page background, not inside a .card:
-               each .env carries a border of its own, and every other mini-grid
-               in the app (Savings, Accounts, Debt, Owed, Assets, Services) does
-               the same rather than wrapping bordered tiles in a bordered card. -->
-          <div class="mb-4">
-            <!-- The button is a SIBLING of .section-h, not a child of the div
-                 that holds the heading. #planEnvSub is a .sub, and the rule
-                 ".section-h .sub:empty { display:none }" removes it whenever
-                 renderEnvelopes has nothing to say — so the gap below this
-                 header has to hang on .section-h, which is always rendered and
-                 already carries margin-bottom. Wrapping h2 and .sub in a plain
-                 div to make room for the button would have moved .sub's parent
-                 to a box that owns no margin, and the gap would vanish in
-                 exactly the state where the subtitle does.
-                 (No backticks anywhere in this file: SHELL_HTML is a template
-                 literal, so one in a comment ends the string.) -->
-            <div class="plan-env-head">
-              <div class="section-h">
-                <h2>Spending buckets</h2>
-                <div class="sub" id="planEnvSub"></div>
-              </div>
-              <button class="btn-ghost" id="planAddEnvelope"><span class="ico" data-ico="plus"></span> New spending bucket</button>
-            </div>
-            <div class="mini-grid" id="planEnvelopes"></div>
-          </div>
-
-          <!-- The loud card. Rendered empty and hidden by renderFree when the
-               split balances, so a finished plan gets no shelf standing there
-               saying "R 0.00 left" — the same rule the Accounts deck follows. -->
-          <div class="plan-free hidden" id="planFree"></div>
         </div>
       </section>
 
