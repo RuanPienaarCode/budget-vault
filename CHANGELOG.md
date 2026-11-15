@@ -3,7 +3,14 @@
 All notable changes to Budget Vault. Versions match the plugin version in
 `manifest.json` and the release tag exactly (no `v` prefix).
 
-## Unreleased
+## 1.61.0 — 2026-11-16
+
+The Plan page is rebuilt around two words: money in, and allocated. It
+opens with what is left to allocate and draws the plan as one bar cut into
+its spending buckets, with the buckets and where the money came from side
+by side beneath it. More can be done to a bucket without a dialog, and the
+page's wording changed in all twelve languages. The Food page gains a tile
+that says how much of your receipt spend is filed.
 
 ### Added
 
