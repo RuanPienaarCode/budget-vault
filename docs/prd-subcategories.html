@@ -136,7 +136,7 @@
       <li>For every category and window, its subcategories plus the transactions that have none add up
         to exactly the category's own figure, refunds included. A test holds this on both household
         seeds.</li>
-      <li>No figure that exists in 1.60 changes. The two pinned figure ledgers pass without an edit.</li>
+      <li>No figure that exists in 1.61 changes. The two pinned figure ledgers pass without an edit.</li>
       <li>A transaction file with no subcategory is byte-for-byte unchanged after load and save.</li>
       <li>Someone who imports statements sets a subcategory once per merchant; a rule fills it in on
         every later import.</li>
@@ -240,7 +240,7 @@
         <tr><td>Names not on the list</td><td>Still shown and still offered, after the listed ones.</td><td>The plugin never drops or hides something a file says.</td><td>Treating an unlisted name as invalid.</td></tr>
         <tr><td>Name matching</td><td>Exact text. No commas in a name.</td><td>Category names match by exact text today.</td><td>Case-insensitive matching.</td></tr>
         <tr><td>The column in the transaction file</td><td><code>Subcategory</code>, declared once in the table schema, written to a month's file only when a row in it uses one.</td><td>ADR-0003 and ADR-0004. A file with no subcategory never changes.</td><td>Writing an empty column into every file.</td></tr>
-        <tr><td>How the column is located</td><td>By its header name, anywhere after the known columns. It stays where it is found; when a file first needs one it is appended after every column the file already has.</td><td>Split is optional, so a fixed position behind it would force an empty Split column into files that never split. A hand-added column already survives in 1.60 directly after Note, and moves one place right when a split is first made.</td><td>A fixed eighth position after Split.</td></tr>
+        <tr><td>How the column is located</td><td>By its header name, anywhere after the known columns. It stays where it is found; when a file first needs one it is appended after every column the file already has.</td><td>Split is optional, so a fixed position behind it would force an empty Split column into files that never split. A hand-added column already survives in 1.61 directly after Note, and moves one place right when a split is first made.</td><td>A fixed eighth position after Split.</td></tr>
         <tr><td>Changing a row's category</td><td>Clears the subcategory, on every path including bulk changes, unless the same action sets both.</td><td>A subcategory belongs to one category.</td><td>Keeping it when the new category has a subcategory of the same name.</td></tr>
         <tr><td>Rename and removal</td><td>No rename. Removing a name from the list rewrites no row.</td><td>Matches categories; avoids a many-file write in one action.</td><td>A rename that rewrites history.</td></tr>
         <tr><td>Creating a name from the dropdown</td><td>"＋ New subcategory…" saves to the category note straight away.</td><td>"＋ Add new category…" already creates its note straight away.</td><td>Holding the new name until Save.</td></tr>
@@ -388,7 +388,7 @@ Categorisation rule     pattern | category | [subcategory]
       categorisation rules file.</p>
     <div class="callout warn">
       <div class="t">An older build on another device</div>
-      A device still running 1.60 or earlier keeps the column intact but does not understand it.
+      A device still running 1.61 or earlier keeps the column intact but does not understand it.
       Changing a row's category there leaves the old subcategory on the row. The newer build then
       shows it as a name in use under the new category instead of dropping it.
     </div>
@@ -415,7 +415,7 @@ Categorisation rule     pattern | category | [subcategory]
     <table>
       <thead><tr><th>Question</th><th>Recommended default</th></tr></thead>
       <tbody>
-        <tr><td>Which version number carries the release?</td><td>1.61.0, the next minor after 1.60.0.</td></tr>
+        <tr><td>Which version number carries the release?</td><td>1.62.0, the next minor after 1.61.0.</td></tr>
         <tr><td>What is the header of the third column in the rules file?</td><td><code>subcategory</code>, lower case like the two beside it.</td></tr>
         <tr><td>Does anyone want a budget per subcategory?</td><td>Wait for a request after release before designing it.</td></tr>
       </tbody>

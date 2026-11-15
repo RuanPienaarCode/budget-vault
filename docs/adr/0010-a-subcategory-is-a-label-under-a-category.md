@@ -2,7 +2,7 @@
 
 Status: accepted
 
-Until 1.60 the finest thing a transaction could say about itself was its
+Until 1.61 the finest thing a transaction could say about itself was its
 category. Above the category there is a type, and `Settings.md` can declare
 custom groups that slot into the type order (`src/groups.js`); below it there
 was nothing.
@@ -70,7 +70,7 @@ reader would expect the next column to sit at position eight, after `Split`.
 with no split. A positional `Subcategory` would have to sit behind it, so every
 file that uses a subcategory and has never had a split would grow an empty
 `Split` column to hold the place. And a hand-added `Subcategory` column already
-survives load and save in 1.60 as an unknown extra, sitting directly after
+survives load and save in 1.61 as an unknown extra, sitting directly after
 `Note`, and moves one place right the day a split is first made in that file.
 Three shapes of file are therefore already possible, and only a header lookup
 reads all of them.
