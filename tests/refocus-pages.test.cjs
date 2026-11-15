@@ -18,7 +18,9 @@
    on a row that took another's place is that row's QUIET control — its name,
    its edit button — wherever the control pressed commits without asking. The
    next source's ✕ under an Enter held down, or the next product's category
-   select under an arrow key, would act on a row the reader never chose.
+   select under an arrow key, would act on a row the reader never chose. (The
+   Plan page's ✕ went with its redesign of 15 Nov 2026; the rule now guards
+   the one-tap status pill that sits on each source row instead.)
 
      the control is redrawn      -> its own replacement, by key
      a row or a card is removed  -> the one that took its place, else the one
@@ -334,32 +336,62 @@ const keysOf = (root, prefix) => descend(root).map(e => e.getAttribute('data-foc
       await press(need(picker, 'plan:Alpha'));
       landed('plan:Alpha', 'and back');
 
-      // Sources: an edit, then removals from the top, the bottom, and the last.
+      /* A slice of the hero's bar opens its bucket and is rebuilt by its own
+         press: the reader goes to what it opened. Here, while the plan still
+         has money in — a plan with none draws no bar. Then the first bucket
+         is opened again, so the accordion cases below start where they did. */
+      await press(need($('#planPot'), 'slice:1'));
+      landed('env:1', 'pressing a slice of the bar lands on the bucket it opened');
+      ok(cls('env-collapse'), 'on that bucket\'s header, now open');
+      await press(need(envs, 'env:0'));
+
+      /* Sources: an edit, the one-tap status, then removals from the top, the
+         bottom, and the last.
+
+         Until 15 Nov 2026 each row had a ✕ that removed it with no question,
+         and the case here was that the landing after one was the next row's
+         name, never its ✕ — Enter held down repeats, and one long press would
+         have emptied the list. The redesign took the ✕ away: removing a
+         source lives in its edit sheet alone, which asks. So that property
+         now holds because no row has a remove control at all, and there is
+         nothing left to land on wrongly; the ✕ cases went with it. The same
+         three landings are driven through the sheet instead. The row's
+         one-tap control is now its status pill, so the rule the ✕ was the
+         example of still applies to it: a row that took another's place is
+         landed on by its name, never its pill. */
       const source = { name: 'Payout', kind: 'Other', amount: '21000', date: '2026-08-03', status: 'received', notes: '', remove: [] };
       answers.fields = source;
       await press(need(sources, 'src:0'));
       landed('src:0', 'editing a source lands back on that source');
       ok(/21/.test(focus.at().parentElement.textContent), 'on the rebuilt row, showing the new amount');
-      /* On the row, not on its ✕: the ✕ asks nothing, and Enter held down
-         repeats — a landing on the next ✕ would empty the list in one press. */
+      await press(need(sources, 'pill:0'));
+      landed('pill:0', 'marking a source as still expected lands back on its pill');
+      ok(cls('is-exp') && M.S.plans.Alpha.sources[0].status === 'expected', 'which is the rebuilt pill, and the source now reads expected');
+      await press(need(sources, 'pill:0'));
+      landed('pill:0', 'and marking it received again lands there too');
+      ok(cls('is-in') && M.S.plans.Alpha.sources[0].status === 'received', 'with the source back in the account');
       const second = M.S.plans.Alpha.sources[1].name;
-      await press(need(sources, 'srcdel:0'));
-      landed('src:0', 'removing a source lands on the one that moved up');
-      ok(focus.at()._cls.has('src2-main') && new RegExp(second).test(focus.at().textContent), 'on that source\'s own button, never its ✕');
-      await press(need(sources, 'srcdel:1'));
-      landed('src:0', 'removing the last source lands on the one above');
       answers.fields = { ...source, remove: ['yes'] };
+      await press(need(sources, 'src:0'));
+      landed('src:0', 'removing a source lands on the one that moved up');
+      ok(cls('src2-main') && new RegExp(second).test(focus.at().textContent), 'on that source\'s own button, never its one-tap pill');
+      await press(need(sources, 'src:1'));
+      landed('src:0', 'removing the last source lands on the one above');
       await press(need(sources, 'src:0'));
       eq(M.S.plans.Alpha.sources.length, 0, 'the edit sheet removed the only source');
       eq(focus.at(), $('#planAddSource'), 'and the reader is on Add a source');
 
-      // The accordion: a collapsed row and the open card's Collapse are one control.
+      /* The accordion: a collapsed row and the open card's Collapse are one
+         control. Since 15 Nov 2026 the open card's header is built as the
+         same row (`env-collapse env-sum is-open`), so "its collapsed row" is
+         an `env-sum` that is not open. */
+      const collapsedRow = () => cls('env-sum') && !cls('is-open');
       await press(need(envs, 'env:1'));
       landed('env:1', 'opening a bucket lands on the same key');
       ok(cls('env-collapse'), 'which is now that bucket\'s Collapse button');
       await press(focus.at());
       landed('env:1', 'collapsing it lands on the same key again');
-      ok(cls('env-sum'), 'which is its collapsed row');
+      ok(collapsedRow(), 'which is its collapsed row');
       await press(need(envs, 'env:2'));
       ok(cls('env-collapse'), 'the third bucket is open');
 
@@ -370,13 +402,47 @@ const keysOf = (root, prefix) => descend(root).map(e => e.getAttribute('data-foc
       answers.fields = { amount: '1600' };
       await press(need(envs, 'amt:2'));
       landed('amt:2', 'typing the amount lands back on the figure');
+      await press(need(envs, 'stepup:2'));
+      landed('stepup:2', 'the + step lands back on itself');
+      eq(M.S.plans.Alpha.envelopes[2].amount, 1700, 'with R 100 added');
+      await press(need(envs, 'stepdown:2'));
+      landed('stepdown:2', 'and the − step on itself');
+      eq(M.S.plans.Alpha.envelopes[2].amount, 1600, 'with R 100 taken back');
+      /* Rename is a pencil in the card's footer with no text of its own; the
+         rebuilt one carries the new name in its label, and the header shows it. */
       answers.fields = { name: 'For us two', note: '' };
       await press(need(envs, 'rename:2'));
-      landed('rename:2', 'renaming a bucket lands back on its name');
-      ok(/For us two/.test(focus.at().textContent), 'which is the new name');
-      answers.fields = { name: 'Picnic', amount: '100', category: '' };
-      await press(need(envs, 'additem:2'));
-      landed('additem:2', 'adding an item lands back on "+ item"');
+      landed('rename:2', 'renaming a bucket lands back on its rename button');
+      ok(/For us two/.test(focus.at().getAttribute('aria-label')) && /For us two/.test(keyed(envs, 'env:2').textContent),
+        'which is the rebuilt one, under the new name');
+      /* Adding an item is typing a line and pressing Enter, and the line is
+         rebuilt by the add: the reader is put back in it for the next one. */
+      {
+        const typeItem = async (name, amount) => {
+          const line = need(envs, 'additem:2');
+          const amt = byClass(envs, 'env-add-amt')[0];
+          focus.on(line);
+          // Typed, as a browser reports it: an `input` per field, which is
+          // what keeps the half-typed line across a redraw nobody asked for.
+          line.value = name; line._fire('input');
+          amt.value = amount; amt._fire('input');
+          line._fire('keydown', { key: 'Enter' });
+          await settle();
+        };
+        const before = M.S.plans.Alpha.items.length;
+        await typeItem('', '50');
+        eq(M.S.plans.Alpha.items.length, before, 'Enter on an empty name adds nothing');
+        landed('additem:2', 'and leaves the reader in the line');
+        await typeItem('Picnic', '100');
+        landed('additem:2', 'adding an item lands back in the add-item line');
+        ok(M.S.plans.Alpha.items.some(i => i.name === 'Picnic' && i.envelope === 'For us two' && i.amount === 100),
+          'and the item is in the bucket, at the amount typed');
+        /* The view writes a kept draft back through the value ATTRIBUTE, so
+           that is what is read: a line rebuilt still holding "Picnic" would
+           add it twice on the next Enter. */
+        eq([focus.at().getAttribute('value'), byClass(envs, 'env-add-amt')[0].getAttribute('value')], ['', ''],
+          'the rebuilt line is empty, its draft dropped, ready for the next item');
+      }
       await press(need(envs, 'tick:1'));
       landed('tick:1', 'advancing an item lands back on its tick');
       ok(cls('part'), 'which shows the new state');
@@ -398,7 +464,7 @@ const keysOf = (root, prefix) => descend(root).map(e => e.getAttribute('data-foc
         answers.fields = { ...item(name), remove: ['yes'] };
         await press(need(envs, 'item:0'));
       }
-      landed('additem:2', 'removing the only item lands on the bucket\'s "+ item"');
+      landed('additem:2', 'removing the only item lands on the bucket\'s add-item line');
 
       // Removing a bucket.
       answers.confirm = false;
@@ -407,7 +473,7 @@ const keysOf = (root, prefix) => descend(root).map(e => e.getAttribute('data-foc
       answers.confirm = true;
       await press(need(envs, 'envdel:2'));
       landed('env:1', 'removing the last bucket lands on the one before it');
-      ok(cls('env-sum'), 'its row — not the delete of whichever bucket the accordion opened instead');
+      ok(collapsedRow(), 'its row — not the delete of whichever bucket the accordion opened instead');
       await press(need(envs, 'envdel:0'));
       landed('env:0', 'removing a bucket lands on the one that took its place');
       ok(cls('env-collapse'), 'which the accordion has opened');
@@ -415,30 +481,51 @@ const keysOf = (root, prefix) => descend(root).map(e => e.getAttribute('data-foc
       eq(M.S.plans.Alpha.envelopes.length, 0, 'no bucket is left');
       eq(focus.at(), $('#planAddEnvelope'), 'removing the only bucket lands on Add a spending bucket');
 
-      // The loud card. Nothing funds the plan and nothing is placed: no card.
-      ok(free._cls.has('hidden'), 'an empty plan has no loud card');
+      /* The block under the bar. Nothing funds the plan and nothing is
+         allocated: it is hidden. A healthy plan's block is the offers alone
+         since 15 Nov 2026 — allocate to a new bucket, or (once there is one)
+         to an existing one; "Add a source" is offered only in the alarmed
+         states, so its two landings are driven from an over-allocated plan
+         below. */
+      ok(free._cls.has('hidden'), 'an empty plan has no block under the bar');
       M.S.plans.Alpha.sources.push({ name: 'Payout', kind: 'Other', amount: 1000, date: '2026-08-03', status: 'received', notes: '' });
       M.ctx.renderPlan();
-      ok(!free._cls.has('hidden'), 'money in no bucket brings the card up');
-      answers.fields = { name: 'Extra', kind: 'Other', amount: '500', date: '' };
-      await press(need(free, 'free:source'));
-      landed('free:source', 'adding a source from the card lands back on that button while the card stands');
+      ok(!free._cls.has('hidden'), 'money in no bucket brings it up');
+      ok(!keyed(free, 'free:addto'), 'with no bucket yet, there is no existing bucket to offer');
       answers.fields = { name: 'First', amount: '400', note: '' };
       await press(need(free, 'free:place'));
-      landed('free:place', 'placing some of it lands back on the offer, which still stands');
-      answers.fields = { name: 'Rest', amount: '1100', note: '' };
+      landed('free:place', 'allocating some of it lands back on the offer, which still stands');
+      await press(need(free, 'free:addto'));
+      landed('free:to:0', '"Add it to an existing bucket" lands on the first bucket offered');
+      await press(need(free, 'free:cancel'));
+      landed('free:addto', 'and Cancel lands back on the offer that opened the list');
+      answers.fields = { name: 'Rest', amount: '600', note: '' };
       await press(need(free, 'free:place'));
-      ok(free._cls.has('hidden'), 'placing all of it takes the card away');
+      ok(free._cls.has('hidden'), 'allocating all of it takes the block away');
       landed('env:1', 'and the reader is on the bucket the press made');
       ok(cls('env-collapse') && /Rest/.test(focus.at().parentElement.textContent), 'which the accordion has opened');
-      // Over-placed: only the source offer is left, and a source that covers it
-      // takes the card away with the button in it.
-      M.S.plans.Alpha.envelopes[1].amount = 1600;
+      /* Money in again, put into an existing bucket in one press. */
+      M.S.plans.Alpha.sources.push({ name: 'Extra', kind: 'Other', amount: 500, date: '2026-08-03', status: 'received', notes: '' });
       M.ctx.renderPlan();
-      ok(!free._cls.has('hidden') && !keyed(free, 'free:place'), 'an over-placed plan shows the card with the one offer');
-      answers.fields = { name: 'Cover', kind: 'Other', amount: '500', date: '' };
+      await press(need(free, 'free:addto'));
+      await press(need(free, 'free:to:0'));
+      eq(M.S.plans.Alpha.envelopes[0].amount, 900, 'the R 500 left to allocate went into the first bucket');
+      ok(free._cls.has('hidden'), 'which leaves nothing unallocated, so the block goes');
+      landed('env:0', 'and the reader is on the bucket that took the money');
+      ok(cls('env-collapse'), 'which the accordion has opened');
+      // Over-allocated: only the source offer is left. One that does not cover
+      // the gap leaves the block standing; one that does takes it away with
+      // the button in it.
+      M.S.plans.Alpha.envelopes[1].amount = 1100;
+      M.ctx.renderPlan();
+      ok(!free._cls.has('hidden') && !keyed(free, 'free:place') && !keyed(free, 'free:addto'),
+        'an over-allocated plan shows the block with the one offer');
+      answers.fields = { name: 'Part', kind: 'Other', amount: '250', date: '' };
       await press(need(free, 'free:source'));
-      ok(free._cls.has('hidden'), 'a source that covers the gap takes the card away');
+      landed('free:source', 'adding a source from the block lands back on that button while the block stands');
+      answers.fields = { name: 'Cover', kind: 'Other', amount: '250', date: '' };
+      await press(need(free, 'free:source'));
+      ok(free._cls.has('hidden'), 'a source that covers the gap takes the block away');
       eq(focus.at(), $('#planAddSource'), 'and the reader is on the page\'s own Add a source');
 
       // Deleting a plan with another still standing: the button is still there.

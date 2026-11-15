@@ -2,7 +2,7 @@
 /* The Plan page's share badges sum to exactly 100% of the pot.
 
    Every spending bucket carries a badge — its share of the pot, as a whole
-   percent — and the loud card under them names the share left unplaced. Each
+   percent — and the page names the share left unplaced. Each
    badge used to be rounded on its own (plan-math.js sharePct, Math.round), so a
    column of shares of ONE pot summed past it: the 2026-10-07 figures audit
    found the six badges of a real, fully placed plan summing to 101%, and a
@@ -11,10 +11,17 @@
 
    The fix is the largest-remainder allocation src/share-percents.js already
    gives the Dashboard donut, taken over the buckets PLUS the unplaced
-   remainder, so the badges and the loud card's "% of the plan" are one
-   partition of the pot. The slider's live badge is held to the same rule: a
-   drag that printed 45% and a release that re-rendered it as 44% would be two
-   figures for one bucket, one tick apart.
+   remainder, so the badges and the unplaced share are one partition of the
+   pot. The slider's live badge is held to the same rule: a drag that printed
+   45% and a release that re-rendered it as 44% would be two figures for one
+   bucket, one tick apart.
+
+   Since the redesign of 15 Nov 2026 the same partition is printed in three
+   more places, and each is held to it here: the unplaced share moved from the
+   loud card ("N% of the plan") to the label under the bar's hatched
+   "Not allocated" slice; every bucket's slice carries its badge again under
+   the bar; and the Allocated stat's note says "{pct}% of money in", which is
+   100 less the unplaced share. Four readings of one column, one rule.
 
    Synthetic plans only. The six-bucket plan below is built to have the
    audit's defect — six shares that round alone to 101 (45.5 / 20.6 / 15.7 /
@@ -66,6 +73,23 @@ const badges = $ => $('#planEnvelopes').children.map(c => {
   return b ? Number(b.textContent.replace('%', '')) : NaN;
 });
 const sumOf = xs => xs.reduce((a, b) => a + b, 0);
+/* The share under the bar's "Not allocated" slice, or null when no slice is
+   drawn (nothing unallocated, or the buckets claim the whole pot). */
+const unallocPct = $ => {
+  const lab = $('#planPot').querySelectorAll('.ps-lab').find(l => l._cls.has('ps-lab-free'));
+  const pct = lab && lab.querySelector('.ps-lab-pct');
+  return pct ? Number(pct.textContent.replace('%', '')) : null;
+};
+/* The badges printed under the bucket slices, in bar order. */
+const sliceBadges = $ => $('#planPot').querySelectorAll('.ps-lab')
+  .filter(l => !l._cls.has('ps-lab-free') && l.querySelector('.ps-lab-pct'))
+  .map(l => Number(l.querySelector('.ps-lab-pct').textContent.replace('%', '')));
+/* The "{pct}% of money in" in the Allocated stat's note. */
+const allocatedPct = $ => {
+  const note = $('#planPot').querySelectorAll('.pot-stat-n')[1];
+  const m = note && note.textContent.match(/(\d+)% of money in/);
+  return m ? Number(m[1]) : NaN;
+};
 
 const SIX = [['Settle', 4550], ['Keep', 2060], ['Coming', 1570], ['House', 560], ['Us', 320], ['Baby', 940]];
 
@@ -77,7 +101,9 @@ const SIX = [['Settle', 4550], ['Keep', 2060], ['Coming', 1570], ['House', 560],
     eq(sumOf(got), 100, `a fully placed pot's badges must sum to 100% (got ${got.join(' + ')})`);
     eq(got, [45, 21, 16, 6, 3, 9],
       'largest remainder: the three biggest fractions take the three spare points, in plan order');
-    ok($('#planFree')._cls.has('hidden'), 'precondition: nothing is unplaced, so the loud card is hidden');
+    ok($('#planFree')._cls.has('hidden'), 'precondition: nothing is unplaced, so the block under the bar is hidden');
+    eq(sliceBadges($), got, 'the labels under the bar\'s slices print the same badges as the bucket rows');
+    eq(allocatedPct($), 100, 'and the Allocated note says all 100% of the money in is allocated');
   }
 
   /* ---- 1b. the collapsed rows follow the partition too ----
@@ -94,12 +120,12 @@ const SIX = [['Settle', 4550], ['Keep', 2060], ['Coming', 1570], ['House', 560],
   {
     const { $ } = await mountPlan(10000, [['One', 3333.33], ['Two', 3333.33]]);
     const got = badges($);
-    const card = $('#planFree').querySelector('.free-fig');
-    ok(card, 'precondition: an unplaced remainder shows the loud card');
-    const cardPct = Number(((card && card.textContent) || '').replace(/%.*$/, ''));
+    const freePct = unallocPct($);
+    ok(freePct !== null, 'precondition: an unplaced remainder draws the bar\'s "Not allocated" slice and its label');
     eq(got, [33, 33], 'two thirds of a pot read 33% each');
-    eq(cardPct, 34, 'and the unplaced third takes the spare point');
-    eq(sumOf(got) + cardPct, 100, 'badges plus "% of the plan" are one partition of the pot');
+    eq(freePct, 34, 'and the unplaced third takes the spare point');
+    eq(sumOf(got) + freePct, 100, 'badges plus the "Not allocated" share are one partition of the pot');
+    eq(allocatedPct($), sumOf(got), 'and the Allocated note\'s share is the badges\' sum, not a fourth rounding');
   }
 
   /* ---- 3. the slider's live badge is the badge the release will draw ---- */
@@ -114,11 +140,13 @@ const SIX = [['Settle', 4550], ['Keep', 2060], ['Coming', 1570], ['House', 560],
     slider._fire('input');
     const live = share.textContent;
     eq(live, '44%', `mid-drag the badge follows the partition, not Math.round alone (got ${live})`);
+    /* The hero follows the drag too (redrawn from a copy of the plan), so the
+       share it now leaves unallocated is already under the bar mid-drag. */
+    eq(unallocPct($), 1, 'mid-drag, the bar already shows the 1% the drag leaves unallocated');
     slider._fire('change');
     const after = badges($);
     eq(`${after[0]}%`, live, 'and the release re-renders exactly what the drag showed');
-    const freeFig = $('#planFree').querySelector('.free-fig');
-    const freePct = freeFig ? Number(freeFig.textContent.replace(/%.*$/, '')) : 0;
+    const freePct = unallocPct($) || 0;
     eq(sumOf(after) + freePct, 100, 'with the 1% now unplaced, the page still adds up to the pot');
   }
 
@@ -131,8 +159,10 @@ const SIX = [['Settle', 4550], ['Keep', 2060], ['Coming', 1570], ['House', 560],
     eq(envelopeShares([100, 200], 0), { shares: [0, 0], unplaced: 0 }, 'a pot of zero divides by nothing');
     eq(envelopeShares([0, 0], 1000), { shares: [0, 0], unplaced: 100 }, 'a pot with nothing placed is all unplaced');
     /* Over-placed: the buckets claim 140% and the remainder is −40%. The
-       column still partitions the pot, it just has a negative slot — the
-       loud card states that figure as "40% of the plan" over the limit. */
+       column still partitions the pot, it just has a negative slot. The page
+       does not print that slot as a share (the bar draws no "Not allocated"
+       slice on an over-allocated plan); the words under the bar name the
+       excess in rand instead. */
     eq(envelopeShares([700, 700], 1000), { shares: [70, 70], unplaced: -40 },
       'an over-placed plan keeps its true shares, and the remainder goes negative by exactly the excess');
 

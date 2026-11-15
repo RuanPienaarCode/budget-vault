@@ -2,36 +2,51 @@
 /* THE PLAN PAGE SAYS ONE THING ONE WAY, AND NEVER SPLITS A FIGURE ACROSS A LINE
    (2026-10-20 audit, D2-14 and D1-05).
 
-   D2-14. The bar's visible key names the three states of the pot "Already
+   D2-14. The bar's visible key named the three states of the pot "Already
    spent", "Spoken for" and "Not spoken for". The same bar's aria-label — the
    sentence a screen reader hears INSTEAD of the key — said "allocated but
    unspent", "not yet allocated" and "more allocated than this plan holds",
-   words that appear nowhere on the page; the loud card and the bucket dialog
+   words that appeared nowhere on the page; the loud card and the bucket dialog
    called the not-spoken-for money "unplaced"; the bucket slider was "Amount
    allocated to …". A reader who hears one set of words and a reader who sees
-   another are reading two different pages. CONTEXT.md has no Plan term (it
-   lists "allocation" among the words a Budget is NOT), so the page's own
-   visible words win:
+   another are reading two different pages. The rule the audit set: one word
+   per quantity, seen and spoken alike.
 
-     committed  (placed in a bucket, not yet gone)      "spoken for"
-     free       (in no bucket: pot − placed)            "not spoken for"
-     allocated  (what the buckets hold)                 "placed" — the hero's
-                own word ("Left to place", "Placed more than this plan holds")
-     placeable  (what can still go into a bucket)       "left to place"
+   RENAMED 15 Nov 2026, rule kept. The redesign reads the page as "money in"
+   against "allocated", and the words moved with it — the audit's chosen words
+   ("placed", "spoken for") are now the ones the page must NOT use, because it
+   no longer prints them. The file keeps its name so its history stays with it.
+   The vocabulary, from the table at the head of en.js's plan.* keys:
 
-   "placed" is NOT folded into "spoken for", deliberately. Spoken for is what a
-   bucket holds LESS what has gone from it, and the two differ as soon as
-   anything is spent: buckets placed at 12 000 against a pot of 10 000, with
-   5 000 spent, are 7 000 spoken for — so "2 000 more is spoken for than this
-   plan holds" would be false where "2 000 more is placed than this plan holds"
-   is true. One word per quantity, and two quantities keep two words.
+     pot        what the sources add up to            "money in"
+     allocated  what the buckets hold                 "allocated"
+     free       pot less allocated                    "not allocated"
+     placeable  what can still go into a bucket       "left to allocate"
+     spent      what has gone                         "spent"
+     left       pot less spent                        "left to spend"
+
+   "Spoken for" (allocated and not yet gone) is no longer a figure the page
+   prints, so the word went with it — and every word the page used to have
+   for a Plan quantity is refused below (HIDDEN), on screen and in the spoken
+   sentences alike, so one surface cannot quietly keep the old word while the
+   other moves on.
+
+   "allocated" is still NOT folded into anything narrower. What a bucket holds
+   and what it holds less what has gone differ as soon as anything is spent:
+   buckets of 12 000 against 10 000 in, with 5 000 spent, are 2 000 "more
+   allocated than the money in" — true — and the page says exactly that, never
+   a figure for the unspent part.
 
    D1-05. "6 spending buckets · R 49 450,00 placed of R 56 / 000,00" wrapped
    in the middle of a figure on a phone: the za locale groups thousands with a
    breaking space, and this line was English concatenated outside i18n.t, so
    the glue i18n.t now puts inside a whole-figure param never reached it. It
    goes through i18n.t (plan.env.sub) now; the page's other English sentences
-   that carry a figure glue it the same way (i18n.nbspFigure).
+   that carry a figure glue it the same way (i18n.nbspFigure). The redesign's
+   new sentences — the notes under the three hero stats, the in-the-account
+   key over the sources — are held to the same rule here. A figure standing
+   alone in its own element (.pot-fig, .pot-stat-v, .env-amt) is kept whole by
+   the stylesheet instead and is not read by this test.
 
    Drives the REAL registerPlan over the dom-stub with the REAL formatter
    (currency.js formatAmount, za separators) and reads the RAW text, U+00A0
@@ -88,15 +103,22 @@ const item = (name, envelope, spent) => ({ name, envelope, amount: spent, spent,
 
 const ariaOf = $ => $('#planPot').querySelector('.plan-split').getAttribute('aria-label');
 const visible = n => descend(n).filter(x => x.tagName === '#TEXT').map(x => readable(x._text)).join(' ');
-/* Words that name a Plan quantity and appear nowhere on the page. */
-const HIDDEN = /allocat|placeable|unplaced/i;
+/* Every word the page has had for a Plan quantity and no longer prints:
+   the audit's own "spoken for" / "placed" / "left to place", and the
+   "placeable" / "unplaced" it already refused. `\bplaced\b` leaves "replaced"
+   and "unplaced" to their own entries. */
+const HIDDEN = /spoken for|placeable|unplaced|\bplaced\b|left to place\b/i;
 /* A money figure with an ordinary (breaking) space inside it: after the symbol,
    or between two digit groups. */
 const BREAKABLE = /R \d|\d \d{3}\b/;
 const rawOf = n => n.rawText;
+/* The page's word for a quantity, from en.js — a template's figure dropped. */
+const word = (key, params) => i18n.t(key, params).replace(/\s+/g, ' ').trim().toLowerCase();
 
 (async () => {
-  /* ---- 1. a plan with some spent, some spoken for, some not ---- */
+  /* ---- 1. a plan with some spent, some allocated and unspent, some not allocated ----
+     48 000 in; 30 000 + 11 250 allocated; 2 000 spent from Car. So 6 750 is
+     not allocated and left to allocate, and 46 000 is left to spend. */
   {
     const { ctx, $ } = await mount(plan('Payout plan', {
       sources: [src(48000)],
@@ -105,27 +127,58 @@ const rawOf = n => n.rawText;
     }));
     const aria = ariaOf($);
     ok(!HIDDEN.test(aria), `the bar's spoken sentence uses no word the page does not show (got "${aria}")`);
-    for (const key of ['plan.split.alreadySpent', 'plan.split.spokenFor', 'plan.split.notSpokenFor', 'plan.split.stillLeft', 'plan.hero.leftToPlace']) {
-      const label = i18n.t(key).toLowerCase();
+    const VOCAB = [
+      word('plan.stat.moneyIn'),                      // pot
+      word('plan.stat.allocated'),                    // allocated
+      word('plan.stat.spent'),                        // spent
+      word('plan.split.notAllocated'),                // free
+      word('plan.hero.leftToPlace'),                  // placeable
+      word('plan.stat.leftToSpend', { amount: '' }),  // left
+    ];
+    eq(VOCAB, ['money in', 'allocated', 'spent', 'not allocated', 'left to allocate', 'left to spend'],
+      'precondition: en.js carries the vocabulary this test holds the page to');
+    for (const label of VOCAB) {
       ok(aria.toLowerCase().includes(label), `the spoken sentence says "${label}", as the page shows it (got "${aria}")`);
       ok(visible($('#planPot')).toLowerCase().includes(label), `and "${label}" is on screen for a sighted reader`);
     }
-    ok(aria.includes('R 39 250,00 spoken for') && aria.includes('R 6 750,00 not spoken for'),
-      `each figure is spoken with the label the key prints beside it (got "${aria}")`);
+    /* The figure and its word together, both ways: the spoken sentence pairs
+       each figure with the word the page prints for it, and the hero prints
+       the same pairing where it has one (the Spent note). */
+    ok(aria.includes('R 41 250,00 allocated') && aria.includes('R 6 750,00 is not allocated')
+      && aria.includes('R 46 000,00 left to spend') && aria.includes('R 6 750,00 of it left to allocate'),
+      `each figure is spoken with the word the page prints for it (got "${aria}")`);
+    ok(visible($('#planPot')).includes('R 46 000,00 left to spend'),
+      'and the hero prints "R 46 000,00 left to spend" in the same words the sentence speaks');
 
+    /* The sighted side of the rule: nothing on the page prints a retired word. */
+    const page = [visible($('#planPot')), visible($('#planFree')), visible($('#planEnvelopes')),
+      readable(rawOf($('#planEnvSub'))), visible($('#planSources'))].join(' ');
+    ok(!HIDDEN.test(page), `no retired word for a Plan quantity is printed anywhere on the page (got "${(page.match(HIDDEN) || [])[0]}")`);
+
+    /* A healthy plan's block under the bar is two buttons and no sentence:
+       the hero's figure is the sentence. They use the hero's verb. */
     const card = $('#planFree');
-    ok(!HIDDEN.test(visible(card)), `the loud card uses no hidden word (got "${visible(card)}")`);
-    ok(/not spoken for/.test(visible(card)), 'it names the money in no bucket "not spoken for", as the key does');
+    ok(!HIDDEN.test(visible(card)), `the block under the bar uses no retired word (got "${visible(card)}")`);
+    ok(/\ballocate\b/i.test(visible(card)), `it offers to "allocate" the money, the hero's verb (got "${visible(card)}")`);
 
     const slider = descend($('#planEnvelopes')).find(n => n.tagName === 'INPUT' && n.getAttribute('type') === 'range');
-    ok(slider && !HIDDEN.test(slider.getAttribute('aria-label')), `the bucket slider's label uses no hidden word (got "${slider && slider.getAttribute('aria-label')}")`);
+    const sliderLabel = slider && slider.getAttribute('aria-label');
+    ok(sliderLabel && !HIDDEN.test(sliderLabel) && /allocated/.test(sliderLabel),
+      `the bucket slider is "Amount allocated to …", the page's word (got "${sliderLabel}")`);
 
     /* D1-05: the bucket line, through i18n.t, figures glued */
     const sub = $('#planEnvSub');
-    eq(readable(rawOf(sub)), '2 spending buckets · R 41 250,00 placed of R 48 000,00', 'the bucket line reads as before');
+    eq(readable(rawOf(sub)), 'R 41 250,00 allocated across 2 spending buckets', 'the bucket line reads in the page\'s words');
     ok(!BREAKABLE.test(rawOf(sub)), `and no figure in it can break across a line (raw ${JSON.stringify(rawOf(sub))})`);
-    ok(rawOf(sub).includes('R 48 000,00'), 'the pot is one unbreakable figure');
-    ok(!BREAKABLE.test(rawOf(card)), `nor in the loud card (raw ${JSON.stringify(rawOf(card))})`);
+    ok(rawOf(sub).includes('R 41 250,00'), 'the allocated total is one unbreakable figure');
+    ok(!BREAKABLE.test(rawOf(card)), `nor in the block under the bar (raw ${JSON.stringify(rawOf(card))})`);
+    /* The redesign's new sentences that carry a figure: the three hero notes
+       and the in-the-account key over the sources. */
+    const notes = $('#planPot').querySelectorAll('.pot-stat-n');
+    eq(notes.length, 3, 'precondition: three hero stats, each with its note');
+    const keyLine = $('#planSources').querySelector('.src2-inout-key');
+    ok([...notes, keyLine].every(n => n && !BREAKABLE.test(rawOf(n))),
+      `nor in the hero's notes or the sources' key (raw ${JSON.stringify([...notes, keyLine].map(n => n && rawOf(n)))})`);
 
     /* the remove-bucket dialog */
     seen.confirms = [];
@@ -133,25 +186,27 @@ const rawOf = n => n.rawText;
     del.click();
     await new Promise(r => setImmediate(r));
     const msg = readable(seen.confirms[0].message);
-    ok(!HIDDEN.test(msg) && /spoken for/.test(msg), `removing a bucket says its money is no longer spoken for (got "${msg}")`);
+    ok(!HIDDEN.test(msg) && /no longer allocated/.test(msg), `removing a bucket says its money is no longer allocated (got "${msg}")`);
     void ctx;
   }
 
-  /* ---- 2. buckets placed past the pot ---- */
+  /* ---- 2. buckets allocated past the money in ---- */
   {
     const { $ } = await mount(plan('Over placed', {
       sources: [src(10000)],
       envelopes: [env('Car', 6000), env('Holiday', 4500)],
     }));
     const aria = ariaOf($);
-    ok(!HIDDEN.test(aria), `over-placed: the spoken sentence uses no hidden word (got "${aria}")`);
-    ok(aria.includes('R 500,00 more is placed than this plan holds'),
-      `and says it in the words the card heading prints (got "${aria}")`);
-    ok(visible($('#planFree')).includes('R 500,00 more is placed than this plan holds'), 'which is on screen');
+    ok(!HIDDEN.test(aria), `over-allocated: the spoken sentence uses no retired word (got "${aria}")`);
+    ok(aria.includes('R 500,00 more is allocated than the money in'),
+      `and says it in the words the heading under the bar prints (got "${aria}")`);
+    ok(visible($('#planFree')).includes('R 500,00 more is allocated than the money in'), 'which is on screen');
     ok(!BREAKABLE.test(rawOf($('#planFree'))), 'with the figure glued');
   }
 
-  /* ---- 3. a bucket run past what it held, every rand left in no bucket ---- */
+  /* ---- 3. a bucket run past what it held, every rand left in no bucket ----
+     2 000 in, 1 000 allocated, 1 300 spent from it: 300 over, 700 left, and
+     none of the 700 still in a bucket. */
   {
     const { $ } = await mount(plan('Over spent', {
       sources: [src(2000)],
@@ -160,22 +215,28 @@ const rawOf = n => n.rawText;
     }));
     const card = $('#planFree');
     const text = visible(card);
-    ok(!HIDDEN.test(text) && !/had not placed|had placed/.test(text), `overspent: the card uses no hidden word (got "${text}")`);
-    ok(/none of it spoken for/.test(text), `and says what is left is none of it spoken for (got "${text}")`);
-    ok(/not spoken for, or spoken for by another bucket/.test(text), 'and where the extra came from, in the key\'s words');
-    ok(!BREAKABLE.test(rawOf(card)), `no figure in the card can break across a line (raw ${JSON.stringify(rawOf(card))})`);
+    ok(!HIDDEN.test(text) && !/had not placed|had placed/.test(text), `overspent: the words under the bar use no retired word (got "${text}")`);
+    ok(/none of it still in a bucket/.test(text), `and say what is left is none of it still in a bucket (got "${text}")`);
+    ok(text.includes(i18n.t('plan.free.overspentFix')), 'and close with what to do about the overrun');
+    ok(!BREAKABLE.test(rawOf(card)), `no figure in them can break across a line (raw ${JSON.stringify(rawOf(card))})`);
     const flags = descend($('#planEnvelopes')).filter(n => /env-rail-flag/.test(n.className || ''));
     ok(flags.length && flags.every(f => !BREAKABLE.test(rawOf(f))), 'nor in a bucket\'s "over" flag');
+    const spentNote = $('#planPot').querySelectorAll('.pot-stat-n')[2];
+    ok(spentNote && /over its bucket/.test(readable(rawOf(spentNote))) && !BREAKABLE.test(rawOf(spentNote)),
+      `nor in the Spent note that names the overrun (raw ${JSON.stringify(spentNote && rawOf(spentNote))})`);
   }
 
-  /* ---- 4. a collapsed overspent row ---- */
+  /* ---- 4. a collapsed overspent row ----
+     The open bucket's header is built as a row too (`env-sum is-open`), so
+     the collapsed rows are the `.env-sum` that are not open. */
   {
     const { $ } = await mount(plan('Two buckets', {
       sources: [src(20000)],
       envelopes: [env('Open', 1000), env('Closed', 1000)],
       items: [item('Big', 'Closed', 1500)],
     }));
-    const rem = descend($('#planEnvelopes')).filter(n => /env-sum-rem/.test(n.className || ''));
+    const rows = $('#planEnvelopes').querySelectorAll('.env-sum').filter(r => !r.classList.contains('is-open'));
+    const rem = rows.map(r => r.querySelector('.env-sum-rem')).filter(Boolean);
     ok(rem.length === 1 && /over/.test(readable(rawOf(rem[0]))), 'the collapsed row says what it is over by');
     ok(!BREAKABLE.test(rawOf(rem[0])), `with the figure glued (raw ${JSON.stringify(rawOf(rem[0]))})`);
   }

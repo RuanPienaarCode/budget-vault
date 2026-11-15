@@ -2,18 +2,20 @@
 /* An overspent plan tells the same figures to every reader (runtime test of
    the 7 Oct 2026 audit fixes, O1 and O2).
 
-   O1. The split bar's aria label read "R -300.00 of it still placeable" (now
-       "… of it left to place", 2026-10-20 audit D2-14) on a
+   O1. The split bar's aria label read "R -300.00 of it still placeable" (then
+       "… of it left to place", 2026-10-20 audit D2-14; "… left to allocate"
+       since the rewording of 15 Nov 2026) on a
        plan whose visible card clamps the same figure to R 0.00. A
        screen-reader user was told a negative amount could be placed.
    O2. On a plan whose buckets hold the whole pot, the overspent card said
        "of which R 0.00 can still be placed — not the R 0.00 the buckets alone
        suggest": a contrast between two equal figures. The clause is dropped
-       when the two are the same.
+       when the two are the same. ("can still be allocated" since 15 Nov 2026;
+       the card is the words under the bar now, the rule the same.)
 
    The plan: R 1 000 in, two buckets that hold all of it (R 600 + R 400), and
    R 900 spent from the first. So R 300 is overspent, R 100 is left, R 400 is
-   still spoken for, and placeable is R 100 - R 400 = -R 300.
+   still held by the untouched bucket, and placeable is R 100 - R 400 = -R 300.
 
      node tests/plan-overspent-copy.test.cjs */
 
@@ -65,16 +67,17 @@ async function mountPlan(plan) {
   ok(split, 'the split bar is drawn');
   const label = split.getAttribute('aria-label') || '';
   ok(!/R -\d/.test(label), `the split bar's label states no negative amount (got "${label}")`);
-  /* "left to place", the hero's word for this figure — it said "still
-     placeable", a word on no part of the page (2026-10-20 audit, D2-14). */
-  ok(/R 0\.00 of it left to place/.test(label),
+  /* "left to allocate", the hero's word for this figure — it said "still
+     placeable", a word on no part of the page (2026-10-20 audit, D2-14), and
+     "left to place" until 15 Nov 2026. */
+  ok(/R 0\.00 of it left to allocate/.test(label),
     `and says nothing of what is left can be placed (got "${label}")`);
   ok(/R 300\.00 was spent past what its bucket held/.test(label), 'the overspend still closes the label');
 
   /* O2 — no contrast between two equal figures. */
   const card = $('#planFree');
   const text = card.textContent || '';
-  ok(/R 0\.00 can still be placed/.test(text), `the card says R 0.00 can still be placed (got "${text}")`);
+  ok(/R 0\.00 can still be allocated/.test(text), `the card says R 0.00 can still be allocated (got "${text}")`);
   ok(!/not the R 0\.00 the buckets alone suggest/.test(text),
     `and does not contrast it with the same R 0.00 (got "${text}")`);
 
@@ -86,7 +89,7 @@ async function mountPlan(plan) {
     items: [{ name: 'Tyres', envelope: 'Car', amount: 900, spent: 900 }] };
   const looseSum = planSummary(loose);
   ok(Math.abs(looseSum.free - 200) < 0.005 && looseSum.placeable < 0.005,
-    `the second plan has R 200 unbucketed and nothing placeable (free ${looseSum.free}, placeable ${looseSum.placeable})`);
+    `the second plan has R 200 unallocated and nothing placeable (free ${looseSum.free}, placeable ${looseSum.placeable})`);
   const { $: $2 } = await mountPlan(loose);
   ok(/not the R 200\.00 the buckets alone suggest/.test($2('#planFree').textContent || ''),
     'where the figures differ, the card still names the one the buckets suggest');

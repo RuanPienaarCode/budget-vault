@@ -360,9 +360,7 @@ body.is-tablet .budget-app-root button:where(.btn-ghost-sm) { padding: 0.35rem 0
 body.is-tablet .budget-app-root button:where(.cat-cell-btn) { padding: 0.25rem 0.5rem; }
 body.is-tablet .budget-app-root button:where(.splash-btn) { padding: 0.7rem 2rem; }
 body.is-tablet .budget-app-root button:where(.plan-seg) { padding: 6px 15px; }
-body.is-tablet .budget-app-root button:where(.env-name) { padding: 5px 0; }
 body.is-tablet .budget-app-root button:where(.ei-name) { padding: 4px 0; }
-body.is-tablet .budget-app-root button:where(.env-add) { padding: 4px 11px; }
 body.is-tablet .budget-app-root button:where(.food-cat-row) { padding: 8px 10px; }
 body.is-tablet .budget-app-root button:where(.food-item-name) { padding: 0; }
 body.is-tablet .budget-app-root button:where(.report-btn) { padding: 0.55rem 1.5rem; }
@@ -370,8 +368,6 @@ body.is-tablet .budget-app-root button:where(.note-chip) { padding: 2px 7px; }
 body.is-tablet .budget-app-root button:where(.score-ring-mid) { padding: 0 18%; }
 body.is-tablet .budget-app-root button:where(.score-ring-row) { padding: 11px 12px; }
 body.is-tablet .budget-app-root button:where(.btn-sm) { padding: 7px 14px; }
-body.is-tablet .budget-app-root button:where(.src2-main) { padding: 2px 0; }
-body.is-tablet .budget-app-root button:where(.env-sum) { padding: 10px 14px; }
 body.is-tablet .budget-app-root button:where(.sav-row) { padding: 13px 14px; }
 body.is-tablet .budget-app-root button:where(.sav-sheet-fence) { padding-top: 10px; }
 @media (max-width: 700px) {
@@ -383,6 +379,17 @@ body.is-tablet .budget-app-root button:where(.dock-btn) { padding: 6px 10px; }
   body.is-tablet .budget-app-root button:where(.dock-btn) { padding: 6px 2px; }
 }
 body.is-tablet .budget-app-root button:where(.fs-hide) { padding: 4px; }   /* first-steps card's hide (x) */
+/* The Plan page's buttons. Their base rules are src/statement/plan.css since
+   the layout of 15 Nov 2026 — the last lane in the cascade — so their twins
+   are the last here, in that file's order. */
+body.is-tablet .budget-app-root button:where(.env-sum) { padding: 12px 16px; }
+body.is-tablet .budget-app-root button:where(.env-amt-btn) { padding: 0 16px; }
+body.is-tablet .budget-app-root button:where(.env-add) { padding: 6px 16px; }
+body.is-tablet .budget-app-root button:where(.src2-main) { padding: 0; }
+body.is-tablet .budget-app-root button:where(.src2-pill) { padding: 4px 11px; }
+@media (max-width: 600px) {
+  body.is-tablet .budget-app-root button:where(.env-sum) { padding: 12px 14px; }
+}
 /* The split dialog is a Modal, outside .budget-app-root, so it cannot use the
    block above; its delete button is (0,1,0) against the host's (0,2,1) and
    loses on an iPad. (0,2,1) here is enough: the plugin's sheet loads after
@@ -4120,24 +4127,17 @@ body.is-phone .budget-app-root .drawer-book:not(.hidden) { display: block; }
   .budget-app-root .acct-drawer-act,
   .budget-app-root .acct-recon-btn,
   .budget-app-root .kpi-caveat-btn,
-  .budget-app-root .env-add,
   .budget-app-root .donut-legend .dl-link,
   .budget-app-root .note-title { min-height: 44px; }
   /* .cat-cell-btn grows too, but its rule lives beside its base rule below:
      that base rule also sets min-height, and at equal specificity the later
      declaration wins — parked here, the override loses the source-order tie. */
 
-  /* Envelope checklist rows are ~18px apart at rest — stacked 44px overlays
-     there would claim each other's rows wholesale. Symmetric padding gives
-     the row the 44px so each tick/name overlay lands inside its own row —
-     and inside the .env card, whose overflow:hidden would clip any halo
-     that escaped the row. Padding, not align-items: the base .env-item
-     rule keeps flex-start deliberately (ticks must line up with a wrapped
-     label's FIRST line, see its comment) and sits later in the file at the
-     same specificity, so an align-items here would silently lose the tie
-     anyway. 13px + 18px (the tick's layout box: 24px less its -3px margins)
-     + 13px = 44, exactly the min-height, so nothing stretches. */
-  .budget-app-root .env-item { min-height: 44px; padding-block: 13px; }
+  /* The Plan page's item rows and its Add button used to take their 44px
+     from here. Since the layout of 15 Nov 2026 their base rules live in
+     src/statement/plan.css, later in the cascade, and carry the height
+     themselves (a 46px row at every width) — a min-height here would lose
+     the source-order tie to them and say nothing. */
 
   /* Native-appearance checkboxes render no pseudo either, so the control
      itself grows. 32px is the ceiling before WebKit's native tick starts to
@@ -4766,7 +4766,7 @@ body.is-phone .budget-app-root .drawer-book:not(.hidden) { display: block; }
 .budget-app-root .env-item-add { margin-top: 2px; }
 .budget-app-root .env-add {
   font: inherit; font-size: 11.5px; font-weight: 600; cursor: pointer;
-  padding: 4px 11px; border-radius: 999px; border: 1px dashed var(--border-color);
+  border-radius: 999px; border: 1px dashed var(--border-color);   /* padding: src/statement/plan.css */
   background: transparent; color: var(--text-muted);
 }
 .budget-app-root .env-add:hover { border-style: solid; border-color: var(--color-primary); color: var(--color-primary); }
@@ -5594,8 +5594,6 @@ body.is-phone .budget-app-root .drawer-book:not(.hidden) { display: block; }
   .budget-app-root .plan-strip { align-items: stretch; }
   .budget-app-root .plan-strip > .row { margin-left: 0; width: 100%; flex-wrap: nowrap; overflow-x: auto; }
   .budget-app-root .plan-strip > .row > * { flex: none; }
-  .budget-app-root .plan-env-head { flex-direction: column; align-items: stretch; gap: 10px; }
-  .budget-app-root .plan-env-head > .btn-ghost { align-self: flex-start; max-width: 100%; }
   .budget-app-root .acct-segs { display: flex; flex-wrap: nowrap; overflow-x: auto; max-width: 100%; border-radius: 18px; -webkit-overflow-scrolling: touch; }
   .budget-app-root .acct-segs > * { flex: none; }
   .budget-app-root .acct-toolbar, .budget-app-root .acct-search-row { flex-direction: column; align-items: stretch; }
@@ -5704,7 +5702,10 @@ body.is-phone .budget-app-root .drawer-book:not(.hidden) { display: block; }
 .budget-app-root .src2-main {
   display: block;
   flex: 1; min-width: 0; text-align: left; background: none; border: 0;
-  font: inherit; cursor: pointer; padding: 2px 0;
+  font: inherit; cursor: pointer;
+  /* Its padding is src/statement/plan.css's since 15 Nov 2026 (0, in a grid
+     row that carries the spacing), and so is its iPad twin: one base rule,
+     one twin, or the two disagree about which is the base. */
 }
 .budget-app-root .src2-main:hover .src2-name { text-decoration: underline; }
 .budget-app-root .src2-main:focus-visible {
@@ -5735,9 +5736,12 @@ body.is-phone .budget-app-root .drawer-book:not(.hidden) { display: block; }
 
 .budget-app-root .env-sum {
   display: flex; align-items: center; justify-content: flex-start; gap: 10px; width: 100%;
-  min-height: 44px; padding: 10px 14px; border-radius: 12px;
+  min-height: 44px; border-radius: 12px;
   border: 1px solid var(--border-color); background: var(--surface);
   font: inherit; cursor: pointer; text-align: left;
+  /* No padding here since 15 Nov 2026: src/statement/plan.css is the row's
+     base rule now and states it (with its iPad twin, which must name one
+     base rule, not two that disagree). */
 }
 .budget-app-root .env-sum:hover { border-color: var(--color-primary); }
 .budget-app-root .env-sum:focus-visible { outline: 2px solid var(--color-primary); outline-offset: 2px; }
@@ -5828,13 +5832,13 @@ body.is-phone .budget-app-root .drawer-book:not(.hidden) { display: block; }
    24px) are gone: statement/foundation.css sets both at every width, later in
    the cascade, and its clamp() floor is the phone size now. */
 @media (max-width: 640px) {
-  .budget-app-root .pot { padding: 24px 20px; }
+  /* The pot's padding, the bucket bar and the open bucket's padding left
+     this block on 15 Nov 2026: src/statement/plan.css states all three, base
+     and phone, later in the cascade. On a phone the bar is no longer removed
+     — it sits on its own line under the name, where it takes no width from
+     it. */
   .budget-app-root .pot-figs { gap: 10px 26px; }
-  /* Tablet and desktop only. On a phone the collapsed row has no width to give
-     a bar, and the remainder is already stated in words under the name. */
-  .budget-app-root .env-sum-bar { display: none; }
   .budget-app-root .src-amt { width: 110px; }
-  .budget-app-root .env { padding: 20px; }
 }
 
 /* ---- mobile redesign: savings view ---- */
@@ -6324,15 +6328,12 @@ body.is-phone .budget-app-root .drawer-book:not(.hidden) { display: block; }
 
 /* Plan view, phone gutter: the sections arrived with three different left
    edges (14px sources, 20px pot, 0px buckets and their header), which is what
-   read as "the button is cut off" on the phone. One gutter for all of them. */
+   read as "the button is cut off" on the phone. One gutter for all of them.
+   Since the layout of 15 Nov 2026 the cards carry their own gutter
+   (src/statement/plan.css, its phone block); only the strip above them, which
+   sits on the page background, still needs one from here. */
 @media (max-width: 640px) {
-  .budget-app-root #planContent .plan-strip,
-  .budget-app-root #planContent .plan-env-head,
-  .budget-app-root #planContent #planEnvelopes,
-  .budget-app-root #planContent #planSources,
-  .budget-app-root #planContent #planPot,
-  .budget-app-root #planContent .section-h { padding-left: 16px; padding-right: 16px; }
-  .budget-app-root #planContent .plan-env-head .section-h { padding-left: 0; padding-right: 0; }
+  .budget-app-root #planContent .plan-strip { padding-left: 16px; padding-right: 16px; }
 }
 /* Bucket items read left to right: tick, name, amount. */
 .budget-app-root .env-item .ei-name, .budget-app-root .env-item .ei-name > * { text-align: left; justify-content: flex-start; }

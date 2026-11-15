@@ -135,12 +135,19 @@ const onIndex = root => byClass(root, 'bvm-scene').findIndex(s => s.hasClass('is
   const text = m.root.textContent;
   for (const key of ['wiz.title', 'wiz.step.name', 'wiz.step.period', 'wiz.step.how', 'wiz.how.csv.title',
     'nav.import', 'nav.budgets', 'bud.total.income', 'bud.total.budgeted', 'bud.total.left',
-    'nav.plan', 'plan.hero.leftToPlace', 'plan.split.spokenFor', 'plan.split.notSpokenFor',
+    'nav.plan', 'plan.hero.leftToPlace', 'plan.stat.moneyIn', 'plan.stat.allocated', 'plan.split.notAllocated',
     'wiz.type.income', 'wiz.type.food', 'wiz.type.savings']) {
+    /* t() answers a key it does not have with the key itself, so "the scene
+       contains t(key)" is true of a key that was deleted: the scene prints the
+       raw key and so does the test. That is how the Plan rewording of 15 Nov
+       2026 took three of this scene's keys out of the table with this suite
+       still green. A key must be in the table before its words can count. */
+    ok(t(key) !== key, `"${key}" is in the translation table`);
     ok(text.includes(t(key)), `the scenes say "${t(key)}" (${key}) from the translation table`);
   }
+  ok(!/\b(plan|wiz|bud|nav)\.[a-z]+\.[A-Za-z.]+/.test(text), 'no scene prints a raw translation key');
   ok(text.includes(t('wiz.stepOf', { n: 1, total: 7 })), 'the settings card counts its step the wizard\'s way');
-  ok(text.includes(t('plan.hero.ofPot', { pot: money(8400, 0) })), 'the plan names its pot through the formatter');
+  ok(text.includes(`${t('plan.stat.moneyIn')} · ${money(8400, 0)}`), 'the plan names its money in through the formatter');
   ok(text.includes(t('bud.remaining.over', { amount: money(60, 0) })), 'an overspent category says so, in the reader\'s money');
   for (const fig of [money(28500, 0), money(4200, 0), money(0, 0), signed(-842.1, 2), signed(28500, 2)]) {
     ok(text.includes(fig), `the figure ${fig} came through the wizard's formatter`);

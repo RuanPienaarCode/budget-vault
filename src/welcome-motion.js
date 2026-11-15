@@ -256,15 +256,20 @@ function planScene(stage, t, money) {
   s.createDiv({ cls: 'bvm-label', text: t('nav.plan') });
   const hero = s.createDiv({ cls: 'bvm-card bvm-hero' });
   hero.createDiv({ cls: 'bvm-hero-lb', text: t('plan.hero.leftToPlace') });
-  /* What is left to place as each bucket takes its share: four figures stacked
-     in one spot, each shown in its own window of the scene by the stylesheet. */
+  /* What is left to allocate as each bucket takes its share: four figures
+     stacked in one spot, each shown in its own window of the scene by the
+     stylesheet. The words are the Plan page's own (money in / allocated / not
+     allocated since 15 Nov 2026) — this scene read three keys that rewording
+     removed, and t() answers a missing key with the key, so for one build the
+     welcome showed "plan.split.spokenFor" in every language. Its test now
+     refuses a key that is not in the table. */
   const fig = hero.createDiv({ cls: 'bvm-hero-v' });
   [8400, 4400, 2600, 0].forEach((v, k) => fig.createSpan({ cls: `bvm-v bvm-v${k + 1}`, text: money(v, 0) }));
-  hero.createDiv({ cls: 'bvm-hero-of', text: t('plan.hero.ofPot', { pot: money(8400, 0) }) });
+  hero.createDiv({ cls: 'bvm-hero-of', text: `${t('plan.stat.moneyIn')} · ${money(8400, 0)}` });
   hero.createDiv({ cls: 'bvm-split' }).createSpan();
   const legend = hero.createDiv({ cls: 'bvm-legend' });
-  legend.createSpan({ cls: 'bvm-key is-spoken', text: t('plan.split.spokenFor') });
-  legend.createSpan({ cls: 'bvm-key', text: t('plan.split.notSpokenFor') });
+  legend.createSpan({ cls: 'bvm-key is-spoken', text: t('plan.stat.allocated') });
+  legend.createSpan({ cls: 'bvm-key', text: t('plan.split.notAllocated') });
   const buckets = s.createDiv({ cls: 'bvm-buckets' });
   [['wiz.type.luxuries', 4000], ['wiz.type.transport', 1800], ['wiz.type.savings', 2600]].forEach(([type, v], k) => {
     const b = buckets.createDiv({ cls: `bvm-card bvm-bk bvm-b${k + 1}` });

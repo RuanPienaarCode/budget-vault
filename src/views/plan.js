@@ -11,10 +11,18 @@
    THE THREE-WAY SPLIT is the page's whole thesis, and every figure on it is
    derived from these four sums, never stored:
 
-     pot        = Σ source.amount                    (what the plan holds)
-     allocated  = Σ envelope.amount                  (what has been placed)
+     pot        = Σ source.amount                    (money in)
+     allocated  = Σ envelope.amount                  (allocated to a bucket)
      spent      = Σ item.spent                       (what has actually gone)
-     free       = pot − allocated                    (what is not spoken for)
+     free       = pot − allocated                    (not allocated)
+
+   The page's WORDS for these changed on 15 Nov 2026 — it reads as "money in"
+   against "allocated" now, where it said "placed" and "spoken for" — and
+   several notes below were written under the old words and are left as they
+   were, because they are the history of why a figure is what it is. Where
+   one says "placed", read "allocated"; "spoken for" was allocated and not
+   yet gone, a figure the page no longer prints (see src/lang/en.js, the note
+   over the plan.* keys, for the one-word-per-quantity table).
 
    An envelope's amount is NOT the sum of its items. That is deliberate, not a
    gap: you decide "R 12 300 goes to the baby" before you know the four things
@@ -35,7 +43,7 @@ const { escMd, patchFrontmatter, yamlStr, freshLeadLines, withLeadExtra } = requ
 const { PLAN_TABLES, plainTableLines } = require('../table-schema');
 const { safeSeg } = require('../vault-path');
 const { askFields, confirmModal } = require('../modal');
-const { planSummary, barSegments, SOURCE_KINDS, sharePct, envelopeShares,
+const { planSummary, potSlices, bucketScale, isReceived, SOURCE_KINDS, envelopeShares,
   envelopeOverState, envelopeBar, round2 } = require('../plan-math');
 const i18n = require('../i18n');
 
@@ -138,7 +146,8 @@ module.exports = function registerPlan(ctx) {
     /* One partition of the pot for every badge and the loud card's "% of the
        plan", computed once per render — see envelopeShares in plan-math.js. */
     const shares = envelopeShares(p.envelopes.map(e => e.amount), sum.pot);
-    renderPot(p, sum);
+    settleOpenEnvelope(p);
+    renderPot(p, sum, shares);
     renderSources(p, sum);
     renderEnvelopes(p, sum, shares);
     renderFree(p, sum, shares);
@@ -200,18 +209,26 @@ module.exports = function registerPlan(ctx) {
      on a FRESH plan "still left" is just the pot restated, the same number
      twice. Hence `showLeft` — it appears once anything has actually been
      spent, which is the point at which it starts saying something the first
-     figure does not. */
-  function renderPot(p, sum) {
+     figure does not.
+
+     SINCE THE LAYOUT OF 15 NOV 2026 the hero is one figure and three: what is
+     left to allocate, then money in, allocated and spent beside it. The big
+     number is still `placeable` — nothing above is undone. What moved is the
+     second slot: "still left" and the overspend are the line under Spent now
+     (the same swap, by the same rule), and the key's rows are gone because
+     the three figures carry the bar's own colours. And the bar is no longer
+     three bands of one rand's three states: it is the pot cut into its
+     buckets (see the note at its call below). */
+  function renderPot(p, sum, shares) {
     const host = $('#planPot');
     host.empty();
-    /* Widths come from barSegments, NOT from the summary: those three always
-       sum to the pot, so the bar can never render clipped or backwards. The
-       key underneath still reports the summary's honest figures, and the two
-       are identical in every case except an overspent plan — which the
-       overspend row and the loud card state in words. */
-    const seg = barSegments(sum);
-    const pct = v => (sum.pot > 0 ? (v / sum.pot) * 100 : 0);
     const over = sum.placeable < 0;
+    /* A plan with no sources has nothing to allocate and nothing to draw: one
+       line saying what to do first, and none of the three zeros. A plan whose
+       buckets hold exactly what came in is neither "left" nor "over", and says
+       so rather than printing a gold R 0,00 under "Left to allocate". */
+    const empty = sum.sources === 0;
+    const settled = !empty && !over && sum.placeable < 0.005;
     /* WHICH KIND of "past the end" this is, because each needs different
        words: buckets claiming more than came in is an allocation someone can
        simply take back, whereas money already out of the account is not. When
@@ -220,117 +237,173 @@ module.exports = function registerPlan(ctx) {
 
        And a THIRD kind since 7 Oct 2026, now that placeable is taken bucket by
        bucket: one bucket ran past what it held, nothing has gone past the pot
-       and nothing is placed past it, yet the buckets still claim more than is
-       left (pot 10 000, three buckets of 3 000, one 4 500 spent: R 500 short).
-       "Spent more than this plan holds" and "Placed more than this plan holds"
-       would both be false there, so the label says the true thing. Each label
-       now keys off the fact it states rather than off the overspend, which
-       could not tell these apart. */
+       and nothing is allocated past it, yet the buckets still claim more than
+       is left (pot 10 000, three buckets of 3 000, one 4 500 spent: R 500
+       short). "Spent more than the money in" and "Allocated more than the
+       money in" would both be false there, so the label says the true thing.
+       Each label keys off the fact it states rather than off the overspend,
+       which could not tell these apart. */
     const overLabel = sum.left < -0.005 ? i18n.t('plan.hero.overSpent')
       : sum.free < -0.005 ? i18n.t('plan.hero.overPlaced')
         : i18n.t('plan.hero.overClaimed');
-    /* WHAT THE SECOND SLOT CARRIES, which is not always the same figure.
+    const eyebrow = empty ? i18n.t('plan.hero.empty')
+      : over ? overLabel
+        : settled ? i18n.t('plan.hero.allAllocated') : i18n.t('plan.hero.leftToPlace');
 
-       "Still left" is the second thing a reader wants — except on an overspent
-       plan. There the second most important fact is not what remains but how
-       far past its bucket the money went: it is what explains why the first
-       figure is smaller than the buckets suggest, so the slot swaps to it.
-       (When no bucket still holds unspent money, `placeable` lands exactly on
-       `left`, and the swap is also what stops the hero printing one number
-       twice.) `left` is not lost: the loud card below says it in words. */
-    const showOverspend = sum.overspend > 0.005;
-    const showLeft = !showOverspend && sum.spent >= 0.005;
-
-    const statusLine = sum.sources === 0 ? null
+    const statusLine = empty ? i18n.t('plan.hero.noSources')
       : sum.expected <= 0.005 ? i18n.t('plan.hero.allIn')
-      : sum.received <= 0.005 ? i18n.t('plan.hero.noneIn')
-      : i18n.t('plan.hero.partial', { received: money(sum.received), expected: money(sum.expected) });
+        : sum.received <= 0.005 ? i18n.t('plan.hero.noneIn')
+          : i18n.t('plan.hero.partial', { received: money(sum.received), expected: money(sum.expected) });
+
+    /* THE THREE FIGURES BESIDE THE HERO: what came in, how much of it has been
+       given a job, how much of that has gone — "money in" against "allocated",
+       which is how the page is read (15 Nov 2026). Each carries one quiet line
+       under it, and the third line is where "left to spend" and the overspend
+       now live: the hero's second slot used to swap between those two, and
+       the swap is kept — an overspent plan's note names the overrun, because
+       it is what explains why the first figure is smaller than the buckets
+       suggest. `left` is not lost there: the words under the bar say it.
+
+       The swatches are the bar's own colours, so the row doubles as its key:
+       a slice is what a bucket holds (Allocated), the dark part of it has
+       gone (Spent), the hatched end is in no bucket (the hero figure). */
+    const stat = (label, value, note, swatch, danger = false) => el('div', { class: 'pot-stat' },
+      el('div', { class: 'pot-stat-l' }, ...(swatch ? [el('i', { class: `pot-sw ${swatch}` })] : []), label),
+      el('div', { class: `pot-stat-v num ${danger ? 'text-danger' : ''}` }, money(value)),
+      el('div', { class: 'pot-stat-n num' }, note));
+    /* Until something has been spent, "left to spend" is the pot restated —
+       the objection the old hero's `showLeft` honoured, and it stands: a
+       fresh plan would print its pot as the big figure, as Money in, and a
+       third time here. So the note says the true thing about a plan nothing
+       has left yet, in the words a bucket's row already uses for it. */
+    const spentNote = sum.overspend > 0.005 ? i18n.t('plan.stat.overBucket', { amount: money(sum.overspend) })
+      : sum.left < -0.005 ? i18n.t('plan.stat.overMoneyIn', { amount: money(-sum.left) })
+        : sum.spent < 0.005 ? i18n.t('plan.env.nothingSpent')
+          : i18n.t('plan.stat.leftToSpend', { amount: money(sum.left) });
+    /* The allocated share is the pot less the unallocated slice of the SAME
+       partition the bucket badges come from (envelopeShares), so this line,
+       the badges and the label under the hatched slice add up to 100. */
+    const allocatedPct = sum.pot > 0 ? 100 - shares.unplaced : 0;
+    /* A figure is never broken across a line, so one too long for a phone at
+       the display size is marked and steps down a size instead (plan.css).
+       It stays ONE text node, cents and all: the reconciliation harvests a
+       figure from an element's own text (scripts/reconcile-page.cjs), and a
+       span around the cents — tried, to set them small — split the hero into
+       "6 550" and "00", neither of them money, and the gate went quiet. */
+    const heroFig = money(Math.abs(sum.placeable));
 
     host.append(
-      /* The two figures side by side: what you may still place, and what you
-         still have. They coincide on an overspent plan — every remaining rand
-         is unplaced once the buckets have been run past — and that coincidence
-         is itself the reading, not a duplicate to suppress. */
-      el('div', { class: 'pot-figs' },
-        el('div', { class: 'pot-fig-block' },
-          el('div', { class: 'pot-eyebrow' }, over ? overLabel : i18n.t('plan.hero.leftToPlace')),
-          el('div', { class: `pot-fig num ${over ? 'text-danger' : 'plan-free-fig'}` },
-            money(Math.abs(sum.placeable)))),
-        ...(showOverspend
-          ? [el('div', { class: 'pot-fig-block pot-fig-block-2' },
-              el('div', { class: 'pot-eyebrow pot-eyebrow-danger' }, i18n.t('plan.split.overspent')),
-              el('div', { class: 'pot-fig-2 num text-danger' }, money(sum.overspend)))]
-          : showLeft
-            ? [el('div', { class: 'pot-fig-block pot-fig-block-2' },
-                el('div', { class: 'pot-eyebrow' }, i18n.t('plan.split.stillLeft')),
-                el('div', { class: `pot-fig-2 num ${sum.left < 0 ? 'text-danger' : ''}` },
-                  money(sum.left)))]
-            : [])),
-      el('div', { class: 'pot-sub' },
-        sum.sources === 0
-          ? i18n.t('plan.hero.noSources')
-          : [i18n.t('plan.hero.ofPot', { pot: money(sum.pot) }), statusLine ? ` · ${statusLine}` : '']),
-      /* One bar, three states of the same rand. role=img with the figures in
-         the label: a screen reader gets the split as a sentence rather than
-         three unlabelled divs, and the visual key below repeats it in text.
-         The overspend closes the sentence when there is one — a screen-reader
-         user must not have to infer it from two figures that happen to
-         disagree.
+      el('div', { class: 'pot-top' },
+        el('div', { class: 'pot-figs' },
+          el('div', { class: 'pot-fig-block' },
+            el('div', { class: 'pot-eyebrow' },
+              ...(empty || over || settled ? [] : [el('i', { class: 'pot-sw pot-sw-free' })]), eyebrow),
+            el('div', { class: `pot-fig num ${over ? 'text-danger' : empty || settled ? 'pot-fig-quiet' : 'plan-free-fig'}${heroFig.length > 12 ? ' pot-fig-long' : ''}` },
+              heroFig),
+            el('div', { class: 'pot-sub' }, statusLine))),
+        ...(empty ? [] : [el('div', { class: 'pot-stats' },
+          stat(i18n.t('plan.stat.moneyIn'), sum.pot, i18n.t('plan.stat.sources', { count: sum.sources })),
+          stat(i18n.t('plan.stat.allocated'), sum.allocated,
+            i18n.t('plan.stat.allocatedNote', { count: sum.envelopes, pct: allocatedPct }), 'pot-sw-alloc'),
+          stat(i18n.t('plan.stat.spent'), sum.spent, spentNote, 'pot-sw-spent',
+            sum.overspend > 0.005 || sum.left < -0.005))])));
 
-         `free` and `left` both go below zero (buckets holding more than the
-         plan; more gone than it ever held), and the sentence used to speak
-         them as they were: "R -500,00 not yet allocated". The key beside the
-         bar prints the same figure in danger red, and the colour says which
-         way it points; a screen reader has no colour, only a minus read in the
-         voice of a number that is fine. Each is worded as what it is instead,
-         the first as the loud card below words it.
+    /* THE BAR: the pot as one strip, cut into its buckets (plan-math.js
+       potSlices). It used to be three bands — spent, spoken for, free — which
+       said how much was in each state and nothing about WHERE; the buckets
+       were five cards further down the page with no visible tie to it. Each
+       slice is now a bucket, as wide as its claim on the pot: the dark part of
+       it has gone, the rest it still holds, red is what went past it, and the
+       hatched end is in no bucket. Same three colours, same meanings.
 
-         And in the WORDS the page shows (2026-10-20 audit, D2-14). This is
-         the sentence a screen reader hears in place of the key, and it said
-         "allocated but unspent", "not yet allocated" and "still placeable" —
-         words on no part of the screen — while the key beside it printed
-         "Spoken for", "Not spoken for" and the hero "Left to place". Each
-         figure is now spoken with the label printed beside it: spoken for
-         (committed), not spoken for (free), still left to spend (left), left
-         to place (placeable), and the over-placed case in the loud card's own
-         words. */
-      el('div', { class: 'plan-split', role: 'img',
-        /* Whole sentences per key, joined by a space — never a clause built
+       ONE STRAIGHT STRIP. Every slice is the same height and nothing moves on
+       hover or when its bucket is open — a slice that lifted read as a broken
+       bar (Ruan, 15 Nov 2026). The open bucket is marked by its name under
+       the bar, in words.
+
+       A slice is a BUTTON that opens its bucket, so the strip is a group, not
+       an image: role=img hides its children from a screen reader, buttons
+       included. The group keeps the sentence the bar always spoke; each slice
+       says its own bucket's figures. Widths are flex shares, so the gaps
+       between slices never push the last one off the row. */
+    const bar = potSlices(p);
+    if (!empty && bar.span > 0) {
+      const openName = typeof expandedEnvelope === 'string' ? expandedEnvelope : null;
+      const shareOf = name => p.envelopes.reduce((t, e, i) => t + (e.name === name ? shares.shares[i] : 0), 0);
+      const slices = [], labels = [];
+      for (const b of bar.slices) {
+        const at = p.envelopes.findIndex(e => e.name === b.name);
+        const overBy = round2(b.spent - b.amount);
+        const open = b.name === openName;
+        slices.push(el('button', {
+          class: `ps-seg${open ? ' is-open' : ''}`, type: 'button', style: `flex:${b.width} 1 0`,
+          'data-focus-key': `slice:${at}`,
+          'aria-label': overBy > 0.005
+            ? i18n.t('plan.slice.ariaOver', { name: b.name, amount: money(b.amount), spent: money(b.spent), over: money(overBy) })
+            : i18n.t('plan.slice.aria', { name: b.name, amount: money(b.amount), spent: money(b.spent) }),
+          /* The slice pressed is rebuilt by its own press, so the reader is
+             put on what it opened: the bucket's own header. */
+          onclick: () => {
+            expandedEnvelope = b.name;
+            renderPlan();
+            refocus($('#planEnvelopes'), `env:${at}`);
+          },
+        },
+          el('i', { class: 'ps-spent', style: `width:${b.spent}%` }),
+          el('i', { class: 'ps-over', style: `width:${b.over}%` })));
+        /* Under the slice: the bucket's own tint (the dot on its row below),
+           its name and its share. A slice too narrow for words keeps the tint
+           and drops them — the row below carries both in full. */
+        labels.push(el('div', { class: `ps-lab${b.width < 9 ? ' is-narrow' : ''}${open ? ' is-open' : ''}`, style: `flex:${b.width} 1 0` },
+          el('i', { class: 'ps-lab-tint', style: `background:${(p.envelopes[at] || {}).tint || 'var(--color-primary)'}` }),
+          el('span', { class: 'ps-lab-name' }, b.name),
+          el('span', { class: 'ps-lab-pct num' }, `${shareOf(b.name)}%`)));
+      }
+      if (bar.orphan > 0) {
+        slices.push(el('span', { class: 'ps-seg ps-orphan', style: `flex:${bar.orphan} 1 0`, role: 'img',
+          'aria-label': i18n.t('plan.slice.orphan', { amount: money(round2(sum.claimed - bar.slices.reduce((t, b) => t + b.claim, 0))) }) }));
+        labels.push(el('div', { class: 'ps-lab is-narrow', style: `flex:${bar.orphan} 1 0` },
+          el('i', { class: 'ps-lab-tint ps-lab-tint-over' })));
+      }
+      if (bar.free > 0) {
+        slices.push(el('span', { class: 'ps-seg ps-free', style: `flex:${bar.free} 1 0` }));
+        labels.push(el('div', { class: `ps-lab ps-lab-free${bar.free < 9 ? ' is-narrow' : ''}`, style: `flex:${bar.free} 1 0` },
+          el('i', { class: 'ps-lab-tint ps-lab-tint-free' }),
+          el('span', { class: 'ps-lab-name' }, i18n.t('plan.split.notAllocated')),
+          el('span', { class: 'ps-lab-pct num' }, `${shares.unplaced}%`)));
+      }
+
+      host.append(
+        /* The sentence a screen reader hears for the whole strip, in the words
+           the page prints (2026-10-20 audit, D2-14 — one word per quantity,
+           seen and spoken alike; the words themselves are 15 Nov 2026's).
+
+           `free` and `left` both go below zero (buckets holding more than came
+           in; more gone than ever came in), and each is worded as what it is
+           rather than spoken as a negative amount: a screen reader has no
+           danger red, only a minus read in the voice of a number that is fine.
+           The overspend closes the sentence when there is one — a reader must
+           not have to infer it from two figures that happen to disagree.
+
+           Whole sentences per key, joined by a space — never a clause built
            around a figure, which no translator can reorder. */
-        'aria-label': [
-          sum.free < -0.005
-            ? i18n.t('plan.split.aria.overPlaced', { pot: money(sum.pot), spent: money(sum.spent), committed: money(sum.committed), over: money(-sum.free) })
-            : i18n.t('plan.split.aria.free', { pot: money(sum.pot), spent: money(sum.spent), committed: money(sum.committed), free: money(Math.max(0, sum.free)) }),
-          sum.left < -0.005
-            ? i18n.t('plan.split.aria.overSpent', { over: money(-sum.left) })
-            : i18n.t('plan.split.aria.left', { left: money(Math.max(0, sum.left)), placeable: money(Math.max(0, sum.placeable)) }),
-          ...(sum.overspend > 0.005 ? [i18n.t('plan.split.aria.pastBucket', { amount: money(sum.overspend) })] : []),
-        ].join(' ') },
-        el('i', { class: 's-spent', style: `width:${pct(seg.spent)}%` }),
-        el('i', { class: 's-alloc', style: `width:${pct(seg.committed)}%` }),
-        el('i', { class: 's-free', style: `width:${pct(seg.free)}%` })),
-      el('div', { class: 'split-key2' },
-        splitRow2(i18n.t('plan.split.spokenFor'), sum.committed, 'var(--color-accent)'),
-        splitRow2(i18n.t('plan.split.notSpokenFor'), sum.free, 'var(--color-gold)',
-          sum.free < 0 ? 'text-danger' : 'plan-free-fig'),
-        splitRow2(i18n.t('plan.split.alreadySpent'), sum.spent, 'var(--color-primary)'),
-        /* THE ROW THAT WAS MISSING. Not a fourth band of the bar — there is no
-           swatch — but the number that explains why "Not spoken for" above it
-           is larger than the figure in the hero. Drawn only when there is one,
-           per the same rule the rest of the app follows: an all-clear vault
-           gets no shelf standing there saying nothing. */
-        ...(sum.overspend > 0.005
-          ? [el('div', { class: 'sk2-row sk2-over' },
-              el('span', { class: 'sk2-label' }, i18n.t('plan.split.overspent')),
-              el('span', { class: 'sk2-fig num text-danger' }, money(sum.overspend)))]
-          : [])));
+        el('div', { class: 'plan-split', role: 'group',
+          'aria-label': [
+            sum.free < -0.005
+              ? i18n.t('plan.split.aria.overPlaced', { pot: money(sum.pot), allocated: money(sum.allocated), spent: money(sum.spent), over: money(-sum.free) })
+              : i18n.t('plan.split.aria.free', { pot: money(sum.pot), allocated: money(sum.allocated), spent: money(sum.spent), free: money(Math.max(0, sum.free)) }),
+            sum.left < -0.005
+              ? i18n.t('plan.split.aria.overSpent', { over: money(-sum.left) })
+              : i18n.t('plan.split.aria.left', { left: money(Math.max(0, sum.left)), placeable: money(Math.max(0, sum.placeable)) }),
+            ...(sum.overspend > 0.005 ? [i18n.t('plan.split.aria.pastBucket', { amount: money(sum.overspend) })] : []),
+          ].join(' ') }, ...slices),
+        /* Hidden from a screen reader: every label repeats what its slice's
+           own button already says. */
+        el('div', { class: 'plan-split-labs', 'aria-hidden': 'true' }, ...labels));
+    }
   }
 
-  const splitRow2 = (label, value, swatch, cls = '') => el('div', { class: 'sk2-row' },
-    el('span', { class: 'sk2-label' }, el('i', { style: `background:${swatch}` }), label),
-    el('span', { class: `sk2-fig num ${cls}` }, money(value)));
-
-  /* ---- money in: a compact read-only ledger, tap a row to edit (variant B) ----
+  /* ---- money in: a compact ledger beside the buckets, tap a row to edit ----
 
      A source is read far more often than it is edited — the old design gave
      every row three live input fields whether or not the reader wanted to
@@ -348,34 +421,62 @@ module.exports = function registerPlan(ctx) {
           'Nothing funds this plan yet. Add a payout, a refund, a salary surplus — anything.'));
         return;
       }
+      /* How much of the money in has actually landed, as one thin bar over the
+         list: solid is in the account, the dashed remainder is still expected.
+         The hero says the same two figures in a sentence; here they sit over
+         the rows they are the sum of. */
+      const pctIn = sum.pot > 0 ? Math.max(0, Math.min(100, (sum.received / sum.pot) * 100)) : 0;
+      host.append(el('div', { class: 'src2-inout' },
+        el('div', { class: 'src2-inout-bar', 'aria-hidden': 'true' }, el('i', { style: `width:${pctIn}%` })),
+        el('div', { class: 'src2-inout-key' },
+          el('span', { class: 'num' }, i18n.t('plan.source.keyIn', { amount: money(sum.received) })),
+          ...(sum.expected > 0.005
+            ? [el('span', { class: 'num src2-key-exp' }, i18n.t('plan.source.keyExpected', { amount: money(sum.expected) }))]
+            : []))));
+
       const list = el('div', { class: 'src2-list' });
       /* The row that took this one's place, else the one before it, else Add a
-         source — for the ✕, and for an edit whose sheet removed the source. An
-         edit that kept it finds the same row under the same key.
-
-         Always the row's own button, which opens its sheet, and never its ✕.
-         The ✕ removes with no question asked, and Enter held down repeats:
-         landing on the next row's ✕ would let one long press empty the list,
-         where before the press stopped because focus had gone (review of this
-         change). The same care the bucket's delete takes below. */
+         source — for an edit whose sheet removed the source. An edit that kept
+         it finds the same row under the same key. Removing lives in the sheet
+         alone now: the row's own ✕ went with the redesign, because a narrow
+         rail has room for the amount and the status and not for a third
+         control, and a remove with no question asked beside a one-tap status
+         was one slip from the wrong press. */
       const afterSource = n => refocus(host, [`src:${n}`, `src:${n - 1}`, $('#planAddSource')]);
       p.sources.forEach((s, n) => {
-        const received = s.status === 'received';
+        /* isReceived, the rule the arithmetic uses (plan-math.js): a source
+           with no status at all counts as received in every sum, so the row
+           must not call it expected. */
+        const received = isReceived(s);
         list.append(el('div', { class: 'src2-row' },
           el('button', { class: 'src2-main', type: 'button', 'data-focus-key': `src:${n}`,
             'aria-label': i18n.t('plan.source.editAria', { name: s.name }),
             onclick: async () => { await editSource(p, s); afterSource(n); } },
-            el('div', { class: 'src2-line1' },
-              el('span', { class: 'src2-name' }, s.name),
-              el('span', { class: 'kind' }, s.kind || 'Other')),
-            el('div', { class: 'src2-line2' },
-              el('span', {}, formatSrcDate(s.date)), ' · ',
-              el('span', { class: received ? 'src2-status-in' : 'src2-status-exp' },
-                received ? i18n.t('plan.source.inAccount') : i18n.t('plan.source.expected')))),
-          el('div', { class: `src2-amt num${received ? '' : ' src2-amt-muted'}` }, money(s.amount)),
-          el('button', { class: 'btn-ghost btn-ghost-sm src2-del', type: 'button', 'data-focus-key': `srcdel:${n}`,
-            'aria-label': i18n.t('plan.source.removeAria', { name: s.name }),
-            onclick: () => { removeSource(p, s); afterSource(n); } }, '✕')));
+            el('span', { class: 'src2-line1' },
+              el('span', { class: 'src2-name' }, s.name)),
+            el('span', { class: 'src2-line2' },
+              el('span', { class: 'kind' }, s.kind || 'Other'),
+              el('span', {}, formatSrcDate(s.date)))),
+          el('div', { class: 'src2-right' },
+            el('div', { class: `src2-amt num${received ? '' : ' src2-amt-muted'}` }, money(s.amount)),
+            /* THE STATUS IS A BUTTON. The day the money lands, the one thing a
+               reader does here is say so, and that used to be a tap on the
+               row, a sheet of six fields, a select, and Save. One press moves
+               a source between expected and in the account; the sheet still
+               carries the same field for anyone already in it. The figures it
+               changes — "in the account today" above, the hero's sentence —
+               move with it, in the same render. */
+            el('button', { class: `src2-pill ${received ? 'is-in' : 'is-exp'}`, type: 'button',
+              'data-focus-key': `pill:${n}`,
+              'aria-label': received
+                ? i18n.t('plan.source.pillInAria', { name: s.name })
+                : i18n.t('plan.source.pillExpectedAria', { name: s.name }),
+              onclick: () => {
+                s.status = received ? 'expected' : 'received';
+                mark(); renderPlan(); refocus(host, `pill:${n}`);
+              } },
+              ...(received ? [icoEl(['check'], 'src2-pill-ico')] : []),
+              received ? i18n.t('plan.source.inAccount') : i18n.t('plan.source.expected')))));
       });
       host.append(list);
     });
@@ -446,16 +547,24 @@ module.exports = function registerPlan(ctx) {
 
      `shares` is the render's one partition of the pot (envelopeShares), read
      by position: badge i is envelope i's slice of it. */
+  /* The guard the accordion's note above describes, as one function: the hero's
+     bar names the open bucket too, and it is drawn BEFORE the buckets, so the
+     question "which one is open" has to be settled once, ahead of both. */
+  function settleOpenEnvelope(p) {
+    if (typeof expandedEnvelope === 'string' && !p.envelopes.some(e => e.name === expandedEnvelope)) expandedEnvelope = null;
+    if (expandedEnvelope === null && p.envelopes.length) expandedEnvelope = p.envelopes[0].name;
+  }
+
   function renderEnvelopes(p, sum, shares) {
     /* Through i18n.t, so both figures are glued whole (2026-10-20 audit,
        D1-05): concatenated here, "… placed of R 56 000,00" wrapped on a phone
        between "R 56" and "000,00". A plural on the bucket count, so `count` is
-       passed (i18n picks the form on `count` alone). "placed" is what the
-       buckets hold — the hero's word, never "spoken for", which is what they
-       hold less what has gone (D2-14). */
+       passed (i18n picks the form on `count` alone). `placed` is the param's
+       name still; the word printed for what the buckets hold is "allocated"
+       (D2-14: one word per quantity, the hero's). */
     $('#planEnvSub').textContent = p.envelopes.length
       ? i18n.t('plan.env.sub', { count: p.envelopes.length, placed: money(sum.allocated), pot: money(sum.pot) })
-      : 'Nothing placed yet — a spending bucket is one intent, and the items are what it buys.';
+      : 'Nothing allocated yet — a spending bucket is one intent, and the items are what it buys.';
     const host = $('#planEnvelopes');
     host.classList.add('plan-env-accordion');
     keepScroll(host, () => {
@@ -465,11 +574,11 @@ module.exports = function registerPlan(ctx) {
           'No spending buckets yet.'));
         return;
       }
-      if (typeof expandedEnvelope === 'string' && !p.envelopes.some(e => e.name === expandedEnvelope)) expandedEnvelope = null;
-      if (expandedEnvelope === null) expandedEnvelope = p.envelopes[0].name;
+      settleOpenEnvelope(p);
+      const scale = bucketScale(p);
       p.envelopes.forEach((e, i) => {
         host.append(e.name === expandedEnvelope
-          ? envelopeCard(p, e, sum, shares.shares[i]) : envelopeSummaryRow(p, e, sum, shares.shares[i]));
+          ? envelopeCard(p, e, sum, shares.shares[i], scale) : envelopeSummaryRow(p, e, sum, shares.shares[i], scale));
       });
     });
   }
@@ -503,39 +612,55 @@ module.exports = function registerPlan(ctx) {
      open every row to find it. Two lines now, not one: the placed amount is
      the headline figure on the right, and what is actually left sits under the
      name, where it does not have to compete with it for the same eye. */
-  function envelopeSummaryRow(p, env, sum, share) {
+  /* The parts a bucket's row is made of, collapsed or open: the open bucket's
+     header IS its collapsed row (same grid, same figures, a chevron turned
+     down), so the two are built from one function and cannot drift. The
+     elements are handed back because the open bucket's slider rewrites three
+     of them live.
+
+     THE BAR IS ON ONE SCALE (plan-math.js bucketScale): as long as this
+     bucket's claim is of the largest claim on the page. Each bar used to be
+     scaled to its own bucket, so R 1 200 and R 18 000 drew the same length
+     and the column could only be read across, never down. Inside its length
+     the three widths are still envelopeBar's — gone, still held, gone past.
+     Never colour ALONE: every segment has its figure in words beside it. */
+  function rowParts(env, spent, state, share, scale) {
+    const rem = envelopeRemainder(state, spent);
+    const bar = envelopeBar(env.amount, spent);
+    const len = Math.max(1.5, Math.min(100, (Math.max(env.amount, spent) / scale) * 100));
+    return {
+      rem,
+      remEl: el('span', { class: `env-sum-rem num ${rem.cls}` }, rem.text),
+      amtEl: el('span', { class: 'env-sum-amt num' }, money(env.amount)),
+      pctEl: el('span', { class: 'env-sum-pct num' }, `${share}%`),
+      barEl: el('span', { class: 'env-sum-bar', 'aria-hidden': 'true' },
+        el('span', { class: 'esb-len', style: `width:${len}%` },
+          el('i', { class: 'esb-spent', style: `width:${bar.spent}%` }),
+          el('i', { class: 'esb-left', style: `width:${bar.left}%` }),
+          el('i', { class: 'esb-over', style: `width:${bar.over}%` }))),
+    };
+  }
+
+  function envelopeSummaryRow(p, env, sum, share, scale) {
     const items = p.items.filter(i => i.envelope === env.name);
     const spent = items.reduce((t, i) => t + (i.spent || 0), 0);
     const state = envelopeOverState(env.amount, items, spent);
-    const rem = envelopeRemainder(state, spent);
-    /* The shape of the sentence the remainder just stated. Hidden below 640px
-       (styles.css) — on a phone the row has no width to spare and the words
-       already carry it; on tablet and desktop the middle column is dead space
-       and a reader scanning six buckets for "which one is in trouble" gets it
-       from the colour without reading a figure. Never colour ALONE: every
-       segment this draws has its figure in words to the left of it. */
-    const bar = envelopeBar(env.amount, spent);
-    const barEl = el('span', { class: 'env-sum-bar', 'aria-hidden': 'true' },
-      el('i', { class: 'esb-spent', style: `width:${bar.spent}%` }),
-      el('i', { class: 'esb-left', style: `width:${bar.left}%` }),
-      el('i', { class: 'esb-over', style: `width:${bar.over}%` }));
+    const r = rowParts(env, spent, state, share, scale);
     const at = p.envelopes.indexOf(env);
     return el('button', {
       class: `env-sum${state.isOverspent ? ' is-overspent' : ''}${state.isOvercommitted ? ' is-overcommitted' : ''}`,
       type: 'button',
       style: `--tint:${env.tint || 'transparent'}`,
-      'aria-label': i18n.t('plan.env.expandAria', { name: env.name }) + ` — ${rem.text}`,
+      'aria-label': i18n.t('plan.env.expandAria', { name: env.name }) + ` — ${r.rem.text}`,
       'data-focus-key': `env:${at}`,
-      // Lands on the open card's Collapse button, which carries the same key.
       onclick: () => { expandedEnvelope = env.name; renderPlan(); refocus($('#planEnvelopes'), `env:${at}`); },
     },
       el('span', { class: 'env-sum-swatch' }),
       el('span', { class: 'env-sum-main' },
         el('span', { class: 'env-sum-name' }, env.name),
-        el('span', { class: `env-sum-rem num ${rem.cls}` }, rem.text)),
-      barEl,
-      el('span', { class: 'env-sum-amt num' }, money(env.amount)),
-      el('span', { class: 'env-sum-pct num' }, `${share}%`));
+        r.remEl),
+      r.barEl, r.amtEl, r.pctEl,
+      icoEl(['chevron-right'], 'env-sum-chev'));
   }
 
   /* Right-hand side of the rail note: up to two status flags rather than one
@@ -582,12 +707,17 @@ module.exports = function registerPlan(ctx) {
       `rgba(127,127,127,.2) ${pctOf(spent)}%, rgba(127,127,127,.2) 100%);background-color:transparent`;
   }
 
-  function envelopeCard(p, env, sum, share) {
+  /* How far one press of − or + moves a bucket. A round hundred: the slider
+     is for the big moves and the type-in sheet for an exact figure, and what
+     sat between them was "a bit more, a bit less". */
+  const AMOUNT_STEP = 100;
+
+  function envelopeCard(p, env, sum, share, scale) {
     const items = p.items.filter(i => i.envelope === env.name);
     const spent = items.reduce((t, i) => t + (i.spent || 0), 0);
     const state = envelopeOverState(env.amount, items, spent);
 
-    /* The slider's ceiling is this envelope's amount plus everything that can
+    /* The slider's ceiling is the envelope's current amount plus whatever can
        still be placed — i.e. the most it could possibly hold without the plan
        going negative. A fixed max would either stop short of what the pot
        allows or invite dragging past it.
@@ -601,33 +731,38 @@ module.exports = function registerPlan(ctx) {
     const sliderMax = Math.ceil(ceiling);
     const pctOf = v => (sliderMax > 0 ? Math.max(0, Math.min(100, (v / sliderMax) * 100)) : 0);
 
+    const at = p.envelopes.indexOf(env);
+    const r = rowParts(env, spent, state, share, scale);
     const amtEl = el('div', { class: 'env-amt num' }, money(env.amount));
-    const shareEl = el('span', { class: 'env-share num' }, `${share}%`);
-    /* The drag's badge: the SAME partition the render takes, with this
+    const shareEl = r.pctEl;
+    shareEl.classList.add('env-share');
+    /* This bucket's badge while the slider is dragged: the same partition of
+       the pot the render makes (plan-math.js envelopeShares), with this
        bucket's live amount in its place — so what the badge reads mid-drag is
        what the release re-renders, not Math.round of this one slice alone. */
-    const at = p.envelopes.indexOf(env);
     const liveShare = v => envelopeShares(p.envelopes.map((e, i) => (i === at ? v : e.amount)), sum.pot).shares[at];
 
     const initialFill = overFillStyle(state, env.amount, spent, pctOf);
     const slider = el('input', {
       class: 'env-slider', type: 'range', min: '0', max: String(sliderMax),
       step: '10', value: String(env.amount),
-      /* "placed", the word the page prints for what a bucket holds — this was
-         "allocated", a word on no part of the screen (2026-10-20 audit, D2-14). */
+      /* "allocated": the word the page prints for what a bucket holds. */
       'aria-label': i18n.t('plan.env.sliderAria', { name: env.name }),
       'data-focus-key': `slider:${at}`,
       ...(initialFill ? { style: initialFill } : {}),
     });
-    /* The buckets' container: where this card's controls are looked for again
+    /* Looked up once: renderPlan() empties and refills this same element, so
+       it is still the place to look for whatever stands where a control stood
        once renderPlan() has replaced the card. */
     const host = $('#planEnvelopes');
 
-    /* Assigned once the elements below exist — the listener is attached now,
+    /* Declared before the listeners that close over them: `input` is wired now
        but only FIRES later, by which point both closures-over are set. */
     let card, flagsHost;
 
-    /* input repaints this card's own figures AND its overspend state — cheap,
+    /* `input` fires on every tick of the drag, so it updates only the nodes
+       that changed — a full renderPlan() here would rebuild the very slider
+       being dragged and it would lose pointer capture. That is unchanged,
        and it keeps the drag smooth. What it must NOT do is call renderPlan():
        that is the whole reason `change` exists as a separate, page-wide commit
        below. Before this, dragging a bucket's amount DOWN past what it had
@@ -636,20 +771,38 @@ module.exports = function registerPlan(ctx) {
        not the moment the mouse comes up. envelopeOverState/railFlags/
        overFillStyle are the same three calls the initial render made, just
        fed the live value instead of env.amount, so drag and release can never
-       disagree about what a given number means. */
+       disagree about what a given number means.
+
+       THE HERO FOLLOWS THE DRAG TOO (15 Nov 2026). The figure a reader is
+       steering by while they drag is "left to allocate", and it used to sit
+       still until release. renderPot is redrawn over a COPY of the plan with
+       this bucket's live amount in it — never the plan itself, which only
+       `change` may write — and #planPot does not contain the slider, so
+       rebuilding it takes nothing out from under the pointer. */
     slider.addEventListener('input', () => {
       const v = Number(slider.value);
       amtEl.textContent = money(v);
+      r.amtEl.textContent = money(v);
       shareEl.textContent = `${liveShare(v)}%`;
 
       const liveState = envelopeOverState(v, items, spent);
       card.classList.toggle('is-overspent', liveState.isOverspent);
       card.classList.toggle('is-overcommitted', liveState.isOvercommitted);
+      const liveRem = envelopeRemainder(liveState, spent);
+      r.remEl.textContent = liveRem.text;
+      r.remEl.className = `env-sum-rem num ${liveRem.cls}`;
       flagsHost.replaceChildren(...railFlags(liveState, spent));
       const fill = overFillStyle(liveState, v, spent, pctOf);
       if (fill) slider.setAttribute('style', fill); else slider.removeAttribute('style');
+
+      const liveP = { ...p, envelopes: p.envelopes.map((e, i) => (i === at ? { ...e, amount: v } : e)) };
+      const liveSum = planSummary(liveP);
+      renderPot(liveP, liveSum, envelopeShares(liveP.envelopes.map(e => e.amount), liveSum.pot));
     });
-    /* Back on the slider. An arrow key is a `change` of its own, so without
+    /* An arrow key on the slider is a `change` too, so a keyboard reader
+       stepping the amount redraws the page on every step: they stay on the
+       slider that stands where the one they pressed stood (dom.js refocus —
+       a no-op for a pointer release, where focus never left it). Without
        this a keyboard reader was dropped to <body> after every step and could
        not take a second one. */
     slider.addEventListener('change', () => {
@@ -657,7 +810,15 @@ module.exports = function registerPlan(ctx) {
       mark(); renderPlan(); refocus(host, `slider:${at}`);
     });
 
-    /* Tap the figure to type it. The slider is the good part of this design and
+    /* Every other way of setting the amount — a step, a move — is one write
+       and one render, and lands the reader on `keys` (the control pressed, or
+       where it stood if the press made it untrue and it is gone). */
+    const setAmount = (v, keys) => {
+      env.amount = round2(Math.max(0, v));
+      mark(); renderPlan(); refocus(host, keys);
+    };
+
+    /* Typing an exact figure. The slider steps by 10 and dragging to a cent is
        also the fiddly part on a phone; without this, a precise amount is
        unreachable by touch and unreachable by keyboard at any sensible step. */
     const amtBtn = el('button', { class: 'env-amt-btn', type: 'button',
@@ -665,72 +826,148 @@ module.exports = function registerPlan(ctx) {
       'data-focus-key': `amt:${at}`,
       onclick: async () => { await editEnvelopeAmount(env); refocus(host, `amt:${at}`); } }, amtEl);
 
+    const stepBtn = dir => {
+      const key = `${dir > 0 ? 'stepup' : 'stepdown'}:${at}`;
+      return el('button', { class: 'env-step', type: 'button', 'data-focus-key': key,
+        'aria-label': dir > 0
+          ? i18n.t('plan.env.stepUpAria', { step: money(AMOUNT_STEP), name: env.name })
+          : i18n.t('plan.env.stepDownAria', { step: money(AMOUNT_STEP), name: env.name }),
+        /* Nothing to take from an empty bucket. */
+        ...(dir < 0 && env.amount <= 0 ? { disabled: '' } : {}),
+        onclick: () => setAmount(env.amount + dir * AMOUNT_STEP, [key, `amt:${at}`]) },
+        icoEl([dir > 0 ? 'plus' : 'minus']));
+    };
+
     flagsHost = el('div', { class: 'env-rail-flags' }, ...railFlags(state, spent));
 
-    /* A 3px accent rule stands in for the old radial-gradient tint wash on
-       the expanded card only (plan-env-accordion in styles.css switches the
-       wash off there) — the wash bled past its own card's rounded corner in
-       the accordion's tighter layout, reading as a rendering fault rather
-       than a colour cue. Collapsed rows keep the wash-free swatch dot
-       instead, so the tint is legible at both sizes without the bleed. */
-    const accent = el('div', { class: 'env-accent', style: `background:${env.tint || 'var(--color-primary)'}` });
+    /* WHAT THIS BUCKET COULD DO NEXT, said as a button — and only the ones
+       that are true right now. Each is a fact the flags beside it already
+       state, with the arithmetic done: an overrun names the figure that
+       covers it, an over-committed list names the figure that matches it, and
+       money no bucket holds can be put here in one press. They write
+       env.amount and nothing else, the same field the slider writes. */
+    const moves = [];
+    if (state.isOverspent) {
+      moves.push(el('button', { class: 'btn-ghost btn-ghost-sm', type: 'button', 'data-focus-key': `raise:${at}`,
+        onclick: () => setAmount(spent, [`raise:${at}`, `amt:${at}`]) },
+        i18n.t('plan.env.raiseTo', { amount: money(round2(spent)) })));
+    }
+    if (state.isOvercommitted) {
+      const want = round2(env.amount - state.gap);
+      moves.push(el('button', { class: 'btn-ghost btn-ghost-sm', type: 'button', 'data-focus-key': `match:${at}`,
+        onclick: () => setAmount(want, [`match:${at}`, `amt:${at}`]) },
+        i18n.t('plan.env.matchItems', { amount: money(want) })));
+    }
+    if (sum.placeable > 0.005) {
+      moves.push(el('button', { class: 'btn-ghost btn-ghost-sm', type: 'button', 'data-focus-key': `rest:${at}`,
+        onclick: () => setAmount(env.amount + sum.placeable, [`rest:${at}`, `amt:${at}`]) },
+        i18n.t('plan.env.addRest', { amount: money(sum.placeable) })));
+    }
 
-    /* Delete moves out of the footer into the expanded header's own overflow
-       spot — the redesign's rule that a destructive action never sits beside
-       an everyday one (Save/rename here). Collapse is the header's other new
-       control: tapping it (or another row) is how the accordion closes — and
-       it writes NONE_OPEN, not null, because null is what the guard in
-       renderEnvelopes answers by opening the first bucket. */
+    /* The open bucket's header is its collapsed row, turned into the control
+       that closes it — so the accordion's two states are one control in one
+       place, and they share the key `env:<n>` (see WHERE THE READER IS). It
+       writes NONE_OPEN, not null, because null is what the guard in
+       renderEnvelopes answers by opening the first bucket.
+
+       Rename and delete sit in the footer, away from the amount: a
+       destructive action never sits beside an everyday one. */
     card = el('div', {
       class: `env${state.isOverspent ? ' is-overspent' : ''}${state.isOvercommitted ? ' is-overcommitted' : ''}`,
       style: `--tint:${env.tint || 'transparent'}`,
     },
-      accent,
-      el('div', { class: 'env-top' },
-        el('button', { class: 'env-collapse', type: 'button',
-          'aria-label': i18n.t('plan.env.collapseAria', { name: env.name }),
-          'data-focus-key': `env:${at}`,
-          // Lands on this bucket's collapsed row, which carries the same key.
-          onclick: () => { expandedEnvelope = NONE_OPEN; renderPlan(); refocus(host, `env:${at}`); } },
-          icoEl(['chevron-down', 'chevron-up'])),
-        el('button', { class: 'env-name', type: 'button',
-          'aria-label': i18n.t('plan.env.renameAria', { name: env.name }),
-          'data-focus-key': `rename:${at}`,
-          onclick: async () => { await renameEnvelope(p, env); refocus(host, `rename:${at}`); } },
-          env.name, icoEl(['pencil', 'square-pen', 'pen-line'], 'env-name-ico')),
-        shareEl,
-        el('button', { class: 'env-del-ico', type: 'button',
-          'aria-label': i18n.t('plan.env.deleteAria', { name: env.name }),
-          'data-focus-key': `envdel:${at}`,
-          /* A bucket that is gone: the one that took its place (its row, or
-             its Collapse button if the accordion opened it), else the one
-             before, else Add a spending bucket. Never `envdel` of whichever
-             bucket the accordion opened instead — a second Enter would be a
-             press on a different bucket's delete. A removal that was
-             cancelled leaves the bucket, and the reader on its delete. */
-          onclick: async () => {
-            await removeEnvelope(p, env);
-            refocus(host, p.envelopes.includes(env) ? `envdel:${at}`
-              : [`env:${at}`, `env:${at - 1}`, $('#planAddEnvelope')]);
-          } }, icoEl(['trash-2', 'trash']))),
-      amtBtn,
-      el('div', { class: 'env-rail' },
-        slider,
-        el('div', { class: 'env-rail-note' },
-          el('span', {}, env.note || ''),
-          flagsHost)),
-      el('ul', { class: 'env-items' },
-        ...items.map((i, k) => itemRow(p, i, k, at)),
-        el('li', { class: 'env-item env-item-add' },
-          el('button', { class: 'env-add', type: 'button', 'data-focus-key': `additem:${at}`,
-            onclick: async () => { await addItem(p, env.name); refocus(host, `additem:${at}`); } }, '＋ item'))),
-      el('div', { class: 'env-foot' },
-        el('span', { class: 'env-count' },
-          items.length
-            ? `${items.filter(i => i.status === 'done').length} of ${items.length} done`
-            : 'no items yet')));
+      el('button', { class: 'env-collapse env-sum is-open', type: 'button',
+        'aria-label': i18n.t('plan.env.collapseAria', { name: env.name }),
+        'data-focus-key': `env:${at}`,
+        onclick: () => { expandedEnvelope = NONE_OPEN; renderPlan(); refocus(host, `env:${at}`); } },
+        el('span', { class: 'env-sum-swatch' }),
+        el('span', { class: 'env-sum-main' },
+          el('span', { class: 'env-sum-name' }, env.name),
+          r.remEl),
+        r.barEl, r.amtEl, shareEl,
+        icoEl(['chevron-down', 'chevron-up'], 'env-sum-chev')),
+      el('div', { class: 'env-body' },
+        el('div', { class: 'env-amt-row' }, stepBtn(-1), amtBtn, stepBtn(1)),
+        el('div', { class: 'env-rail' },
+          slider,
+          el('div', { class: 'env-rail-note' },
+            flagsHost,
+            ...(moves.length ? [el('div', { class: 'env-moves' }, ...moves)] : []))),
+        el('ul', { class: 'env-items' },
+          ...items.map((i, k) => itemRow(p, i, k, at)),
+          addItemRow(p, env, at)),
+        el('div', { class: 'env-foot' },
+          el('span', { class: 'env-note' }, env.note || ''),
+          el('span', { class: 'env-count' },
+            items.length
+              ? `${items.filter(i => i.status === 'done').length} of ${items.length} done`
+              : 'no items yet'),
+          el('button', { class: 'env-edit-ico', type: 'button',
+            'aria-label': i18n.t('plan.env.renameAria', { name: env.name }),
+            'data-focus-key': `rename:${at}`,
+            onclick: async () => { await renameEnvelope(p, env); refocus(host, `rename:${at}`); } },
+            icoEl(['pencil', 'square-pen', 'pen-line'])),
+          el('button', { class: 'env-del-ico', type: 'button',
+            'aria-label': i18n.t('plan.env.deleteAria', { name: env.name }),
+            'data-focus-key': `envdel:${at}`,
+            /* Gone: the bucket that took this one's place (its row, or its
+               header if the accordion opened it), else the one before, else
+               Add a spending bucket. Never `envdel` of whichever bucket the
+               accordion opened instead — a second Enter would be a press on a
+               different bucket's delete. A removal that was cancelled leaves
+               the bucket, and the reader on its delete. */
+            onclick: async () => {
+              await removeEnvelope(p, env);
+              refocus(host, p.envelopes.includes(env) ? `envdel:${at}`
+                : [`env:${at}`, `env:${at - 1}`, $('#planAddEnvelope')]);
+            } }, icoEl(['trash-2', 'trash'])))));
 
     return card;
+  }
+
+  /* ADDING AN ITEM IS TYPING A LINE AND PRESSING ENTER (15 Nov 2026). It was
+     a button, a sheet of three fields and Save, per item — and a bucket's
+     list is five things typed one after another. The line stays put and
+     focus goes straight back into it, so a list is as many lines as it has
+     items. Category and notes are not asked here: they are the item's own
+     sheet, one tap on its name, where they always were for an edit.
+
+     What is typed is kept across a redraw the reader did not ask for (the
+     vault watcher re-reads the page when a file changes on another device),
+     keyed by plan and bucket, and dropped the moment the line is added.
+
+     No opWriter guard, unlike the sheets: nothing is awaited between the
+     press and the write, so there is no moment for the state to be replaced
+     under an open dialog. */
+  const itemDrafts = new Map();
+  function addItemRow(p, env, at) {
+    const host = $('#planEnvelopes');
+    const draftKey = `${S.planName}\u0000${env.name}`;
+    const draft = itemDrafts.get(draftKey) || { name: '', amount: '' };
+    const nameIn = el('input', { class: 'env-add-name', type: 'text', value: draft.name,
+      placeholder: i18n.t('plan.item.addPlaceholder'), autocomplete: 'off',
+      'aria-label': i18n.t('plan.item.addAria', { name: env.name }),
+      'data-focus-key': `additem:${at}` });
+    const amtIn = el('input', { class: 'env-add-amt num', type: 'text', inputmode: 'decimal', value: draft.amount,
+      placeholder: '0', autocomplete: 'off',
+      'aria-label': i18n.t('plan.item.addAmountAria') });
+    const keep = () => itemDrafts.set(draftKey, { name: nameIn.value, amount: amtIn.value });
+    const add = () => {
+      const name = nameIn.value.trim();
+      if (!name) { nameIn.focus(); return; }
+      // An amount left empty is "not priced yet", which is what 0 means here.
+      const amount = amtIn.value.trim() === '' ? 0 : normalizeAmount(amtIn.value);
+      if (amount === null) { toast('Not a number', true); amtIn.focus(); return; }
+      p.items.push({ name, envelope: env.name, amount, spent: 0, status: 'planned', category: '', notes: '' });
+      itemDrafts.delete(draftKey);
+      mark(); renderPlan(); refocus(host, `additem:${at}`);
+    };
+    for (const input of [nameIn, amtIn]) {
+      input.addEventListener('input', keep);
+      input.addEventListener('keydown', e => { if (e.key === 'Enter') { e.preventDefault(); add(); } });
+    }
+    return el('li', { class: 'env-item env-item-add' }, nameIn, amtIn,
+      el('button', { class: 'btn-ghost btn-ghost-sm env-add', type: 'button', onclick: add }, i18n.t('plan.item.add')));
   }
 
   /* `k` is the item's position in its bucket and `at` the bucket's in the
@@ -781,7 +1018,12 @@ module.exports = function registerPlan(ctx) {
       right);
   }
 
-  /* ---- what is not spoken for: the only card that is deliberately loud ----
+  /* ---- what is not allocated: the block under the bar ----
+
+     It was a card of its own at the foot of the page, deliberately loud. Since
+     15 Nov 2026 it is the hero's last block: on a healthy plan just what to
+     do with money no bucket holds, and the words only when something is over.
+     The three states and their reasons are unchanged:
 
      THREE states, not two. It used to key off `sum.free` alone, which meant an
      overspent plan — money gone past what its buckets hold, `free` still
@@ -796,92 +1038,133 @@ module.exports = function registerPlan(ctx) {
      to be true there too: the old opening, "The buckets hold R 9 000 but
      R 5 500 has actually gone", was a sentence about two plan-wide totals and
      reads as nonsense when the second is the smaller. */
+  /* Which bucket ran furthest past what it held — the one the overspent words
+     offer to open. null when none did. */
+  function worstBucket(p) {
+    let worst = null, by = 0.005;
+    for (const e of p.envelopes) {
+      const over = p.items.reduce((t, i) => t + (i.envelope === e.name ? (i.spent || 0) : 0), 0) - e.amount;
+      if (over > by) { worst = e; by = over; }
+    }
+    return worst;
+  }
+
+  /* Whether "Add it to an existing bucket" has been pressed and the page is
+     showing the buckets to choose from. View state like expandedEnvelope:
+     never written to disk, and dropped whenever there is nothing to add. */
+  let addToOpen = false;
+
   function renderFree(p, sum, shares) {
     const card = $('#planFree');
     const overspent = sum.overspend > 0.005;
     const overplaced = sum.free < -0.005;
-    /* A finished split makes this card disappear rather than saying "R 0.00
+    /* Hidden when the plan balances exactly, rather than showing "R 0.00
        left" — an all-clear vault gets no shelf standing there saying nothing,
        the same rule the Accounts deck follows. An overspend keeps it on screen
        whatever the split looks like: that is never nothing to say. */
     const show = overspent || Math.abs(sum.free) >= 0.005;
     card.classList.toggle('hidden', !show);
-    if (!show) return;
     const over = overspent || overplaced;
+    if (!show || over) addToOpen = false;
+    if (!show) return;
     card.classList.toggle('is-over', over);
     card.empty();
 
-    /* Every figure in this card's sentences goes through fig(): glued, so a
-       phone cannot break one across a line (2026-10-20 audit, D1-05). */
-    const heading = overspent
-      ? `${fig(sum.overspend)} was spent past what its bucket held`
-      : overplaced
-        ? `${fig(-sum.free)} more is placed than this plan holds`
-        : `${fig(sum.free)} is not spoken for`;
-    /* The percentage is of the figure the heading just quoted, not always of
-       `free` — quoting one number and then taking a share of a different one
-       is how the rest of this repo's two-figures-one-rule bugs started. The
-       unplaced remainder (the heading's figure in both other states) is the
-       last slice of the same partition the bucket badges come from, so the
-       badges and this card add up to the pot; the overspend is not a slice of
-       the pot and is rounded on its own. */
-    const pctOfPlan = overspent ? sharePct(sum.overspend, sum.pot) : Math.abs(shares.unplaced);
-    /* "of which R 9 341,00 can still be placed" beside "that leaves R 9 341,00"
-       is the same number twice in one sentence — and it IS the same number
-       whenever nothing is still spoken for (every bucket spent through or
-       past), because placeable is left less what is spoken for. So the clause
-       changes rather than the figure being printed again. */
-    const allUnplaced = Math.abs(sum.placeable - sum.left) < 0.005;
-    /* The contrast with what the buckets alone suggest is only said when it
-       is a different figure: on a fully placed plan both read R 0,00. */
-    const shownPlaceable = allUnplaced ? sum.left : Math.max(0, sum.placeable);
-    const contrast = Math.abs(shownPlaceable - sum.free) >= 0.005
-      ? ` — not the ${fig(sum.free)} the buckets alone suggest` : '';
-    /* In the key's words (2026-10-20 audit, D2-14): money in no bucket is "not
-       spoken for", the label the key prints beside that very figure, never
-       "unplaced". The extra an overrun spent came out of money that was not
-       spoken for, or out of what another bucket still had spoken for; when no
-       bucket still holds any unspent money (allUnplaced), what is left is
-       none of it spoken for. */
-    const body = overspent
-      ? 'The extra came out of money that was not spoken for, or spoken for by another bucket. '
-        + `That leaves ${fig(sum.left)} in this plan, `
-        + (allUnplaced ? 'none of it spoken for'
-          : `of which ${fig(Math.max(0, sum.placeable))} can still be placed`)
-        + `${contrast}. `
-        + 'Raise the bucket that ran over, or record where the extra came from.'
-      : overplaced
-        ? 'The spending buckets add up to more than the money coming in. Take some back out, or add the source that covers it.'
-        : 'Leaving money not spoken for is a decision too — but it should be one you made, not one you forgot.';
+    const acts = [];
+    const addSourceBtn = () => el('button', { class: 'btn-ghost', type: 'button', 'data-focus-key': 'free:source',
+      onclick: async () => {
+        await addSource(p);
+        refocus(card, 'free:source');
+        refocus($('#planSources'), $('#planAddSource'));
+      } }, icoEl(['plus']), i18n.t('plan.free.addSource'));
 
-    card.append(
-      el('h2', {}, heading),
-      el('div', { class: 'free-fig num' }, `${pctOfPlan}% of the plan`),
-      el('p', {}, body),
-      el('div', { class: 'free-acts' },
-        /* The button offers `placeable`, never `free` — it was the second
-           place the overstated figure reached the reader, and the one that
-           would have written it into a bucket. */
-        /* Both buttons redraw this card, or take it away: a plan with nothing
-           left over has no loud card at all, and the card is HIDDEN then, not
-           emptied, so the button pressed is still in it with nothing to show
-           it. While the card stands the reader goes back to the button they
-           pressed. Once it is gone they go to what the press made — the new
-           bucket, which the accordion has just opened — or, for a source, to
-           the page's own Add a source. */
-        ...(over || sum.placeable <= 0.005 ? [] : [el('button', { class: 'btn-gradient', type: 'button',
-          'data-focus-key': 'free:place',
-          onclick: async () => {
-            await addEnvelope(p, sum.placeable);
-            refocus(card, 'free:place');
-            refocus($('#planEnvelopes'), [`env:${p.envelopes.length - 1}`, $('#planAddEnvelope')]);
-          } }, 'Put it in a new spending bucket')]),
-        el('button', { class: 'btn-ghost', type: 'button', 'data-focus-key': 'free:source',
-          onclick: async () => {
-            await addSource(p);
-            refocus(card, 'free:source');
-            refocus($('#planSources'), $('#planAddSource'));
-          } }, '＋ Add a source')));
+    if (over) {
+      /* THE WORDS, in the alarmed states only. A healthy plan with money in
+         no bucket needs no sentence under the bar: the hero's figure is that
+         sentence, and what follows it is what to do. Whole sentences per key,
+         every figure glued by t() so a phone cannot break one across a line
+         (2026-10-20 audit, D1-05).
+
+         `placeable`, and `free` only as the contrast, for the reason the hero
+         has: on an overspent plan the buckets alone suggest more room than
+         there is. When the two are the same figure the contrast is the same
+         number twice in one sentence, so the clause is dropped — and when no
+         bucket still holds unspent money, what is left is none of it in a
+         bucket, which is said instead of a second R 0,00. */
+      const allUnplaced = Math.abs(sum.placeable - sum.left) < 0.005;
+      const shownPlaceable = allUnplaced ? sum.left : Math.max(0, sum.placeable);
+      const contrast = Math.abs(shownPlaceable - sum.free) >= 0.005;
+      const leaves = { left: money(sum.left), placeable: money(Math.max(0, sum.placeable)), free: money(sum.free) };
+      const heading = overspent
+        ? i18n.t('plan.free.overspent', { amount: money(sum.overspend) })
+        : i18n.t('plan.free.overPlaced', { amount: money(-sum.free) });
+      const body = overspent
+        ? [allUnplaced
+            ? (contrast ? i18n.t('plan.free.leavesNoneContrast', leaves) : i18n.t('plan.free.leavesNone', leaves))
+            : (contrast ? i18n.t('plan.free.leavesContrast', leaves) : i18n.t('plan.free.leaves', leaves)),
+          i18n.t('plan.free.overspentFix')].join(' ')
+        : i18n.t('plan.free.overPlacedBody');
+      card.append(el('div', { class: 'free-words' },
+        icoEl(['alert-triangle', 'triangle-alert'], 'free-ico'),
+        el('div', {}, el('h2', {}, heading), el('p', {}, body))));
+
+      /* The overrun's own bucket, one press away: the fix the words name
+         ("raise the bucket that ran over") starts there. */
+      const worst = overspent ? worstBucket(p) : null;
+      if (worst) {
+        const at = p.envelopes.indexOf(worst);
+        acts.push(el('button', { class: 'btn-ghost', type: 'button', 'data-focus-key': 'free:open',
+          onclick: () => {
+            expandedEnvelope = worst.name;
+            renderPlan();
+            refocus($('#planEnvelopes'), `env:${at}`);
+          } }, i18n.t('plan.free.open', { name: worst.name })));
+      }
+      acts.push(addSourceBtn());
+    } else if (addToOpen && p.envelopes.length && sum.placeable > 0.005) {
+      /* The buckets, to choose one. Pressing a name puts every unallocated
+         rand in it — `placeable`, the hero's figure — and opens it, so the
+         reader lands on the bucket they just changed. */
+      acts.push(el('span', { class: 'free-lead' }, i18n.t('plan.free.addToLead', { amount: money(sum.placeable) })));
+      p.envelopes.forEach((e, i) => {
+        acts.push(el('button', { class: 'btn-ghost btn-ghost-sm free-chip', type: 'button',
+          'data-focus-key': `free:to:${i}`,
+          'aria-label': i18n.t('plan.free.addToAria', { amount: money(sum.placeable), name: e.name }),
+          onclick: () => {
+            e.amount = round2(e.amount + sum.placeable);
+            expandedEnvelope = e.name;
+            addToOpen = false;
+            mark(); renderPlan();
+            refocus($('#planEnvelopes'), `env:${i}`);
+          } },
+          el('i', { class: 'free-chip-dot', style: `background:${e.tint || 'var(--color-primary)'}` }), e.name));
+      });
+      acts.push(el('button', { class: 'btn-ghost btn-ghost-sm', type: 'button', 'data-focus-key': 'free:cancel',
+        onclick: () => { addToOpen = false; renderPlan(); refocus(card, 'free:addto'); } }, i18n.t('plan.free.cancel')));
+    } else if (sum.placeable > 0.005) {
+      /* "Allocate it to a new bucket" offers the hero's figure — `placeable`,
+         never `free` — and is not drawn at all on an over plan: it was the one
+         place the overstated figure reached the reader, and the one that would
+         have written it into a bucket.
+
+         WHERE THE READER IS afterwards depends on whether these buttons
+         survived. A new bucket that takes every rand left over hides this
+         block (hidden, not emptied, so the button pressed is still in it with
+         nothing to show it). While it stands the reader goes back to the
+         button they pressed. Once it is gone they go to what the press made —
+         the new bucket, which the accordion has just opened. */
+      acts.push(el('button', { class: 'btn-gradient', type: 'button', 'data-focus-key': 'free:place',
+        onclick: async () => {
+          await addEnvelope(p, sum.placeable);
+          refocus(card, 'free:place');
+          refocus($('#planEnvelopes'), [`env:${p.envelopes.length - 1}`, $('#planAddEnvelope')]);
+        } }, i18n.t('plan.free.place')));
+      if (p.envelopes.length) {
+        acts.push(el('button', { class: 'btn-ghost', type: 'button', 'data-focus-key': 'free:addto',
+          onclick: () => { addToOpen = true; renderPlan(); refocus(card, 'free:to:0'); } }, i18n.t('plan.free.addTo')));
+      }
+    }
+    card.append(el('div', { class: 'free-acts' }, ...acts));
   }
 
   /* ------------------------------ actions -------------------------------- */
@@ -974,15 +1257,15 @@ module.exports = function registerPlan(ctx) {
 
   async function removeEnvelope(p, env) {
     const items = p.items.filter(i => i.envelope === env.name);
-    /* "no longer spoken for": the key's own words for where a bucket's money
-       goes when the bucket does — it said "back to unplaced", a word on no
-       part of the page (2026-10-20 audit, D2-14). */
+    /* "no longer allocated": the page's own word for where a bucket's money
+       goes when the bucket does — it once said "back to unplaced", a word on
+       no part of the page (2026-10-20 audit, D2-14). */
     const op = opWriterOf(ctx);   // the state this dialog was opened over (io.js opWriter)
     const ok = await confirmModal(app, {
       title: `Remove ${env.name}?`,
       message: items.length
-        ? `${items.length} item${items.length === 1 ? '' : 's'} inside it will be removed too. Its money is no longer spoken for.`
-        : 'Its money is no longer spoken for.',
+        ? `${items.length} item${items.length === 1 ? '' : 's'} inside it will be removed too. Its money is no longer allocated.`
+        : 'Its money is no longer allocated.',
       confirmText: 'Remove',
     });
     if (!ok) return;
@@ -992,22 +1275,6 @@ module.exports = function registerPlan(ctx) {
     mark(); renderPlan();
   }
 
-  async function addItem(p, envelope) {
-    const op = opWriterOf(ctx);   // the state this dialog was opened over (io.js opWriter)
-    const r = await askFields(app, `New item in ${envelope}`, [
-      { key: 'name', label: 'What is it?', type: 'text', placeholder: 'Pram & car seat' },
-      { key: 'amount', label: 'What do you expect it to cost?', type: 'number', value: '0' },
-      { key: 'category', label: 'Budget category (optional)', type: 'text',
-        desc: 'Used when this lands as a real transaction.' },
-    ]);
-    if (!r || !r.name.trim()) return;
-    if (op.replaced()) return toast(op.replaced(), true);
-    const amount = normalizeAmount(r.amount);
-    if (amount === null) return toast('Not a number', true);
-    p.items.push({ name: r.name.trim(), envelope, amount, spent: 0,
-      status: 'planned', category: (r.category || '').trim(), notes: '' });
-    mark(); renderPlan();
-  }
 
   async function editItem(p, item) {
     const op = opWriterOf(ctx);   // the state this dialog was opened over (io.js opWriter)

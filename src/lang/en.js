@@ -2057,24 +2057,55 @@ module.exports = {
   'assets.aria.remove': 'Remove {name}',
 
   /* ------------------------- plan view (mobile redesign) ------------------------- */
-  'plan.hero.leftToPlace': "Left to place",
-  'plan.hero.overPlaced': "Placed more than this plan holds",
-  'plan.hero.overSpent': "Spent more than this plan holds",
-  'plan.hero.overClaimed': "More is spoken for than is left",
-  'plan.hero.ofPot': "of {pot} in this plan",
-  'plan.hero.allIn': "all of it has been received",
-  'plan.hero.noneIn': "none of it has arrived yet",
-  'plan.hero.partial': "{received} is in the account today, {expected} is still expected",
-  'plan.hero.noSources': "No sources yet — add what funds this plan.",
-  'plan.split.spokenFor': "Spoken for",
-  'plan.split.notSpokenFor': "Not spoken for",
-  'plan.split.alreadySpent': "Already spent",
-  'plan.split.overspent': "Overspent",
-  'plan.split.stillLeft': "Still left to spend",
+  /* THE PLAN PAGE'S WORDS, since the redesign of 15 Nov 2026: the page reads
+     as "money in" against "allocated". One word per quantity, on screen and
+     spoken alike (the 2026-10-20 audit's rule, D2-14, with new words):
+
+       pot        what the sources add up to            "money in"
+       allocated  what the buckets hold                 "allocated"
+       free       pot less allocated                    "not allocated"
+       placeable  what can still go into a bucket       "left to allocate"
+       spent      what has gone                         "spent"
+       left       pot less spent                        "left to spend"
+
+     "Spoken for" (allocated and not yet gone) is no longer a figure the page
+     prints, so the word is gone with it. */
+  'plan.hero.leftToPlace': "Left to allocate",
+  'plan.hero.overPlaced': "Allocated more than the money in",
+  'plan.hero.overSpent': "Spent more than the money in",
+  'plan.hero.overClaimed': "More is allocated than is left",
+  'plan.hero.allAllocated': "All of it is allocated",
+  'plan.hero.empty': "No money in yet",
+  'plan.hero.allIn': "All of the money in has been received.",
+  'plan.hero.noneIn': "None of the money in has arrived yet.",
+  'plan.hero.partial': "{received} of the money in is in the account today. {expected} is still expected.",
+  'plan.hero.noSources': "Add the money that funds this plan, then allocate it to spending buckets.",
+  /* The three figures beside the hero, each with one quiet line under it. */
+  'plan.stat.moneyIn': "Money in",
+  'plan.stat.allocated': "Allocated",
+  'plan.stat.spent': "Spent",
+  'plan.stat.sources': { one: '{count} source', other: '{count} sources' },
+  'plan.stat.allocatedNote': {
+    one: '{count} spending bucket, {pct}% of money in',
+    other: '{count} spending buckets, {pct}% of money in',
+  },
+  'plan.stat.leftToSpend': "{amount} left to spend",
+  'plan.stat.overMoneyIn': "{amount} more than the money in",
+  'plan.stat.overBucket': "{amount} over its bucket",
+  /* Under the bar's last slice, and one slice of the bar as a screen reader
+     hears it (each slice is a button that opens its bucket). */
+  'plan.split.notAllocated': "Not allocated",
+  'plan.slice.aria': "{name}: {amount} allocated, {spent} spent. Open this spending bucket.",
+  'plan.slice.ariaOver': "{name}: {amount} allocated, {spent} spent, {over} over. Open this spending bucket.",
+  'plan.slice.orphan': "{amount} spent from no spending bucket",
   'plan.source.editAria': "Edit source {name}",
-  'plan.source.removeAria': "Remove source {name}",
-  'plan.source.inAccount': "in the account",
-  'plan.source.expected': "expected",
+  /* A source's status is a button now: one press moves it between the two. */
+  'plan.source.inAccount': "In the account",
+  'plan.source.expected': "Expected",
+  'plan.source.pillInAria': "{name} is in the account. Press to mark it as still expected.",
+  'plan.source.pillExpectedAria': "{name} is still expected. Press to mark it as received.",
+  'plan.source.keyIn': "{amount} in the account",
+  'plan.source.keyExpected': "{amount} still expected",
   'plan.source.noDate': "No date",
   'plan.source.fieldName': "What is it?",
   'plan.source.fieldKind': "Kind",
@@ -2091,11 +2122,11 @@ module.exports = {
   'plan.env.expandAria': "Expand {name}",
   /* The line over the spending buckets (2026-10-20 audit, D1-05: built by
      hand, it wrapped mid-figure on a phone — through t() the figures are
-     glued). {placed} is what the buckets hold, the hero's "place" word;
-     never "spoken for", which is what they hold less what has gone. */
+     glued). {placed} is what the buckets hold: "allocated", the page's word
+     for it since 15 Nov 2026. */
   'plan.env.sub': {
-    one: '{count} spending bucket · {placed} placed of {pot}',
-    other: '{count} spending buckets · {placed} placed of {pot}',
+    one: '{placed} allocated to {count} spending bucket',
+    other: '{placed} allocated across {count} spending buckets',
   },
   'plan.env.leftInBucket': "{amount} left",
   'plan.env.allSpent': "all of it spent",
@@ -2112,13 +2143,42 @@ module.exports = {
      remainder. An item's tick is a sentence per state, and cycleTip is its
      hover title — the order a tap moves it through. */
   'plan.pickerAria': 'Choose a plan',
-  'plan.split.aria.free': 'Of {pot}: {spent} already spent, {committed} spoken for, {free} not spoken for.',
-  'plan.split.aria.overPlaced': 'Of {pot}: {spent} already spent, {committed} spoken for, {over} more is placed than this plan holds.',
-  'plan.split.aria.left': '{left} still left to spend, {placeable} of it left to place.',
-  'plan.split.aria.overSpent': '{over} more spent than this plan holds.',
+  'plan.split.aria.free': 'Money in {pot}. {allocated} allocated, of which {spent} is spent. {free} is not allocated.',
+  'plan.split.aria.overPlaced': 'Money in {pot}. {allocated} allocated, of which {spent} is spent. {over} more is allocated than the money in.',
+  'plan.split.aria.left': '{left} left to spend, {placeable} of it left to allocate.',
+  'plan.split.aria.overSpent': '{over} more spent than the money in.',
   'plan.split.aria.pastBucket': '{amount} was spent past what its bucket held.',
   'plan.env.overBy': '{amount} over',
-  'plan.env.sliderAria': 'Amount placed in {name}',
+  'plan.env.sliderAria': 'Amount allocated to {name}',
+  /* The open bucket's own controls: a step either side of the amount, the
+     moves it offers when one is true, and its type-and-Enter item line. */
+  'plan.env.stepUpAria': 'Add {step} to {name}',
+  'plan.env.stepDownAria': 'Take {step} from {name}',
+  'plan.env.addRest': 'Add the {amount} left to allocate',
+  'plan.env.raiseTo': 'Raise the bucket to {amount}',
+  'plan.env.matchItems': 'Match the items ({amount})',
+  'plan.env.newBucket': 'New bucket',
+  'plan.item.addPlaceholder': 'Add an item, e.g. Car seat',
+  'plan.item.addAria': 'New item in {name}',
+  'plan.item.addAmountAria': 'What you expect it to cost',
+  'plan.item.add': 'Add',
+  /* Under the bar: what to do about money no bucket holds, or about an
+     overrun. Whole sentences, each figure glued by t(). */
+  'plan.free.place': 'Allocate it to a new bucket',
+  'plan.free.addTo': 'Add it to an existing bucket',
+  'plan.free.addToLead': 'Allocate {amount} to',
+  'plan.free.addToAria': 'Add {amount} to {name}',
+  'plan.free.cancel': 'Cancel',
+  'plan.free.addSource': 'Add a source',
+  'plan.free.open': 'Open {name}',
+  'plan.free.overspent': '{amount} was spent past what its bucket held.',
+  'plan.free.overPlaced': '{amount} more is allocated than the money in.',
+  'plan.free.overPlacedBody': 'Take some back out of a spending bucket, or add the source that covers it.',
+  'plan.free.leaves': 'That leaves {left} in this plan, of which {placeable} can still be allocated.',
+  'plan.free.leavesContrast': 'That leaves {left} in this plan, of which {placeable} can still be allocated, not the {free} the buckets alone suggest.',
+  'plan.free.leavesNone': 'That leaves {left} in this plan, none of it still in a bucket.',
+  'plan.free.leavesNoneContrast': 'That leaves {left} in this plan, none of it still in a bucket, not the {free} the buckets alone suggest.',
+  'plan.free.overspentFix': 'Raise the bucket that ran over, or record where the extra came from.',
   'plan.env.typeAria': 'Set the amount for {name} by typing it',
   'plan.env.renameAria': 'Rename spending bucket {name}',
   'plan.item.aria.planned': '{name}: planned — click to advance',

@@ -51,8 +51,9 @@ eq(CSS_SOURCES, [
   'src/statement/accounts.css',
   'src/statement/phone.css',
   'src/statement/phone-tables.css',
+  'src/statement/plan.css',
   'src/styles-presets.css',
-], 'fonts -> legacy -> foundation -> four lanes -> two phone lanes -> presets, in that order');
+], 'fonts -> legacy -> foundation -> four lanes -> two phone lanes -> the Plan page -> presets, in that order');
 eq(CSS_SOURCES[CSS_SOURCES.length - 1], 'src/styles-presets.css', 'the generated palette blocks are last');
 
 /* ---- 2. nothing under src/ is left out ---- */
