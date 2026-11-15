@@ -84,6 +84,14 @@ The set of per-category target amounts for one period. Targets only — a budget
 never holds actual spend.
 _Avoid_: plan, allocation, envelope
 
+**Subcategory**:
+An optional label on a transaction saying which part of its category the money
+went to: fuel, services or tolls under Car. It belongs to exactly one category
+and never has a budget of its own; a category's subcategories, together with
+its transactions that have none, always add up to the category's figure. See
+`docs/adr/0010-a-subcategory-is-a-label-under-a-category.md`.
+_Avoid_: tag, child category, sub-budget, label
+
 **Excluded transaction**:
 A row the user has vetoed from income and spend totals. Still listed everywhere
 transactions are shown, so nothing silently disappears. It is how a windfall
