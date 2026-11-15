@@ -1,0 +1,432 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Subcategories — Product Requirements</title>
+<style>
+  :root{
+    --bg:#0f1115; --panel:#171a21; --panel-2:#1d212b; --line:#2a2f3a;
+    --ink:#e7eaf0; --muted:#9aa3b2; --muted-2:#6f81a3;
+    --accent:#5b9dff; --accent-2:#7c5cff;
+    --crit:#f06464; --warn:#f5a524; --ok:#3ecf8e; --info:#5bb8ff;
+    --sans:ui-sans-serif,system-ui,-apple-system,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+    --mono:ui-monospace,SFMono-Regular,Menlo,Consolas,"Liberation Mono",monospace;
+    --radius:12px;
+    --maxw:1080px;
+  }
+  *{box-sizing:border-box}
+  html{scroll-behavior:smooth}
+  body{
+    margin:0;background:linear-gradient(180deg,#0c0e12,var(--bg) 240px);color:var(--ink);
+    font-family:var(--sans);line-height:1.6;font-size:16px;padding-bottom:4rem;
+  }
+  main{max-width:var(--maxw);margin:0 auto;padding:48px 24px 96px}
+  a{color:var(--accent)}
+
+  header.hero{padding:8px 0 28px;border-bottom:1px solid var(--line);margin-bottom:36px}
+  .eyebrow{font-size:12px;letter-spacing:.14em;text-transform:uppercase;color:var(--accent);font-weight:700}
+  h1{font-size:34px;line-height:1.15;margin:10px 0 8px;letter-spacing:-.02em}
+  h1 .accent{color:var(--accent-2)}
+  .lede{color:var(--muted);font-size:17px;max-width:70ch;margin:0}
+  .meta{display:flex;flex-wrap:wrap;gap:8px 18px;align-items:center;margin:16px 0 0;color:var(--muted);font-size:14px}
+
+  h2{font-size:23px;margin:46px 0 14px;letter-spacing:-.01em;border-left:3px solid var(--accent);padding-left:.6rem}
+  h3{font-size:17px;margin:26px 0 8px;color:var(--muted)}
+  p{margin:10px 0}
+  ul,ol{margin:10px 0;padding-left:22px} li{margin:5px 0}
+
+  .toc{display:flex;flex-wrap:wrap;gap:8px;margin:18px 0 0;list-style:none;padding:0}
+  .toc a{font-size:13px;color:var(--muted);text-decoration:none;border:1px solid var(--line);
+    padding:5px 11px;border-radius:999px}
+  .toc a:hover{color:var(--ink);border-color:var(--accent)}
+
+  .panel{background:var(--panel);border:1px solid var(--line);border-radius:var(--radius);padding:20px 22px;margin:16px 0}
+
+  code{font-family:var(--mono);font-size:.88em;background:#10131a;border:1px solid var(--line);padding:1px 6px;border-radius:6px}
+  pre{background:#10131a;border:1px solid var(--line);border-radius:var(--radius);padding:16px 18px;overflow:auto;margin:12px 0;font-size:13.5px;line-height:1.55}
+  pre code{background:none;border:none;padding:0;font-size:inherit}
+
+  .scroll{overflow-x:auto}
+  table{width:100%;border-collapse:collapse;margin:14px 0;font-size:14.5px}
+  th,td{text-align:left;padding:10px 12px;border-bottom:1px solid var(--line);vertical-align:top}
+  th{color:var(--muted-2);font-weight:600;font-size:12.5px;letter-spacing:.04em;text-transform:uppercase}
+  table.striped tbody tr:nth-child(odd){background:var(--panel)}
+  table.striped tbody tr:nth-child(even){background:var(--panel-2)}
+
+  .callout{border-left:3px solid var(--accent);background:var(--panel-2);border-radius:0 var(--radius) var(--radius) 0;padding:14px 18px;margin:18px 0}
+  .callout.warn{border-left-color:var(--warn)} .callout.ok{border-left-color:var(--ok)}
+  .callout .t{font-weight:700;margin-bottom:4px}
+
+  .badge{display:inline-block;font-size:.68rem;font-weight:700;padding:.12rem .5rem;border-radius:999px;text-transform:uppercase;letter-spacing:.04em;white-space:nowrap}
+  .b-warn{background:rgba(245,165,36,.15);color:var(--warn);border:1px solid rgba(245,165,36,.4)}
+  .b-ok{background:rgba(62,207,142,.13);color:var(--ok);border:1px solid rgba(62,207,142,.4)}
+  .b-info{background:rgba(91,184,255,.13);color:var(--info);border:1px solid rgba(91,184,255,.4)}
+  .b-violet{background:rgba(124,92,255,.14);color:#a995ff;border:1px solid rgba(124,92,255,.45)}
+
+  .stories{list-style:none;padding:0;margin:8px 0}
+  .stories li{display:grid;grid-template-columns:64px 1fr;gap:12px;padding:9px 0;border-bottom:1px solid var(--line);margin:0}
+  .stories li:last-child{border-bottom:none}
+
+  .phases{display:grid;grid-template-columns:repeat(auto-fit,minmax(230px,1fr));gap:.8rem;margin:1rem 0}
+  .phase{background:var(--panel);border:1px solid var(--line);border-radius:var(--radius);padding:1rem 1.1rem}
+  .phase .pn{font-size:.72rem;color:var(--accent);font-weight:700;letter-spacing:.06em;text-transform:uppercase}
+  .phase h3{margin:.3rem 0 .5rem;font-size:1.02rem;color:var(--ink)}
+  .phase h4{margin:.8rem 0 .2rem;font-size:.74rem;letter-spacing:.06em;text-transform:uppercase;color:var(--muted-2)}
+  .phase p{margin:.2rem 0;font-size:.9rem;color:var(--muted)}
+  .phase ul{margin:0;padding-left:1.1rem;font-size:.88rem;color:var(--muted)}
+
+  a:focus-visible,button:focus-visible,summary:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+  .muted{color:var(--muted)}
+  footer{margin-top:60px;padding-top:20px;border-top:1px solid var(--line);color:var(--muted-2);font-size:13px}
+</style>
+</head>
+<body>
+<main>
+  <header class="hero">
+    <div class="eyebrow">Budget Vault · Product requirements</div>
+    <h1>Sub<span class="accent">categories</span></h1>
+    <p class="lede">One budget for Car, with fuel, services and tolls visible underneath it. An optional
+      label under a category that shows where the money went and never changes a figure.</p>
+    <div class="meta">
+      <span class="badge b-ok">Approved</span>
+      <span>Ruan Pienaar</span>
+      <span>15 November 2026</span>
+      <span>Decision record: ADR-0010</span>
+    </div>
+    <nav aria-label="Contents">
+      <ul class="toc">
+        <li><a href="#problem">Problem</a></li>
+        <li><a href="#goals">Goals</a></li>
+        <li><a href="#non-goals">Non-goals</a></li>
+        <li><a href="#users">Users</a></li>
+        <li><a href="#stories">User stories</a></li>
+        <li><a href="#decisions">Technical decisions</a></li>
+        <li><a href="#testing">Testing</a></li>
+        <li><a href="#delivery">Delivery</a></li>
+        <li><a href="#data">Data model</a></li>
+        <li><a href="#integrations">Integrations</a></li>
+        <li><a href="#metrics">Success metrics</a></li>
+        <li><a href="#open">Open questions</a></li>
+      </ul>
+    </nav>
+  </header>
+
+  <section id="problem">
+    <h2>Problem statement</h2>
+    <p>The finest thing a transaction can say about itself is its category. A household that wants to
+      know how much of Car went on fuel has two options today, and neither works.</p>
+    <ul>
+      <li><strong>Make more categories.</strong> Fuel, Services and Tolls each need their own note and
+        their own line in every period's budget. The household now budgets three figures it only
+        wanted to see, and the Car total it started with no longer exists anywhere: the Dashboard has
+        no spending roll-up by group.</li>
+      <li><strong>Write it in the Note.</strong> Search finds it, but it cannot be filtered, summed or
+        picked from a list, and two spellings count as two things.</li>
+    </ul>
+    <p>The cost of leaving it: the question "what is this category made of" stays unanswered inside the
+      plugin, and people who need it either leave or keep a second record elsewhere.</p>
+  </section>
+
+  <section id="goals">
+    <h2>Goals</h2>
+    <ol>
+      <li>A transaction can carry one optional subcategory under its category, set from the
+        Transactions table and the Add dialog.</li>
+      <li>For every category and window, its subcategories plus the transactions that have none add up
+        to exactly the category's own figure, refunds included. A test holds this on both household
+        seeds.</li>
+      <li>No figure that exists in 1.60 changes. The two pinned figure ledgers pass without an edit.</li>
+      <li>A transaction file with no subcategory is byte-for-byte unchanged after load and save.</li>
+      <li>Someone who imports statements sets a subcategory once per merchant; a rule fills it in on
+        every later import.</li>
+      <li>A vault that never uses subcategories sees no new control anywhere.</li>
+    </ol>
+  </section>
+
+  <section id="non-goals">
+    <h2>Non-goals</h2>
+    <div class="scroll">
+    <table>
+      <thead><tr><th>Out of scope</th><th>Why</th></tr></thead>
+      <tbody>
+        <tr><td>A budget per subcategory</td><td>Budgets, Plan and the health score stay per category. Whether a child's budget comes out of its parent's or adds to it has no obvious answer, and the view ships first.</td></tr>
+        <tr><td>More than two levels</td><td>The model is category, then subcategory. No deeper nesting.</td></tr>
+        <tr><td>A subcategory shared between categories</td><td>"Home" under Insurance and "Home" under Repairs are two subcategories that share a name.</td></tr>
+        <tr><td>Renaming a subcategory</td><td>Categories have no rename either, and a rename rewrites many month files in one action. Removing a name from the list only stops offering it.</td></tr>
+        <tr><td>A link to the Food page</td><td>A receipt itemises one slip; a subcategory labels one bank line. Joining them would let the Food page move a budget figure.</td></tr>
+        <tr><td>A subcategory field in the split dialog</td><td>Each part of a split carries its own, set in the table afterwards like any other row.</td></tr>
+        <tr><td>Editing the subcategory in the import review</td><td>The review shows what a rule set, as text. It is changed on Transactions.</td></tr>
+        <tr><td>The Budget page's figures, Plan, Report, the score and the PDF</td><td>They stay per category. The PDF's transaction table has no room for another column.</td></tr>
+        <tr><td>Copying a transaction, creating accounts or categories inside the Add dialog, a daily spending chart</td><td>Separate builds. None is needed for this one.</td></tr>
+      </tbody>
+    </table>
+    </div>
+  </section>
+
+  <section id="users">
+    <h2>Users and access model</h2>
+    <p>Budget Vault has no accounts, no sign-in and no server. Everyone who can open the vault can use
+      every part of the plugin, and that does not change.</p>
+    <div class="scroll">
+    <table>
+      <thead><tr><th>Who</th><th>How they meet the feature</th></tr></thead>
+      <tbody>
+        <tr><td>Someone who types entries in</td><td>Picks a subcategory in the Add dialog or in the table.</td></tr>
+        <tr><td>Someone who imports statements</td><td>Sets it once on Transactions; a rule learns the pair and applies it on later imports.</td></tr>
+        <tr><td>Someone on a phone</td><td>The same controls. The subcategory is a second line inside the existing category cell of the transaction card.</td></tr>
+        <tr><td>Someone who never wants it</td><td>Sees nothing new. No control appears until the open book has a subcategory.</td></tr>
+      </tbody>
+    </table>
+    </div>
+  </section>
+
+  <section id="stories">
+    <h2>User stories</h2>
+    <p class="muted">Tags are the four build slices. All four ship to the store as one version.</p>
+
+    <h3>Setting up the names</h3>
+    <ul class="stories">
+      <li><span class="badge b-info">Slice 1</span><span>As a budgeter, I want to open a Subcategories dialog for a category from the Budget page so that I can add the first names before any dropdown exists.</span></li>
+      <li><span class="badge b-info">Slice 1</span><span>As a budgeter, I want to remove a name from the list without my old transactions changing so that tidying the list is safe.</span></li>
+      <li><span class="badge b-info">Slice 1</span><span>As a budgeter, I want to pick "＋ New subcategory…" at the bottom of the dropdown so that I can add a name without leaving the row I am on.</span></li>
+    </ul>
+
+    <h3>Labelling transactions</h3>
+    <ul class="stories">
+      <li><span class="badge b-info">Slice 1</span><span>As a budgeter, I want a subcategory dropdown under the category in the Transactions table so that I can label a row where I already categorise it.</span></li>
+      <li><span class="badge b-info">Slice 1</span><span>As a budgeter, I want a subcategory dropdown under Category in the Add dialog so that a new entry is complete in one step.</span></li>
+      <li><span class="badge b-info">Slice 1</span><span>As a budgeter, I want the subcategory cleared when I change a row's category so that a row never claims a subcategory of the wrong category.</span></li>
+      <li><span class="badge b-info">Slice 1</span><span>As a budgeter, I want each part of a split to carry its own subcategory so that one bank line can be divided all the way down.</span></li>
+      <li><span class="badge b-info">Slice 1</span><span>As someone who does not use subcategories, I want no new controls and no change to my files so that the update costs me nothing.</span></li>
+    </ul>
+
+    <h3>Finding them again</h3>
+    <ul class="stories">
+      <li><span class="badge b-info">Slice 1</span><span>As a budgeter, I want to filter Transactions by subcategory, including "No subcategory", so that I can see exactly the rows behind a figure.</span></li>
+      <li><span class="badge b-info">Slice 1</span><span>As a budgeter, I want search to match subcategory names so that typing "fuel" finds the rows labelled Fuel.</span></li>
+    </ul>
+
+    <h3>Importing</h3>
+    <ul class="stories">
+      <li><span class="badge b-violet">Slice 2</span><span>As someone who imports statements, I want a rule to set the subcategory along with the category so that I do not pick it by hand on every row, every month.</span></li>
+      <li><span class="badge b-violet">Slice 2</span><span>As someone who imports statements, I want the pair learned when I save a row with both set so that I never edit the rules file myself.</span></li>
+      <li><span class="badge b-violet">Slice 2</span><span>As someone who imports statements, I want the import review to show the subcategory a rule chose so that I can see what will be saved.</span></li>
+    </ul>
+
+    <h3>Seeing the breakdown</h3>
+    <ul class="stories">
+      <li><span class="badge b-warn">Slice 3</span><span>As a budgeter, I want a category in "Where it went" to expand into its subcategories with amounts so that I can see what the category is made of.</span></li>
+      <li><span class="badge b-warn">Slice 3</span><span>As a budgeter, I want to click a subcategory and land on Transactions filtered to it so that I can check the rows.</span></li>
+      <li><span class="badge b-warn">Slice 3</span><span>As a budgeter, I want an "All transactions" row in the expansion so that I can still open the whole category.</span></li>
+    </ul>
+
+    <h3>Taking the data out</h3>
+    <ul class="stories">
+      <li><span class="badge b-ok">Slice 4</span><span>As a budgeter, I want the transaction exports to include the subcategory so that the detail survives outside the plugin.</span></li>
+    </ul>
+  </section>
+
+  <section id="decisions">
+    <h2>Technical decisions</h2>
+    <div class="scroll">
+    <table class="striped">
+      <thead><tr><th>Decision</th><th>Choice</th><th>Rationale</th><th>Alternatives rejected</th></tr></thead>
+      <tbody>
+        <tr><td>What a subcategory is</td><td>A new, optional level below category.</td><td>A category is the thing a budget is set on. The request is one budget with its parts visible.</td><td>A group as the parent with separate categories as children: every child needs a note and a budget line, and the Dashboard has no roll-up by group.</td></tr>
+        <tr><td>Depth and ownership</td><td>Two levels. A subcategory belongs to exactly one category.</td><td>Keeps every sum unambiguous.</td><td>Deeper nesting; names shared across categories.</td></tr>
+        <tr><td>Effect on figures</td><td>None. Subcategories plus "No subcategory" always equal the category's figure, refunds signed.</td><td>Lets the feature ship without re-auditing any number. Nothing that existed before reads the new field.</td><td>Budgets or score inputs at subcategory level.</td></tr>
+        <tr><td>Where the names live</td><td>A comma-separated <code>subcategories:</code> line on the category's own note.</td><td>The same shape custom groups already have in Settings, and the list travels with the category.</td><td>A separate file of subcategories; a list inferred only from transactions.</td></tr>
+        <tr><td>Names not on the list</td><td>Still shown and still offered, after the listed ones.</td><td>The plugin never drops or hides something a file says.</td><td>Treating an unlisted name as invalid.</td></tr>
+        <tr><td>Name matching</td><td>Exact text. No commas in a name.</td><td>Category names match by exact text today.</td><td>Case-insensitive matching.</td></tr>
+        <tr><td>The column in the transaction file</td><td><code>Subcategory</code>, declared once in the table schema, written to a month's file only when a row in it uses one.</td><td>ADR-0003 and ADR-0004. A file with no subcategory never changes.</td><td>Writing an empty column into every file.</td></tr>
+        <tr><td>How the column is located</td><td>By its header name, anywhere after the known columns. It stays where it is found; when a file first needs one it is appended after every column the file already has.</td><td>Split is optional, so a fixed position behind it would force an empty Split column into files that never split. A hand-added column already survives in 1.60 directly after Note, and moves one place right when a split is first made.</td><td>A fixed eighth position after Split.</td></tr>
+        <tr><td>Changing a row's category</td><td>Clears the subcategory, on every path including bulk changes, unless the same action sets both.</td><td>A subcategory belongs to one category.</td><td>Keeping it when the new category has a subcategory of the same name.</td></tr>
+        <tr><td>Rename and removal</td><td>No rename. Removing a name from the list rewrites no row.</td><td>Matches categories; avoids a many-file write in one action.</td><td>A rename that rewrites history.</td></tr>
+        <tr><td>Creating a name from the dropdown</td><td>"＋ New subcategory…" saves to the category note straight away.</td><td>"＋ Add new category…" already creates its note straight away.</td><td>Holding the new name until Save.</td></tr>
+        <tr><td>Import rules</td><td>An optional third column in the rules file. A blank one sets the category alone. Learned when a row is saved on Transactions with both set.</td><td>Rules can only set a category today; without this, importers pick every row by hand.</td><td>A second rules file; leaving rules out of the first release.</td></tr>
+        <tr><td>Where it is edited</td><td>Inside the existing category cell on Transactions, and under Category in the Add dialog. Shown only when that row's category has subcategories.</td><td>No new table column, so the phone cards and the pinned figure fixtures keep their layout.</td><td>A new column in the table.</td></tr>
+        <tr><td>The Dashboard click</td><td>A category with subcategorised spending in the window expands in place, with an "All transactions" row. The expansion is not remembered.</td><td>Shows the breakdown where the category's figure already is.</td><td>A separate breakdown page; remembering the open state.</td></tr>
+        <tr><td>Export</td><td>CSV, Markdown, XLSX and the report's JSON gain a Subcategory column when the book uses any. The PDF does not.</td><td>The PDF table has no room.</td><td>Always writing the column.</td></tr>
+        <tr><td>Visibility</td><td>Nothing appears until the open book has a subcategory.</td><td>Existing users see no change after the update.</td><td>A setting to switch the feature on.</td></tr>
+        <tr><td>Languages</td><td>Every new string in all twelve.</td><td>The i18n tests fail otherwise.</td><td>English first.</td></tr>
+      </tbody>
+    </table>
+    </div>
+  </section>
+
+  <section id="testing">
+    <h2>Testing decisions</h2>
+    <h3>Seams under test</h3>
+    <div class="scroll">
+    <table>
+      <thead><tr><th>Seam</th><th>What it proves</th><th>Prior art to mirror</th></tr></thead>
+      <tbody>
+        <tr><td>Transaction file, load then save</td><td>A file with no subcategory is unchanged byte for byte. The column is read wherever its header sits. A category change clears it.</td><td><code>golden-tables</code>, <code>table-schema-guards</code></td></tr>
+        <tr><td>Per-category figures</td><td>Subcategories plus "No subcategory" add up to the category's figure, refunds included, on both household seeds.</td><td><code>summary-conservation</code>, <code>dash-donut-printed-figures</code></td></tr>
+        <tr><td>Rendered pages through the view harness</td><td>The dropdowns, filter, Budget dialog and Dashboard expansion appear only when used. The two pinned figure ledgers stay unchanged for the existing seeds.</td><td><code>figures-ledger</code>, <code>views-render</code>, <code>i18n-render</code></td></tr>
+      </tbody>
+    </table>
+    </div>
+    <p>Rules and export are pure functions and are tested where they already are:
+      <code>rules-csv-roundtrip</code>, <code>exporter</code> and <code>export-preview-equals-written</code>.</p>
+
+    <h3>What a good test looks like here</h3>
+    <p>It drives a file or a page the way a household would and asserts what comes back out: the bytes
+      written, the figure printed, the control on screen. It never reaches into a module's internals.</p>
+
+    <h3>Modules under test</h3>
+    <ul>
+      <li><strong>Slice 1</strong> carries the critical path: the file round trip and the adds-up rule.</li>
+      <li><strong>Slice 2</strong>: rule matching and learning, including a rule with a blank subcategory.</li>
+      <li><strong>Slice 3</strong>: the rendered Dashboard expansion against the same figures as slice 1.</li>
+      <li><strong>Slice 4</strong>: the written export equals the previewed one, with and without the column.</li>
+    </ul>
+
+    <div class="callout">
+      <div class="t">Contract before code</div>
+      Each slice agrees its function signatures, return shapes, error cases and named test cases before
+      the first failing test is written.
+    </div>
+  </section>
+
+  <section id="delivery">
+    <h2>Phased delivery plan</h2>
+    <p>Four slices in order. Each is deployed to the Pienaar Vault when it lands. The store release is
+      one version, cut once all four are in.</p>
+    <div class="phases">
+      <div class="phase">
+        <div class="pn">Slice 1</div>
+        <h3>Core</h3>
+        <p>The column, the list on the category note, the Subcategories dialog, the dropdowns in the
+          table and the Add dialog, the filter and search.</p>
+        <h4>Unlocks</h4>
+        <p>Usable on its own by anyone typing entries in. Everything else builds on it.</p>
+        <h4>Accepted when</h4>
+        <ul>
+          <li>A file with no subcategory is unchanged after load and save.</li>
+          <li>The column is read directly after Note, after Split, and after an unknown column.</li>
+          <li>The adds-up test passes on both household seeds.</li>
+          <li>Changing a category clears the subcategory.</li>
+          <li>Both pinned figure ledgers pass unedited.</li>
+          <li>No new control shows in a book with no subcategory.</li>
+        </ul>
+      </div>
+      <div class="phase">
+        <div class="pn">Slice 2</div>
+        <h3>Import rules</h3>
+        <p>A rule can set a subcategory and learns it from a save on Transactions. The import review
+          shows it as text.</p>
+        <h4>Unlocks</h4>
+        <p>The feature is worth having for people who import statements.</p>
+        <h4>Accepted when</h4>
+        <ul>
+          <li>A rules file with two columns loads and saves unchanged.</li>
+          <li>A rule with a blank subcategory sets the category alone.</li>
+          <li>Saving a row with both set teaches the pair, and the next import applies both.</li>
+        </ul>
+      </div>
+      <div class="phase">
+        <div class="pn">Slice 3</div>
+        <h3>Dashboard expansion</h3>
+        <p>A category in "Where it went" expands into its subcategories, with an "All transactions"
+          row.</p>
+        <h4>Unlocks</h4>
+        <p>The breakdown is visible without filtering.</p>
+        <h4>Accepted when</h4>
+        <ul>
+          <li>The expanded amounts add up to the category's printed figure.</li>
+          <li>A category with no subcategorised spending in the window opens Transactions as before.</li>
+          <li>The collapsed "Other" row is unchanged.</li>
+          <li>Clicking a subcategory opens Transactions filtered to it.</li>
+        </ul>
+      </div>
+      <div class="phase">
+        <div class="pn">Slice 4</div>
+        <h3>Export</h3>
+        <p>A Subcategory column in the CSV, Markdown and XLSX transaction exports and the report's
+          JSON.</p>
+        <h4>Unlocks</h4>
+        <p>The store release.</p>
+        <h4>Accepted when</h4>
+        <ul>
+          <li>The column is present when the book uses subcategories and absent when it does not.</li>
+          <li>The written file equals the preview.</li>
+          <li>The PDF is unchanged.</li>
+        </ul>
+      </div>
+    </div>
+  </section>
+
+  <section id="data">
+    <h2>Data model sketch</h2>
+<pre><code>Type / group            (Settings: built-in types plus custom groups)
+   └── Category         (one note per category; budgets are set here)
+          │  subcategories: "Fuel, Services, Tolls"      ← the offered names, in order
+          │
+          └── Subcategory            (a name; belongs to exactly one category)
+                 ▲
+                 │ 0 or 1
+Transaction ─────┘      Date | Description | Category | Amount | Excluded | Note | [Split] | … | [Subcategory]
+                        the column exists in a month's file only once a row in it uses one
+
+Categorisation rule     pattern | category | [subcategory]
+</code></pre>
+    <ul>
+      <li>A transaction has at most one subcategory, and only if it has a category.</li>
+      <li>A split part is a transaction and follows the same rule.</li>
+      <li>A budget row points at a category and nothing below it.</li>
+      <li>A name on a transaction that is missing from the category's list is still a subcategory of
+        that category.</li>
+    </ul>
+  </section>
+
+  <section id="integrations">
+    <h2>Integrations</h2>
+    <p>None. The feature makes no network request and adds no dependency. It reads and writes three
+      kinds of file the plugin already owns: the month's transaction file, the category note, and the
+      categorisation rules file.</p>
+    <div class="callout warn">
+      <div class="t">An older build on another device</div>
+      A device still running 1.60 or earlier keeps the column intact but does not understand it.
+      Changing a row's category there leaves the old subcategory on the row. The newer build then
+      shows it as a name in use under the new category instead of dropping it.
+    </div>
+  </section>
+
+  <section id="metrics">
+    <h2>Success metrics</h2>
+    <ul>
+      <li>The adds-up test passes on both household seeds in every slice.</li>
+      <li>Both pinned figure ledgers pass with no edit across all four slices.</li>
+      <li>The byte-for-byte file test passes for a transaction file and a rules file that use no
+        subcategory.</li>
+      <li>Ruan labels one month of a real category in the Pienaar Vault after slice 1, on a computer
+        and on an iPhone, with no change to any figure on the Dashboard.</li>
+      <li>After slice 2, a second import of the same merchants needs no subcategory picked by hand.</li>
+      <li>No issue reporting a changed figure or a rewritten file in the 30 days after the store
+        release.</li>
+    </ul>
+  </section>
+
+  <section id="open">
+    <h2>Open questions</h2>
+    <div class="scroll">
+    <table>
+      <thead><tr><th>Question</th><th>Recommended default</th></tr></thead>
+      <tbody>
+        <tr><td>Which version number carries the release?</td><td>1.61.0, the next minor after 1.60.0.</td></tr>
+        <tr><td>What is the header of the third column in the rules file?</td><td><code>subcategory</code>, lower case like the two beside it.</td></tr>
+        <tr><td>Does anyone want a budget per subcategory?</td><td>Wait for a request after release before designing it.</td></tr>
+      </tbody>
+    </table>
+    </div>
+  </section>
+
+  <footer>
+    <p>Written 15 November 2026 from the settled design in ADR-0010 and <code>CONTEXT.md</code>.
+      Self-contained: no network at runtime.</p>
+  </footer>
+</main>
+</body>
+</html>
