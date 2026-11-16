@@ -29,13 +29,14 @@ const { SCHEMAS } = require('../table-schema');
 const {
   FOOD_ITEMS_FILE, FOOD_CATEGORIES, OTHER, itemKey, parseFoodItems, mergeFoodItems, coverage,
   serializeReceipt, serializeFoodItems, refileReceiptText, receiptPath,
-  matchReceipts, foodSummary, receiptPaid, foodTrend, priceChange, versusLastPeriod,
+  matchReceipts, foodSummary, receiptPaid, foodTrend, priceChange, versusLastPeriod, findDuplicateReceipt,
 } = require('../receipt-file');
 const {
   RANGES, rangePills, createChart, scales, gridlines, axisLabels, linePath,
   trackPoints, themeColors, SLICE_PALETTE, phoneWidth,
 } = require('../chart');
 const { askReceipt } = require('../receipt-modal');
+const { confirmModal } = require('../modal');
 // For the accessible names only — the page's visible copy is still English
 // (EXPECTED_ENGLISH_ONLY in tests/i18n-render.test.cjs). Namespaced, as
 // everywhere in src/.
@@ -468,6 +469,22 @@ module.exports = function registerFood(ctx) {
     const got = await askReceipt(app, { money, foodItems: S.foodItems, categories: categoryChoices() });
     if (!got) return;
     if (op.replaced()) return toast(op.replaced(), true);
+    /* The same slip pasted twice used to be kept twice, quietly, as "... 2.md":
+       that shop's food spend and item counts doubled and nothing said why
+       (audit, 16 Nov 2026). Ask first. The safe answer is the highlighted one
+       and Escape is it too; only "Save anyway" writes the second copy. */
+    const dup = findDuplicateReceipt(S.receipts, got);
+    if (dup) {
+      const again = await confirmModal(app, {
+        title: 'You already saved this slip',
+        message: `${got.store} on ${dateText(got.date)} for ${money(got.total)} is already in Receipts (${dup.rel}). Saving it again would count that shop twice.`,
+        confirmText: 'Save anyway',
+        cancelText: 'Do not save',
+        primary: 'cancel',
+      });
+      if (!again) return;
+      if (op.replaced()) return toast(op.replaced(), true);
+    }
     let rel = receiptPath(got);
     for (let n = 2; pathTaken(rel); n++) rel = receiptPath(got).replace(/\.md$/, ` ${n}.md`);
     try {

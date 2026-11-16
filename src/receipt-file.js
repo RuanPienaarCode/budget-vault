@@ -30,7 +30,7 @@
    map's flag. It is a flag beside the category, not a category: a chicken is
    both Meat & fish and healthy. */
 
-const { parseFrontmatter, parseMdTable, splitAroundTable, yamlStr } = require('./markdown');
+const { parseFrontmatter, parseMdTable, findTable, yamlStr } = require('./markdown');
 const { SCHEMAS, headerLines, rowLine, rowToObject } = require('./table-schema');
 const { safeSeg } = require('./vault-path');
 const { roundCents } = require('./amount');
@@ -221,25 +221,111 @@ function parseReceiptFile(text, rel) {
   };
 }
 
-/* Re-file every row of one receipt carrying `key`, leaving everything around
-   the table — frontmatter, heading, a line the reader added — byte for byte.
+/* The cells of one table line, raw (untrimmed, still \|-escaped), with what
+   surrounds them — leading space, trailing pipe, trailing space — so a line
+   can be put back together to the byte. The same scan markdown.js's
+   parseMdTable makes (a pipe preceded by a backslash is text, a trailing
+   pipe is dropped only when unescaped), kept here because that module does
+   not export it and a line this file patches must split exactly as the
+   loader splits it. */
+function lineCells(line) {
+  const lead = line.match(/^\s*/)[0];
+  const rest = line.slice(lead.length);
+  const tailWs = rest.match(/\s*$/)[0];
+  const core = rest.slice(1, rest.length - tailWs.length);       // rest starts with '|'
+  const trailPipe = core.endsWith('|') && core[core.length - 2] !== '\\';
+  const inner = trailPipe ? core.slice(0, -1) : core;
+  const cells = [];
+  let cur = '';
+  for (let i = 0; i < inner.length; i++) {
+    if (inner[i] === '|' && inner[i - 1] !== '\\') { cells.push(cur); cur = ''; }
+    else cur += inner[i];
+  }
+  cells.push(cur);
+  return { lead, cells, trailPipe, tailWs };
+}
+
+/* A cell's new text, keeping the space the reader (or the writer before
+   them) padded it with. A cell that was blank or missing gets the plain
+   " value " the serializer writes. */
+function withCellText(raw, value) {
+  if (!raw.trim()) return ` ${value} `;
+  return raw.match(/^\s*/)[0] + value + raw.match(/\s*$/)[0];
+}
+
+/* Re-file every row of one receipt carrying `key`, leaving everything else in
+   the file byte for byte: the frontmatter, the heading, a line the reader
+   added, the header and divider rows, every row that does not carry the key,
+   a hand-added column's cells, and a row with neither a name nor a barcode
+   (which the loader skips but the reader can see, and whose money is part of
+   the slip). The only bytes that change are the Category and/or Healthy cell
+   of a matching row.
+
+   This used to parse the receipt, edit the items and serialise the lot, which
+   wrote back only what the schema's seven columns hold: an extra "Note"
+   column and a hand-typed R20 bag-levy row vanished the first time an
+   unrelated product was re-filed (audit, 16 Nov 2026). Patching the cells in
+   place is the narrower write, so there is nothing else to lose.
+
    Returns null when nothing in this file changed, so the caller writes only
    the files that did. */
 function refileReceiptText(text, key, { category, healthy }) {
-  const parsed = parseReceiptFile(text, '');
+  const schema = SCHEMAS.receiptItems;
+  const catCol = schema.columns.findIndex(c => c.key === 'category');
+  const healthCol = schema.columns.findIndex(c => c.key === 'healthy');
+  const lines = String(text).split('\n');
+  const run = findTable(lines, schema.columns[0].header);
+  if (!run) return null;
   let changed = false;
-  for (const it of parsed.items) {
-    if (itemKey(it) !== key) continue;
-    if (category != null && it.category !== category) { it.category = category; changed = true; }
-    if (healthy != null && !!it.healthy !== !!healthy) { it.healthy = !!healthy; delete it.healthyRaw; changed = true; }
+  for (let i = run.start + 1; i < run.end; i++) {
+    const t = lines[i].trim();
+    if (/^\|[\s:|-]+\|$/.test(t)) continue;                      // the divider row
+    const parts = lineCells(lines[i]);
+    const it = rowToObject(schema, parts.cells.map(c => c.trim()));
+    if (!(it.name || it.barcode) || itemKey(it) !== key) continue;
+    let rowChanged = false;
+    const put = (col, row) => {
+      while (parts.cells.length <= col) parts.cells.push(' ');
+      parts.cells[col] = withCellText(parts.cells[col], schema.columns[col].write(row));
+      rowChanged = true;
+    };
+    if (category != null && it.category !== category) put(catCol, { category });
+    if (healthy != null && !!it.healthy !== !!healthy) put(healthCol, { healthy: !!healthy });
+    if (!rowChanged) continue;
+    lines[i] = parts.lead + '|' + parts.cells.join('|') + (parts.trailPipe ? '|' : '') + parts.tailWs;
+    changed = true;
   }
-  if (!changed) return null;
-  const { before, after } = splitAroundTable(text, SCHEMAS.receiptItems.columns[0].header);
-  return serializeReceipt(parsed, { lead: before, trail: after });
+  return changed ? lines.join('\n') : null;
 }
 
 const paidOf = it => r2((it.amount || 0) + (it.discount || 0));
 const receiptPaid = r => r2(r.items.reduce((a, it) => a + paidOf(it), 0));
+
+/* Is this slip one already saved? Same shop (trimmed, case- and space-folded),
+   same date, same total to the cent, and — only when BOTH carry a time — the
+   same time. Two shops' slips can share a total and a day, and a household
+   that shops twice on a Saturday has two slips of the same shop; the time is
+   what tells those apart, so it decides whenever it can. A slip typed with no
+   time cannot be told apart that way, so it is the same slip.
+
+   A saved receipt with no total in its frontmatter is compared by what its
+   lines add up to, which is the figure the Food page shows for it.
+   Returns the saved receipt that matches, else null. The Food page asks the
+   reader before it writes the second copy; this only decides whether to ask. */
+function findDuplicateReceipt(saved, slip) {
+  const cents = v => Math.round((Number(v) || 0) * 100);
+  const totalOf = r => (r.total != null ? r.total : receiptPaid(r));
+  const store = fold(slip.store);
+  const time = String(slip.time || '').trim();
+  for (const r of saved || []) {
+    if (fold(r.store) !== store || r.date !== slip.date) continue;
+    if (cents(totalOf(r)) !== cents(totalOf(slip))) continue;
+    const rt = String(r.time || '').trim();
+    if (rt && time && rt !== time) continue;
+    return r;
+  }
+  return null;
+}
 
 /* Which bank line each receipt is the slip for.
 
@@ -460,5 +546,5 @@ module.exports = {
   guessCategory, fold, itemKey, suggestFiling, mergeFoodItems, coverage,
   parseFoodItems, serializeFoodItems,
   receiptPath, serializeReceipt, parseReceiptFile, refileReceiptText,
-  paidOf, receiptPaid, matchReceipts, foodSummary,
+  paidOf, receiptPaid, matchReceipts, foodSummary, findDuplicateReceipt,
 };

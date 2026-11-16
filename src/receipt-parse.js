@@ -385,16 +385,38 @@ function parseCheckers(lines, known) {
    reported as rounding — a till rounding to the nearest 10c, as the first
    butcher slip imported here did — not as a misread line. */
 const MONEY_TAIL = /(?:^|\s)(-?)R?\s?(\d{1,3}(?:[ ,]\d{3})+|\d+)(?:[.,](\d{2}))?\s*[A-Z]?$/;
+/* The same tail for a PRODUCT line. A space between digit groups is a
+   thousands separator only when a currency symbol directly precedes the
+   number (R1 234.56, R 1 234.56). Without one it is a pack size and a price:
+   "Eggs 30 120.00" was read as R30 120.00 = 30120.00 (audit, 16 Nov 2026).
+   A comma still groups with or without a symbol. */
+const MONEY_TAIL_ITEM = /(?:^|\s)(-?)(?:R\s?(\d{1,3}(?:[ ,]\d{3})+|\d+)|(\d{1,3}(?:,\d{3})+|\d+))(?:[.,](\d{2}))?\s*[A-Z]?$/;
+/* A quantity or weight waiting for its price: "2 x", "3x", "2 ×", "0.456 kg @".
+   The @ / x / × must FOLLOW A NUMBER, optionally with a unit between. This
+   was `/[@x×]\s*$/`, which also took the last letter of a word, so "Cake Mix",
+   "Box", "Ajax" and "Kleenex" were skipped as quantities and the price after
+   each landed on the item above (audit, 16 Nov 2026). */
+const QTY_AWAITING_PRICE = /\d(?:[.,]\d+)?\s*(?:kg|g|mg|ml|l|lbs?|oz|units?|pcs?|ea)?\s*[@x×]\s*$/i;
 const SEPARATOR = /^[-=_*~.]{5,}$/;
 const DATE_OR_TIME = /\b\d{1,2}[:h]\d{2}\b|\b\d{4}-\d{2}-\d{2}\b|\b\d{1,2}[/.-]\d{1,2}[/.-]\d{2,4}\b|\b\d{1,2}\s+[A-Za-z]{3}[a-z]*\.?\s+\d{4}\b/;
 const PAID_LINE = /\b(E\.?\s*F\.?\s*T|CARD|AMOUNT\s+DUE|BALANCE\s+DUE|TENDER(?:ED)?|CREDIT|DEBIT)\b/i;
 
-function moneyTail(line) {
-  const m = line.match(MONEY_TAIL);
+function moneyTail(line, item = false) {
+  let m = line.match(MONEY_TAIL);
   if (!m) return null;
-  const whole = m[2].replace(/[ ,]/g, '');
-  const v = Number(whole) + (m[3] ? Number(m[3]) / 100 : 0);
-  return { text: line.slice(0, m.index).trim(), value: m[1] === '-' ? -v : v };
+  let text = line.slice(0, m.index).trim();
+  let whole = m[2], cents = m[3], sign = m[1];
+  /* On a product line the strict reading wins — unless nothing before the
+     figure is a word. A price column Live Text put on a line of its own
+     ("1 234.56") has no name to keep a pack size in, so its grouping stays. */
+  if (item && /[A-Za-z]/.test(text)) {
+    m = line.match(MONEY_TAIL_ITEM);
+    if (!m) return null;
+    text = line.slice(0, m.index).trim();
+    whole = m[2] ?? m[3]; cents = m[4]; sign = m[1];
+  }
+  const v = Number(whole.replace(/[ ,]/g, '')) + (cents ? Number(cents) / 100 : 0);
+  return { text, value: sign === '-' ? -v : v };
 }
 const hasWords = s => /[A-Za-z]{2,}/.test(s.replace(/\b\d+(?:[.,]\d+)?\s*(?:@|x|kg|g)\b/gi, ''));
 
@@ -429,8 +451,8 @@ function parseGeneric(lines) {
       continue;                     // a header line above it
     }
     if (DATE_OR_TIME.test(l) && !items.length && !pending) continue;
-    if (/[@x×]\s*$/i.test(l)) continue;           // "0.268 @" — weight, price follows
-    const t = moneyTail(l);
+    if (QTY_AWAITING_PRICE.test(l)) continue;     // "0.268 @" — weight, price follows
+    const t = moneyTail(l, true);
     if (t && !hasWords(t.text)) {
       /* A figure with no product words: the price of the product above,
          or a discount on it. The last one before the next product wins. */
