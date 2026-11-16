@@ -172,6 +172,31 @@ function splitShortfall(parent, parts) {
   return (cents(parent.amount) - taken) / 100;
 }
 
+/* The parts belonging to one split parent, among the rows of ITS OWN file:
+   split role `part`, with the parent's date and description — the same three
+   facts applySplit copies onto a part, and the only join there is, because a
+   part carries no id back to its parent. This is the rule the Transactions page
+   applies when it deletes or un-splits a parent; it is here so a second caller
+   (the importer's Undo) asks the question the same way.
+
+   Narrow rather than clever, and the limit is real: a file holding two
+   identical charges on one day, both split, cannot say whose parts are whose.
+   `splitParentsSharingKey` is the way a caller notices that case. */
+function splitPartsOf(rows, parent) {
+  return (rows || []).filter(x => x !== parent && splitRole(x && x.split) === SPLIT_PART
+    && x.date === parent.date && x.desc === parent.desc);
+}
+
+/* The OTHER split parents in `rows` that share this parent's date and
+   description — the rows whose parts `splitPartsOf` cannot tell apart from this
+   one's. Empty on any unambiguous split. By role alone, like the page's own
+   lookup: a parent whose Excluded tick was removed by hand still owns parts. */
+function splitParentsSharingKey(rows, parent) {
+  return (rows || []).filter(x => x !== parent && splitRole(x && x.split) === SPLIT_PARENT
+    && x.date === parent.date && x.desc === parent.desc);
+}
+
 module.exports = {
   SPLIT_PARENT, SPLIT_PART, splitRole, supersededBySplit, isSplitPart, applySplit, splitShortfall,
+  splitPartsOf, splitParentsSharingKey,
 };
