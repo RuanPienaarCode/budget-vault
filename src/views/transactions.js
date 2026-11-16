@@ -1618,7 +1618,26 @@ module.exports = function registerTransactions(ctx) {
     }
     let learned = 0;
     if (pendingLearns.size) {
-      learned = await learnRules([...pendingLearns].map(([desc, cat]) => ({ desc, cat })), op);
+      /* Only what still stands. pendingLearns is written when a category is
+         picked and nothing ever took a pair back out when the pick was later
+         undone by a route that does not pass through the picker: "Reload from
+         disk" (the row is uncategorised again), a bulk re-categorise of the
+         search (the row now says something else), a deleted row. Each of those
+         left a rule the reader had already thrown away to be taught on the
+         next Save, and the next statement import then filed that merchant
+         under it (2026-11-16 audit). A pair is a rule the reader stands behind
+         only while a live row of this load carries that description in that
+         category right now; the rest are dropped without a word. Checked here,
+         at the one moment the pairs become rules, rather than at every route
+         that can change a row — a new route cannot forget to call it. */
+      const standing = new Set();
+      for (const f of Object.values(S.txFiles || {})) {
+        for (const r of f.rows) if (r.cat) standing.add(`${r.cat}\u0000${r.desc}`);
+      }
+      const pairs = [...pendingLearns]
+        .filter(([desc, cat]) => standing.has(`${cat}\u0000${desc}`))
+        .map(([desc, cat]) => ({ desc, cat }));
+      learned = pairs.length ? await learnRules(pairs, op) : 0;
       /* Cleared either way: null means the state was replaced while this save
          was writing (another book, or the same one re-read), and these pairs
          were read off rows of a load nobody is looking at — keeping them for

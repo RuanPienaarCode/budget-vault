@@ -19,11 +19,12 @@ const { opWriterOf } = require('../io');
 const i18n = require('../i18n');
 const { el, tableCells, refocus, caveatChip } = require('../dom');
 const { normalizeAmount, inferGrouping } = require('../amount');
-const { parseStatement, decodeStatement, parseStatementDate, detectStatementColumns, reconcileAmounts, applyCounterparties,
+const { parseStatement, decodeStatement, parseStatementDate, detectStatementColumns, reconcileAmounts, reconcileFeesBesideAmount, applyCounterparties,
   statementAccountNumber, sameAccountNumber, TRANSFER_LEG_DAYS } = require('../statement');
 const { prepareRules, autoCategorise, matchRule } = require('../rules');
 const { buildIndex, addToIndex, flagItems } = require('../dedupe');
 const { confirmModal } = require('../modal');
+const { splitRole, SPLIT_PARENT, splitPartsOf, splitParentsSharingKey } = require('../tx-role');
 const { isCreditCard } = require('../committed');
 const { symbolOf, isForeign } = require('../currency');
 const { todayIso, isoDayNumber } = require('../dates');
@@ -247,6 +248,12 @@ module.exports = function registerImport(ctx) {
        never become transactions, because an unbroken run of balances is what
        makes the reconciliation below conclusive. */
     const ledger = [];
+    /* The rows that print a fee BESIDE an amount (the third column is otherwise
+       read only when the amount is missing, below). Kept with enough to decide
+       afterwards, from the balance column, whether the fee is a charge of its
+       own — see reconcileFeesBesideAmount. `at` is where the row's item sits (or
+       would sit) in `items`, so a fee row can be inserted right after it. */
+    const feeCarriers = [];
     /* ISSUE 30. What "1.500" means is a property of the FILE, not of the cell,
        and reading it per cell put two different answers in one column. On a
        real Indonesian export:
@@ -349,11 +356,27 @@ module.exports = function registerImport(ctx) {
          leaving rather than merely failing to see it leave. A bank that writes
          fees unsigned instead is caught by the balance column: fee rows are in
          the ledger below, so the reconciliation now judges them too. */
+      /* A fee on a row that ALSO has an amount is not read by the fallback below
+         (that is the pair-the-header-named rule above, deliberately), and was
+         dropped without a trace: -200.00 and a 5.00 fee imported as -200.00,
+         and the 80% slack in reconcileAmounts let the one row the balance
+         disagreed on through under a green banner. Noticed here, decided once
+         the whole column is in (reconcileFeesBesideAmount): the balance either
+         shows the fee was already inside the amount, or that it was charged on
+         top, or it cannot say — and each of the three is spoken, never silent. */
+      let feeBeside = 0;
+      if (amount != null && iFee !== -1) {
+        const fb = num(r[iFee]);
+        if (fb != null && fb !== 0) feeBeside = fb;
+      }
       if (amount == null && iFee !== -1) {
         const f = num(r[iFee]);
         if (f != null && f !== 0) amount = f;
       }
-      if (iBalance !== -1 && amount != null) ledger.push({ amount, balance: num(r[iBalance]) });
+      const ledgerEntry = iBalance !== -1 && amount != null ? { amount, balance: num(r[iBalance]), fee: feeBeside } : null;
+      if (ledgerEntry) ledger.push(ledgerEntry);
+      const carrier = feeBeside ? { fee: feeBeside, date: null, desc, entry: ledgerEntry, at: -1, noted: false } : null;
+      if (carrier) feeCarriers.push(carrier);
       const date = rawDate ? parseStatementDate(rawDate, dayFirst) : null;
       if (date && desc && amount != null && amount !== 0) {
         /* excluded/transferTo are filled in by applyCounterparties below, once
@@ -379,16 +402,53 @@ module.exports = function registerImport(ctx) {
            which told the reader the importer had failed on rows it had read
            perfectly well (2026-10-14 audit, L2b-06). */
         noted++;
+        if (carrier) carrier.noted = true;
       } else if (date || amount != null) {
         // Looked like a transaction and wasn't usable — worth reporting.
         skipped++;
       }
+      if (carrier) { carrier.date = date; carrier.at = items.length; }
       // Anything else (a preamble line, a blank, a trailing disclaimer) carries
       // neither a date nor an amount and is ignored silently. Counting those as
       // "unparseable" made a hand-mapped statement look broken when it wasn't.
       if (showBar && (i % CHUNK === CHUNK - 1)) {
         importProgress('set', null, (i + 1) / dataRows.length * 0.9);
         await new Promise(res => setTimeout(res, 0));
+      }
+    }
+    /* The fees printed beside amounts, decided from the balance column (see the
+       note where they are noticed). Only a carrier that is a real, importable
+       row is counted or inserted; every carrier's fee still goes into the
+       ledger when it is added, because the balance stepped over it either way. */
+    let feeNote = null;
+    if (feeCarriers.length) {
+      const importable = feeCarriers.filter(k => k.date && k.desc);
+      const verdict = iBalance !== -1 ? reconcileFeesBesideAmount(ledger) : { reading: 'unproven' };
+      if (verdict.reading === 'extra') {
+        // Back to front, so earlier insertion points stay valid.
+        for (let n = feeCarriers.length - 1; n >= 0; n--) {
+          const k = feeCarriers[n];
+          const idx = ledger.indexOf(k.entry);
+          const fee = idx === -1 ? null : verdict.items[idx];
+          if (fee == null) continue;
+          k.entry.amount = parseFloat((k.entry.amount + fee).toFixed(2));
+          if (!(k.date && k.desc)) continue;
+          const feeDesc = `${k.desc} (fee)`;
+          const matched = matchRule(feeDesc, rules);
+          items.splice(k.at, 0, { date: k.date, desc: feeDesc, amount: parseFloat(fee.toFixed(2)),
+            cat: matched ? matched.category : '', matchedPattern: matched ? matched.p : '',
+            include: true, excluded: false, transferTo: '', feeOf: k.desc });
+          // A row with an amount of 0 was counted as "no amount" above; it has
+          // a fee row now, so it is not that any more.
+          if (k.noted) noted--;
+        }
+        feeNote = importable.length ? { added: true, count: importable.length,
+          total: parseFloat(importable.reduce((n, k) => n + Math.abs(k.fee), 0).toFixed(2)) } : null;
+      } else if (verdict.reading !== 'inside' && importable.length) {
+        // Not provable, or no balance to prove it with: amounts stay exactly as
+        // read and the review says what was left out.
+        feeNote = { added: false, count: importable.length,
+          total: parseFloat(importable.reduce((n, k) => n + Math.abs(k.fee), 0).toFixed(2)) };
       }
     }
     if (showBar) { importProgress('set', 'Preparing review…', 0.95); await new Promise(res => setTimeout(res, 0)); }
@@ -402,8 +462,11 @@ module.exports = function registerImport(ctx) {
        income and spend totals" is exactly what an excluded transaction means.
        Never a decision — the review's exclude tick is live on this row like
        any other, and `transferTo` is carried so the reader can see WHY it is
-       badged. renderImportReview runs this again whenever the account changes. */
-    applyCounterparties(items, S.accounts, label0, legsOfAccounts());
+       badged. renderImportReview runs this again whenever the account changes —
+       and, like this, only AFTER the signs are decided (see the note there):
+       the first call below is that same pass, put after the verdict so the
+       provisional state on the pending import is never one the review would
+       contradict. */
     /* Prove the sign convention against the statement's own balance column.
        This is what lets a bank nobody has tested import safely: if its single
        Amount column lists debits as positive, the balances say so and every
@@ -425,6 +488,7 @@ module.exports = function registerImport(ctx) {
        lands on the same numbers rather than negating them again. */
     for (const it of items) it.amount0 = it.amount;
     const rec = signVerdict(items, ledger, iBalance, iAmount, acct0);
+    applyCounterparties(items, S.accounts, label0, legsOfAccounts());
     /* The same verdict on a Debit/Credit PAIR, where it cannot be acted on.
        `verified && flip` means the file only reconciles with every amount
        negated — so the balance column has just proved that what the header calls
@@ -445,7 +509,7 @@ module.exports = function registerImport(ctx) {
       if (!range) range = { min: it.date, max: it.date };
       else { if (it.date < range.min) range.min = it.date; if (it.date > range.max) range.max = it.date; }
     }
-    S.pendingImport = { items, label: label0, index, range, skipped, noted, filename: file.name,
+    S.pendingImport = { items, label: label0, index, range, skipped, noted, filename: file.name, feeNote,
       // What the FILE says it is, kept beside what the user picked — the two
       // are compared on every render and again at commit. See acctIdentity().
       acctNumber: statementAccountNumber(rows, map),
@@ -789,16 +853,27 @@ module.exports = function registerImport(ctx) {
        self-transfer suggestion is a function of that account, so it is
        recomputed every render rather than left as parse-time guesswork; rows
        the reader has decided on carry manualExclude and are skipped. */
-    applyCounterparties(p.items, S.accounts, p.label, legsOfAccounts());
+    /* ISSUE 53. The account is settled by here, so the sign verdict is
+       re-decided from that account — not from the parse-time guess. Idempotent
+       (see signVerdict), so re-rendering for "show more" or a category change
+       costs nothing and changes nothing.
 
-    /* ISSUE 53. The account is settled by the line above, so the sign verdict
-       is re-decided here from the SAME account — not from the parse-time guess.
-       Idempotent (see signVerdict), so re-rendering for "show more" or a
-       category change costs nothing and changes nothing. */
+       DECIDED FIRST, and the order is the point. A transfer is "the same
+       amount, the OPPOSITE sign" (statement.js oppositeLeg), so the transfer
+       pass has to see the signs this account will actually import with. Run
+       before the verdict, it saw the previous account's signs: pick a credit
+       card for a file that had been read as an asset ledger and the card
+       payment, still carrying the old sign, looked for the wrong leg, stayed
+       +500 income and un-excluded — and the very next render, with the signs
+       settled, excluded it. Pressing Import between the two imported the
+       transfer as income. One render now gives the final state. */
     if (p.ledger) {
       p.reconcile = signVerdict(p.items, p.ledger, p.iBalance, p.iAmount,
         p.label ? accountForLabel(p.label) : null);
     }
+    /* Pre-excluded transfers follow from the account AND the decided signs —
+       see the note on applyCounterparties. */
+    applyCounterparties(p.items, S.accounts, p.label, legsOfAccounts());
 
     /* The statement is already parsed and on screen by the time anyone notices
        it belongs to an account this vault has never had — and on a fresh vault
@@ -922,6 +997,33 @@ module.exports = function registerImport(ctx) {
     previewMoney = v => (isForeign(target, home) && typeof ctx.moneyIn === 'function'
       ? ctx.moneyIn(symbolOf(target, home), v)
       : money(v));
+    /* A fee printed BESIDE an amount (reconcileFeesBesideAmount). Said whichever
+       way it went, because both outcomes change what lands in the vault:
+
+         added      the balance showed each fee was charged on top, so each is a
+                    "(fee)" row of its own — told, so the extra rows are not a
+                    surprise on the table below;
+         not added  the file could not settle it (no balance column, or the
+                    fee rows disagreed), so the amounts are exactly as read and
+                    the fee is NOT in them. That is a warning, and the plain
+                    green sentence is withdrawn: the rows the balance disagrees
+                    on used to be absorbed by the 80% slack under it. */
+    const fn = p.feeNote;
+    if (fn && rec) {
+      const n = fn.count, m = previewMoney(fn.total);
+      if (fn.added) {
+        recEl.textContent += ` ${n === 1 ? '1 row printed a fee' : `${n} rows printed a fee`} beside its amount (${m} in total); the balance column shows ${n === 1 ? 'it was' : 'each was'} charged on top, so ${n === 1 ? 'it is' : 'each is'} imported as a separate “(fee)” row.`;
+      } else {
+        const said = `${n === 1 ? '1 row carries a fee' : `${n} rows carry a fee`} beside its amount (${m} in total), and ${n === 1 ? 'it was' : 'they were'} NOT added to the amounts below. `
+          + (p.iBalance === -1
+            ? 'There is no balance column to show whether a fee is already inside the amount or charged on top of it. '
+            : 'The balance column does not settle whether a fee is already inside the amount or charged on top of it. ')
+          + 'If a fee is a charge of its own, add it on the Transactions page after importing.';
+        const plainGreen = rec.verified && !rec.flipped && !rec.inverted && !rec.unchecked;
+        recEl.textContent = plainGreen ? said : `${recEl.textContent} ${said}`;
+        recEl.classList.add('imp-reconcile-warn');
+      }
+    }
     const nbEl = $('#impNonBudget');
     const nonBudget = !!target && !target.in_budget;
     nbEl.classList.toggle('hidden', !nonBudget);
@@ -1307,20 +1409,46 @@ module.exports = function registerImport(ctx) {
       const file = S.txFiles[f.key];
       if (!file) continue;
       const live = new Set(file.rows);
-      const doomed = new Set(f.rows.filter(row => live.has(row)));
+      const imported = new Set(f.rows.filter(row => live.has(row)));
+      const doomed = new Set(imported);
+      /* A row that was split AFTER it was imported has parts the receipt never
+         held: applySplit mutates the imported row into the parent in place (so
+         it is still on the receipt) but the parts are new row objects made on
+         the Transactions page. Left behind they described a charge that no
+         longer exists, counted as ordinary spend, and kept a created month from
+         counting as emptied. They go with their parent — found the way that page
+         finds them (tx-role.js splitPartsOf).
+
+         The one case that cannot be settled by looking: another split parent in
+         the same file with the same date and description that this undo is NOT
+         taking back. Its parts are indistinguishable from these, so removing
+         "these" could remove the other's, a reader's own categorisation. Left
+         in place and counted, and the confirmation and the result say so. */
+      const partsGone = new Set(), partsKept = new Set();
+      for (const parent of imported) {
+        if (splitRole(parent.split) !== SPLIT_PARENT) continue;
+        const mine = splitPartsOf(file.rows, parent);
+        if (!mine.length) continue;
+        const shared = splitParentsSharingKey(file.rows, parent).some(x => !imported.has(x));
+        for (const part of mine) (shared ? partsKept : partsGone).add(part);
+      }
+      for (const part of partsGone) doomed.add(part);
       /* `emptied` — a month this import CREATED, left with nothing but its own
          rows. Taking those back means taking the file back too: rewriting it
          header-only left a month file the import had invented, and a second
          Undo could not remove it (2026-10-07 audit, L3-19). A created month
-         that has since gained a row of the reader's own (Add transaction, a
-         split's parts) is not emptied, and is rewritten like any other. */
+         that has since gained a row of the reader's own (Add transaction) is
+         not emptied, and is rewritten like any other. Asked of the doomed set
+         AFTER the split parts joined it — a split's parts are the import's own
+         rows by then, not the reader's. */
       const emptied = !!f.created && file.rows.every(row => doomed.has(row));
       /* The file to trash is taken HERE, before the confirmation below, as a
          TFile — io.js trashFile's own rule: a path re-resolved after a dialog
          may name nothing by then, or a different file, while a TFile survives
          a rename. The account, plan, tax-year and note deletes do the same. */
       const tfile = emptied ? fileAt(txFileRel(file.label, file.month)) : null;
-      if (doomed.size) targets.push({ key: f.key, file, doomed, dirty: file.dirty, emptied, tfile });
+      if (doomed.size) targets.push({ key: f.key, file, doomed, dirty: file.dirty, emptied, tfile,
+        parts: partsGone.size, keptParts: partsKept.size });
     }
     const total = targets.reduce((n, t) => n + t.doomed.size, 0);
     if (!total) {
@@ -1340,13 +1468,26 @@ module.exports = function registerImport(ctx) {
     const acts = [];
     if (rewritten) acts.push(`rewrite ${plural(rewritten, 'monthly file')}`);
     if (trashed) acts.push(`move the ${plural(trashed, 'file')} this import created to the vault's trash`);
+    /* The split parts that go with their parents, said by number whenever there
+       are any — "remove 3 rows" over a dialog that removes 5 is the small lie
+       the resolved-against-the-model count above exists to avoid. Parts left in
+       place (see the lookup) are named too, so they are not mistaken for rows
+       this undo missed. */
+    const parts = targets.reduce((n, t) => n + t.parts, 0);
+    const keptParts = targets.reduce((n, t) => n + t.keptParts, 0);
+    const keptSaid = keptParts
+      ? `${plural(keptParts, 'split part')} could not be told apart from those of another split row with the same date and description that is not in this import, so ${keptParts === 1 ? 'it stays' : 'they stay'} in place — delete ${keptParts === 1 ? 'it' : 'them'} on the Transactions page if ${keptParts === 1 ? 'it is' : 'they are'} not wanted.`
+      : '';
     const go = await confirmModal(app, {
       title: 'Undo this import',
-      message: `Remove the ${plural(total, 'row')} imported into ${r.label}`
-        + (r.filename ? ` from ${r.filename}` : '') + `, and ${acts.join(', and ')}? `
+      message: `Remove the ${plural(total - parts, 'row')} imported into ${r.label}`
+        + (r.filename ? ` from ${r.filename}` : '')
+        + (parts ? `, plus the ${plural(parts, 'split part')} of rows you split afterwards` : '')
+        + `, and ${acts.join(', and ')}? `
         + 'Categorisation rules learned during the import are kept — they cost nothing and '
         + 'are useful whichever account the statement really belongs to.'
-        + (alsoSaves ? ' Unsaved edits you have made in those same months will be written out too.' : ''),
+        + (alsoSaves ? ' Unsaved edits you have made in those same months will be written out too.' : '')
+        + (keptSaid ? ' ' + keptSaid.charAt(0).toUpperCase() + keptSaid.slice(1) : ''),
       confirmText: `Remove ${total} row${total === 1 ? '' : 's'}`,
     });
     if (!go) return;
@@ -1413,7 +1554,9 @@ module.exports = function registerImport(ctx) {
        file still dirty re-lights it on its own next edit. */
     if (!Object.values(S.txFiles).some(f => f.dirty)) $('#txSave').disabled = true;
     ctx.render();
-    toast(`Undone — ${undone} row${undone === 1 ? '' : 's'} removed from ${files} file${files === 1 ? '' : 's'}`);
+    toast(`Undone — ${undone} row${undone === 1 ? '' : 's'} removed from ${files} file${files === 1 ? '' : 's'}`
+      + (parts ? ` (${plural(parts, 'split part')} included)` : '')
+      + (keptSaid ? `. ${keptSaid.charAt(0).toUpperCase() + keptSaid.slice(1)}` : ''));
   }
 
   /* "Columns wrong?" on the review screen — reopen the mapper against the file

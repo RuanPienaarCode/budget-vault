@@ -29,13 +29,14 @@ const { SCHEMAS } = require('../table-schema');
 const {
   FOOD_ITEMS_FILE, FOOD_CATEGORIES, OTHER, itemKey, parseFoodItems, mergeFoodItems, coverage,
   serializeReceipt, serializeFoodItems, refileReceiptText, receiptPath,
-  matchReceipts, foodSummary, receiptPaid, foodTrend, priceChange, versusLastPeriod,
+  matchReceipts, foodSummary, receiptPaid, foodTrend, priceChange, versusLastPeriod, findDuplicateReceipt,
 } = require('../receipt-file');
 const {
   RANGES, rangePills, createChart, scales, gridlines, axisLabels, linePath,
   trackPoints, themeColors, SLICE_PALETTE, phoneWidth,
 } = require('../chart');
 const { askReceipt } = require('../receipt-modal');
+const { confirmModal } = require('../modal');
 // For the accessible names only — the page's visible copy is still English
 // (EXPECTED_ENGLISH_ONLY in tests/i18n-render.test.cjs). Namespaced, as
 // everywhere in src/.
@@ -468,6 +469,22 @@ module.exports = function registerFood(ctx) {
     const got = await askReceipt(app, { money, foodItems: S.foodItems, categories: categoryChoices() });
     if (!got) return;
     if (op.replaced()) return toast(op.replaced(), true);
+    /* The same slip pasted twice used to be kept twice, quietly, as "... 2.md":
+       that shop's food spend and item counts doubled and nothing said why
+       (audit, 16 Nov 2026). Ask first. The safe answer is the highlighted one
+       and Escape is it too; only "Save anyway" writes the second copy. */
+    const dup = findDuplicateReceipt(S.receipts, got);
+    if (dup) {
+      const again = await confirmModal(app, {
+        title: 'You already saved this slip',
+        message: `${got.store} on ${dateText(got.date)} for ${money(got.total)} is already in Receipts (${dup.rel}). Saving it again would count that shop twice.`,
+        confirmText: 'Save anyway',
+        cancelText: 'Do not save',
+        primary: 'cancel',
+      });
+      if (!again) return;
+      if (op.replaced()) return toast(op.replaced(), true);
+    }
     let rel = receiptPath(got);
     for (let n = 2; pathTaken(rel); n++) rel = receiptPath(got).replace(/\.md$/, ` ${n}.md`);
     try {
@@ -478,8 +495,16 @@ module.exports = function registerFood(ctx) {
     }
     await ctx.loadReceipts();
     /* Jump the header pill to the receipt's own period, so the reader sees
-       what they just saved rather than an unchanged page. */
-    S.period = currentPeriod(got.date);
+       what they just saved rather than an unchanged page.
+
+       Not while the Budgets page holds unsaved edits: its draft belongs to the
+       period on screen and is rebuilt, without a word, the moment the period
+       moves (views/budgets.js budgetDraft). The pill's own arrows ask before
+       they do that (controller.js makePeriodChanger); a receipt save is not
+       the moment to ask, so it leaves the period where it is. The receipt is
+       saved either way and the toast says so (audit, 16 Nov 2026). */
+    const budgetDraftDirty = typeof ctx.budgetDirty === 'function' && ctx.budgetDirty();
+    if (!budgetDraftDirty) S.period = currentPeriod(got.date);
     toast(`Saved ${got.items.length} line${got.items.length === 1 ? '' : 's'} from ${got.store}`);
     ctx.render();
   }

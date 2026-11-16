@@ -326,6 +326,118 @@ function reconcileAmounts(rows, { liability = false } = {}) {
   return best;
 }
 
+/* A Fee column read BESIDE an amount — what the balance column says it is.
+
+   views/import.js reads the Fee column only when the row has no amount (a
+   Capitec charge sits alone in `Fee`). A bank that prints Amount AND Fee on the
+   SAME row (Revolut-shaped: -200.00 ATM withdrawal, 5.00 fee, balance moved by
+   205) had the fee dropped, and because reconcileAmounts passes at 80%
+   agreement the one row it disagreed on was absorbed under the green "amounts
+   check out" banner.
+
+   Whether such a fee is a separate charge or already inside the amount is a
+   fact about the bank, and the only witness is the running balance on the rows
+   that carry one. So this decides from those rows and nothing else, and never
+   guesses:
+
+     'none'     no row carries a fee beside its amount
+     'inside'   on every judgeable fee-carrying row the balance moved by the
+                amount alone — the fee is already in it, add nothing
+     'extra'    the balance moved by the amount PLUS a fee on every judgeable
+                fee-carrying row, consistently: `items[i]` is that fee in the
+                file's own sign convention, to be imported as a second row
+     'unproven' anything else — no balance, too few rows, the fee rows disagree
+                with each other, or the orientation itself is not proven
+
+   `rows` is [{ amount, balance, fee }] in FILE order, one per row that has an
+   amount (the same rows reconcileAmounts is given); `fee` is the cell's number
+   as written, or null/0. The statement's direction (oldest- or newest-first)
+   and sign convention are learned from the rows WITHOUT a fee — the steps
+   across fee-carrying rows are exactly what is in question, so they cannot also
+   be the evidence for the orientation. Two readings of a fee that fit:
+
+     signed    the movement beyond the amount equals the fee AS WRITTEN
+     unsigned  it equals the fee's magnitude, with one direction for all rows
+               (a charge: "amount - |fee|")
+
+   agree wherever the fee column is one-signed, and give the same items there;
+   a column with both signs only fits the signed reading, which is tried first.
+   A row whose movement cannot be seen (the first row of an oldest-first
+   statement has no balance before it) is not evidence, but is given the same
+   reading as the rest — that is what "consistently" means.
+
+   The caller's ledger must then carry amount + items[i] for those rows, or the
+   verdict would blame the balance for a fee that is now imported. Comparison in
+   whole cents, as everywhere here. Returns { reading, items } with `items`
+   parallel to `rows` (null where nothing is added). */
+function reconcileFeesBesideAmount(rows) {
+  const c = v => Math.round(v * 100);
+  const none = reading => ({ reading, items: (rows || []).map(() => null) });
+  const list = rows || [];
+  const carries = r => r && r.fee != null && Number.isFinite(r.fee) && c(r.fee) !== 0;
+  if (!list.some(carries)) return none('none');
+
+  const pts = [];                       // positions in `list` that a balance step can be read across
+  list.forEach((r, i) => { if (r && r.amount != null && r.balance != null) pts.push(i); });
+  if (pts.length < 4) return none('unproven');
+  // The balance movement attributable to the row at pts[k], in each direction.
+  const move = (k, order) => {
+    const here = c(list[pts[k]].balance);
+    if (order === 'fwd') return k >= 1 ? here - c(list[pts[k - 1]].balance) : null;
+    return k < pts.length - 1 ? here - c(list[pts[k + 1]].balance) : null;
+  };
+
+  // Orientation, from the clean rows only. Unique best or nothing: a tie is
+  // two orientations the file cannot choose between.
+  let best = null, tie = false, cleanJudged = 0;
+  for (const order of ['fwd', 'rev']) {
+    for (const sign of [1, -1]) {
+      let agree = 0, judged = 0;
+      pts.forEach((i, k) => {
+        if (carries(list[i])) return;
+        const m = move(k, order);
+        if (m == null) return;
+        judged++;
+        if (m === sign * c(list[i].amount)) agree++;
+      });
+      if (!best || agree > best.agree) { best = { order, sign, agree }; tie = false; cleanJudged = judged; }
+      else if (agree === best.agree) tie = true;
+    }
+  }
+  if (!best || tie || cleanJudged < 3 || best.agree < Math.ceil(cleanJudged * 0.8)) return none('unproven');
+
+  // What each judgeable fee-carrying row moved the balance by, beyond its amount.
+  // In the file's own convention: dividing by the sign is multiplying by it.
+  const extra = new Map();              // list index -> residual in cents, file convention
+  pts.forEach((i, k) => {
+    if (!carries(list[i])) return;
+    const m = move(k, best.order);
+    if (m != null) extra.set(i, best.sign * (m - best.sign * c(list[i].amount)));
+  });
+  if (!extra.size) return none('unproven');
+  const resid = [...extra.entries()];
+  if (resid.every(([, r]) => r === 0)) return none('inside');
+
+  const carriers = list.map((r, i) => (carries(r) ? i : -1)).filter(i => i >= 0);
+  let items = null;
+  if (resid.every(([i, r]) => r === c(list[i].fee))) {
+    items = carriers.map(i => list[i].fee);
+  } else if (resid.every(([i, r]) => Math.abs(r) === Math.abs(c(list[i].fee)))
+    && new Set(resid.map(([, r]) => Math.sign(r))).size === 1) {
+    const dir = Math.sign(resid[0][1]);
+    items = carriers.map(i => dir * Math.abs(list[i].fee));
+  }
+  if (!items) return none('unproven');
+
+  const out = list.map(() => null);
+  carriers.forEach((i, n) => { out[i] = parseFloat(items[n].toFixed(2)); });
+  // The reading must leave the whole statement reconciling, or it has proved
+  // nothing the caller can show the reader.
+  const total = list.map((r, i) => ({ amount: r.amount == null ? r.amount : r.amount + (out[i] || 0), balance: r.balance }));
+  if (!reconcileAmounts(total).verified) return none('unproven');
+  return { reading: 'extra', items: out };
+}
+
 /* Infer the column layout of a statement CSV that has NO header row — Nedbank
    exports both its cheque and credit-card statements this way, as a short
    "Statement Enquiry / Account Number / Account Description" preamble followed
@@ -366,6 +478,30 @@ function detectHeaderlessColumns(rows, dayFirst = true) {
   if (firstNum >= width) return null;   // no numeric column at all
 
   let iAmount = width - 1, iBalance = -1;
+  /* ONE trailing numeric column is not always an amount. When it is the running
+     balance — `date, amount, desc, balance`, or `date, desc, debit, credit,
+     balance` with the sparse debit/credit pair — the amount sits further left,
+     behind a text column or as two half-empty ones, and the right-hand run never
+     reaches it. Reading the lone trailing column as the amount then imports the
+     balance as every transaction (1480, 1450, 1410 for -20, -30, -40) and, with
+     iBalance left at -1, the review says the statement has no balance column.
+     Only the file can say which reading is right, so each candidate is tried
+     against the last column with the SAME reconcileAmounts the two-number branch
+     uses, and only a verified one licenses the change. Nothing verifying — or
+     two readings both verifying — is the absence of proof: fall through to what
+     this function has always returned. */
+  if (width - firstNum === 1) {
+    const found = leftOfBalance(data, width, num);
+    if (found) {
+      // The amount (or the pair) is not the rightmost number, so the description
+      // is the rightmost TEXT column that is not one of them or the balance.
+      const iDesc = findDesc(data, width - 2, found.cols, num, isDate);
+      if (iDesc === -1) return null;
+      // Same keys as always for a single amount column; a pair adds iDebit and
+      // iCredit, which are the only way to name it.
+      return { dataStart, iDate: 0, iDesc, iAmount: -1, iBalance: width - 1, ...found.map };
+    }
+  }
   if (width - firstNum >= 2) {
     // Two trailing numbers: amount + running balance, or a Debit/Credit pair.
     // Only the first reconciles, so the file decides rather than the importer.
@@ -395,15 +531,71 @@ function detectHeaderlessColumns(rows, dayFirst = true) {
   // mostly free text. Scanning right-to-left is what keeps the credit-card
   // shape working — a left-to-right scan would stop on its SECOND date column
   // and import the date as every description.
-  let iDesc = -1;
-  for (let c = iAmount - 1; c >= 1; c--) {
+  const iDesc = findDesc(data, iAmount - 1, [], num, isDate);
+  if (iDesc === -1) return null;
+  return { dataStart, iDate: 0, iDesc, iAmount, iBalance };
+}
+
+/* The rightmost column, scanning leftwards from `from` and never below 1, whose
+   values are mostly free text, skipping any column in `skip`. Shared by both
+   readings in detectHeaderlessColumns so the credit-card rule it exists for (a
+   left-to-right scan stops on the SECOND date column) is spelled once. */
+function findDesc(data, from, skip, num, isDate) {
+  for (let c = from; c >= 1; c--) {
+    if (skip.includes(c)) continue;
     const vals = data.map(r => (r[c] ?? '').toString().trim()).filter(Boolean);
     if (!vals.length) continue;
     const text = vals.filter(v => num(v) == null && !isDate(v)).length;
-    if (text > vals.length / 2) { iDesc = c; break; }
+    if (text > vals.length / 2) return c;
   }
-  if (iDesc === -1) return null;
-  return { dataStart, iDate: 0, iDesc, iAmount, iBalance };
+  return -1;
+}
+
+/* Look LEFT of a lone trailing numeric column for the amount it might be the
+   running balance of: (a) one other column that is a number on every row, or
+   (b) a pair of columns where every row has a number in exactly one of them (a
+   Debit/Credit pair). Returns { cols, map } for the ONE reading the balances
+   verify, or null. `map` carries the column keys to merge into the layout.
+
+   (a) is accepted with either sign — a signed Amount column is flipped later
+   by signVerdict, as it is everywhere. (b) is accepted only in an orientation
+   that reconciles as it stands, because nothing flips a pair afterwards: the
+   importer reads credit as written and negates debit (views/import.js), and
+   the amount tested here is built by that same rule. A pair is tried both ways
+   round; when the balances agree with one orientation unflipped, that is which
+   column is money in.
+
+   Two verified readings are as unprovable as none — a second always-numeric
+   column that happens to track the balance is a reason to ask, not to pick. */
+function leftOfBalance(data, width, num) {
+  const last = width - 1;
+  const bal = r => num(r[last]);
+  const verifies = amountOf => reconcileAmounts(data.map(r => ({ amount: amountOf(r), balance: bal(r) })));
+  const hits = [];
+  for (let c = 1; c < last; c++) {
+    if (!data.every(r => num(r[c]) != null)) continue;
+    if (verifies(r => num(r[c])).verified) hits.push({ cols: [c], map: { iAmount: c } });
+  }
+  const carries = c => data.some(r => num(r[c]) != null);
+  for (let a = 1; a < last; a++) {
+    for (let b = a + 1; b < last; b++) {
+      if (!carries(a) || !carries(b)) continue;
+      if (!data.every(r => (num(r[a]) != null) !== (num(r[b]) != null))) continue;
+      for (const [cr, dr] of [[a, b], [b, a]]) {
+        // The importer's own rule: a non-zero credit as written, else a
+        // non-zero debit negated.
+        const amountOf = r => {
+          const c = num(r[cr]);
+          if (c != null && c !== 0) return c;
+          const d = num(r[dr]);
+          return d != null && d !== 0 ? -Math.abs(d) : null;
+        };
+        const v = verifies(amountOf);
+        if (v.verified && !v.flip) hits.push({ cols: [a, b], map: { iDebit: dr, iCredit: cr } });
+      }
+    }
+  }
+  return hits.length === 1 ? hits[0] : null;
 }
 
 /* Header-name aliases, lowercase. Exact match wins in array order; amount can
@@ -628,7 +820,7 @@ function detectStatementColumns(rows, dayFirst = true) {
   /* A headerless file has no column NAMES, so nothing can identify a fee column
      in one — and inferring it from shape would mean guessing which of several
      numeric columns is which. Left at -1; the manual mapper is the door. */
-  return { ...shape, iDebit: -1, iCredit: -1, iFee: -1, iExtra: -1, headerIdx: -1 };
+  return { iDebit: -1, iCredit: -1, ...shape, iFee: -1, iExtra: -1, headerIdx: -1 };
 }
 
 /* ------------------------- whose statement is this? -----------------------
@@ -703,7 +895,7 @@ function sameAccountNumber(a, b) {
 
 module.exports = {
   parseStatement, decodeStatement, parseStatementDate,
-  counterpartyAccount, applyCounterparties, oppositeLeg, TRANSFER_LEG_DAYS, reconcileAmounts,
+  counterpartyAccount, applyCounterparties, oppositeLeg, TRANSFER_LEG_DAYS, reconcileAmounts, reconcileFeesBesideAmount,
   detectHeaderlessColumns, detectStatementColumns, hasAmountColumn,
   statementAccountNumber, sameAccountNumber,
 };
