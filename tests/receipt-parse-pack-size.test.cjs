@@ -32,6 +32,12 @@ eq(one('TV R1,234.56'), [['TV', 1234.56]], '... and with one');
 eq(one('Eggs 30 120,00'), [['Eggs 30', 120]], 'a decimal comma after a pack size');
 eq(one('Eggs 30 R120.00'), [['Eggs 30', 120]], 'a symbol on the price only');
 eq(one('Fridge R12 345.00'), [['Fridge', 12345]], 'bigger thousands with a symbol');
+/* A price never starts with a nought, so a last group that does is the tail of
+   a grouped figure even with no symbol. Read strictly, "TV 5 000" was "TV 5"
+   at R0 and the line was dropped. */
+eq(one('TV 5 000'), [['TV', 5000]], 'a whole-rand thousand with no symbol is not a pack size and R0');
+eq(one('TV 1 034.56'), [['TV', 1034.56]], 'nor is a group that starts with a nought, with cents');
+eq(one('Eggs 30 120'), [['Eggs 30', 120]], 'a pack size before a whole-rand price is still part of the name');
 
 /* The whole slip adds up, so no sum-mismatch is raised for the pack size. */
 {

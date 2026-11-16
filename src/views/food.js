@@ -495,8 +495,16 @@ module.exports = function registerFood(ctx) {
     }
     await ctx.loadReceipts();
     /* Jump the header pill to the receipt's own period, so the reader sees
-       what they just saved rather than an unchanged page. */
-    S.period = currentPeriod(got.date);
+       what they just saved rather than an unchanged page.
+
+       Not while the Budgets page holds unsaved edits: its draft belongs to the
+       period on screen and is rebuilt, without a word, the moment the period
+       moves (views/budgets.js budgetDraft). The pill's own arrows ask before
+       they do that (controller.js makePeriodChanger); a receipt save is not
+       the moment to ask, so it leaves the period where it is. The receipt is
+       saved either way and the toast says so (audit, 16 Nov 2026). */
+    const budgetDraftDirty = typeof ctx.budgetDirty === 'function' && ctx.budgetDirty();
+    if (!budgetDraftDirty) S.period = currentPeriod(got.date);
     toast(`Saved ${got.items.length} line${got.items.length === 1 ? '' : 's'} from ${got.store}`);
     ctx.render();
   }

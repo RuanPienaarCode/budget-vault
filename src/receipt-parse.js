@@ -410,10 +410,20 @@ function moneyTail(line, item = false) {
      figure is a word. A price column Live Text put on a line of its own
      ("1 234.56") has no name to keep a pack size in, so its grouping stays. */
   if (item && /[A-Za-z]/.test(text)) {
-    m = line.match(MONEY_TAIL_ITEM);
-    if (!m) return null;
-    text = line.slice(0, m.index).trim();
-    whole = m[2] ?? m[3]; cents = m[4]; sign = m[1];
+    const strict = line.match(MONEY_TAIL_ITEM);
+    if (!strict) return null;
+    const price = strict[2] ?? strict[3];
+    /* One thing the strict reading cannot be: a price that starts with a
+       nought. Nobody writes R0 as "000" or R34.56 as "034.56", so in
+       "TV 5 000" and "TV 1 034.56" the last group is the tail of a grouped
+       figure, not a price after a pack size — and reading it strictly made
+       the first one "TV 5" at R0, which the parser then dropped. The space
+       grouping stands there. */
+    const tailOfGroup = whole.includes(' ') && price.length > 1 && price[0] === '0';
+    if (!tailOfGroup) {
+      text = line.slice(0, strict.index).trim();
+      whole = price; cents = strict[4]; sign = strict[1];
+    }
   }
   const v = Number(whole.replace(/[ ,]/g, '')) + (cents ? Number(cents) / 100 : 0);
   return { text, value: sign === '-' ? -v : v };
