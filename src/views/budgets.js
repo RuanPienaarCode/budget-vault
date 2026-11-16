@@ -420,8 +420,18 @@ module.exports = function registerBudgets(ctx) {
   }
   // Drop the in-memory draft so it rebuilds from S.budgets on next render.
   // Called after any reload from disk (sync / manual edit) so a stale draft
-  // can never be saved over freshly-loaded data.
-  function invalidateBudgetDraft() { budDraft = null; budDraftPeriod = null; budDirty = false; }
+  // can never be saved over freshly-loaded data, and when the reader confirms
+  // a period change that discards their edits.
+  /* Save goes dark here too, not only when the draft is next rebuilt. budgetDirty()
+     reads that button as a fallback, and a period change confirmed from another
+     page repaints THAT page — budgetDraft() does not run, the button stays lit,
+     and the vault watcher then reads "dirty" and defers every reload until the
+     reader happens to open Budgets again. */
+  function invalidateBudgetDraft() {
+    budDraft = null; budDraftPeriod = null; budDirty = false;
+    const save = $('#budSave');
+    if (save) save.disabled = true;
+  }
   // True when the budget view holds unsaved edits.
   function budgetDirty() { const b = $('#budSave'); return budDirty || (!!b && !b.disabled); }
   ctx.registerDirty(budgetDirty);

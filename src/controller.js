@@ -507,6 +507,33 @@ async function reloadFromDisk(ctx, S, $, disableSaveButtons) {
   }
 }
 
+/* The one way the period pill moves S.period. It lives out here rather than as
+   a closure in mountApp so a bare-node test can drive it
+   (tests/budget-period-change-confirm.test.cjs) — mountApp needs a DOM shell.
+
+   Switching period rebuilds the Budget draft for the new period
+   (views/budgets.js budgetDraft), which throws away anything typed and not
+   saved. The pill is on every page but Report, so the draft can be dirty while
+   another page is showing: this used to ask only when S.view was 'budgets', and
+   an edit typed there, then a trip to the Dashboard and a tap on the next-period
+   arrow, was gone with no dialog. The question is about the DRAFT, not the page.
+   Plain view switching asks nothing: the draft survives that and must keep to. */
+function makePeriodChanger({ S, ctx, confirm, render }) {
+  return async function changePeriod(next) {
+    if (ctx.budgetDirty()) {
+      const go = await confirm({
+        title: 'Unsaved budget changes',
+        message: 'Switching period will discard your unsaved budget edits. Continue?',
+        confirmText: 'Discard & switch',
+      });
+      if (!go) return;
+      ctx.invalidateBudgetDraft();
+    }
+    S.period = next;
+    render();
+  };
+}
+
 function mountApp(view) {
   const plugin = view.plugin;
   const app = view.app;
@@ -1249,20 +1276,11 @@ function mountApp(view) {
   $('#topbarReport').addEventListener('click', () => { if (S.loaded) switchView('report'); });
   $('#pluginSettingsLink').addEventListener('click', () => { closeDrawer(); openPluginSettings(); });
   // Switching period rebuilds the budget draft for the new period, discarding
-  // any unsaved edits — so confirm first when the Budget view is dirty.
-  async function changePeriod(next) {
-    if (S.view === 'budgets' && ctx.budgetDirty()) {
-      const go = await confirmModal(app, {
-        title: 'Unsaved budget changes',
-        message: 'Switching period will discard your unsaved budget edits. Continue?',
-        confirmText: 'Discard & switch',
-      });
-      if (!go) return;
-      ctx.invalidateBudgetDraft();
-    }
-    S.period = next;
-    render();
-  }
+  // any unsaved edits — so confirm first when the Budget draft is dirty.
+  const changePeriod = makePeriodChanger({
+    S, ctx, render: () => render(),
+    confirm: opts => confirmModal(app, opts),
+  });
   $('#prevPeriod').addEventListener('click', () => changePeriod(ctx.shiftPeriod(S.period, -1)));
   $('#nextPeriod').addEventListener('click', () => changePeriod(ctx.shiftPeriod(S.period, 1)));
   $('#currentPeriod').addEventListener('click', () => changePeriod(ctx.currentPeriod()));
@@ -1566,4 +1584,4 @@ function mountApp(view) {
   };
 }
 
-module.exports = { mountApp, formatMoney, classifyRename, fsChangeInBudget, failedLoadShowsConnect, modalOpenIn, reloadFromDisk, applyInputMode, wireDropZone, makeReloadScheduler, makeRefusalHandler, unreadableSummary, visibleUnreadable, unreadableBannerText };
+module.exports = { mountApp, makePeriodChanger, formatMoney, classifyRename, fsChangeInBudget, failedLoadShowsConnect, modalOpenIn, reloadFromDisk, applyInputMode, wireDropZone, makeReloadScheduler, makeRefusalHandler, unreadableSummary, visibleUnreadable, unreadableBannerText };

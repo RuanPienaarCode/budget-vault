@@ -623,13 +623,24 @@ module.exports = function registerPeriod(ctx) {
   function budgetTotalsOf(budget) {
     let income = 0, spend = 0, setAside = 0;
     for (const b of budget || []) {
-      const type = budgetRowType(b);
-      if (type === 'income') income += b.amount;
-      else if (type === 'transfer') continue;
-      else if (SET_ASIDE_TYPES.has(type)) setAside += b.amount;
-      else spend += b.amount;
+      const bucket = budgetBucket(budgetRowType(b));
+      if (bucket === 'income') income += b.amount;
+      else if (bucket === 'setAside') setAside += b.amount;
+      else if (bucket === 'spend') spend += b.amount;
     }
     return { income, spend, setAside };
+  }
+  /* The one answer to "which total does a budget row of this type go into".
+     budgetTotalsOf sums by it and budgetUsed picks its assume-spent rows by it,
+     so the provision can only cover rows the spending base also holds. It used
+     to be spelled twice — here, and as "not income, not transfer" in
+     budgetUsed — and a savings row marked assume-spent put R2 000 into the
+     numerator of a base that had never counted it: 125% used, which read 75%
+     the moment the transfer was made. */
+  function budgetBucket(type) {
+    if (type === 'income') return 'income';
+    if (type === 'transfer') return 'transfer';
+    return SET_ASIDE_TYPES.has(type) ? 'setAside' : 'spend';
   }
 
   /* ADR-0007 · Budget used has one period-level reading. The rule is ADR-0005's;
@@ -640,11 +651,10 @@ module.exports = function registerPeriod(ctx) {
     const budget = rows || S.budgets[p] || [];
     const budgeted = budgetTotalsOf(budget).spend;
     /* The assume-spent provision, over the same rows the denominator was
-       built from, measured against this period's real spend per category. */
-    const assumedRows = budget.filter(b => {
-      const type = budgetRowType(b);
-      return type !== 'income' && type !== 'transfer' && catAssumeSpent(b.category);
-    });
+       built from (budgetBucket 'spend' — a set-aside envelope is in neither
+       the base nor the provision), measured against this period's real spend
+       per category. */
+    const assumedRows = budget.filter(b => budgetBucket(budgetRowType(b)) === 'spend' && catAssumeSpent(b.category));
     const assumed = assumedProvision(assumedRows, b => -(sum.byCat[b.category] || 0));
     const operands = { spend: sum.spend, setAside: sum.setAside, assumed };
     return { spent: budgetSpent(operands), budgeted, assumed, setAside: sum.setAside || 0,
