@@ -144,7 +144,7 @@ function usedToneClass(used) {
 }
 
 module.exports = function registerFigures(ctx) {
-  const { S, summaryInRange, periodSummary, budgetTotals, budgetTotalsOf, budgetUsed, periodSpend, periodRange, catType, catAssumeSpent, budgetRowType, accountIndex, impliedAccounts, currentPeriod } = ctx;
+  const { S, summaryInRange, periodSummary, budgetTotals, budgetTotalsOf, budgetUsed, periodSpend, periodRange, catType, catAssumeSpent, budgetRowType, accountIndex, impliedAccounts, currentPeriod, budgetBucket } = ctx;
 
   /* Budget vs actual, one row per category that is either budgeted or
      spent, the type read live (budgetRowType), and an assume-spent row's
@@ -185,7 +185,11 @@ module.exports = function registerFigures(ctx) {
     const rows = new Map();
     for (const b of budget) {
       const type = budgetRowType(b);
-      const assumed = type !== 'income' && type !== 'transfer' && catAssumeSpent(b.category);
+      /* Only a row budgetUsed's provision covers can be "already spent":
+         budgetBucket 'spend'. A savings or investment row (set-aside) is in
+         neither the spending base nor the provision, so on this table it
+         reads what really moved, with no tag, as the strip above it does. */
+      const assumed = budgetBucket(type) === 'spend' && catAssumeSpent(b.category);
       /* `realSpend` rides along on an assume-spent row only: the Budget page
          says "no transaction expected" when it is 0, and the row's actual
          (the larger of plan and real) cannot tell 0 from "less than plan". */
