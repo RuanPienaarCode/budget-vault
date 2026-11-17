@@ -167,30 +167,91 @@ function applySplit(parent, parts, marker) {
    `if (splitShortfall(...))` reads as the question it is. */
 function splitShortfall(parent, parts) {
   if (!parent) return 0;
-  const cents = v => Math.round((Number(v) || 0) * 100);
-  const taken = (parts || []).reduce((sum, p) => sum + cents(p && p.amount), 0);
-  return (cents(parent.amount) - taken) / 100;
+  const taken = (parts || []).reduce((sum, p) => sum + amountCents(p && p.amount), 0);
+  return (amountCents(parent.amount) - taken) / 100;
+}
+
+/* A stored amount in whole cents, SIGNED. The one rule for turning an amount
+   the schema keeps to three decimals (a fuel slip: -912.345) into cents, shared
+   by the chip's shortfall above and the split dialog's total (modal.js), so the
+   total the dialog balances to is, to the cent, the total the chip checks the
+   parts against.
+
+   It has to be shared and not merely repeated, because the obvious second
+   spelling is not the same rule. Math.round rounds a half toward +infinity:
+   -912.345 -> -91234 but 912.345 -> 91235. The dialog works in magnitudes, and
+   Math.abs() first then round gives 91235 for both — one cent off the chip on
+   every negative parent that sits exactly on a half cent, and the dialog would
+   then offer a total the chip reports as R0.01 unaccounted. So the dialog takes
+   the magnitude of THIS (the signed rounding), never rounds the magnitude
+   itself. */
+function amountCents(v) {
+  return Math.round((Number(v) || 0) * 100);
 }
 
 /* The parts belonging to one split parent, among the rows of ITS OWN file:
    split role `part`, with the parent's date and description — the same three
-   facts applySplit copies onto a part, and the only join there is, because a
-   part carries no id back to its parent. This is the rule the Transactions page
-   applies when it deletes or un-splits a parent; it is here so a second caller
-   (the importer's Undo) asks the question the same way.
+   facts applySplit copies onto a part. A part carries no id back to its parent,
+   so that is the only join there is; this is the ONE lookup the Transactions
+   page (chip, Un-split, Delete) and the importer's Undo all ask.
 
-   Narrow rather than clever, and the limit is real: a file holding two
-   identical charges on one day, both split, cannot say whose parts are whose.
-   `splitParentsSharingKey` is the way a caller notices that case. */
-function splitPartsOf(rows, parent) {
-  return (rows || []).filter(x => x !== parent && splitRole(x && x.split) === SPLIT_PART
+   Two cases, and the second exists because the first is not enough.
+
+   1. No other split parent in the file shares the parent's date and
+      description: every part with that date and description, wherever it sits
+      in the file. Exactly the rule this had before twins were told apart.
+
+   2. Another parent does share them (two identical charges on one day, both
+      split): date and description cannot say whose parts are whose, so the
+      parts are told apart by POSITION. The Transactions page splices a split's
+      parts in directly under their parent (splitTransaction), and a Save
+      keeps the rows in the order they are in (placeRows only places rows new
+      to the file), so a parent's own parts are the contiguous run of `part`
+      rows with its date and description that follows it in the file's row
+      order — up to the first row that is not one.
+
+   A twin parent with NO such run under it — a hand-reordered file — falls back
+   to every part with that key, as in case 1, so no row is stranded. That
+   answer is a guess and says nothing about whose parts they are:
+   splitPartsAmbiguous is how a caller finds out, to say so before it removes
+   anything. A parent that is not among `rows` has no position, so it falls back
+   the same way. */
+function partsOfKey(rows, parent) {
+  return rows.filter(x => x !== parent && splitRole(x && x.split) === SPLIT_PART
     && x.date === parent.date && x.desc === parent.desc);
+}
+function resolveSplitParts(rows, parent) {
+  rows = rows || [];
+  const all = partsOfKey(rows, parent);
+  if (!splitParentsSharingKey(rows, parent).length) return { parts: all, ambiguous: false };
+  const at = rows.indexOf(parent);
+  const run = [];
+  if (at >= 0) {
+    for (let i = at + 1; i < rows.length; i++) {
+      const x = rows[i];
+      if (!(splitRole(x && x.split) === SPLIT_PART && x.date === parent.date && x.desc === parent.desc)) break;
+      run.push(x);
+    }
+  }
+  return run.length ? { parts: run, ambiguous: false } : { parts: all, ambiguous: true };
+}
+function splitPartsOf(rows, parent) {
+  return resolveSplitParts(rows, parent).parts;
+}
+
+/* True when splitPartsOf had to fall back to every part with the parent's key
+   because another identical split shares it and no run of parts sits under this
+   parent: the count it returned may include the other split's parts. False on
+   every unambiguous split, including a twin told apart by position. */
+function splitPartsAmbiguous(rows, parent) {
+  return resolveSplitParts(rows, parent).ambiguous;
 }
 
 /* The OTHER split parents in `rows` that share this parent's date and
-   description — the rows whose parts `splitPartsOf` cannot tell apart from this
-   one's. Empty on any unambiguous split. By role alone, like the page's own
-   lookup: a parent whose Excluded tick was removed by hand still owns parts. */
+   description — the rows whose parts date + description alone cannot tell apart
+   from this one's. Empty on any unambiguous split. By role alone, like the
+   page's own lookup: a parent whose Excluded tick was removed by hand still owns
+   parts. */
 function splitParentsSharingKey(rows, parent) {
   return (rows || []).filter(x => x !== parent && splitRole(x && x.split) === SPLIT_PARENT
     && x.date === parent.date && x.desc === parent.desc);
@@ -198,5 +259,5 @@ function splitParentsSharingKey(rows, parent) {
 
 module.exports = {
   SPLIT_PARENT, SPLIT_PART, splitRole, supersededBySplit, isSplitPart, applySplit, splitShortfall,
-  splitPartsOf, splitParentsSharingKey,
+  splitPartsOf, splitPartsAmbiguous, splitParentsSharingKey, amountCents,
 };

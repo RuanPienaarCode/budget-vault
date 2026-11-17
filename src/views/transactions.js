@@ -13,7 +13,7 @@ const { transactionsCsv, categoriesCsv, transactionsMarkdown, categoriesMarkdown
 const { ISO_DATE, todayIso, nowLocalMinute } = require('../dates');
 const { symbolOf, formatSigned } = require('../currency');
 const { localeFor } = require('../locale');
-const { applySplit, splitRole, splitShortfall, SPLIT_PARENT, isSplitPart } = require('../tx-role');
+const { applySplit, splitRole, splitShortfall, SPLIT_PARENT, isSplitPart, splitPartsOf, splitPartsAmbiguous, amountCents } = require('../tx-role');
 const { prepareRules, matchRule } = require('../rules');
 /* Namespace import: this file binds `t` as a local (`const t = $('#txTable')`). */
 const i18n = require('../i18n');
@@ -806,7 +806,9 @@ module.exports = function registerTransactions(ctx) {
      return to simply gets no restore. */
   async function splitTransaction(item, i) {
     const r = item._row;
-    if (!r.amount) return toast(i18n.t('tx.split.zero'), true);
+    /* Zero in cents too: 0.004 is a real stored amount that rounds to nothing,
+       and the dialog would open on a total no part can be typed to. */
+    if (!r.amount || !amountCents(r.amount)) return toast(i18n.t('tx.split.zero'), true);
     if (r.excluded) return toast(i18n.t('tx.split.excluded'), true);
     /* Before the modal, not after: a part passes both guards above — it has a
        real amount and is not excluded — so without this the reader allocates a
@@ -910,10 +912,8 @@ module.exports = function registerTransactions(ctx) {
      preference, nothing about it can describe the same money twice, and taking
      it away would be a regression dressed as a fix.
 
-     (splitPartsOf lives further down with the delete, which needs the same
-     join. Function declaration, so it is hoisted; kept there rather than moved
-     because that is the header explaining why the match is date + description
-     and deliberately narrow.) */
+     (The parts come from tx-role.js splitPartsOf, the one lookup this chip,
+     Un-split and Delete share.) */
   function excludedCell(item, mark, i) {
     const r = item._row;
     if (splitRole(r.split) !== SPLIT_PARENT) {
@@ -932,7 +932,7 @@ module.exports = function registerTransactions(ctx) {
         'data-focus-key': `excl:${i}`,
         ...(r.excluded ? { checked: '' } : {}), onchange: e => { r.excluded = e.target.checked; mark(); } }));
     }
-    const parts = splitPartsOf(item._file, r);
+    const parts = splitPartsOf(item._file.rows, r);
     const gap = splitShortfall(r, parts);
     /* The shortfall stated as a MAGNITUDE. It is money the parts stopped
        describing — what a reader leaves behind by deleting one part, since the
@@ -985,11 +985,12 @@ module.exports = function registerTransactions(ctx) {
      ordinary unticked checkbox, the parts are visibly gone, and Save lights up. */
   async function unsplitTransaction(item, i) {
     const r = item._row, f = item._file;
-    const parts = splitPartsOf(f, r);
+    const parts = splitPartsOf(f.rows, r);
     const op = opWriterOf(ctx);
     const go = await confirmModal(app, {
       title: i18n.t('tx.unsplit.title'),
-      message: i18n.t('tx.unsplit.msg', { count: parts.length, desc: r.desc, amount: rowFlow(r.amount, item) }),
+      message: i18n.t('tx.unsplit.msg', { count: parts.length, desc: r.desc, amount: rowFlow(r.amount, item) })
+        + ambiguousNote(f.rows, r),
       confirmText: i18n.t('tx.unsplit.action'),
     });
     if (!go || afterDialog(op)) return;
@@ -1060,23 +1061,25 @@ module.exports = function registerTransactions(ctx) {
     return b;
   }
 
-  /* The parts belonging to one parent, matched on date + description within the
-     parent's own file — the same three facts applySplit copies onto a part, and
-     the only join there is: a part carries no id back to its parent. Narrow
-     rather than clever: a file holding two identical charges on one day, both
-     split, has no way to tell whose parts are whose, so this deliberately takes
-     BOTH sets and the dialog states the count it found. Undercounting would
-     strand rows; overcounting is visible in the number the reader agrees to. */
-  function splitPartsOf(f, parent) {
-    return f.rows.filter(x => x !== parent && splitRole(x.split) === 'part'
-      && x.date === parent.date && x.desc === parent.desc);
-  }
+  /* The parts of one parent come from tx-role.js splitPartsOf, the one lookup
+     the chip, Un-split, Delete and the importer's Undo all ask. It matches on
+     date + description (a part carries no id back to its parent) and, where two
+     identical charges on one day are both split, tells their parts apart by
+     position — see that function for the rule and its limit.
+
+     When it cannot (a hand-reordered file), it returns every part with the key
+     and the count in the dialog is high. That is the one case the dialog says so
+     in words, since the reader is about to agree to a number. English only:
+     this sentence has no key in the twelve tables yet (the lang files are
+     outside the lane that wrote it). */
+  const AMBIGUOUS_PARTS = 'These parts could not be told apart from another identical split\'s on the same day, so they are all counted here.';
+  const ambiguousNote = (rows, parent) => splitPartsAmbiguous(rows, parent) ? ' ' + AMBIGUOUS_PARTS : '';
 
   async function deleteTransaction(item, i) {
     const r = item._row, f = item._file;
     const role = splitRole(r.split);
-    const parts = role === 'parent' ? splitPartsOf(f, r) : [];
-    const detail = role === 'parent' && parts.length ? i18n.t('tx.delete.parent', { count: parts.length })
+    const parts = role === 'parent' ? splitPartsOf(f.rows, r) : [];
+    const detail = role === 'parent' && parts.length ? i18n.t('tx.delete.parent', { count: parts.length }) + ambiguousNote(f.rows, r)
       : role === 'part' ? i18n.t('tx.delete.part')
         : i18n.t('tx.delete.reimport');
     const op = opWriterOf(ctx);

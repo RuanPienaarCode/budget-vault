@@ -7,6 +7,7 @@ const { el } = require('./dom');
 const { normalizeAmount } = require('./amount');
 // Namespaced, as everywhere in src/ — `t` is a local in half these files.
 const i18n = require('./i18n');
+const { amountCents } = require('./tx-role');
 
 /* Does Enter, pressed with focus on `target`, mean "I am done with this form"?
 
@@ -310,7 +311,19 @@ class SplitModal extends Modal {
     this.result = null;
     // Work in magnitudes; sign is re-applied in submit().
     this.sign = opts.tx.amount < 0 ? -1 : 1;
-    this.total = Math.abs(opts.tx.amount);
+    /* In whole cents, rounded by the SAME rule the row's chip uses for the
+       parent (tx-role.js amountCents, via splitShortfall). The stored amount
+       can carry three decimals (a fuel slip: -912.345); the parts are cents, so
+       against the raw figure two different cent totals both read as balanced
+       and one of them then showed a shortfall on the chip, while 58.125 had no
+       cent total at all and the Split button never enabled. Rounded here there
+       is exactly one total, it is reachable by typing cents, and what the dialog
+       accepts is what the chip calls complete. The magnitude is taken AFTER the
+       signed rounding, never before: Math.round(-912.345 * 100) and
+       Math.round(912.345 * 100) differ by a cent. The row's own amount is not
+       touched. */
+    this.totalCents = Math.abs(amountCents(opts.tx.amount));
+    this.total = this.totalCents / 100;
     this.parts = [
       { mag: this.total, cat: opts.tx.cat || '', note: '' },
       { mag: 0, cat: '', note: '' },
