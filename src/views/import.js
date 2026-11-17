@@ -18,7 +18,7 @@
 const { opWriterOf } = require('../io');
 const i18n = require('../i18n');
 const { el, tableCells, refocus, caveatChip } = require('../dom');
-const { normalizeAmount, inferGrouping } = require('../amount');
+const { normalizeAmount, inferGrouping, readAmountColumn } = require('../amount');
 const { parseStatement, decodeStatement, parseStatementDate, detectStatementColumns, reconcileAmounts, reconcileFeesBesideAmount, applyCounterparties,
   statementAccountNumber, sameAccountNumber, TRANSFER_LEG_DAYS } = require('../statement');
 const { prepareRules, autoCategorise, matchRule } = require('../rules');
@@ -288,6 +288,14 @@ module.exports = function registerImport(ctx) {
     const localeGrouping = loc.thousands === '.' ? 'dot' : loc.thousands === ',' ? 'comma' : null;
     const numOpts = { grouping: inferGrouping(amountCells) ?? localeGrouping };
     const num = v => normalizeAmount(v, numOpts);
+    /* The Amount column, read as a COLUMN (amount.js readAmountColumn): one that
+       marks money in with "Cr" and leaves money out bare has its bare values
+       read as money out. Whether to KEEP that reading is decided below, once
+       the rows are in, because with a balance column the balances have the
+       last word. For every other column `values` is exactly num() per cell. */
+    const amountCol = iAmount !== -1 ? readAmountColumn(dataRows.map(r => r[iAmount]), numOpts) : null;
+    /* The rows whose amount the rule negated, with what they read as before. */
+    const creditRule = [];
     /* ISSUE 62. Which way round the day and month are is a property of the
        FILE, and the file says so: a statement is written in date order, so the
        reading under which its dates go backwards is the wrong reading. The
@@ -325,7 +333,8 @@ module.exports = function registerImport(ctx) {
       if (loc.stripDescSuffix && desc.endsWith(loc.stripDescSuffix)) desc = desc.slice(0, -loc.stripDescSuffix.length);
       /* Amount: a single signed column when present, else credit (positive) /
          debit (negated — statements list debits as positive numbers). */
-      let amount = iAmount !== -1 ? num(r[iAmount]) : null;
+      let amount = amountCol ? amountCol.values[i] : null;
+      const wasAmount = amountCol && amountCol.applied && amount !== amountCol.plain[i] ? amountCol.plain[i] : null;
       // A non-blank amount cell that normalizeAmount refused: the only thing a
       // row is "unparseable" FOR, as far as the money goes (see below).
       const unreadable = [iAmount, iDebit, iCredit, iFee].some(i => i !== -1 && (r[i] || '').trim() !== '' && num(r[i]) == null);
@@ -375,6 +384,8 @@ module.exports = function registerImport(ctx) {
       }
       const ledgerEntry = iBalance !== -1 && amount != null ? { amount, balance: num(r[iBalance]), fee: feeBeside } : null;
       if (ledgerEntry) ledger.push(ledgerEntry);
+      const rule = wasAmount != null ? { was: wasAmount, entry: ledgerEntry, item: null } : null;
+      if (rule) creditRule.push(rule);
       const carrier = feeBeside ? { fee: feeBeside, date: null, desc, entry: ledgerEntry, at: -1, noted: false } : null;
       if (carrier) feeCarriers.push(carrier);
       const date = rawDate ? parseStatementDate(rawDate, dayFirst) : null;
@@ -394,6 +405,7 @@ module.exports = function registerImport(ctx) {
         items.push({ date, desc, amount: parseFloat(amount.toFixed(2)), cat: matched ? matched.category : '',
           matchedPattern: matched ? matched.p : '',
           include: true, excluded: false, transferTo: '' });
+        if (rule) rule.item = items[items.length - 1];
       } else if (date && desc && (amount === 0 || (amount == null && !unreadable))) {
         /* A dated, described line with NO MONEY on it: the 0.00 an FNB
            statement prints for a waived fee, the notice Capitec prints for a
@@ -414,6 +426,37 @@ module.exports = function registerImport(ctx) {
       if (showBar && (i % CHUNK === CHUNK - 1)) {
         importProgress('set', null, (i + 1) / dataRows.length * 0.9);
         await new Promise(res => setTimeout(res, 0));
+      }
+    }
+    /* The credit-marked column rule (amount.js creditMarkedColumn), kept or
+       dropped. Decided BEFORE the fee pass and the sign verdict below, which both
+       read the amounts as they stand here.
+
+       With a balance column the file has to prove it: the rule stands only when
+       the balances reconcile under it and do NOT already reconcile under the
+       per-cell reading. Anything else - the balances prove the old reading, or
+       prove neither - puts every negated row back, and the review then says
+       what it always said for that file. Reconciliation does not depend on the
+       account (reconcileAmounts tries both signs, and only which one wins
+       follows the liability flag), so the account that is not settled yet does
+       not matter here. Without a balance column there is nothing to prove it
+       against and the column's own explicit markers decide; the review says so
+       either way (`creditMarked`). A fee beside the amount is the one case left
+       to the fee pass after this, untouched. */
+    let creditMarked = false;
+    if (creditRule.length) {
+      if (iBalance === -1) creditMarked = true;
+      else {
+        const asRead = ledger.map(e => ({ amount: e.amount, balance: e.balance }));
+        const before = ledger.map(e => ({ amount: e.amount, balance: e.balance }));
+        for (const k of creditRule) if (k.entry) before[ledger.indexOf(k.entry)].amount = k.was;
+        creditMarked = reconcileAmounts(asRead).verified && !reconcileAmounts(before).verified;
+      }
+      if (!creditMarked) {
+        for (const k of creditRule) {
+          if (k.entry) k.entry.amount = k.was;
+          if (k.item) k.item.amount = parseFloat(k.was.toFixed(2));
+        }
       }
     }
     /* The fees printed beside amounts, decided from the balance column (see the
@@ -514,6 +557,8 @@ module.exports = function registerImport(ctx) {
       // are compared on every render and again at commit. See acctIdentity().
       acctNumber: statementAccountNumber(rows, map),
       reconcile: rec,
+      // True only when the credit-marked column rule was applied and kept.
+      creditMarked,
       /* ISSUE 62. Non-null only when the file overruled the household's date
          convention, so the review can say so. */
       dateReading,
@@ -981,6 +1026,12 @@ module.exports = function registerImport(ctx) {
           ? 'Amounts check out against this statement’s own balance column.'
           : 'Could not check these amounts against the balance column — the balances don’t line up. Spot-check a few rows below before importing, especially the + and − signs.';
 
+    /* The credit-marked column rule changes how a column is read, so the
+       review says so, whatever the verdict above (runImport has the why). */
+    if (p.creditMarked && rec) {
+      recEl.textContent += ' This statement’s amounts mark money in with “Cr” and leave money out unmarked, so the unmarked amounts were read as money out.';
+    }
+
     /* Say where these rows are going to land BEFORE they land. An account
        flagged `budget: false` still imports and still shows in Transactions,
        but never reaches the Dashboard's income/spend — which looks like a
@@ -1393,6 +1444,21 @@ module.exports = function registerImport(ctx) {
     };
   }
 
+  /* An OPEN review keeps the dedupe index it was built with, and commitImport
+     adds each landed row to it so a retry after a stopped import sees them as
+     present — which they are. Undo takes rows back out of the ledger, and an
+     index nobody refreshed went on calling them duplicates: a badge with no
+     tick box and "already in the vault", on rows that are not (2026-11-17
+     audit, M1). Rebuilt from S.txFiles rather than subtracted from: with a
+     same-day, same-amount pair the vault's copies and the statement's are
+     indistinguishable by key, and the rebuild is right by construction.
+     Nothing else on the review is touched — flagItems re-judges on the next
+     render and keeps every sticky bit (a hand-made tick or untick) where the
+     row is still eligible. No review open: nothing to do. */
+  function refreshPendingIndex() {
+    if (S.pendingImport) S.pendingImport.index = dedupIndex();
+  }
+
   async function undoImport() {
     const r = S.lastImport;
     if (!r || !r.files.length) return;
@@ -1544,10 +1610,14 @@ module.exports = function registerImport(ctx) {
       }
     } catch (err) {
       S.lastImport = null;
+      /* Files already taken back are out of the ledger, so an open review has
+         to stop counting them as present — same as the success path below. */
+      refreshPendingIndex();
       ctx.renderTransactions();
       return toast(`Undo stopped after ${files} file${files === 1 ? '' : 's'} (${err.message || err}) — the rest are unchanged`, true);
     }
     S.lastImport = null;
+    refreshPendingIndex();
     /* The Save button may have been lit by edits that have just been written
        out above. Asking the page to recompute is not possible from here — the
        predicate lives in controller.js — so re-render and let it settle: any

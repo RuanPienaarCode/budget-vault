@@ -89,8 +89,65 @@ const NOT_A_NAME = /^(Electronic Payment|RATE|TAX|GROSS|NET|Voided|VoidLineItem|
 const BLOCK_END = /^(BARCODE|Please keep your till slip)/i;
 
 /* Lines a generic (non-Checkers) receipt prints with a price that are not a
-   product. TOTAL is read for the total; the rest are skipped. */
-const GENERIC_SKIP = /\b(SUB\s*TOTAL|TOTAL|BALANCE|CHANGE|CASH|CARD|TENDER|PAYMENT|VAT|TAX|ROUNDING|SAVED|SAVINGS|DUE|AMOUNT)\b/i;
+   product. TOTAL is read for the total; the rest are skipped.
+
+   A total / payment / tax line is told by a keyword that LEADS it, never by
+   one that merely appears somewhere in it. The old test matched the word
+   anywhere, so "Birthday Card 35.00" was lost, and — because a match after the
+   first item ends the product block — so was every line under it (audit, 17
+   Nov 2026).
+
+   "Leads" means: reading the line's words from the left, past anything that is
+   not a letter (`*** TOTAL`, `R55.00 TOTAL`) and past single letters, every
+   word up to and including the keyword is a keyword, a card brand (VISA,
+   MASTERCARD, MASTER, AMEX, BANK) or a lead-in the slips actually print (YOU,
+   YOUR, HAVE, TODAY, GRAND, NET, THE, PAID, BY, PAY, APPROVED, ACCEPTED) — so `YOU SAVED`,
+   `TOTAL SAVINGS`, `VISA CARD`, `DEBIT CARD ****1234` and `PAID BY CARD` lead
+   with a keyword, while `Birthday Card` and `Gift Card` (BIRTHDAY, GIFT are
+   product words) do not. A word that is not one of those ends the lead.
+
+   Two strengths, because some payment words are also the first word of a
+   product. STRONG words (TOTAL, SUB TOTAL, VAT, ROUNDING, TENDER(ED),
+   PAYMENT, AMOUNT, DUE, SAVED, EFT) make a total line WHEREVER they stand in
+   it, as they did before this rule: "TOTAL ITEMS 3", "VAT NO 4123456789", and
+   just as much "Sub-Total", "Sale Total", "Order Total", where the word comes
+   second. WEAK words (CASH, CARD, TAX, CHANGE, BALANCE,
+   SAVINGS, CREDIT, DEBIT) also start products — Cash Register Roll, Tax Free
+   Tea, Savings Jar, Balance Bike — so a weak word that leads makes a total
+   line only when nothing after the lead is an ordinary product word (TOTAL_TAIL
+   below: "CASH 100.00", "CARD ****1234 55.00", "TAX 15% 7.17", "CHANGE GIVEN").
+   A word nobody listed after a weak lead reads as a product: the slip's own
+   total check then shows the miss, where the old rule dropped lines silently. */
+const KEYWORD_STRONG = new Set(['TOTAL', 'SUBTOTAL', 'VAT', 'ROUNDING', 'TENDER', 'TENDERED', 'PAYMENT', 'AMOUNT', 'DUE', 'SAVED', 'EFT']);
+const KEYWORD_WEAK = new Set(['CASH', 'CARD', 'TAX', 'CHANGE', 'BALANCE', 'SAVINGS', 'CREDIT', 'DEBIT']);
+const LEAD_IN = new Set(['VISA', 'MASTERCARD', 'MASTER', 'AMEX', 'BANK', 'YOU', 'YOUR', "YOU'VE", 'HAVE', 'TODAY', "TODAY'S", 'TODAYS', 'GRAND', 'NET', 'THE', 'PAID', 'BY', 'PAY', 'APPROVED', 'ACCEPTED']);
+/* Words that may follow a weak keyword on a payment line without turning it
+   into a product name. */
+const TOTAL_TAIL = new Set(['INCL', 'INCLUDING', 'INCLUSIVE', 'EXCL', 'EXCLUDING', 'NO', 'NR', 'NUM', 'NUMBER', 'REG', 'RATE', 'GIVEN', 'RECEIVED', 'REQUIRED', 'PURCHASE', 'SALE', 'ACCEPTED', 'APPROVED', 'ONLY', 'AT', 'OF', 'ON', 'TO', 'FOR', 'SLIP', 'BACK', 'NOTE', 'TYPE', 'AUTH', 'CODE', 'REF', 'DETAILS', 'ENTRY']);
+function isTotalLine(line) {
+  const words = line
+    .replace(/\bSUB[\s-]*TOTAL\b/gi, 'SUBTOTAL')
+    .replace(/\bE\.?\s*F\.?\s*T\b/gi, 'EFT')
+    .toUpperCase()
+    .match(/[A-Z][A-Z']+/g) || [];       // two letters or more: "R", "A" are not words
+  /* A STRONG word counts wherever it stands, as it always did. Only the weak
+     words have to lead: they are the ones that also name products, and they
+     are what this rule was written to stop losing. Asking a strong word to
+     lead as well read "Sub-Total 49.98", "Sale Total", "Order Total" and
+     "Invoice Total" as products priced at the slip's own total — the block
+     did not end there and the slip counted twice (pre-push audit, 17 Nov
+     2026). A product with a strong word in its name is still not kept; it
+     never was. */
+  if (words.some(w => KEYWORD_STRONG.has(w))) return true;
+  let i = 0, weak = false;
+  for (; i < words.length; i++) {
+    const w = words[i];
+    if (KEYWORD_WEAK.has(w)) weak = true;
+    else if (!LEAD_IN.has(w)) break;
+  }
+  if (!weak) return false;
+  return words.slice(i).every(w => TOTAL_TAIL.has(w) || LEAD_IN.has(w) || KEYWORD_WEAK.has(w));
+}
 
 /* Store "Checkers Sampletown" off the line naming the branch ("SAMPLETOWN Tel
    No ..."). Title-cased because the slip shouts. */
@@ -397,11 +454,44 @@ const MONEY_TAIL_ITEM = /(?:^|\s)(-?)(?:R\s?(\d{1,3}(?:[ ,]\d{3})+|\d+)|(\d{1,3}
    "Box", "Ajax" and "Kleenex" were skipped as quantities and the price after
    each landed on the item above (audit, 16 Nov 2026). */
 const QTY_AWAITING_PRICE = /\d(?:[.,]\d+)?\s*(?:kg|g|mg|ml|l|lbs?|oz|units?|pcs?|ea)?\s*[@x×]\s*$/i;
+/* A quantity / weight detail and NOTHING else: a number, an optional unit,
+   optional NET / GROSS / EACH / EA, an @ or x / ×, then optionally a unit price
+   with an optional per-unit suffix — "0.456 kg @ R19.99/kg", "2 @ 4.50 each",
+   "0.456 kg NET @", "2 x". QTY_AWAITING_PRICE only knew the forms that END at
+   the @/x, so a unit price after it ("/kg" is not a digit, so MONEY_TAIL missed
+   it too) made the detail a fake item priced by the figure under it, and the
+   "unpriced" problem it left behind switched the slip's total check off (audit,
+   17 Nov 2026). The anchors on both ends are the point: a name with a unit in
+   it ("Milk 2l 32.99") or a product after the detail is not matched. */
+const QTY_UNIT = '(?:kg|g|mg|ml|l|lbs?|oz|units?|pcs?|ea|each)';
+const QTY_DETAIL = new RegExp(
+  '^\\d+(?:[.,]\\d+)?\\s*' + QTY_UNIT + '?\\s*(?:(?:net|gross|each|ea)\\s*)*[@x×]' +
+  '(?:\\s*(?:R\\s?)?(?:\\d{1,3}(?:[ ,]\\d{3})+|\\d+)(?:[.,]\\d+)?' +
+  '(?:\\s*(?:\\/|per\\s|p\\/)\\s*' + QTY_UNIT + '|\\s*(?:each|ea))?)?$', 'i');
 const SEPARATOR = /^[-=_*~.]{5,}$/;
 const DATE_OR_TIME = /\b\d{1,2}[:h]\d{2}\b|\b\d{4}-\d{2}-\d{2}\b|\b\d{1,2}[/.-]\d{1,2}[/.-]\d{2,4}\b|\b\d{1,2}\s+[A-Za-z]{3}[a-z]*\.?\s+\d{4}\b/;
 const PAID_LINE = /\b(E\.?\s*F\.?\s*T|CARD|AMOUNT\s+DUE|BALANCE\s+DUE|TENDER(?:ED)?|CREDIT|DEBIT)\b/i;
 
+/* The sign written AFTER the figure — "Promo 5.00-", "5,00-", "R5.00-". It
+   counts only straight after a figure with its two decimals at the end of the
+   line, so "Coke 2-pack 25.00" and "Wipes 80-count" keep their hyphens, and a
+   figure without cents ("Bin Bags 10-") is a name. The line is read as
+   though the minus were not there and the value negated, so the trailing
+   spelling is by construction the leading one. */
+const TRAILING_MINUS = /^(.*\d[.,]\d{2})-$/;
+/* The heading of a slip, above its first product (parseGeneric): the keyword
+   ANYWHERE in the line, as the test was before isTotalLine, and a figure with
+   its cents at the end, which is what a priced product line has and a heading
+   does not. */
+const KEYWORD_ANYWHERE = /\b(SUB\s*TOTAL|TOTAL|BALANCE|CHANGE|CASH|CARD|TENDER|PAYMENT|VAT|TAX|ROUNDING|SAVED|SAVINGS|DUE|AMOUNT)\b/i;
+const CENTS_TAIL = /\d[.,]\d{2}-?\s*[A-Z]?$/;
+
 function moneyTail(line, item = false) {
+  const tm = line.match(TRAILING_MINUS);
+  if (tm) {
+    const r = moneyTail(tm[1], item);
+    return r && r.value > 0 ? { text: r.text, value: -r.value } : r;
+  }
   let m = line.match(MONEY_TAIL);
   if (!m) return null;
   let text = line.slice(0, m.index).trim();
@@ -456,14 +546,25 @@ function parseGeneric(lines) {
   for (let i = start; i < lines.length; i++) {
     const l = lines[i];
     if (SEPARATOR.test(l) || /TAX\s*INVOICE/i.test(l)) continue;
-    if (GENERIC_SKIP.test(l) || PAID_LINE.test(l)) {
+    if (isTotalLine(l)) {
       if (items.length) break;      // the totals: the product block is over
       continue;                     // a header line above it
     }
+    /* Above the first product the old, wider test still stands for a line with
+       no price in cents: a slip's heading prints these words in places no
+       list of "words that may follow" will ever cover — "CASH SALE INVOICE",
+       "TAX INV NO 12345", "Till 3 Cash Desk" — and isTotalLine, built to keep
+       "Cash Register Roll 45.00", read each of those as a product: an
+       unpriced row, or one priced at the invoice number. A line that ends in
+       rand and cents is a product wherever it stands, so "Birthday Card 35.00"
+       as the first line of a slip is still kept; only the first product of a
+       slip, named with a payment word AND written without cents, is still
+       lost here, as it was before any of this. */
+    if (!items.length && !pending && !CENTS_TAIL.test(l) && (KEYWORD_ANYWHERE.test(l) || PAID_LINE.test(l))) continue;
     if (DATE_OR_TIME.test(l) && !items.length && !pending) continue;
-    if (QTY_AWAITING_PRICE.test(l)) continue;     // "0.268 @" — weight, price follows
+    if (QTY_AWAITING_PRICE.test(l) || QTY_DETAIL.test(l)) continue;     // "0.268 @" — weight, price follows
     const t = moneyTail(l, true);
-    if (t && !hasWords(t.text)) {
+    if (t && (!hasWords(t.text) || QTY_DETAIL.test(t.text))) {
       /* A figure with no product words: the price of the product above,
          or a discount on it. The last one before the next product wins. */
       if (t.value < 0) {

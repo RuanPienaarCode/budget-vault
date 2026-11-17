@@ -44,7 +44,7 @@ const { PLAN_TABLES, plainTableLines } = require('../table-schema');
 const { safeSeg } = require('../vault-path');
 const { askFields, confirmModal } = require('../modal');
 const { planSummary, potSlices, bucketScale, isReceived, SOURCE_KINDS, envelopeShares,
-  envelopeOverState, envelopeBar, round2 } = require('../plan-math');
+  envelopeOverState, envelopeBar, envelopeReach, round2 } = require('../plan-math');
 const i18n = require('../i18n');
 
 module.exports = function registerPlan(ctx) {
@@ -727,8 +727,12 @@ module.exports = function registerPlan(ctx) {
        let a bucket be dragged R 5 377 past what the plan still had. Same
        figure as the hero, from the same place — the ceiling and the headline
        must never disagree about how much room is left. */
-    const ceiling = Math.max(env.amount, env.amount + Math.max(0, sum.placeable), 100);
-    const sliderMax = Math.ceil(ceiling);
+    /* From the bucket's CLAIM, max(amount, spent), not from what it holds
+       (plan-math.js envelopeReach): on an overspent bucket the amount sits
+       below the money that has already gone, and adding placeable to it
+       stopped the slider short of the room there is. */
+    const reach = envelopeReach(env.amount, spent, sum.placeable);
+    const sliderMax = Math.ceil(reach.ceiling);
     const pctOf = v => (sliderMax > 0 ? Math.max(0, Math.min(100, (v / sliderMax) * 100)) : 0);
 
     const at = p.envelopes.indexOf(env);
@@ -860,7 +864,7 @@ module.exports = function registerPlan(ctx) {
     }
     if (sum.placeable > 0.005) {
       moves.push(el('button', { class: 'btn-ghost btn-ghost-sm', type: 'button', 'data-focus-key': `rest:${at}`,
-        onclick: () => setAmount(env.amount + sum.placeable, [`rest:${at}`, `amt:${at}`]) },
+        onclick: () => setAmount(reach.addRest, [`rest:${at}`, `amt:${at}`]) },
         i18n.t('plan.env.addRest', { amount: money(sum.placeable) })));
     }
 
@@ -1131,7 +1135,11 @@ module.exports = function registerPlan(ctx) {
           'data-focus-key': `free:to:${i}`,
           'aria-label': i18n.t('plan.free.addToAria', { amount: money(sum.placeable), name: e.name }),
           onclick: () => {
-            e.amount = round2(e.amount + sum.placeable);
+            /* From the bucket's claim, like the card's own "Add the rest"
+               (plan-math.js envelopeReach): on an overspent bucket, adding
+               placeable to what it HOLDS left the overrun unallocated. */
+            const spent = p.items.filter(it => it.envelope === e.name).reduce((t, it) => t + (it.spent || 0), 0);
+            e.amount = envelopeReach(e.amount, spent, sum.placeable).addRest;
             expandedEnvelope = e.name;
             addToOpen = false;
             mark(); renderPlan();
