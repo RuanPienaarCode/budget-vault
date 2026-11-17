@@ -143,7 +143,7 @@ function typeGroupLabel(type) {
 }
 
 module.exports = function registerBudgets(ctx) {
-  const { S, $, app, money, toast, typeBadge, writeFile, readFile, periodTitle, periodMonthName, periodSummary, periodRange, shiftPeriod, periodKeyValid, intervalDays, promptCreateCategory, promptDeleteCategory, catAssumeSpent, budgetUsed, budgetVsActualRows, planFigures, movedToFunds, periodDeficit, catType, budgetRowType, currentPeriod, locale } = ctx;
+  const { S, $, app, money, toast, typeBadge, writeFile, readFile, periodTitle, periodMonthName, periodSummary, periodRange, shiftPeriod, periodKeyValid, intervalDays, promptCreateCategory, promptDeleteCategory, catAssumeSpent, budgetUsed, budgetVsActualRows, planFigures, movedToFunds, periodDeficit, catType, budgetRowType, budgetBucket, currentPeriod, locale } = ctx;
 
   /* Budgets saved under the OTHER period-name shape — what a vault accumulates
      when someone switches between a payday month and a pay cycle. They are not
@@ -975,9 +975,13 @@ module.exports = function registerBudgets(ctx) {
           el('td', {}, el('input', { type: 'text', class: 'form-control form-control-sm', value: d.notes, style: 'width:230px',
             'aria-label': i18n.t('bud.aria.notes', { category: d.category }), onchange: e => { d.notes = e.target.value; mark(); } })),
           el('td', { style: 'white-space:nowrap' },
-            // Income and transfers are never "already spent" — offering the
-            // toggle there would only invite a state with no meaning.
-            type === 'income' || type === 'transfer' ? '' : el('button', {
+            // Only a spending row can be "already spent" (period.js budgetBucket,
+            // the predicate budgetUsed and the per-row table read): income and
+            // transfers never are, and a savings / investment row is in neither
+            // the spending base nor the provision, so the toggle there would
+            // change nothing. A category file already carrying the flag is left
+            // as it is — it is read by nothing.
+            budgetBucket(type) !== 'spend' ? '' : el('button', {
               class: `btn-ghost btn-ghost-sm bud-act bud-act-assume${assumed ? ' bud-assume-on' : ''}`, type: 'button',
               'aria-pressed': assumed ? 'true' : 'false',
               'aria-label': i18n.t('bud.aria.assume', { category: d.category }),
@@ -1085,10 +1089,23 @@ module.exports = function registerBudgets(ctx) {
     // zero-budgeted category must survive) plus any virtual row the user
     // gave an amount or a note. Untouched zero rows stay display-only, so
     // the period file doesn't bloat to all 50+ categories.
-    const draft = persistedRows(budgetDraft());
-    for (const d of draft) d.inFile = true;
-    S.budgets[S.period] = draft.map(d => ({ ...d }));
-    const meta = S.budgetMeta[S.period];
+    /* NOTHING SHARED IS TOUCHED UNTIL THE WRITE LANDS. This used to assign
+       S.budgets[S.period] and flip every draft row's inFile before the write,
+       so a rejected write (an iCloud conflict, a locked file) left the unsaved
+       rows in memory as if saved: the Dashboard and Report printed them, and
+       "Discard & switch" rebuilt the draft from them, bringing the edit back
+       looking saved with Save disabled and nothing on disk. So the rows to
+       write are COPIES marked inFile, the shared state and the draft's own
+       flags are set only after the write, and a failure leaves the draft
+       dirty with the typed values and every flag as it was. */
+    const kept = persistedRows(budgetDraft());
+    const draft = kept.map(d => ({ ...d, inFile: true }));
+    /* The period these rows belong to, read ONCE. The shared state is now set
+       after an await, and the header pill can move S.period while the write is
+       in flight (the reader confirms "Discard & switch"): read again down
+       there, S.period would file this period's rows under the next one. */
+    const period = S.period;
+    const meta = S.budgetMeta[period];
     /* Both the range note and the file itself come out of src/budget-file.js.
        This used to be built here, inline — frontmatter patch, heading, range
        note, column header, separator and row template all as literals inside a
@@ -1130,10 +1147,12 @@ module.exports = function registerBudgets(ctx) {
     try {
       // ISSUE 97 — where this period was READ from. A period filed under
       // Budgets/2025/ used to be written back flat, forking the file.
-      await writeFile((S.budgetMeta[S.period] || {}).rel || `Budgets/${S.period}.md`, text);
+      await writeFile((meta || {}).rel || `Budgets/${period}.md`, text);
     } catch (e) {
       return toast(i18n.t('bud.err.save', { error: e.message || e }), true);
     }
+    S.budgets[period] = draft.map(d => ({ ...d }));
+    for (const d of kept) d.inFile = true;
     /* The file's order is now the order just written, so a second Save before
        the next load keeps the rows this one placed where it placed them. */
     if (meta) {
@@ -1142,7 +1161,7 @@ module.exports = function registerBudgets(ctx) {
     }
     budDirty = false;
     $('#budSave').disabled = true;
-    toast(i18n.t('bud.saved', { period: S.period }));
+    toast(i18n.t('bud.saved', { period }));
   }
 
   /* The parts of a period file's shape load.js recorded beside its rows. */

@@ -690,6 +690,12 @@ module.exports = function registerPeriod(ctx) {
     intervalDays, periodKeyValid, catAssumeSpent, catKnown, periodDeficit,
     /* ADR-0005. The one period-level "budget used" reading. */
     budgetUsed,
+    /* Published so figures.js's rowsFrom (and the Budgets page's assume-spent
+       toggle) ask the SAME predicate budgetUsed does for "may this row be
+       assumed spent" — a third spelling of the type list is how the per-row
+       table came to print "already spent" under a strip that had stopped
+       counting it. */
+    budgetBucket,
     /* ADR-0006 Phase 2. The ledger and its lenses, for every consumer that
        needs a period figure the three named seams do not already hand back. */
     ledgerEnv, ledger, tally, LENSES,

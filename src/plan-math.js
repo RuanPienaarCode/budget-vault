@@ -428,5 +428,31 @@ function envelopeOverState(amount, items, spent) {
   return { overAmt, isOverspent: overAmt > 0.005, gap, isOvercommitted: gap < -0.005 };
 }
 
+/* HOW FAR ONE BUCKET CAN BE RAISED: the two figures the envelope card derives
+   from `placeable`, in one place so the page and its test share them.
+
+   Both start from the bucket's CLAIM, max(amount, spent) — the same claim
+   bucketClaims counts — and not from what it holds. Raising a bucket by
+   `placeable` only places that much when the bucket was already claiming what
+   it holds; an overspent bucket's first (spent − amount) rand of "extra" is
+   money that has already gone, so adding placeable to its amount under-fills by
+   exactly the overrun. Money in R 10 000, A holds R 3 000 with R 4 500 spent,
+   B holds R 2 000: placeable is R 3 500, the old button set A to R 6 500 and
+   left R 1 500 unplaced; from the claim it is R 8 000 and nothing is left.
+
+     addRest  the amount that places every placeable rand in this bucket
+     ceiling  the slider's top: that, never below what the bucket holds now and
+              never below 100 (so an empty bucket still has a track to drag)
+
+   A bucket that is not overspent has claim = amount, so both are exactly what
+   the card computed before. `placeable` is passed in, never recomputed: it is
+   planSummary's figure and the hero prints the same one. */
+function envelopeReach(amount, spent, placeable) {
+  const a = Number(amount) || 0;
+  const claim = Math.max(a, Number(spent) || 0);
+  const room = Math.max(0, Number(placeable) || 0);
+  return { addRest: round2(claim + room), ceiling: Math.max(a, claim + room, 100) };
+}
+
 module.exports = { planSummary, barSegments, potSlices, bucketScale, envelopeGap, envelopeBar, sharePct, envelopeShares, round2,
-  isReceived, envelopeOverState, SOURCE_KINDS };
+  isReceived, envelopeOverState, envelopeReach, SOURCE_KINDS };
