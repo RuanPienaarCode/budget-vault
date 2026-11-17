@@ -108,9 +108,10 @@ const BLOCK_END = /^(BARCODE|Please keep your till slip)/i;
 
    Two strengths, because some payment words are also the first word of a
    product. STRONG words (TOTAL, SUB TOTAL, VAT, ROUNDING, TENDER(ED),
-   PAYMENT, AMOUNT, DUE, SAVED, EFT) are never the first word of anything sold:
-   a line they lead is a total line whatever follows ("TOTAL ITEMS 3",
-   "VAT NO 4123456789"). WEAK words (CASH, CARD, TAX, CHANGE, BALANCE,
+   PAYMENT, AMOUNT, DUE, SAVED, EFT) make a total line WHEREVER they stand in
+   it, as they did before this rule: "TOTAL ITEMS 3", "VAT NO 4123456789", and
+   just as much "Sub-Total", "Sale Total", "Order Total", where the word comes
+   second. WEAK words (CASH, CARD, TAX, CHANGE, BALANCE,
    SAVINGS, CREDIT, DEBIT) also start products — Cash Register Roll, Tax Free
    Tea, Savings Jar, Balance Bike — so a weak word that leads makes a total
    line only when nothing after the lead is an ordinary product word (TOTAL_TAIL
@@ -122,23 +123,30 @@ const KEYWORD_WEAK = new Set(['CASH', 'CARD', 'TAX', 'CHANGE', 'BALANCE', 'SAVIN
 const LEAD_IN = new Set(['VISA', 'MASTERCARD', 'MASTER', 'AMEX', 'BANK', 'YOU', 'YOUR', "YOU'VE", 'HAVE', 'TODAY', "TODAY'S", 'TODAYS', 'GRAND', 'NET', 'THE', 'PAID', 'BY', 'PAY', 'APPROVED', 'ACCEPTED']);
 /* Words that may follow a weak keyword on a payment line without turning it
    into a product name. */
-const TOTAL_TAIL = new Set(['INCL', 'INCLUDING', 'INCLUSIVE', 'EXCL', 'EXCLUDING', 'NO', 'NR', 'NUM', 'NUMBER', 'REG', 'RATE', 'GIVEN', 'RECEIVED', 'REQUIRED', 'PURCHASE', 'SALE', 'ACCEPTED', 'APPROVED', 'ONLY', 'AT', 'OF', 'ON', 'TO', 'FOR', 'SLIP', 'BACK', 'NOTE']);
+const TOTAL_TAIL = new Set(['INCL', 'INCLUDING', 'INCLUSIVE', 'EXCL', 'EXCLUDING', 'NO', 'NR', 'NUM', 'NUMBER', 'REG', 'RATE', 'GIVEN', 'RECEIVED', 'REQUIRED', 'PURCHASE', 'SALE', 'ACCEPTED', 'APPROVED', 'ONLY', 'AT', 'OF', 'ON', 'TO', 'FOR', 'SLIP', 'BACK', 'NOTE', 'TYPE', 'AUTH', 'CODE', 'REF', 'DETAILS', 'ENTRY']);
 function isTotalLine(line) {
   const words = line
-    .replace(/\bSUB\s*TOTAL\b/gi, 'SUBTOTAL')
+    .replace(/\bSUB[\s-]*TOTAL\b/gi, 'SUBTOTAL')
     .replace(/\bE\.?\s*F\.?\s*T\b/gi, 'EFT')
     .toUpperCase()
     .match(/[A-Z][A-Z']+/g) || [];       // two letters or more: "R", "A" are not words
-  let i = 0, strong = false, weak = false;
+  /* A STRONG word counts wherever it stands, as it always did. Only the weak
+     words have to lead: they are the ones that also name products, and they
+     are what this rule was written to stop losing. Asking a strong word to
+     lead as well read "Sub-Total 49.98", "Sale Total", "Order Total" and
+     "Invoice Total" as products priced at the slip's own total — the block
+     did not end there and the slip counted twice (pre-push audit, 17 Nov
+     2026). A product with a strong word in its name is still not kept; it
+     never was. */
+  if (words.some(w => KEYWORD_STRONG.has(w))) return true;
+  let i = 0, weak = false;
   for (; i < words.length; i++) {
     const w = words[i];
-    if (KEYWORD_STRONG.has(w)) strong = true;
-    else if (KEYWORD_WEAK.has(w)) weak = true;
+    if (KEYWORD_WEAK.has(w)) weak = true;
     else if (!LEAD_IN.has(w)) break;
   }
-  if (strong) return true;
   if (!weak) return false;
-  return words.slice(i).every(w => TOTAL_TAIL.has(w));
+  return words.slice(i).every(w => TOTAL_TAIL.has(w) || LEAD_IN.has(w) || KEYWORD_WEAK.has(w));
 }
 
 /* Store "Checkers Sampletown" off the line naming the branch ("SAMPLETOWN Tel

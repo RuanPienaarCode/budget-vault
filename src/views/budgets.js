@@ -1159,8 +1159,14 @@ module.exports = function registerBudgets(ctx) {
       meta.order = budgetFileRows({ rows: draft, groups: S.settings.groups, ...budgetFileShape(meta) })
         .map(r => r.category || null);
     }
-    budDirty = false;
-    $('#budSave').disabled = true;
+    /* Clean is a fact about the draft that was SAVED. If the pill moved while
+       the write was in flight, the draft on the page is another period's, and
+       anything typed into it since is not saved by this: leave its dirty state
+       and its Save button as they are. */
+    if (S.period === period) {
+      budDirty = false;
+      $('#budSave').disabled = true;
+    }
     toast(i18n.t('bud.saved', { period }));
   }
 

@@ -158,6 +158,11 @@ async function mount() {
     eq(S.budgets['2026-07'].find(r => r.category === 'Groceries').amount, 4555, 'the rows landed under the period Save was pressed on');
     eq(S.budgets['2026-08'], undefined, 'and not under the period the pill moved to');
     ok(/Groceries \| expense \| 4555\.00/.test(await ctx.readFile('Budgets/2026-07.md')), 'the file written is that period\'s');
+    /* "Clean" is a fact about the draft that was saved. The page is on another
+       period now, so its dirty state and Save button are not this save's to
+       clear. */
+    ok(ctx.budgetDirty(), 'the save does not mark the page clean once the pill has moved on');
+    eq($('#budSave').disabled, false, 'nor disable its Save button');
     S.period = '2026-07';
   }
 

@@ -1135,7 +1135,11 @@ module.exports = function registerPlan(ctx) {
           'data-focus-key': `free:to:${i}`,
           'aria-label': i18n.t('plan.free.addToAria', { amount: money(sum.placeable), name: e.name }),
           onclick: () => {
-            e.amount = round2(e.amount + sum.placeable);
+            /* From the bucket's claim, like the card's own "Add the rest"
+               (plan-math.js envelopeReach): on an overspent bucket, adding
+               placeable to what it HOLDS left the overrun unallocated. */
+            const spent = p.items.filter(it => it.envelope === e.name).reduce((t, it) => t + (it.spent || 0), 0);
+            e.amount = envelopeReach(e.amount, spent, sum.placeable).addRest;
             expandedEnvelope = e.name;
             addToOpen = false;
             mark(); renderPlan();

@@ -53,5 +53,11 @@ const view = fs.readFileSync(path.join(__dirname, '..', 'src', 'views', 'plan.js
 assert.ok(/envelopeReach\(/.test(view), 'plan.js calls envelopeReach');
 assert.ok(!/env\.amount\s*\+\s*sum\.placeable/.test(view), 'plan.js no longer adds placeable to the held amount');
 assert.ok(!/env\.amount\s*\+\s*Math\.max\(0,\s*sum\.placeable\)/.test(view), 'nor does the slider ceiling');
+/* The free card's "Add to <bucket>" chips do the same job from the other side
+   of the page, and were still spelling it the old way after the card was fixed
+   (pre-push audit, 17 Nov 2026). No bucket's amount is raised by placeable
+   anywhere in the view except through envelopeReach. */
+assert.ok(!/\.amount\s*\+\s*sum\.placeable/.test(view), 'no bucket amount is raised by placeable outside envelopeReach');
+assert.ok((view.match(/envelopeReach\(/g) || []).length >= 2, 'the card and the free-card chips both call it');
 
 console.log('PASS plan-add-rest-overspent: Add the rest and the slider ceiling start from the bucket claim');

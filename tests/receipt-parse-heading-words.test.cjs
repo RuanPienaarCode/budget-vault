@@ -75,4 +75,39 @@ for (const head of [
   eq(r.items.map(i => [i.name, i.amount, i.discount || 0]), [['Milk', 20, 0], ['Bread', 15, 0]], 'a credit note discounts nothing');
 }
 
+/* A total is a total wherever the word stands in its line.
+
+   TOTAL (and the other strong words) never had to lead: "Sub-Total", "Sale
+   Total", "Order Total" end the product block as they always did. Asked to
+   lead, each was read as a product priced at the slip's own total, the block
+   ran on, and the slip counted twice (pre-push audit, 17 Nov 2026). The slip
+   below has NO line that starts with TOTAL, so the line under test is the only
+   thing that can end the block and name the total. */
+for (const line of [
+  'Sub-Total 49.98', 'SUB-TOTAL 49.98', 'Sub Total: 49.98', 'Sale Total 49.98', 'Order Total 49.98',
+  'Invoice Total 49.98', 'Basket Total 49.98', 'Rounded Total 49.98', 'Items Total 49.98', 'Final Total 49.98',
+  'Nett Total 49.98', 'Customer Total 49.98', 'Bill Total R49.98', 'Grand-Total 49.98', 'Total Incl. VAT 49.98',
+  'Total (VAT Incl) 49.98', 'Total Due: R49.98', 'Cash Total 49.98', 'Card Total 49.98',
+]) {
+  const r = slip('Bread 16.99', 'Milk 32.99', line, 'Cash 50.00', 'Change 0.02');
+  eq(rows(r), [['Bread', 16.99], ['Milk', 32.99]], `"${line}" ends the products and is not one`);
+  eq([r.total, r.problems], [49.98, []], `"${line}" is the slip's total, and the slip adds up`);
+}
+
+/* The card machine's "Card Type" line under a slip with no TOTAL line ends the
+   products, alone, with nothing above it to have ended them already. */
+{
+  const r = slip('Bread 16.99', 'Milk 32.99', 'Card Type: VISA');
+  eq(rows(r), [['Bread', 16.99], ['Milk', 32.99]], '"Card Type: VISA" under the products is not a product');
+}
+
+/* A card holder is something a shop sells. HOLDER is not a word that may
+   follow a payment word, so the line is a product and the ones under it are
+   kept. */
+{
+  const r = slip('Milk 20.00', 'Credit Card Holder 120.00', 'Plasters 20.00', 'TOTAL 160.00');
+  eq(rows(r), [['Milk', 20], ['Credit Card Holder', 120], ['Plasters', 20]], 'a card holder is a product, and the block runs on');
+  eq(r.problems, [], 'and the slip adds up');
+}
+
 console.log(`PASS receipt-parse-heading-words — a slip's heading keeps its payment words out of the products (${checks} checks)`);
