@@ -270,6 +270,83 @@ function normalizeAmount(raw, opts) {
   return neg ? -n : n;
 }
 
+/* ---- a column that marks only its credits ----
+
+   normalizeAmount reads a marker per VALUE: "500.00 Cr" is +500 and "100 Dr" is
+   -100. A statement whose Amount column marks money IN with "Cr" and leaves
+   money out bare ("500.00 Cr", "1,234.56") therefore reads both as positive,
+   and negating the whole column cannot separate them. One cell cannot know
+   which kind of column it sits in, so the decision is the COLUMN's, taken from
+   the raw cells (2026-11-17 audit, M2; plausible only - no supported bank is
+   known to export this way, so every case that is not exactly this one must
+   read as it always did).
+
+   amountMark says what ONE cell states about its own sign, from the same
+   markers normalizeAmount reads, and is deliberately wary: anything that might
+   be a sign it did not fully understand is not 'plain'.
+     null        empty cell
+     'plain'     a bare number, no sign and no marker
+     'credit'    a Cr marker, leading or trailing
+     'debit'     Dr / DB, a minus (leading, trailing, or inside a symbol), or brackets
+     'positive'  an explicit plus
+     'unsure'    "CRC 1 000" - letters glued to a leading "Cr" that are more likely
+                 a currency code than a marker
+   No lookbehind (iOS WebKit before 16.4 cannot parse it): the letter before a
+   trailing marker is tested by hand, as normalizeAmount does. */
+function amountMark(raw) {
+  let s = (raw ?? '').toString().trim();
+  if (!s) return null;
+  if (/^\(.*\)$/.test(s)) return 'debit';
+  let mark = null;
+  const lead = s.match(/^(cr|dr)\.?\s*/i);
+  if (lead) {
+    if (lead[1].toLowerCase() === 'dr') return 'debit';
+    if (lead[0] === lead[1] && /^[a-z]/i.test(s.slice(lead[0].length))) return 'unsure';
+    mark = 'credit';
+    s = s.slice(lead[0].length).trim();
+  }
+  const tail = s.match(/(cr|dr|db)\.?\s*$/i);
+  if (tail && !/[a-z]/i.test(s.charAt(tail.index - 1))) {
+    if (tail[1].toLowerCase() !== 'cr') return 'debit';
+    mark = 'credit';
+    s = s.slice(0, tail.index).trim();
+  }
+  if (/[-−－]/.test(s)) return 'debit';
+  if (s.startsWith('+')) return 'positive';
+  return mark || 'plain';
+}
+
+/* True when this column marks its credits and nothing else: at least one
+   NON-ZERO value carries a Cr marker and no cell at all - zero or unreadable
+   included - carries a debit marker, a minus, brackets, a plus or anything
+   amountMark is unsure of. Then, and only then, a bare non-zero value is money
+   out. Every other column - no markers, a Dr anywhere, a minus anywhere - is
+   not this shape, and nothing about it changes. */
+function creditMarkedColumn(cells, opts) {
+  let credit = false;
+  for (const raw of cells || []) {
+    const m = amountMark(raw);
+    if (m === null || m === 'plain') continue;
+    if (m !== 'credit') return false;
+    const v = normalizeAmount(raw, opts);
+    if (v != null && v !== 0) credit = true;
+  }
+  return credit;
+}
+
+/* One amount column, read cell by cell the way normalizeAmount reads it, with
+   the credit-marked rule above applied on top. `plain` is the per-cell reading
+   with no rule, kept so a caller that cannot prove the rule from a balance
+   column can fall back to exactly what it always had; `applied` says whether
+   the column was one that the rule changed anything in. */
+function readAmountColumn(cells, opts) {
+  const list = cells || [];
+  const plain = list.map(raw => normalizeAmount(raw, opts));
+  if (!creditMarkedColumn(list, opts)) return { values: plain, plain, applied: false };
+  const values = plain.map((v, i) => (v != null && v > 0 && amountMark(list[i]) !== 'credit' ? -v : v));
+  return { values, plain, applied: true };
+}
+
 /* Strict numeric-cell parse. Returns { ok, value, raw, readable }. `ok` is true
    only for a plain decimal (the app's on-disk format); anything else (e.g.
    "1 234,56", "R100") is preserved verbatim in `raw` so a serializer can write
@@ -348,4 +425,4 @@ function roundCents(v) {
   return n < 0 && r !== 0 ? -r : r;
 }
 
-module.exports = { normalizeAmount, inferGrouping, parseNum, roundCents };
+module.exports = { normalizeAmount, inferGrouping, parseNum, roundCents, amountMark, creditMarkedColumn, readAmountColumn };
