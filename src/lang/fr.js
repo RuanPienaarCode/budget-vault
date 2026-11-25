@@ -558,8 +558,12 @@ module.exports = {
   },
   'tx.bulk.backup': 'Elles sont d\'abord écrites dans {path}, donc récupérables — la corbeille du coffre ne peut pas annuler cela seule, car les fichiers mensuels sont modifiés et non supprimés.',
   'tx.bulk.splits': {
-    one: '1 d\'entre elles appartient à une ventilation dont les autres lignes ne sont peut-être pas sélectionnées.',
-    other: '{count} d\'entre elles appartiennent à des ventilations dont les autres lignes ne sont peut-être pas sélectionnées.',
+    one: "{count} ligne de plus part avec elles, {total} en tout : une ventilation se supprime en entier — la ligne d'origine et toutes ses parts — pour qu'aucune part ne décrive une ligne disparue.",
+    other: "{count} lignes de plus partent avec elles, {total} en tout : une ventilation se supprime en entier — la ligne d'origine et toutes ses parts — pour qu'aucune part ne décrive une ligne disparue.",
+  },
+  'tx.bulk.splitsLeft': {
+    one: "{count} ligne correspondante est laissée telle quelle : elle appartient à des ventilations identiques du même jour dont les parts ne peuvent pas être distinguées. Placez les parts de chaque ligne d'origine juste en dessous d'elle dans son fichier, de sorte qu'elles en fassent le montant, puis supprimez à nouveau.",
+    other: "{count} lignes correspondantes sont laissées telles quelles : elles appartiennent à des ventilations identiques du même jour dont les parts ne peuvent pas être distinguées. Placez les parts de chaque ligne d'origine juste en dessous d'elle dans son fichier, de sorte qu'elles en fassent le montant, puis supprimez à nouveau.",
   },
   'tx.bulk.confirm': {
     one: 'Supprimer 1 ligne',
@@ -595,6 +599,8 @@ module.exports = {
      split parent row (the why is in en.js) --- */
   'tx.split.chip': 'répartie en {count}',
   'tx.split.chipGap': '{amount} non affecté',
+  'tx.split.chipMissing': 'répartie · parts introuvables',
+  'tx.split.ambiguous': "Les parts de cette ventilation ne peuvent pas être distinguées de celles d'une autre ventilation identique du même jour, donc rien n'a été modifié. Dans {file}, placez les parts de chaque ligne d'origine juste en dessous d'elle, de sorte qu'elles en fassent le montant, puis réessayez.",
   'tx.aria.splitChip': 'Options de ventilation pour {desc} du {date}',
 
   /* Accessible names (audit of 11 Nov 2026, task 19) — machine-assisted, not native-reviewed. */
@@ -609,6 +615,7 @@ module.exports = {
     one: 'Cela supprime la part et rétablit {desc} comme une seule transaction de {amount}.',
     other: 'Cela supprime les {count} parts et rétablit {desc} comme une seule transaction de {amount}.',
   },
+  'tx.unsplit.noParts': "Aucune part de ventilation portant la date et la description de cette ligne n'a été trouvée dans {file} ; elle reste donc ventilée et hors des totaux. Si sa date ou sa description a été modifiée, remettez-la pour qu'elle corresponde à ses parts ; si ses parts ont été supprimées, videz les cellules Excluded et Split de cette ligne dans le fichier.",
 
   'tx.add.noAccount': 'Ajoutez d\'abord un compte — chaque transaction appartient à un compte',
   'tx.add.title': 'Ajouter une transaction',
@@ -1951,6 +1958,10 @@ module.exports = {
   'tx.bulkCat.msg': {
     one: '1 ligne sera définie sur {cat}.',
     other: '{count} lignes seront définies sur {cat}.',
+  },
+  'tx.bulkCat.splitsSkipped': {
+    one: '{count} ligne correspondante appartient à une ventilation et garde sa catégorie — modifiez-la sur sa propre ligne.',
+    other: '{count} lignes correspondantes appartiennent à des ventilations et gardent leurs catégories — modifiez-les sur leurs propres lignes.',
   },
   'tx.bulkCat.confirm': {
     one: 'Définir la catégorie (1)',

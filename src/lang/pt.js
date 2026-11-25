@@ -569,8 +569,12 @@ module.exports = {
   },
   'tx.bulk.backup': 'Elas são gravadas antes em {path}, para poderem ser trazidas de volta — a lixeira do cofre não desfaz isto sozinha, porque os arquivos mensais são editados e não excluídos.',
   'tx.bulk.splits': {
-    one: '1 delas pertence a uma divisão, cujas outras linhas os filtros podem não ter selecionado.',
-    other: '{count} delas pertencem a divisões, cujas outras linhas os filtros podem não ter selecionado.',
+    one: 'Mais {count} linha vai junto, {total} no total: uma divisão é excluída inteira — a linha original e todas as partes — para que nenhuma parte fique descrevendo uma linha que já não existe.',
+    other: 'Mais {count} linhas vão junto, {total} no total: uma divisão é excluída inteira — a linha original e todas as partes — para que nenhuma parte fique descrevendo uma linha que já não existe.',
+  },
+  'tx.bulk.splitsLeft': {
+    one: '{count} linha correspondente fica como está: pertence a divisões idênticas do mesmo dia cujas partes não podem ser distinguidas. Coloque as partes de cada linha original logo abaixo dela no arquivo, somando o valor dela, e exclua de novo.',
+    other: '{count} linhas correspondentes ficam como estão: pertencem a divisões idênticas do mesmo dia cujas partes não podem ser distinguidas. Coloque as partes de cada linha original logo abaixo dela no arquivo, somando o valor dela, e exclua de novo.',
   },
   'tx.bulk.confirm': {
     one: 'Excluir 1 linha',
@@ -606,6 +610,8 @@ module.exports = {
      split parent row (the why is in en.js) --- */
   'tx.split.chip': 'dividida em {count}',
   'tx.split.chipGap': '{amount} não atribuído',
+  'tx.split.chipMissing': 'dividida · partes não encontradas',
+  'tx.split.ambiguous': 'As partes desta divisão não podem ser distinguidas das de outra divisão idêntica do mesmo dia, então nada foi alterado. Em {file}, coloque as partes de cada linha original logo abaixo dela, somando o valor dela, e tente de novo.',
   'tx.aria.splitChip': 'Opções de divisão para {desc} em {date}',
 
   /* Accessible names (audit of 11 Nov 2026, task 19) — machine-assisted, not native-reviewed. */
@@ -620,6 +626,7 @@ module.exports = {
     one: 'Isto remove a parte e devolve {desc} como uma única transação de {amount}.',
     other: 'Isto remove as {count} partes e devolve {desc} como uma única transação de {amount}.',
   },
+  'tx.unsplit.noParts': 'Nenhuma parte de divisão com a data e a descrição desta linha foi encontrada em {file}, então ela continua dividida e fora dos totais. Se a data ou a descrição foi editada, volte ao que corresponde às partes; se as partes foram apagadas, esvazie as células Excluded e Split desta linha no arquivo.',
 
   'tx.add.noAccount': 'Crie uma conta primeiro — toda transação pertence a uma',
   'tx.add.title': 'Adicionar transação',
@@ -1953,6 +1960,10 @@ module.exports = {
   'tx.bulkCat.msg': {
     one: '1 linha será definida como {cat}.',
     other: '{count} linhas serão definidas como {cat}.',
+  },
+  'tx.bulkCat.splitsSkipped': {
+    one: '{count} linha correspondente pertence a uma divisão e mantém a categoria — altere-a na própria linha.',
+    other: '{count} linhas correspondentes pertencem a divisões e mantêm as categorias — altere-as nas próprias linhas.',
   },
   'tx.bulkCat.confirm': {
     one: 'Definir categoria (1)',

@@ -534,7 +534,10 @@ module.exports = {
   },
   'tx.bulk.backup': '削除前に {path} へ書き出すので元に戻せます — 月別ファイルは削除ではなく編集されるため、保管庫のゴミ箱だけでは戻せません。',
   'tx.bulk.splits': {
-    other: 'そのうち {count} 件は分割に属し、対になる行は絞り込みに含まれていない可能性があります。',
+    other: '分割は丸ごと削除されるため、さらに {count} 行が一緒に削除され、合計 {total} 行になります（元の行とそのすべての明細）。なくなった行を指す明細は残りません。',
+  },
+  'tx.bulk.splitsLeft': {
+    other: '一致した {count} 行はそのまま残します。同じ日の同一の分割に属し、どの明細がどちらのものか区別できません。ファイル内で元の行それぞれの直下に、その金額と一致する明細を並べてから、もう一度削除してください。',
   },
   'tx.bulk.confirm': {
     other: '{count} 行を削除',
@@ -563,6 +566,8 @@ module.exports = {
      split parent row (the why is in en.js) --- */
   'tx.split.chip': '{count} 件に分割',
   'tx.split.chipGap': '{amount} が未計上',
+  'tx.split.chipMissing': '分割 · 明細が見つかりません',
+  'tx.split.ambiguous': 'この分割の明細は、同じ日の同一の分割の明細と区別できないため、何も変更していません。{file} で元の行それぞれの直下に、その金額と一致する明細を並べてから、もう一度お試しください。',
   'tx.aria.splitChip': '{date} の {desc} の分割オプション',
 
   /* Accessible names (audit of 11 Nov 2026, task 19) — machine-assisted, not native-reviewed. */
@@ -576,6 +581,7 @@ module.exports = {
   'tx.unsplit.msg': {
     other: '分割された {count} 件の明細を削除し、{desc} を {amount} の 1 件の取引に戻します。',
   },
+  'tx.unsplit.noParts': '{file} にこの行と同じ日付・説明の分割明細が見つからないため、分割のまま集計の対象外にしています。日付や説明を編集した場合は明細と一致するように戻してください。明細を削除した場合は、ファイル内のこの行の Excluded と Split のセルを空にしてください。',
 
   'tx.add.noAccount': '先に口座を追加してください — 取引は必ずいずれかの口座に属します',
   'tx.add.title': '取引を追加',
@@ -1850,6 +1856,9 @@ module.exports = {
   'tx.bulkCat.title': 'これらの行のカテゴリを設定',
   'tx.bulkCat.msg': {
     other: '{count} 行を {cat} に設定します。',
+  },
+  'tx.bulkCat.splitsSkipped': {
+    other: '一致した {count} 行は分割に属するため、カテゴリはそのままです — 各行で個別に変更してください。',
   },
   'tx.bulkCat.confirm': {
     other: 'カテゴリを設定（{count}）',

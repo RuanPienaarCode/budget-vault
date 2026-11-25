@@ -210,39 +210,69 @@ function amountCents(v) {
       rows with its date and description that follows it in the file's row
       order — up to the first row that is not one.
 
-   A twin parent with NO such run under it — a hand-reordered file — falls back
-   to every part with that key, as in case 1, so no row is stranded. That
-   answer is a guess and says nothing about whose parts they are:
-   splitPartsAmbiguous is how a caller finds out, to say so before it removes
-   anything. A parent that is not among `rows` has no position, so it falls back
-   the same way. */
+   Position is only trusted when it ADDS UP, for every twin at once. It used to
+   be trusted whenever a run existed, and a hand-reordered file is exactly
+   where a run exists by accident (2026-11-25 audit, TXN-1). Sorted by the
+   Split column — [R100 parent, R50 parent, -60, -40, -30, -20] — the R50
+   parent's "run" was all four parts and nothing was flagged: Delete on it said
+   "Its 4 split parts go with it", took the R100's parts too, and left the R100
+   excluded with nothing describing it, out of every total. Sorted by Amount —
+   [R100, -60, R50, -40, -30, -20] — R100 claimed only the -60, and an un-split
+   on it left the -40 behind, counted on top of the restored line.
+
+   So a twin's answer stands only when EVERY parent sharing the key has a run
+   under it that sums to that parent to the cent (splitShortfall, the chip's
+   own arithmetic, so "adds up" means one thing in this module) AND the runs
+   between them take every part carrying the key. The question is asked of the
+   whole group, so the twins are either all told apart or all flagged — never
+   one confident answer beside a guess. A tidy file always passes: the page
+   splices a split's parts in under it and the dialog only writes parts that
+   sum to their parent.
+
+   Anything less falls back to every part with that key, as in case 1, so no
+   row is stranded. That answer is a guess and says nothing about whose parts
+   they are: splitPartsAmbiguous is how a caller finds out, and every caller
+   that REMOVES parts refuses on it rather than acting on a guess. A parent that
+   is not among `rows` has no position, so it falls back the same way. */
 function partsOfKey(rows, parent) {
   return rows.filter(x => x !== parent && splitRole(x && x.split) === SPLIT_PART
     && x.date === parent.date && x.desc === parent.desc);
 }
+function runUnder(rows, parent) {
+  const run = [];
+  for (let i = rows.indexOf(parent) + 1; i > 0 && i < rows.length; i++) {
+    const x = rows[i];
+    if (!(splitRole(x && x.split) === SPLIT_PART && x.date === parent.date && x.desc === parent.desc)) break;
+    run.push(x);
+  }
+  return run;
+}
 function resolveSplitParts(rows, parent) {
   rows = rows || [];
   const all = partsOfKey(rows, parent);
-  if (!splitParentsSharingKey(rows, parent).length) return { parts: all, ambiguous: false };
-  const at = rows.indexOf(parent);
-  const run = [];
-  if (at >= 0) {
-    for (let i = at + 1; i < rows.length; i++) {
-      const x = rows[i];
-      if (!(splitRole(x && x.split) === SPLIT_PART && x.date === parent.date && x.desc === parent.desc)) break;
-      run.push(x);
-    }
+  const twins = splitParentsSharingKey(rows, parent);
+  if (!twins.length) return { parts: all, ambiguous: false };
+  const guess = { parts: all, ambiguous: true };
+  if (rows.indexOf(parent) < 0) return guess;
+  let claimed = 0, mine = null;
+  for (const p of [parent, ...twins]) {
+    const run = runUnder(rows, p);
+    if (!run.length || splitShortfall(p, run)) return guess;
+    claimed += run.length;
+    if (p === parent) mine = run;
   }
-  return run.length ? { parts: run, ambiguous: false } : { parts: all, ambiguous: true };
+  // Runs end at the next parent, so they cannot overlap: a count is enough.
+  return claimed === all.length ? { parts: mine, ambiguous: false } : guess;
 }
 function splitPartsOf(rows, parent) {
   return resolveSplitParts(rows, parent).parts;
 }
 
 /* True when splitPartsOf had to fall back to every part with the parent's key
-   because another identical split shares it and no run of parts sits under this
-   parent: the count it returned may include the other split's parts. False on
-   every unambiguous split, including a twin told apart by position. */
+   because another identical split shares it and position could not tell the
+   twins apart (some twin's run is missing, does not add up to it, or leaves a
+   part unclaimed): the count it returned may include the other split's parts.
+   False on every unambiguous split, including a twin told apart by position. */
 function splitPartsAmbiguous(rows, parent) {
   return resolveSplitParts(rows, parent).ambiguous;
 }
@@ -257,7 +287,62 @@ function splitParentsSharingKey(rows, parent) {
     && x.date === parent.date && x.desc === parent.desc);
 }
 
+/* A selection of rows in ONE file, widened so that no split is cut in half.
+
+   Built for the bulk delete (2026-11-25 audit, TXN-3), which removed exactly
+   the rows the filters selected. A category filter selects a parent and only
+   the parts in that category, so the delete left the other parts behind with
+   no parent: still counted (a part is an ordinary row to every total), so the
+   account total kept money for a line that no longer existed, and the dedup
+   key went with the parent, so re-importing the statement added the whole
+   line back on top of the orphans. The single-row Delete already takes a
+   parent's parts with it; this is that rule for a set.
+
+     • a selected parent brings all its parts (splitPartsOf);
+     • a selected part brings its parent and its sibling parts;
+     • a part whose parent is gone (no parent row carries its date and
+       description) is just itself — there is nothing to complete.
+
+   When twins cannot be told apart (splitPartsAmbiguous) there is no "its
+   parts" to complete with, so the key's whole group — every parent and every
+   part with that date and description — is the unit. Taken only when the
+   selection already holds ALL of it (deleting a whole statement imported into
+   the wrong account must still work on a scrambled file); otherwise every
+   selected row of that group is LEFT, not guessed at, and returned in `left`
+   so the caller can say how many and why.
+
+   Returns { take, left }, both in file order. `take` includes the selected
+   rows it keeps, so `take.length - (selected kept)` is what was added. */
+function wholeSplits(rows, selected) {
+  rows = rows || [];
+  const sel = new Set(selected || []);
+  const take = new Set(), left = new Set();
+  for (const r of rows) {
+    if (!sel.has(r) || take.has(r) || left.has(r)) continue;
+    const role = splitRole(r && r.split);
+    if (!role) { take.add(r); continue; }
+    const parents = role === SPLIT_PARENT ? [r, ...splitParentsSharingKey(rows, r)]
+      : rows.filter(x => splitRole(x && x.split) === SPLIT_PARENT && x.date === r.date && x.desc === r.desc);
+    if (!parents.length) { take.add(r); continue; }
+    if (resolveSplitParts(rows, parents[0]).ambiguous) {
+      const group = [...parents, ...partsOfKey(rows, parents[0])];
+      if (group.every(x => sel.has(x))) group.forEach(x => take.add(x));
+      else group.forEach(x => { if (sel.has(x)) left.add(x); });
+      continue;
+    }
+    /* Not ambiguous, so the runs took every part with this key and exactly
+       one parent owns `r`. The fallback to `r` alone cannot be reached by the
+       rule above; it is there so a future change to that rule leaves a row
+       the reader selected rather than throwing inside a delete. */
+    const owner = role === SPLIT_PARENT ? r : parents.find(p => splitPartsOf(rows, p).includes(r));
+    if (!owner) { take.add(r); continue; }
+    take.add(owner);
+    for (const x of splitPartsOf(rows, owner)) take.add(x);
+  }
+  return { take: rows.filter(x => take.has(x)), left: rows.filter(x => left.has(x)) };
+}
+
 module.exports = {
   SPLIT_PARENT, SPLIT_PART, splitRole, supersededBySplit, isSplitPart, applySplit, splitShortfall,
-  splitPartsOf, splitPartsAmbiguous, splitParentsSharingKey, amountCents,
+  splitPartsOf, splitPartsAmbiguous, splitParentsSharingKey, amountCents, wholeSplits,
 };
