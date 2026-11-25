@@ -456,6 +456,9 @@ module.exports = {
   'bud.copy.done': {
     other: '前の期間から {count} 件のカテゴリをコピーしました',
   },
+  'bud.copy.doneFrom': {
+    other: '予算のある直近の過去の期間 {period} から {count} 件のカテゴリをコピーしました',
+  },
   'bud.copy.nothing': 'コピーするものがありません — すべてのカテゴリにすでに値があります',
 
   /* =========================== Transactions page ========================== */
@@ -783,6 +786,22 @@ module.exports = {
   /* Accessible names (audit of 11 Nov 2026, task 19) — machine-assisted, not native-reviewed. */
   'cat.aria.current': '{label} — 現在は {value}',
   'cat.aria.currentNone': '{label} — 現在はカテゴリなし',
+
+  'cat.delete.title': 'カテゴリを削除',
+  'cat.delete.confirm': '削除',
+  'cat.delete.lead': '「{name}」を削除しますか？',
+  'cat.delete.unused': 'このカテゴリを使っている取引はありません。過去の予算ファイルは変わりません。',
+  'cat.delete.used': {
+    other: '{count} 件の取引がこのカテゴリに分類されています。',
+  },
+  'cat.delete.kindLost': 'カテゴリの種類（「{kind}」）はそのファイルから読み込まれるため、ファイルを削除すると、このカテゴリに分類されたお金からその種類が失われます。',
+  'cat.delete.effect.income': 'このカテゴリで入ったお金は、再分類するまで、過去の期間を含むすべての期間で収入として数えられなくなります。',
+  'cat.delete.effect.transfer': 'このカテゴリで動いたお金は、再分類するまで、過去の期間を含むすべての期間で振替ではなくなり、未分類の支出として数えられます。',
+  'cat.delete.effect.other': 'このカテゴリに分類されたお金は、再分類するまで、過去の期間を含むすべての期間で未分類の支出として数えられます。',
+  'cat.delete.rules': {
+    other: '{count} 件の分類ルールが、新しい取り込みを引き続き「{name}」に分類し、今後も続けます。',
+  },
+  'cat.delete.trash': 'カテゴリのファイルは保管庫のゴミ箱に移動します。',
 
   'acct.err.exists': 'その口座はすでに存在します',
   'acct.err.save': '{name} を保存できませんでした（{error}）— ファイルには何も書き込まれていません。もう一度お試しください。',

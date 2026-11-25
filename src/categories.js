@@ -189,6 +189,46 @@ module.exports = function registerCategories(ctx) {
     return wrap;
   }
 
+  /* What the delete confirm says (2026-11-25 audit, BUD-1). It used to read
+     "Past budget files are not changed", which is true of the budget files and
+     hides the thing that does change: a transaction's kind (income / transfer /
+     spending) is looked up from its category's NOTE (ledger.js), so trashing
+     the note takes the kind from every row filed under it, in EVERY period
+     the rows fall in. An income category's money stops counting as income; a
+     transfer category's rows become uncategorised spending. So when anything
+     is filed under the name the dialog says how many rows, which kind goes,
+     and what the figures do until the rows are re-categorised.
+
+     The categorisation rules that name the category are counted too: they are
+     not touched by a delete (RUL-9), so they go on filing new imports under a
+     name with no note, and the same rows come back after the reader has
+     tidied them. Said here, not fixed: whether an in-use category should be
+     archived or refused is the owner's decision, and the delete stays
+     possible.
+
+     Built from sentences (cat.delete.*) so each can be left out and each can
+     take its own plural; the kind is the group's translated name, falling back
+     to the stored word the way views/budgets.js typeGroupLabel does. */
+  function deleteMessage(name, used, known) {
+    const type = (known && known.type) || '';
+    const key = 'wiz.type.' + type;
+    const word = type ? i18n.t(key) : '';
+    const kind = word && word !== key ? word : type;
+    const parts = [i18n.t('cat.delete.lead', { name })];
+    if (used) {
+      parts.push(i18n.t('cat.delete.used', { count: used }));
+      if (kind) parts.push(i18n.t('cat.delete.kindLost', { kind }));
+      parts.push(i18n.t(type === 'income' ? 'cat.delete.effect.income'
+        : type === 'transfer' ? 'cat.delete.effect.transfer' : 'cat.delete.effect.other'));
+    } else {
+      parts.push(i18n.t('cat.delete.unused'));
+    }
+    const rules = (S.rules || []).filter(r => r.category === name).length;
+    if (rules) parts.push(i18n.t('cat.delete.rules', { count: rules, name }));
+    parts.push(i18n.t('cat.delete.trash'));
+    return parts.join(' ');
+  }
+
   /* Delete a category after confirmation: the file goes to the vault's trash
      (recoverable), the in-memory list drops it. Existing transactions and past
      budget files are deliberately untouched — selects already render a stored
@@ -239,11 +279,9 @@ module.exports = function registerCategories(ctx) {
     }
     const op = opWriterOf(ctx);   // `known`, `file` and S.categories below are this load's
     const ok = await confirmModal(app, {
-      title: 'Delete category',
-      message: `Delete "${name}"? ` +
-        (used ? `${used} existing transaction${used === 1 ? '' : 's'} keep the name and will show it as "(missing)" until re-categorised. ` : '') +
-        'Past budget files are not changed, and the category file goes to your vault trash.',
-      confirmText: 'Delete',
+      title: i18n.t('cat.delete.title'),
+      message: deleteMessage(name, used, known),
+      confirmText: i18n.t('cat.delete.confirm'),
     });
     if (!ok) return false;
     const gone = op.replaced();

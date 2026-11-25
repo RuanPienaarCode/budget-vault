@@ -475,6 +475,10 @@ module.exports = {
     one: 'Kukhutshelwe udidi olungu-{count} ukusuka kwixesha elidlulileyo',
     other: 'Kukhutshelwe iindidi ezingu-{count} ukusuka kwixesha elidlulileyo',
   },
+  'bud.copy.doneFrom': {
+    one: 'Kukhutshelwe udidi olungu-{count} ukusuka ku-{period}, ixesha langaphambili lamva nje elinebhajethi',
+    other: 'Kukhutshelwe iindidi ezingu-{count} ukusuka ku-{period}, ixesha langaphambili lamva nje elinebhajethi',
+  },
   'bud.copy.nothing': 'Akukho nto yokukhuphela — lonke udidi sele lunexabiso',
 
   /* =========================== Transactions page ========================== */
@@ -834,6 +838,24 @@ module.exports = {
   /* Accessible names (audit of 11 Nov 2026, task 19) — machine-assisted, not native-reviewed. */
   'cat.aria.current': '{label} — okwangoku {value}',
   'cat.aria.currentNone': '{label} — okwangoku akunadidi',
+
+  'cat.delete.title': 'Cima udidi',
+  'cat.delete.confirm': 'Cima',
+  'cat.delete.lead': 'Cima "{name}"?',
+  'cat.delete.unused': 'Akukho nkqubo esebenzisa oludidi. Iifayile zebhajethi zangaphambili azitshintshi.',
+  'cat.delete.used': {
+    one: '{count} inkqubo ifayilwe phantsi kwalo.',
+    other: '{count} iinkqubo zifayilwe phantsi kwalo.',
+  },
+  'cat.delete.kindLost': 'Uhlobo lodidi ("{kind}") lufundwa kwifayile yalo, ngoko ukucima ifayile kususa olo hlobo kwimali efayilwe phantsi kwalo.',
+  'cat.delete.effect.income': 'Imali engene phantsi kwalo ayisabalwa njengengeniso, kuwo onke amaxesha, kuquka adlulileyo, de iphinde ibekwe esikweni.',
+  'cat.delete.effect.transfer': 'Imali ehambe phantsi kwalo ayisaluguqulelo kwaye ibalwa njengendleko engenadidi, kuwo onke amaxesha, kuquka adlulileyo, de iphinde ibekwe esikweni.',
+  'cat.delete.effect.other': 'Imali efayilwe phantsi kwalo ibalwa njengendleko engenadidi kuwo onke amaxesha, kuquka adlulileyo, de iphinde ibekwe esikweni.',
+  'cat.delete.rules': {
+    one: '{count} umthetho wokwahlula usafayila ukungeniswa okutsha phantsi kwe-"{name}" kwaye uya kuqhubeka wenjenjalo.',
+    other: '{count} imithetho yokwahlula isafayila ukungeniswa okutsha phantsi kwe-"{name}" kwaye iya kuqhubeka yenjenjalo.',
+  },
+  'cat.delete.trash': 'Ifayile yodidi iya kwindawo yenkunkuma yevolti yakho.',
 
   'acct.err.exists': 'Iakhawunti sele ikho',
   'acct.err.save': 'Ayikwazanga ukugcina u-{name} ({error})',

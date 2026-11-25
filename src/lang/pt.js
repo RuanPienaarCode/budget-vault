@@ -477,6 +477,10 @@ module.exports = {
     one: 'Copiamos {count} categoria do período anterior',
     other: 'Copiamos {count} categorias do período anterior',
   },
+  'bud.copy.doneFrom': {
+    one: 'Copiamos {count} categoria de {period}, o período anterior mais recente com orçamento',
+    other: 'Copiamos {count} categorias de {period}, o período anterior mais recente com orçamento',
+  },
   'bud.copy.nothing': 'Nada a copiar — todas as categorias já têm um valor',
 
   /* =========================== Transactions page ========================== */
@@ -836,6 +840,24 @@ module.exports = {
   /* Accessible names (audit of 11 Nov 2026, task 19) — machine-assisted, not native-reviewed. */
   'cat.aria.current': '{label} — atualmente {value}',
   'cat.aria.currentNone': '{label} — atualmente sem categoria',
+
+  'cat.delete.title': 'Excluir categoria',
+  'cat.delete.confirm': 'Excluir',
+  'cat.delete.lead': 'Excluir "{name}"?',
+  'cat.delete.unused': 'Nenhuma transação a usa. Os arquivos de orçamento anteriores não mudam.',
+  'cat.delete.used': {
+    one: '{count} transação está classificada nela.',
+    other: '{count} transações estão classificadas nela.',
+  },
+  'cat.delete.kindLost': 'O tipo de uma categoria ("{kind}") é lido do arquivo dela, então excluir o arquivo tira esse tipo do dinheiro classificado nela.',
+  'cat.delete.effect.income': 'O dinheiro que entrou nela deixa de contar como receita, em todos os períodos, inclusive os passados, até ser reclassificado.',
+  'cat.delete.effect.transfer': 'O dinheiro que se moveu nela deixa de ser uma transferência e conta como gasto sem categoria, em todos os períodos, inclusive os passados, até ser reclassificado.',
+  'cat.delete.effect.other': 'O dinheiro classificado nela conta como gasto sem categoria em todos os períodos, inclusive os passados, até ser reclassificado.',
+  'cat.delete.rules': {
+    one: '{count} regra de categorização ainda classifica as novas importações em "{name}" e vai continuar fazendo isso.',
+    other: '{count} regras de categorização ainda classificam as novas importações em "{name}" e vão continuar fazendo isso.',
+  },
+  'cat.delete.trash': 'O arquivo da categoria vai para a lixeira do seu cofre.',
 
   'acct.err.exists': 'Essa conta já existe',
   'acct.err.save': 'Não foi possível salvar {name} ({error}) — nada foi gravado no arquivo; tente a mesma ação de novo.',

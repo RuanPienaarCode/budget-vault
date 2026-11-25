@@ -460,6 +460,10 @@ module.exports = {
     one: '{count} kategorie uit die vorige tydperk gekopieer',
     other: '{count} kategorieë uit die vorige tydperk gekopieer',
   },
+  'bud.copy.doneFrom': {
+    one: '{count} kategorie uit {period} gekopieer, die jongste vroeëre tydperk met \'n begroting',
+    other: '{count} kategorieë uit {period} gekopieer, die jongste vroeëre tydperk met \'n begroting',
+  },
   'bud.copy.nothing': 'Niks om te kopieer nie — elke kategorie het reeds \'n waarde',
 
   /* =========================== Transactions page ========================== */
@@ -819,6 +823,24 @@ module.exports = {
   /* Accessible names (audit of 11 Nov 2026, task 19) — machine-assisted, not native-reviewed. */
   'cat.aria.current': '{label} — tans {value}',
   'cat.aria.currentNone': '{label} — tans ongekategoriseer',
+
+  'cat.delete.title': 'Vee kategorie uit',
+  'cat.delete.confirm': 'Vee uit',
+  'cat.delete.lead': 'Vee "{name}" uit?',
+  'cat.delete.unused': 'Geen transaksie gebruik dit nie. Vorige begrotingslêers word nie verander nie.',
+  'cat.delete.used': {
+    one: '{count} transaksie is onder hierdie kategorie gêer.',
+    other: '{count} transaksies is onder hierdie kategorie gêer.',
+  },
+  'cat.delete.kindLost': '\'n Kategorie se soort ("{kind}") word uit sy lêer gelees, so as die lêer uitgevee word, verdwyn daardie soort van die geld wat daaronder gêer is.',
+  'cat.delete.effect.income': 'Geld wat daaronder inkom, tel nie meer as inkomste nie, in elke tydperk, ook vorige, totdat dit herkategoriseer word.',
+  'cat.delete.effect.transfer': 'Geld wat daaronder beweeg het, is nie meer \'n oordrag nie en tel as ongekategoriseerde besteding, in elke tydperk, ook vorige, totdat dit herkategoriseer word.',
+  'cat.delete.effect.other': 'Geld wat daaronder gêer is, tel as ongekategoriseerde besteding in elke tydperk, ook vorige, totdat dit herkategoriseer word.',
+  'cat.delete.rules': {
+    one: '{count} kategoriseringsreël sorteer nuwe invoere steeds onder "{name}" en sal dit bly doen.',
+    other: '{count} kategoriseringsreëls sorteer nuwe invoere steeds onder "{name}" en sal dit bly doen.',
+  },
+  'cat.delete.trash': 'Die kategorielêer gaan na jou kluis se asblik.',
 
   'acct.err.exists': 'Rekening bestaan reeds',
   'acct.err.save': 'Kon nie {name} stoor nie ({error}) — niks is na die lêer geskryf nie; probeer weer.',

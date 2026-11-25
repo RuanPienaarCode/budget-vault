@@ -26,6 +26,7 @@ const { normalizeAmount, parseNum } = require('./amount');
 const { todayIso } = require('./dates');
 const { largestRemainder } = require('./share-percents');
 const { fileOutsideWindow } = require('./misfiled');
+const { rowIsWritten } = require('./budget-file');
 
 /* ADR-0007 · One readable-balance rule. The loader parses "about 300" to 0 and
    keeps the text in `balanceRaw`; only when normalizeAmount ALSO fails on that
@@ -126,6 +127,25 @@ function printedParts(values, total) {
   const nums = values.map(v => Number(v) || 0);
   const sum = total === undefined ? nums.reduce((s, v) => s + v, 0) : Number(total) || 0;
   return largestRemainder(nums, printedWhole(sum));
+}
+
+/* "includes R x already spent" — the assume-spent provision's sentence, with
+   ONE threshold and ONE rounding for every surface that prints it (2026-11-25
+   audit, NUM-7). The Dashboard hero hid it below R 1 and printed whole rands;
+   the Budget strip printed it from a cent, rounding R 0,52 up to "R 1"; the
+   Report printed it from a cent, to the cent. Three readings of one figure,
+   two of them a sentence about rounding noise the third never said.
+
+   The Dashboard's rule is the one kept: a provision under one currency unit is
+   nothing worth a sentence, and what is said is said in whole units. Returns
+   the formatted amount for the sentence, or '' when there is nothing to say,
+   so a caller cannot take the threshold and forget the rounding.
+   `money(v, decimals)` is the caller's formatter (ctx.money, the Report's
+   injected one). */
+const ASSUMED_NOTE_MIN = 1;
+function assumedNoteAmount(assumed, money) {
+  const a = Number(assumed);
+  return a >= ASSUMED_NOTE_MIN ? money(a, 0) : '';
 }
 
 /* The tone of "{pct}% of spending budget used", ONE rule for the Dashboard
@@ -266,8 +286,10 @@ module.exports = function registerFigures(ctx) {
                     into the emergency fund being as allocated as a rand of
                     groceries (ISSUE 40)
        hasIncomeRow a row that came from the file or was deliberately touched
-                    (inFile), never a zero row the draft seeded for a category
-                    nobody has budgeted
+                    (an amount or a note typed into it), never a zero row the
+                    draft seeded for a category nobody has budgeted — the
+                    rule Save uses to decide a row is written, budget-file.js
+                    rowIsWritten (BUD-8, 2026-11-25 audit)
        incomeBase   the plan's own income; a finished period's actual income
                     stands in when the plan names none (ISSUE 73: finished
                     means BEFORE today's period, a future one has not)
@@ -282,7 +304,7 @@ module.exports = function registerFigures(ctx) {
     const rows = (opts && opts.rows) || S.budgets[p] || [];
     const totals = budgetTotalsOf(rows);
     const total = totals.spend + totals.setAside;
-    const hasIncomeRow = rows.some(r => budgetRowType(r) === 'income' && r.inFile !== false);
+    const hasIncomeRow = rows.some(r => budgetRowType(r) === 'income' && rowIsWritten(r));
     const actualIncome = periodSummary(p).income;
     const periodFinished = p < currentPeriod();
     const args = { budgetIncome: totals.income, actualIncome, periodFinished };
@@ -491,3 +513,4 @@ module.exports.remainderDecimals = remainderDecimals;
 module.exports.printedRemainder = printedRemainder;
 module.exports.printedParts = printedParts;
 module.exports.usedToneClass = usedToneClass;
+module.exports.assumedNoteAmount = assumedNoteAmount;

@@ -504,6 +504,10 @@ module.exports = {
     one: 'Copied {count} category from the previous period',
     other: 'Copied {count} categories from the previous period',
   },
+  'bud.copy.doneFrom': {
+    one: 'Copied {count} category from {period}, the latest earlier period with a budget',
+    other: 'Copied {count} categories from {period}, the latest earlier period with a budget',
+  },
   'bud.copy.nothing': 'Nothing to copy — every category already has a value',
 
   /* =========================== Transactions page ========================== */
@@ -899,6 +903,30 @@ module.exports = {
      sentence, not a category called "uncategorised" dropped into one. */
   'cat.aria.current': '{label} — currently {value}',
   'cat.aria.currentNone': '{label} — currently uncategorised',
+
+  /* The delete-category confirm (categories.js promptDeleteCategory), built
+     from sentences so each can be left out: the count and the rule sentence
+     take `count` for their plural, and a category's kind is a word the file
+     itself holds ({kind} is its translated group name). What a delete changes
+     is told by kind, because a transaction's kind is read from the category's
+     note — income stops counting as income, a transfer becomes spending. */
+  'cat.delete.title': 'Delete category',
+  'cat.delete.confirm': 'Delete',
+  'cat.delete.lead': 'Delete "{name}"?',
+  'cat.delete.unused': 'No transaction uses it. Past budget files are not changed.',
+  'cat.delete.used': {
+    one: '{count} transaction is filed under it.',
+    other: '{count} transactions are filed under it.',
+  },
+  'cat.delete.kindLost': 'A category\'s kind ("{kind}") is read from its file, so deleting the file removes that kind from the money filed under it.',
+  'cat.delete.effect.income': 'Money that came in under it stops counting as income, in every period, past ones included, until it is re-categorised.',
+  'cat.delete.effect.transfer': 'Money that moved under it stops being a transfer and counts as uncategorised spending, in every period, past ones included, until it is re-categorised.',
+  'cat.delete.effect.other': 'Money filed under it counts as uncategorised spending in every period, past ones included, until it is re-categorised.',
+  'cat.delete.rules': {
+    one: '{count} categorisation rule still files new imports under "{name}", and will keep doing so.',
+    other: '{count} categorisation rules still file new imports under "{name}", and will keep doing so.',
+  },
+  'cat.delete.trash': 'The category file goes to your vault trash.',
 
   'acct.err.exists': 'Account already exists',
   'acct.err.save': 'Could not save {name} ({error}) — nothing was written to the file; try the same action again.',

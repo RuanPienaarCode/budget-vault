@@ -251,7 +251,8 @@ const keysOf = (root, prefix) => descend(root).map(e => e.getAttribute('data-foc
       // Delete a category whose row is in this period's file: the row stays.
       await press(need(t, 'del:Groceries'));
       ok(!M.S.categories.some(c => c.name === 'Groceries'), 'the category is deleted');
-      landed('del:Groceries', 'deleting a category whose budget row stays lands on that row\'s delete');
+      eq(keyed(t, 'del:Groceries'), null, 'the row that stays has no Delete left: its category is gone (BUD-10a)');
+      landed('clear:Groceries', 'deleting a category whose budget row stays lands on that row\'s Clear, the one button left in its cell');
 
       // Delete one whose row is virtual: the row goes, and the next moves up.
       {
