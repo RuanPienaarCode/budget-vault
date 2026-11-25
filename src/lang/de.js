@@ -461,6 +461,10 @@ module.exports = {
     one: '{count} Kategorie aus dem vorherigen Zeitraum kopiert',
     other: '{count} Kategorien aus dem vorherigen Zeitraum kopiert',
   },
+  'bud.copy.doneFrom': {
+    one: '{count} Kategorie aus {period} kopiert, dem letzten früheren Zeitraum mit Budget',
+    other: '{count} Kategorien aus {period} kopiert, dem letzten früheren Zeitraum mit Budget',
+  },
   'bud.copy.nothing': 'Nichts zu kopieren — jede Kategorie hat bereits einen Wert',
 
   /* =========================== Transactions page ========================== */
@@ -813,6 +817,24 @@ module.exports = {
   /* Accessible names (audit of 11 Nov 2026, task 19) — machine-assisted, not native-reviewed. */
   'cat.aria.current': '{label} — derzeit {value}',
   'cat.aria.currentNone': '{label} — derzeit ohne Kategorie',
+
+  'cat.delete.title': 'Kategorie löschen',
+  'cat.delete.confirm': 'Löschen',
+  'cat.delete.lead': '„{name}“ löschen?',
+  'cat.delete.unused': 'Keine Buchung verwendet sie. Frühere Budgetdateien bleiben unverändert.',
+  'cat.delete.used': {
+    one: '{count} Buchung ist ihr zugeordnet.',
+    other: '{count} Buchungen sind ihr zugeordnet.',
+  },
+  'cat.delete.kindLost': 'Die Art einer Kategorie („{kind}“) wird aus ihrer Datei gelesen. Mit dem Löschen der Datei verliert das zugeordnete Geld diese Art.',
+  'cat.delete.effect.income': 'Geld, das dort eingegangen ist, zählt nicht mehr als Einnahme, in jedem Zeitraum, auch in früheren, bis es neu kategorisiert wird.',
+  'cat.delete.effect.transfer': 'Geld, das dort bewegt wurde, ist keine Umbuchung mehr und zählt als nicht kategorisierte Ausgabe, in jedem Zeitraum, auch in früheren, bis es neu kategorisiert wird.',
+  'cat.delete.effect.other': 'Geld, das ihr zugeordnet ist, zählt als nicht kategorisierte Ausgabe, in jedem Zeitraum, auch in früheren, bis es neu kategorisiert wird.',
+  'cat.delete.rules': {
+    one: '{count} Kategorisierungsregel ordnet neue Importe weiterhin „{name}“ zu und wird das auch weiter tun.',
+    other: '{count} Kategorisierungsregeln ordnen neue Importe weiterhin „{name}“ zu und werden das auch weiter tun.',
+  },
+  'cat.delete.trash': 'Die Kategoriedatei kommt in den Papierkorb deines Tresors.',
 
   'acct.err.exists': 'Konto existiert bereits',
   'acct.err.save': '{name} konnte nicht gespeichert werden ({error}) — es wurde nichts in die Datei geschrieben; versuch es noch einmal.',

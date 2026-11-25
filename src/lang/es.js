@@ -462,6 +462,10 @@ module.exports = {
     one: 'Copiada {count} categoría del periodo anterior',
     other: 'Copiadas {count} categorías del periodo anterior',
   },
+  'bud.copy.doneFrom': {
+    one: 'Copiada {count} categoría de {period}, el último periodo anterior con presupuesto',
+    other: 'Copiadas {count} categorías de {period}, el último periodo anterior con presupuesto',
+  },
   'bud.copy.nothing': 'Nada que copiar — todas las categorías ya tienen un valor',
 
   /* =========================== Transactions page ========================== */
@@ -814,6 +818,24 @@ module.exports = {
   /* Accessible names (audit of 11 Nov 2026, task 19) — machine-assisted, not native-reviewed. */
   'cat.aria.current': '{label} — actualmente {value}',
   'cat.aria.currentNone': '{label} — actualmente sin categoría',
+
+  'cat.delete.title': 'Eliminar categoría',
+  'cat.delete.confirm': 'Eliminar',
+  'cat.delete.lead': '¿Eliminar «{name}»?',
+  'cat.delete.unused': 'Ninguna transacción la usa. Los archivos de presupuesto anteriores no cambian.',
+  'cat.delete.used': {
+    one: '{count} transacción está archivada en ella.',
+    other: '{count} transacciones están archivadas en ella.',
+  },
+  'cat.delete.kindLost': 'El tipo de una categoría («{kind}») se lee de su archivo, así que al eliminarlo el dinero archivado en ella pierde ese tipo.',
+  'cat.delete.effect.income': 'El dinero que entró en ella deja de contar como ingreso, en todos los periodos, también los pasados, hasta que se vuelva a categorizar.',
+  'cat.delete.effect.transfer': 'El dinero que se movió en ella deja de ser una transferencia y cuenta como gasto sin categoría, en todos los periodos, también los pasados, hasta que se vuelva a categorizar.',
+  'cat.delete.effect.other': 'El dinero archivado en ella cuenta como gasto sin categoría en todos los periodos, también los pasados, hasta que se vuelva a categorizar.',
+  'cat.delete.rules': {
+    one: '{count} regla de categorización sigue archivando las importaciones nuevas en «{name}» y seguirá haciéndolo.',
+    other: '{count} reglas de categorización siguen archivando las importaciones nuevas en «{name}» y seguirán haciéndolo.',
+  },
+  'cat.delete.trash': 'El archivo de la categoría va a la papelera de tu bóveda.',
 
   'acct.err.exists': 'La cuenta ya existe',
   'acct.err.save': 'No se pudo guardar {name} ({error}) — no se escribió nada en el archivo; inténtalo de nuevo.',

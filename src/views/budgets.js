@@ -8,7 +8,7 @@ const { parseFrontmatter } = require('../markdown');
 /* The Budgets/<period>.md format lives in one pure module, shared with the
    setup wizard — see the header of budget-file.js for why it stopped being
    inline here. */
-const { serializeBudgetFile, budgetFileRows, budgetRangeNote } = require('../budget-file');
+const { serializeBudgetFile, budgetFileRows, budgetRangeNote, carriedFrontmatter, rowIsWritten, earlierBudgetKey } = require('../budget-file');
 /* Row order must agree with serializeBudgetFile() and the Dashboard: a custom
    group slots in before `expense` and an undeclared type sorts LAST. Plain
    indexOf() over the built-in order cannot express that — it returns -1 for
@@ -20,7 +20,7 @@ const { askBudgetReslice, confirmModal } = require('../modal');
 const { inferIntervalFromKeys, resliceBudget } = require('../reslice');
 const { ISO_DATE, isoDayNumber } = require('../dates');
 const { sharePercentLabel } = require('../share-percents');
-const { amountUnreadable, printedRemainder, usedToneClass } = require('../figures');
+const { amountUnreadable, printedRemainder, usedToneClass, assumedNoteAmount } = require('../figures');
 /* Namespace import — this file binds `t` as a local (`const t = $('#budTable')`),
    so a bare `t` from i18n would be shadowed inside renderBudgets(). */
 const i18n = require('../i18n');
@@ -166,16 +166,25 @@ module.exports = function registerBudgets(ctx) {
 
      Pure and separate from the render, same reason otherShapeBudgets is just
      above: a bare-node test can pin the decision without touching the DOM.
-     This checks the immediately previous SAME-shape period (shiftPeriod(-1))
-     — the ordinary roll — a different case from otherShapeBudgets() (a
+     This checks the most recent EARLIER same-shape period that has a budget
+     (previousBudgetKey, below) — the ordinary roll, or a roll that skipped a
+     month — a different case from otherShapeBudgets() (a
      DIFFERENT period-length shape, reachable only after a settings change). A
      vault can be in both states at once; renderShapeNote checks this one
      FIRST because it is the common case (every period roll), where the other
      only fires on a length switch. */
   function freshPeriodNote() {
-    const prevKey = shiftPeriod(S.period, -1);
-    const prev = S.budgets[prevKey] || [];
-    return prev.length ? { prevKey, count: prev.length } : null;
+    const prevKey = previousBudgetKey();
+    return prevKey ? { prevKey, count: S.budgets[prevKey].length } : null;
+  }
+  /* The period "Copy previous period" and the new-period banner read from
+     (2026-11-25 audit, BUD-3): the most recent EARLIER period of the shape in
+     force that has a budget, over the keys already loaded (budget-file.js
+     earlierBudgetKey — one pass, never forward). It was exactly shiftPeriod(-1),
+     so a skipped month meant no banner and "No budget found for the previous
+     period" with an older budget sitting on disk. */
+  function previousBudgetKey() {
+    return earlierBudgetKey(S.budgets, S.period, periodKeyValid);
   }
 
   /* The note only earns its place when this period is genuinely unbudgeted AND
@@ -391,10 +400,16 @@ module.exports = function registerBudgets(ctx) {
      user gave an amount or a note; untouched zero rows stay display-only, so
      the period file does not bloat to all 50+ categories. saveBudget writes
      exactly these, and the new-period banner asks the same question. */
-  const persistedRows = draft =>
-    draft.filter(d => d.category && (d.inFile || d.amount || (d.notes && d.notes.trim())));
+  /* The rule itself is budget-file.js rowIsWritten, shared with planFigures'
+     "does the plan have an income row" (2026-11-25 audit, BUD-8). */
+  const persistedRows = draft => draft.filter(rowIsWritten);
 
   let budDraft = null, budDraftPeriod = null;
+  /* Set by Copy previous period: the earlier period whose file this draft was
+     copied from, and the period the copy went into. Save reads it to carry
+     that file's own frontmatter into a period file that is being CREATED
+     (budget-file.js carriedFrontmatter, BUD-9). Dropped with the draft. */
+  let budCopiedFrom = null;
   /* This page's dirty state used to live only in the DOM, read back off
      #budSave.disabled. That gates the file watcher, and reading a button
      fails OPEN — if the button is ever missing it reports "clean" and the
@@ -408,13 +423,22 @@ module.exports = function registerBudgets(ctx) {
   function budgetDraft() {
     if (budDraftPeriod !== S.period || !budDraft) {
       budDraft = (S.budgets[S.period] || []).map(r => ({ ...r, inFile: true }));
-      const have = new Set(budDraft.map(d => d.category));
-      for (const c of S.categories) {
-        if (!have.has(c.name)) budDraft.push({ category: c.name, type: c.type, amount: 0, notes: '', inFile: false });
-      }
+      budCopiedFrom = null;
       budDraftPeriod = S.period;
       budDirty = false;
       $('#budSave').disabled = true;
+    }
+    /* On EVERY draw, not once per period (2026-11-25 audit, BUD-2): a category
+       created from another page (Transactions "Add new category", the import
+       review) joins S.categories while this draft is alive, and a list built
+       once never showed it until the period changed or the vault reloaded.
+       Only missing categories are appended, as the zero rows a fresh draft
+       seeds — nothing in the draft is replaced, reordered or dropped, so an
+       unsaved edit survives, and an untouched row stays display-only
+       (rowIsWritten) and is not saved. */
+    const have = new Set(budDraft.map(d => d.category));
+    for (const c of S.categories) {
+      if (!have.has(c.name)) budDraft.push({ category: c.name, type: c.type, amount: 0, notes: '', inFile: false });
     }
     return budDraft;
   }
@@ -428,7 +452,7 @@ module.exports = function registerBudgets(ctx) {
      and the vault watcher then reads "dirty" and defers every reload until the
      reader happens to open Budgets again. */
   function invalidateBudgetDraft() {
-    budDraft = null; budDraftPeriod = null; budDirty = false;
+    budDraft = null; budDraftPeriod = null; budDirty = false; budCopiedFrom = null;
     const save = $('#budSave');
     if (save) save.disabled = true;
   }
@@ -548,8 +572,12 @@ module.exports = function registerBudgets(ctx) {
        only disclosure was a foreign account, or (now) a fund purchase, the
        fragment ran straight onto the end of the sentence:
        "45% of budget usedR 5000,00 more went out of your funds". */
-    const spentNote = assumed > 0
-      ? i18n.t('bud.total.spentNoteAssumed', { pct: usedPct ?? 0, amount: money(assumed, 0) })
+    /* The provision is named only from R 1, in whole rands — the Dashboard's
+       rule, figures.js assumedNoteAmount, shared with the Report (NUM-7). It
+       was named from a cent and rounded up to "R 1" for R 0,52. */
+    const assumedAmount = assumedNoteAmount(assumed, money);
+    const spentNote = assumedAmount
+      ? i18n.t('bud.total.spentNoteAssumed', { pct: usedPct ?? 0, amount: assumedAmount })
       : (usedPct !== null ? i18n.t('bud.total.spentNote', { pct: usedPct }) : '');
 
     /* The note is assembled as NAMED fragments rather than one string. The
@@ -1045,17 +1073,28 @@ module.exports = function registerBudgets(ctx) {
                stands beside where it was, in the same cell. Delete takes the
                row off the page unless this period's file still names the
                category: the row itself if it stayed, else the one that moved
-               up into its place, else the one above, else Add category. */
+               up into its place, else the one above, else Add category. (A row
+               that stays has lost its Delete with its category: Clear it is.) */
             d.inFile
-              ? el('button', { class: 'btn-ghost btn-ghost-sm bud-act bud-act-clear', 'aria-label': i18n.t('bud.aria.clear', { category: d.category }), title: i18n.t('bud.title.clear'), 'data-focus-key': `clear:${cat}`, onclick: () => { d.amount = 0; d.amountRaw = null; d.notes = ''; d.inFile = false; mark(); renderBudgets(); refocus(t, [`clear:${cat}`, `del:${cat}`]); } }, icoEl(['rotate-ccw', 'undo-2', 'list-restart']))
+              ? el('button', { class: 'btn-ghost btn-ghost-sm bud-act bud-act-clear', 'aria-label': i18n.t('bud.aria.clear', { category: d.category }), title: i18n.t('bud.title.clear'), 'data-focus-key': `clear:${cat}`, onclick: () => { d.amount = 0; d.amountRaw = null; d.notes = ''; d.inFile = false; mark(); renderBudgets(); refocus(t, [`clear:${cat}`, `del:${cat}`, `amount:${cat}`]); } }, icoEl(['rotate-ccw', 'undo-2', 'list-restart']))
               : '',
-            el('button', { class: 'btn-ghost btn-ghost-sm bud-act bud-act-delete', 'aria-label': i18n.t('bud.aria.delete', { category: d.category }), title: i18n.t('bud.title.delete'), 'data-focus-key': `del:${cat}`, onclick: async () => {
+            /* Not offered for a row whose category note is gone (2026-11-25
+               audit, BUD-10a). There is no category left to delete —
+               promptDeleteCategory answers false for a name no note carries —
+               so the button did nothing and said nothing, on exactly the rows
+               a reader is most likely to try it on. The smaller of the two
+               honest options: Clear (above) is what takes such a row out of
+               this period's budget, and it needs no new words or look. */
+            !S.categories.some(c => c.name === d.category) ? '' : el('button', { class: 'btn-ghost btn-ghost-sm bud-act bud-act-delete', 'aria-label': i18n.t('bud.aria.delete', { category: d.category }), title: i18n.t('bud.title.delete'), 'data-focus-key': `del:${cat}`, onclick: async () => {
               if (await promptDeleteCategory(d.category)) {
                 const draft = budgetDraft();
                 const i = draft.indexOf(d);
                 if (i !== -1 && !d.inFile) draft.splice(i, 1);
                 renderBudgets();
-                refocus(t, [`del:${cat}`, at + 1 < shown.length ? `del:${shown[at + 1]}` : null,
+                /* A row that stays (this period's file still names the category) no longer
+                   has a Delete — its category is gone, BUD-10a — so the reader is put
+                   on its Clear, the one button left in that cell. */
+                refocus(t, [`del:${cat}`, `clear:${cat}`, at + 1 < shown.length ? `del:${shown[at + 1]}` : null,
                   at > 0 ? `del:${shown[at - 1]}` : null, $('#budAddCat')]);
               }
             } }, icoEl(['trash-2', 'trash'])))));
@@ -1115,7 +1154,11 @@ module.exports = function registerBudgets(ctx) {
        different rules, agreeing right up until one of them is edited. */
     const text = serializeBudgetFile({
       period: S.period,
-      rawFrontmatter: (meta && meta.raw) || '',
+      /* A period file that is being CREATED from a copy of an earlier one
+         starts from that file's own frontmatter (BUD-9); every other new file
+         starts from the plugin's default (serializeBudgetFile), and an existing
+         file patches its own block as before. */
+      rawFrontmatter: (meta && meta.raw) || carriedRawFor(period),
       rows: draft,
       groups: S.settings.groups,
       // ISSUE 67 — a paragraph a household added above or below the table;
@@ -1168,6 +1211,16 @@ module.exports = function registerBudgets(ctx) {
       $('#budSave').disabled = true;
     }
     toast(i18n.t('bud.saved', { period }));
+  }
+
+  /* The frontmatter a new period file is born with when the draft was copied
+     from an earlier period's (budget-file.js carriedFrontmatter); '' — the
+     serializer's own default — for any other new file. Only while the copy is
+     still the draft's (budCopiedFrom is dropped with it). */
+  function carriedRawFor(period) {
+    if (!budCopiedFrom || budCopiedFrom.period !== period) return '';
+    const from = (S.budgetMeta || {})[budCopiedFrom.key];
+    return from && from.raw ? carriedFrontmatter(from.raw) : '';
   }
 
   /* The parts of a period file's shape load.js recorded beside its rows. */
@@ -1293,7 +1346,8 @@ module.exports = function registerBudgets(ctx) {
   }
 
   function copyPreviousBudget() {
-    const prev = S.budgets[shiftPeriod(S.period, -1)];
+    const prevKey = previousBudgetKey();
+    const prev = prevKey ? S.budgets[prevKey] : null;
     if (!prev || !prev.length) return toast(i18n.t('bud.copy.none'), true);
     const draft = budgetDraft();
     let copied = 0;
@@ -1309,9 +1363,17 @@ module.exports = function registerBudgets(ctx) {
         }
       } else { draft.push({ ...fromAnotherPeriod(r), inFile: true }); copied++; }
     }
-    if (copied) { budDirty = true; $('#budSave').disabled = false; }
+    if (copied) {
+      budDirty = true; $('#budSave').disabled = false;
+      budCopiedFrom = { period: S.period, key: prevKey };
+    }
     renderBudgets();
-    toast(copied ? i18n.t('bud.copy.done', { count: copied }) : i18n.t('bud.copy.nothing'));
+    /* The period is named when it is not the one just before this (BUD-3): a
+       toast that says "the previous period" over a budget from three months
+       back would be the one place the reader could not tell. */
+    toast(!copied ? i18n.t('bud.copy.nothing')
+      : prevKey === shiftPeriod(S.period, -1) ? i18n.t('bud.copy.done', { count: copied })
+        : i18n.t('bud.copy.doneFrom', { count: copied, period: `${periodMonthName(prevKey)} · ${periodTitle(prevKey)}` }));
   }
 
   async function addNewCategory() {

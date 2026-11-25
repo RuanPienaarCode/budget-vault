@@ -480,6 +480,10 @@ module.exports = {
     one: 'Kukopishwe isigaba esingu-{count} kusukela esikhathini esedlule',
     other: 'Kukopishwe izigaba ezingu-{count} kusukela esikhathini esedlule',
   },
+  'bud.copy.doneFrom': {
+    one: 'Kukopishwe isigaba esingu-{count} kusuka ku-{period}, isikhathi sangaphambilini sakamuva esinebhajethi',
+    other: 'Kukopishwe izigaba ezingu-{count} kusuka ku-{period}, isikhathi sangaphambilini sakamuva esinebhajethi',
+  },
   'bud.copy.nothing': 'Akukho lutho lokukopisha — zonke izigaba sezinenani',
 
   /* =========================== Transactions page ========================== */
@@ -832,6 +836,24 @@ module.exports = {
   /* Accessible names (audit of 11 Nov 2026, task 19) — machine-assisted, not native-reviewed. */
   'cat.aria.current': '{label} — okwamanje {value}',
   'cat.aria.currentNone': '{label} — okwamanje akunasigaba',
+
+  'cat.delete.title': 'Susa isigaba',
+  'cat.delete.confirm': 'Susa',
+  'cat.delete.lead': 'Susa "{name}"?',
+  'cat.delete.unused': 'Alukho ukuthengiselana okusisebenzisayo. Amafayela ebhajethi adlule awashintshi.',
+  'cat.delete.used': {
+    one: '{count} ukuthengiselana kufayiliwe ngaphansi kwaso.',
+    other: '{count} ukuthengiselana kufayiliwe ngaphansi kwaso.',
+  },
+  'cat.delete.kindLost': 'Uhlobo lwesigaba ("{kind}") lufundwa kufayela laso, ngakho ukususa ifayela kususa lolo hlobo emalini efayiliwe ngaphansi kwaso.',
+  'cat.delete.effect.income': 'Imali engene ngaphansi kwaso ayisabalwa njengemali engenayo, kuzo zonke izikhathi, kuhlanganise nezedlule, kuze kube yilapho ihlukaniswa kabusha.',
+  'cat.delete.effect.transfer': 'Imali ehambe ngaphansi kwaso ayisiyo-ntuthuko futhi ibalwa njengokusetshenziswa okungenasigaba, kuzo zonke izikhathi, kuhlanganise nezedlule, kuze kube yilapho ihlukaniswa kabusha.',
+  'cat.delete.effect.other': 'Imali efayiliwe ngaphansi kwaso ibalwa njengokusetshenziswa okungenasigaba kuzo zonke izikhathi, kuhlanganise nezedlule, kuze kube yilapho ihlukaniswa kabusha.',
+  'cat.delete.rules': {
+    one: '{count} umthetho wokuhlukanisa usafayila okungeniswe okusha ngaphansi kwe-"{name}" futhi uzoqhubeka kanjalo.',
+    other: '{count} imithetho yokuhlukanisa isafayila okungeniswe okusha ngaphansi kwe-"{name}" futhi izoqhubeka kanjalo.',
+  },
+  'cat.delete.trash': 'Ifayela lesigaba liya kudoti wevolti yakho.',
 
   'acct.err.exists': 'I-akhawunti isivele ikhona',
   'acct.err.save': 'Ayikwazanga ukulondoloza u-{name} ({error})',

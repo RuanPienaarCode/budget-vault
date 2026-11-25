@@ -466,6 +466,10 @@ module.exports = {
     one: '{count} catégorie copiée depuis la période précédente',
     other: '{count} catégories copiées depuis la période précédente',
   },
+  'bud.copy.doneFrom': {
+    one: '{count} catégorie copiée depuis {period}, la dernière période antérieure avec un budget',
+    other: '{count} catégories copiées depuis {period}, la dernière période antérieure avec un budget',
+  },
   'bud.copy.nothing': 'Rien à copier — chaque catégorie a déjà une valeur',
 
   /* =========================== Transactions page ========================== */
@@ -826,6 +830,24 @@ module.exports = {
   /* Accessible names (audit of 11 Nov 2026, task 19) — machine-assisted, not native-reviewed. */
   'cat.aria.current': '{label} — actuellement {value}',
   'cat.aria.currentNone': '{label} — actuellement sans catégorie',
+
+  'cat.delete.title': 'Supprimer la catégorie',
+  'cat.delete.confirm': 'Supprimer',
+  'cat.delete.lead': 'Supprimer « {name} » ?',
+  'cat.delete.unused': 'Aucune transaction ne l\'utilise. Les fichiers de budget passés ne changent pas.',
+  'cat.delete.used': {
+    one: '{count} transaction est classée dedans.',
+    other: '{count} transactions sont classées dedans.',
+  },
+  'cat.delete.kindLost': 'Le type d\'une catégorie (« {kind} ») est lu dans son fichier : supprimer le fichier retire ce type à l\'argent classé dedans.',
+  'cat.delete.effect.income': 'L\'argent entré dedans cesse de compter comme revenu, dans chaque période, y compris les passées, jusqu\'à ce qu\'il soit reclassé.',
+  'cat.delete.effect.transfer': 'L\'argent déplacé dedans cesse d\'être un virement et compte comme dépense non catégorisée, dans chaque période, y compris les passées, jusqu\'à ce qu\'il soit reclassé.',
+  'cat.delete.effect.other': 'L\'argent classé dedans compte comme dépense non catégorisée dans chaque période, y compris les passées, jusqu\'à ce qu\'il soit reclassé.',
+  'cat.delete.rules': {
+    one: '{count} règle de catégorisation classe encore les nouveaux imports sous « {name} » et continuera de le faire.',
+    other: '{count} règles de catégorisation classent encore les nouveaux imports sous « {name} » et continueront de le faire.',
+  },
+  'cat.delete.trash': 'Le fichier de la catégorie va dans la corbeille de ton coffre.',
 
   'acct.err.exists': 'Ce compte existe déjà',
   'acct.err.save': 'Impossible d\'enregistrer {name} ({error}) — rien n\'a été écrit dans le fichier ; réessayez la même action.',

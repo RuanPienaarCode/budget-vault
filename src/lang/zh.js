@@ -456,6 +456,9 @@ module.exports = {
   'bud.copy.done': {
     other: '已从上一周期复制 {count} 个分类',
   },
+  'bud.copy.doneFrom': {
+    other: '已从 {period}（最近一个有预算的更早周期）复制 {count} 个分类',
+  },
   'bud.copy.nothing': '没有可复制的内容 — 每个分类都已有数值',
 
   /* =========================== Transactions page ========================== */
@@ -777,6 +780,22 @@ module.exports = {
   /* Accessible names (audit of 11 Nov 2026, task 19) — machine-assisted, not native-reviewed. */
   'cat.aria.current': '{label} — 当前为 {value}',
   'cat.aria.currentNone': '{label} — 当前未分类',
+
+  'cat.delete.title': '删除分类',
+  'cat.delete.confirm': '删除',
+  'cat.delete.lead': '删除“{name}”？',
+  'cat.delete.unused': '没有交易使用它。以往的预算文件不会改变。',
+  'cat.delete.used': {
+    other: '有 {count} 笔交易归在它名下。',
+  },
+  'cat.delete.kindLost': '分类的类型（“{kind}”）是从它的文件中读取的，所以删除文件会让归在它名下的钱失去该类型。',
+  'cat.delete.effect.income': '在它名下收到的钱，在每一个周期（包括过去的周期）都不再计为收入，直到重新分类。',
+  'cat.delete.effect.transfer': '在它名下转动的钱不再是转账，而会在每一个周期（包括过去的周期）计为未分类支出，直到重新分类。',
+  'cat.delete.effect.other': '归在它名下的钱会在每一个周期（包括过去的周期）计为未分类支出，直到重新分类。',
+  'cat.delete.rules': {
+    other: '有 {count} 条分类规则仍会把新导入的交易归到“{name}”，并会一直这样做。',
+  },
+  'cat.delete.trash': '分类文件会进入你的库的回收站。',
 
   'acct.err.exists': '该账户已存在',
   'acct.err.save': '无法保存 {name}（{error}）— 文件未写入任何内容；请重试同一操作。',

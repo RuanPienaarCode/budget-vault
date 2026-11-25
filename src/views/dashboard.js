@@ -12,7 +12,7 @@ const { scoreBand, pillarRows, scoreScale } = require('../health-math');
 const { gapSentence, yearsNumber } = require('../health-copy');
 const { decimalText } = require('../locale');
 const { todayIso, isRealIsoDate } = require('../dates');
-const { balanceReadable, printedRemainder, printedParts, usedToneClass } = require('../figures');
+const { balanceReadable, printedRemainder, printedParts, usedToneClass, assumedNoteAmount } = require('../figures');
 const { worth, cardOverlap, otherCurrencyNet } = require('../worth');
 const { owedSummary } = require('../owed-math');
 const { currenciesIn, symbolOf, isForeign, splitByCurrency, formatSigned } = require('../currency');
@@ -3073,8 +3073,11 @@ function heroQualifiers(F, money) {
   if (used.setAside >= 1) {
     add('setAside', 'spent', i18n.t('dash.stat.setAside', { amount: money(used.setAside, 0) }), { amount: used.setAside });
   }
-  if (used.assumed >= 1) {
-    add('assumed', 'spent', i18n.t('dash.hero.assumedIncluded', { amount: money(used.assumed, 0) }), { amount: used.assumed });
+  /* The threshold and the whole-rand rounding are figures.js assumedNoteAmount,
+     the one rule the Budget strip and the Report read as well (NUM-7). */
+  const assumedAmount = assumedNoteAmount(used.assumed, money);
+  if (assumedAmount) {
+    add('assumed', 'spent', i18n.t('dash.hero.assumedIncluded', { amount: assumedAmount }), { amount: used.assumed });
   }
   /* EVERY refund the period kept, in full: periodSummary().refunds (ledger.js
      tally), not the donut's gap (2026-10-20 audit, M1-02). The sentence says

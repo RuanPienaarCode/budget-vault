@@ -465,6 +465,9 @@ module.exports = {
   'bud.copy.done': {
     other: '{count} kategori disalin dari periode sebelumnya',
   },
+  'bud.copy.doneFrom': {
+    other: '{count} kategori disalin dari {period}, periode sebelumnya terbaru yang punya anggaran',
+  },
   'bud.copy.nothing': 'Tidak ada yang perlu disalin — setiap kategori sudah punya angka',
 
   /* =========================== Transactions page ========================== */
@@ -790,6 +793,22 @@ module.exports = {
   /* Accessible names (audit of 11 Nov 2026, task 19) — machine-assisted, not native-reviewed. */
   'cat.aria.current': '{label} — saat ini {value}',
   'cat.aria.currentNone': '{label} — saat ini tanpa kategori',
+
+  'cat.delete.title': 'Hapus kategori',
+  'cat.delete.confirm': 'Hapus',
+  'cat.delete.lead': 'Hapus "{name}"?',
+  'cat.delete.unused': 'Tidak ada transaksi yang memakainya. File anggaran sebelumnya tidak berubah.',
+  'cat.delete.used': {
+    other: '{count} transaksi dicatat di bawahnya.',
+  },
+  'cat.delete.kindLost': 'Jenis sebuah kategori ("{kind}") dibaca dari filenya, jadi menghapus file itu menghilangkan jenis tersebut dari uang yang dicatat di bawahnya.',
+  'cat.delete.effect.income': 'Uang yang masuk di bawahnya tidak lagi dihitung sebagai pemasukan, di setiap periode, termasuk yang lalu, sampai dikategorikan ulang.',
+  'cat.delete.effect.transfer': 'Uang yang dipindahkan di bawahnya bukan lagi transfer dan dihitung sebagai pengeluaran tanpa kategori, di setiap periode, termasuk yang lalu, sampai dikategorikan ulang.',
+  'cat.delete.effect.other': 'Uang yang dicatat di bawahnya dihitung sebagai pengeluaran tanpa kategori di setiap periode, termasuk yang lalu, sampai dikategorikan ulang.',
+  'cat.delete.rules': {
+    other: '{count} aturan kategorisasi masih mencatat impor baru di bawah "{name}" dan akan terus begitu.',
+  },
+  'cat.delete.trash': 'File kategori masuk ke tempat sampah vault Anda.',
 
   'acct.err.exists': 'Rekening itu sudah ada',
   'acct.err.save': '{name} tidak bisa disimpan ({error}) — tidak ada yang tertulis ke berkasnya; coba tindakan yang sama sekali lagi.',
