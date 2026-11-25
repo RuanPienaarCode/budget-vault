@@ -918,7 +918,7 @@ money	R 17 500,00	17500	report-3m/Income & spend/Total budgeted/c1
 money	R 12 100,00	12100	report-3m/Income & spend/p1
 money	R 15 500,00	15500	report-3m/Income & spend/p1
 percent	78%	-	report-3m/Income & spend/p1
-money	R 500,00	500	report-3m/Income & spend/p1
+money	R 500	500	report-3m/Income & spend/p1
 money	R 2 000,00	2000	report-3m/Income & spend/p1
 money	R 1 000,00	1000	report-3m/Income & spend/p1
 money	R 2 000,00	2000	report-3m/Income & spend/p1#2
@@ -982,7 +982,7 @@ money	R 17 500,00	17500	report-12m/Income & spend/Total budgeted/c1
 money	R 12 100,00	12100	report-12m/Income & spend/p1
 money	R 15 500,00	15500	report-12m/Income & spend/p1
 percent	78%	-	report-12m/Income & spend/p1
-money	R 500,00	500	report-12m/Income & spend/p1
+money	R 500	500	report-12m/Income & spend/p1
 money	R 2 000,00	2000	report-12m/Income & spend/p1
 money	R 1 000,00	1000	report-12m/Income & spend/p1
 money	R 2 000,00	2000	report-12m/Income & spend/p1#2
