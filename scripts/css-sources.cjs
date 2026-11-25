@@ -19,7 +19,12 @@
      3. foundation src/statement/foundation.css: the type system (tokens, the
                    global figure/label/title treatment, the statement classes).
                    Overrides the base by being later.
-     4. lanes      one file per page group (dashboard, budget, transactions,
+        primitives src/statement/primitives.css: the controls every page
+                   shares (fields, row actions, toolbar buttons), stated once
+                   in the restyled pages' values. After the foundation so it can
+                   read its tokens; before the lanes so a page can still say
+                   something more particular by being later.
+     4. lanes     one file per page group (dashboard, budget, transactions,
                    accounts), so the lanes can restyle their pages without ever
                    editing the same file. They win over foundation by being
                    later; none of them wins over another because no two lanes
@@ -42,6 +47,7 @@ const CSS_SOURCES = [
   'src/styles-fonts.css',
   'src/styles.css',
   'src/statement/foundation.css',
+  'src/statement/primitives.css',
   'src/statement/dashboard.css',
   'src/statement/budget.css',
   'src/statement/transactions.css',

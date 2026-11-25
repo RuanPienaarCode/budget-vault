@@ -305,8 +305,16 @@
   .budget-app-root .bud-total:nth-child(2) { border-left: 1px solid var(--border-color); }
 
   /* The four header buttons wrapped to two rows of 44px. One sideways rail
-     instead, to the card's edges (14px = .card-h's side padding), with Save
-     first so the one button that matters is not the last thing on a scroller. */
+     instead, to the card's edges (14px = .card-h's side padding).
+
+     The order is the reader's, not the markup's (Export, Copy previous
+     period, New category, Save budget): Save first, so the one button that
+     matters is not the last thing on a scroller, then New category and Copy
+     previous period, the two that build a budget, and Export last. New
+     category used to sit past the right edge of a 375px screen (2026-11-25
+     audit, VIS-1). Tab order is the markup's and unchanged (`order` moves
+     boxes, not focus). The fading right edge and its end spacer are the
+     Transactions rail's (transactions.css, section 4, says why a mask). */
   .budget-app-root #view-budgets .card-h > .row {
     flex: 1 1 100%;
     min-width: 0;
@@ -317,10 +325,15 @@
     scrollbar-width: none;
     margin: 0 -14px;
     padding: 0 14px 2px;
+    -webkit-mask-image: linear-gradient(to right, var(--text-primary) calc(100% - 24px), transparent);
+    mask-image: linear-gradient(to right, var(--text-primary) calc(100% - 24px), transparent);
   }
   .budget-app-root #view-budgets .card-h > .row::-webkit-scrollbar { display: none; }
+  .budget-app-root #view-budgets .card-h > .row::after { content: ''; flex: none; width: 12px; order: 99; }
   .budget-app-root #view-budgets .card-h > .row > * { flex: none; white-space: nowrap; }
   .budget-app-root #view-budgets .card-h > .row > #budSave { order: -1; }
+  .budget-app-root #view-budgets .card-h > .row > #budCopyPrev { order: 1; }
+  .budget-app-root #view-budgets .card-h > .row > #budExport { order: 2; }
 }
 
 /* ------------------------------------------------------------------
@@ -635,11 +648,15 @@
     -webkit-overflow-scrolling: touch;
     scrollbar-width: none;
     padding: 0 0 2px;
+    -webkit-mask-image: linear-gradient(to right, var(--text-primary) calc(100% - 24px), transparent);
+    mask-image: linear-gradient(to right, var(--text-primary) calc(100% - 24px), transparent);
   }
   body.is-phone .budget-app-root #view-transactions .tx-actions::-webkit-scrollbar { display: none; }
+  body.is-phone .budget-app-root #view-transactions .tx-actions::after { content: ''; flex: none; width: 12px; order: 99; }
   body.is-phone .budget-app-root #view-transactions .tx-actions > * { flex: none; white-space: nowrap; }
-  body.is-phone .budget-app-root #view-transactions .tx-actions > #txCount { order: -2; }
-  body.is-phone .budget-app-root #view-transactions .tx-actions > #txSave { order: -1; }
+  body.is-phone .budget-app-root #view-transactions .tx-actions > #txAdd { order: -3; }
+  body.is-phone .budget-app-root #view-transactions .tx-actions > #txSave { order: -2; }
+  body.is-phone .budget-app-root #view-transactions .tx-actions > #txCount { order: -1; }
 
   /* Same closed-drawer shadow rule as portrait. */
   body.is-phone .budget-app-root .app-drawer:not(.open) { box-shadow: none; }

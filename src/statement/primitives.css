@@ -1,0 +1,195 @@
+/* Statement lane: primitives — one field, one row action, one toolbar button for every page (2026-11-25 audit, VIS-3/CSS-3/CSS-4/CSS-7). */
+/* ============================================================
+   THE SHARED CONTROLS.
+
+   Five pages were restyled in the statement type (Dashboard, Budget,
+   Transactions, Accounts, Plan) and each sized its own fields and buttons in
+   its own lane file; the other twelve kept the legacy sheet's. The 2026-11-25
+   audit measured the result at 1440px: fields 40px / 12px corners / 15px text
+   on Transactions, Budget and Plan, 29-31px / 8px / 12.8px everywhere else;
+   row actions borderless 34px icon squares on Transactions and Budget,
+   bordered 28px pills on Debts, Owed, Assets, Services and Tax; three recipes
+   for the button beside a card title. Two apps' worth of controls.
+
+   This file makes the restyled pages' controls the app's controls. NOTHING
+   HERE IS A NEW VALUE: every size, radius, weight and colour below is one a
+   restyled page already drew for the same component, now stated once.
+
+   WHERE IT SITS. Right after foundation.css (scripts/css-sources.cjs), so it
+   overrides the legacy sheet by being later, and every page lane after it can
+   still say something more particular by being later still. It never edits
+   a lane's choice from here: where a lane sizes its own control (the
+   Transactions note field, the Budget table's amount field) that lane reads
+   the --st-control-* tokens from foundation.css instead of a literal.
+
+   TOUCH. Nothing here sets a min-height or a touch size. A touch screen
+   lifts every field to 44px / 16px and every button to 44px in phone.css and
+   the legacy sheet's (pointer: coarse) block, which are later or heavier, and
+   min-height outranks height, so a 40px field is still 44px under a finger.
+
+   Tokens only, no hex, no :has() and no container queries (iOS 15 floor).
+   ============================================================ */
+
+/* ------------------------------------------------------------
+   1. FIELDS — one geometry for a text field and a select
+   ------------------------------------------------------------
+   Two rules, because the box and the text need different weights.
+
+   THE BOX at (0,2,1), `input.` and `select.` in front: the legacy sheet's
+   `.budget-app-root input[type='text'] { height: auto }` is (0,2,1) and would
+   beat a bare class, and naming the element keeps a textarea (which a
+   .form-control may one day be) out of a 40px box. Nothing here fights a
+   touch screen: phone.css lifts these fields with min-height, which beats
+   any height. The side padding is the Transactions filters' and the Budget
+   amount field's 12px.
+
+   THE TEXT at (0,2,0), a bare class. phone.css raises the same fields to
+   16px under (pointer: coarse) with `.budget-app-root .form-control` and
+   `.form-select` — (0,2,0), later in the cascade — because iOS zooms the page
+   when a field under 16px takes focus. A font-size here at (0,2,1) beat that
+   rule for every <select> and every input without a type attribute, and put
+   the zoom back on an iPhone (caught measuring at 375px under a touch
+   pointer). At the same weight, phone.css wins by being later. */
+.budget-app-root input.form-control,
+.budget-app-root input.form-control-sm,
+.budget-app-root select.form-select,
+.budget-app-root select.form-select-sm {
+  height: var(--st-control-h);
+  padding: 0 12px;
+  border-radius: var(--st-control-radius);
+}
+.budget-app-root .form-control,
+.budget-app-root .form-control-sm,
+.budget-app-root .form-select,
+.budget-app-root .form-select-sm { font-size: var(--st-control-font); }
+/* In a table row the field steps down to the row's size (--st-control-h-cell,
+   --st-control-font-cell: the Transactions note field). (0,3,0) on purpose:
+   it beats the (0,2,1) rule above and the legacy `input[type='text']` reset,
+   and it TIES with phone.css's touch rule for the same table fields
+   (`.table .form-control { font-size: 16px; min-height: 40px }`), which is
+   later and so still wins under a finger (a .form-select-sm is always also a
+   .form-select in the markup, so phone.css's `.table .form-select` reaches
+   it). The Budget table's amount field is
+   the row's figure and keeps its own 40px / 15px (budget.css).
+
+   The side padding stays the legacy field's .55rem here, not the 12px above.
+   These tables' columns are held to widths chosen around it (src/styles.css:
+   the Debts rate field is 56-68px, the Kind select fills its column), and at
+   12px a side the Debts rate "22,25" was cut to "22,2" — a figure that reads
+   as a different number. Widening those columns is the legacy sheet's call. */
+.budget-app-root .table .form-control,
+.budget-app-root .table .form-control-sm,
+.budget-app-root .table .form-select,
+.budget-app-root .table .form-select-sm {
+  height: var(--st-control-h-cell);
+  padding-inline: 0.55rem;
+  font-size: var(--st-control-font-cell);
+}
+/* A search box is the one field drawn as a pill, as the Transactions search
+   and the Accounts "Find an account" box already were: a different component
+   from a value field, and it reads as one. Same height and text as every
+   field; the text starts in from the curve as on Transactions. The Accounts
+   box is not a .form-control, so it is named; the Food and Notes searches
+   are, and drew as 29px / 8px value fields before this.
+   No font-size in the (0,3,1) rule: it would out-rank phone.css's 16px touch
+   rule for `input[type='search']`. The two .form-control searches take 15px
+   from the field text rule above; the Accounts box is set at (0,2,1), the
+   weight of its legacy rule and of phone.css's touch rule for it, which is
+   later and wins on a phone. */
+.budget-app-root input[type='search'].form-control,
+.budget-app-root input[type='search'].form-control-sm,
+.budget-app-root .acct-search input {
+  height: var(--st-control-h);
+  padding: 0 18px;
+  border-radius: 999px;
+}
+.budget-app-root .acct-search input { font-size: var(--st-control-font); }
+
+/* ------------------------------------------------------------
+   2. ROW ACTIONS — the quiet icon square
+   ------------------------------------------------------------
+   An icon-only button in a table row is a 34px borderless square in muted
+   ink that shows its edge and a --line-soft wash under the pointer, and
+   turns rose when it deletes: the Budget table's .bud-act and the
+   Transactions row buttons. On Debts, Owed, Assets, Services and Tax the same
+   action was a bordered 28px pill (.btn-ghost-sm) beside rows of quiet ones.
+
+   ONLY ICON-ONLY BUTTONS. A .btn-ghost-sm with words in it ("Open" on Food,
+   "Upload" / "Add" on Tax) stays the small pill it is: a word in a 34px
+   square would be clipped or unreadable. With no :has() on the iOS 15 floor
+   the words cannot be detected, so the buttons are picked by what they are:
+     - [data-focus-key^="del:"]  every row's Delete (Debts, Owed, Assets,
+                                 Services, the three Tax tables, Transactions):
+                                 an "✕" or a bin, never a word;
+     - [data-focus-key^="split:"] the Transactions Split icon beside it;
+     - .owed-acts > .btn-ghost-sm the Owed row's two icons ("+" repayment
+                                 and Delete), which is all that box holds.
+   The Budget table's own .bud-act squares are left to budget.css: they sit
+   in fixed slots there, and that lane already draws them this way. */
+.budget-app-root .table tbody td .btn-ghost-sm[data-focus-key^="del:"]:not(.bud-act),
+.budget-app-root .table tbody td .btn-ghost-sm[data-focus-key^="split:"],
+.budget-app-root .table tbody td .owed-acts > .btn-ghost-sm {
+  width: 34px;
+  height: 34px;
+  padding: 0;
+  justify-content: center;
+  border-color: transparent;
+  color: var(--text-muted);
+}
+@media (hover: hover) {
+  .budget-app-root .table tbody td .btn-ghost-sm[data-focus-key^="del:"]:not(.bud-act):hover,
+  .budget-app-root .table tbody td .btn-ghost-sm[data-focus-key^="split:"]:hover,
+  .budget-app-root .table tbody td .owed-acts > .btn-ghost-sm:hover {
+    background: var(--line-soft);
+    border-color: var(--border-color);
+  }
+  /* The rose the Transactions and Budget Delete turn under the pointer. */
+  .budget-app-root .table tbody td .btn-ghost-sm[data-focus-key^="del:"]:not(.bud-act):hover { color: var(--color-danger-ink); }
+}
+
+/* ------------------------------------------------------------
+   3. TOOLBAR BUTTONS — the button beside a card title
+   ------------------------------------------------------------
+   The Transactions recipe: 13px, weight 500 (600 on the gradient), one line,
+   34px tall under a mouse. Budget drew its header buttons at 13.6px / 600 /
+   33px and Plan its .btn-sm at 13px / 600 / 34px, and the older pages' "New
+   ... / Save changes" pairs took Budget's: three recipes for one control.
+   Scoped to a card header and to Plan's own toolbars (its page rail, the
+   bucket heading, the Money in foot), never to a bare .btn-ghost: a button in
+   a card body or a drawer is not a toolbar button. Not a .btn-ghost-sm in a
+   header either — that is a chip, and keeps its own size.
+
+   These selectors are (0,3,0) and heavier, so they already beat Obsidian's
+   iPad rule (.is-tablet button, (0,2,1)) and need no body.is-tablet twin
+   (tests/css-tablet-button-padding twins only bare `.budget-app-root .cls`
+   rules). The 34px is a mouse size; on a touch screen the legacy (pointer:
+   coarse) block grows .btn-ghost and .btn-gradient to 44px, untouched. */
+.budget-app-root .card-h .btn-ghost:not(.btn-ghost-sm),
+.budget-app-root .card-h .btn-gradient,
+.budget-app-root .plan-actions-rail > .btn-ghost,
+.budget-app-root .plan-actions-rail > .btn-gradient,
+.budget-app-root .plan-env-head > .btn-ghost,
+.budget-app-root .plan-src-foot > .btn-ghost {
+  padding: 0 14px;
+  font-size: var(--st-small);
+  font-weight: var(--st-weight-label);
+  line-height: 1;
+}
+.budget-app-root .card-h .btn-gradient,
+.budget-app-root .plan-actions-rail > .btn-gradient { font-weight: 600; }
+@media (pointer: fine) {
+  .budget-app-root .card-h .btn-ghost:not(.btn-ghost-sm),
+  .budget-app-root .card-h .btn-gradient,
+  .budget-app-root .plan-actions-rail > .btn-ghost,
+  .budget-app-root .plan-actions-rail > .btn-gradient,
+  .budget-app-root .plan-env-head > .btn-ghost,
+  .budget-app-root .plan-src-foot > .btn-ghost { min-height: 34px; }
+}
+/* Plan's page rail is the one toolbar the legacy touch block misses: its
+   `.btn-sm { min-height: 34px }` is later than the (pointer: coarse) grow rule
+   for .btn-ghost / .btn-gradient and ties it, so Save plan and New plan stayed
+   34px under a finger while every other toolbar button is 44px. */
+@media (pointer: coarse) {
+  .budget-app-root .plan-actions-rail > .btn-ghost,
+  .budget-app-root .plan-actions-rail > .btn-gradient { min-height: 44px; }
+}
