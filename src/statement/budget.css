@@ -167,10 +167,9 @@
 /* ------------------------------------------------------------
    2. THE TABLE
    ------------------------------------------------------------ */
-.budget-app-root .bud-table thead th {
-  font-weight: var(--st-weight-label);
-  color: var(--text-light);
-}
+/* The heading row and the money cells (15px, weight 500, tabular) are the
+   foundation's table voice (foundation.css, section 2), which this table's
+   own rules became for every table in the app. */
 
 /* Group bars: a tinted band with a dot in the group's colour. A custom group or
    an undeclared type falls to the neutral dot. */
@@ -206,12 +205,8 @@
   padding: 3px 10px;
 }
 
-/* Figures: tabular, the Actual column a step up from the muted default. */
-.budget-app-root .bud-table td.num {
-  font-size: 15px;
-  font-weight: 500;
-  font-variant-numeric: tabular-nums lining-nums;
-}
+/* The field inside a money cell keeps the regular weight the 500 cell would
+   otherwise hand it. */
 .budget-app-root .bud-table td.num input { font-weight: 400; }
 
 /* Under the amount: what is left, or what is over, and the carried-in states. */
@@ -251,10 +246,10 @@
     width: 100%;
   }
   .budget-app-root .bud-table tbody tr:not(.type-row) input.form-control {
-    height: 40px;
+    height: var(--st-control-h);
     padding: 0 12px;
-    border-radius: 12px;
-    font-size: 15px;
+    border-radius: var(--st-control-radius);
+    font-size: var(--st-control-font);
   }
   .budget-app-root .bud-table tbody tr:not(.type-row) td:first-child { font-weight: 600; }
 

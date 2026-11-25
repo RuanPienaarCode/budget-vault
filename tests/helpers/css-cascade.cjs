@@ -19,7 +19,8 @@
    leave out is a node no selector can match.
 
    Deliberately small, not a CSS engine:
-     - selectors: tag, .class, #id, [attr], [attr=value], :not()/:is()/:where()
+     - selectors: tag, .class, #id, [attr], [attr=value] and [attr^= $= *= ~= |=value],
+       :not()/:is()/:where()
        of a compound list, descendant and child combinators; :first-child,
        :last-child and :nth-child(N) for a node that gives { nth, of }. Any
        other pseudo-class (:hover, :focus-visible, :nth-child(an+b) ...) does
@@ -77,8 +78,15 @@ function matchCompound(comp, node, pseudoWanted) {
     else if ((m = /^\[\s*([\w-]+)\s*(?:([~|^$*]?=)\s*(['"]?)(.*?)\3)?\s*\]/.exec(rest))) {
       const v = (node.attrs || {})[m[1]];
       if (v === undefined) return false;
-      if (m[2] === '=' && String(v) !== m[4]) return false;
-      if (m[2] && m[2] !== '=') return false;
+      const sv = String(v);
+      if (m[2] === '=' && sv !== m[4]) return false;
+      // The substring operators, for the row-action rules that pick a button
+      // by what its data-focus-key starts with (statement/primitives.css).
+      if (m[2] === '^=' && !sv.startsWith(m[4])) return false;
+      if (m[2] === '$=' && !sv.endsWith(m[4])) return false;
+      if (m[2] === '*=' && !sv.includes(m[4])) return false;
+      if (m[2] === '~=' && !sv.split(/\s+/).includes(m[4])) return false;
+      if (m[2] === '|=' && sv !== m[4] && !sv.startsWith(m[4] + '-')) return false;
     } else if ((m = /^:(not|is|where)\(((?:[^()]|\([^()]*\))*)\)/.exec(rest))) {
       const any = splitTop(m[2], ',').some(c => matchCompound(c, node, null));
       if (m[1] === 'not' ? any : !any) return false;

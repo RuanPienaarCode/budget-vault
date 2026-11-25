@@ -29,7 +29,12 @@
 
 /* ---- the hero ----------------------------------------------------------- */
 .budget-app-root .plan-hero { padding-bottom: 32px; }
-.budget-app-root .pot { padding: 32px 40px 0; }
+/* 44px at the sides: the gutter of every card header and body in the app
+   (.card-h, .body-pad in src/styles.css). Plan's hero was inset 40px and its
+   two column cards 28px, so its titles stood off the line every other page's
+   titles keep (2026-11-25 audit, CSS-2). The bands under 769px follow the
+   other pages' 20px at the end of this section; the phone block keeps its own. */
+.budget-app-root .pot { padding: 32px 44px 0; }
 /* Wrapping flex, not a grid on a media query: the app's breakpoints read the
    WINDOW, and a Plan page in a narrow split pane of a wide window would have
    kept its wide layout and run off the pane. These wrap by the room there
@@ -135,7 +140,7 @@
    the hero's last block now, so it carries no border or wash of its own. */
 .budget-app-root .plan-free,
 .budget-app-root .plan-free.is-over {
-  padding: 26px 40px 0; border: 0; border-radius: 0; background: none;
+  padding: 26px 44px 0; border: 0; border-radius: 0; background: none;
 }
 .budget-app-root .plan-free .free-acts { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin-top: 0; }
 .budget-app-root .plan-free .free-words { display: flex; align-items: flex-start; gap: 10px; max-width: 68ch; }
@@ -153,8 +158,8 @@
 .budget-app-root .plan-cols > .plan-money-in { flex: 1 1 300px; min-width: 0; margin: 0; }
 .budget-app-root .plan-env-head,
 .budget-app-root .plan-money-in .card-h {
-  display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; flex-wrap: nowrap;
-  padding: 28px 28px 14px; margin: 0;
+  display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: nowrap;
+  padding: 28px 44px 14px; margin: 0;
 }
 .budget-app-root .plan-env-head .section-h { margin: 0; padding: 0; }
 .budget-app-root .plan-env-head h2,
@@ -166,7 +171,9 @@
 .budget-app-root .plan-env-head > .btn-ghost { flex: none; white-space: nowrap; }
 
 /* ---- the buckets: rows in one card, the open one lifted ------------------ */
-.budget-app-root #planEnvelopes { display: block; padding: 0 12px 16px; }
+/* 28px + a row's own 16px puts each bucket's dot on the 44px line of the
+   heading above it; the row's rounded hover still reaches 16px past it. */
+.budget-app-root #planEnvelopes { display: block; padding: 0 28px 16px; }
 .budget-app-root #planEnvelopes > .plan-empty-row { padding: 6px 16px 12px; font-size: 14px; }
 
 /* A row. The hairline between rows is drawn as a background so it can stop
@@ -280,15 +287,17 @@
 .budget-app-root .env-item .ei-amt,
 .budget-app-root .env-item .ei-actual { align-self: center; font-size: 14.5px; }
 .budget-app-root .env-item .ei-amt { color: var(--text-primary); }
-/* The line an item is typed into. `input.` in front on purpose: the base
+/* The line an item is typed into: the app's one field (foundation.css,
+   --st-control-*; it was 10px corners and 14.5px text, the only field in the
+   app on those). `input.` in front on purpose: the base
    sheet's `.budget-app-root input[type="text"] { height: auto }` is one
    element heavier than a bare class and collapsed these to a 23px box. */
 .budget-app-root .env-item-add { flex-wrap: wrap; gap: 8px; margin: 0; padding: 10px 0 0; border-bottom: 0; }
 .budget-app-root input.env-add-name,
 .budget-app-root input.env-add-amt {
-  box-sizing: border-box; height: 40px; min-width: 0; padding: 0 12px;
-  border: 1px solid var(--control-border); border-radius: 10px; background: var(--surface); box-shadow: none;
-  font: inherit; font-size: 14.5px; color: var(--text-primary);
+  box-sizing: border-box; height: var(--st-control-h); min-width: 0; padding: 0 12px;
+  border: 1px solid var(--control-border); border-radius: var(--st-control-radius); background: var(--surface); box-shadow: none;
+  font: inherit; font-size: var(--st-control-font); color: var(--text-primary);
 }
 .budget-app-root input.env-add-name { flex: 1 1 12em; }
 .budget-app-root input.env-add-amt { flex: none; width: 7.5em; text-align: right; }
@@ -322,7 +331,7 @@
 }
 
 /* ---- money in ----------------------------------------------------------- */
-.budget-app-root #planSources { padding: 2px 28px 0; }
+.budget-app-root #planSources { padding: 2px 44px 0; }
 .budget-app-root #planSources > .plan-empty-row { padding: 6px 0 4px; font-size: 14px; }
 /* Solid is in the account; the dashed remainder is still expected. */
 .budget-app-root .src2-inout { padding-bottom: 8px; }
@@ -362,7 +371,22 @@
 .budget-app-root .src2-pill.is-exp { border: 1px dashed var(--color-gold); background: none; color: var(--color-gold); }
 .budget-app-root .src2-pill-ico svg { width: 13px; height: 13px; }
 .budget-app-root .src2-pill:focus-visible { outline: 2px solid var(--color-primary); outline-offset: 2px; }
-.budget-app-root .plan-src-foot { padding: 12px 28px 28px; }
+.budget-app-root .plan-src-foot { padding: 12px 44px 28px; }
+
+/* Under 769px every other card's header and body step to a 20px gutter
+   (src/styles.css, .card-h / .body-pad); Plan's do the same, so a narrow pane
+   does not leave this one page at 44px. The phone block below is later and
+   sets its own (also 20px) values under 601px. */
+@media (max-width: 768px) {
+  .budget-app-root .pot { padding: 32px 20px 0; }
+  .budget-app-root .plan-free,
+  .budget-app-root .plan-free.is-over { padding: 26px 20px 0; }
+  .budget-app-root .plan-env-head,
+  .budget-app-root .plan-money-in .card-h { padding: 28px 20px 14px; }
+  .budget-app-root #planEnvelopes { padding: 0 4px 16px; }
+  .budget-app-root #planSources { padding: 2px 20px 0; }
+  .budget-app-root .plan-src-foot { padding: 12px 20px 28px; }
+}
 
 /* ---- phone --------------------------------------------------------------
    One gutter of 20px inside every card, and cards edge to edge as on every

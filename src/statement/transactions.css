@@ -30,14 +30,15 @@
 .budget-app-root #view-transactions .tx-filters { gap: 12px; }
 .budget-app-root #view-transactions .tx-actions { gap: 8px; }
 
-/* One control height across the row: two selects and the search field, 40px,
-   the plugin's 12px field radius. */
+/* One control height across the row: two selects and the search field, the
+   app's one field geometry (foundation.css, --st-control-*), which these
+   three were the model for. */
 .budget-app-root #view-transactions .tx-filters .form-select-sm,
 .budget-app-root #view-transactions .tx-filters #txSearch {
-  height: 40px;
+  height: var(--st-control-h);
   padding: 0 12px;
-  border-radius: 12px;
-  font-size: 15px;
+  border-radius: var(--st-control-radius);
+  font-size: var(--st-control-font);
 }
 /* The search is the pill of the three. Its text starts a little in from the
    curve; the selects keep their native chevron. */
@@ -61,28 +62,16 @@
   font-variant-numeric: tabular-nums lining-nums;
 }
 
-/* Buttons: one height, the mockup's small size. */
-.budget-app-root #view-transactions .tx-actions .btn-ghost,
-.budget-app-root #view-transactions .tx-actions .btn-gradient {
-  padding: 0 14px;
-  font-size: var(--st-small);
-  font-weight: 500;
-  line-height: 1;
-}
-.budget-app-root #view-transactions .tx-actions .btn-gradient { font-weight: 600; }
-@media (pointer: fine) {
-  .budget-app-root #view-transactions .tx-actions .btn-ghost,
-  .budget-app-root #view-transactions .tx-actions .btn-gradient { min-height: 34px; }
-}
+/* The action buttons' size (13px, weight 500, 34px under a mouse) was this
+   page's and is now every card header's: primitives.css, section 3. */
 
 /* ------------------------------------------------------------
    2. TABLE: headings, rows, hover
    ------------------------------------------------------------ */
-.budget-app-root #view-transactions .table thead th {
-  font-size: var(--st-small);
-  font-weight: 500;
-  color: var(--text-light);
-}
+/* The heading row (13px, weight 500, --text-light), the money cell's tabular
+   figures and the --line-soft row hover are the foundation's now, shared by
+   every table in the app (foundation.css, section 2); this page keeps its own
+   body size, row height and 16px figure below. */
 .budget-app-root #view-transactions .table tbody td {
   font-size: var(--st-body);
   line-height: 1.35;
@@ -100,8 +89,6 @@
     padding-bottom: 12px;
   }
 }
-/* A calm hover: a faint wash instead of the green tint. */
-.budget-app-root #view-transactions .table.table-hover tbody tr:hover { background: var(--line-soft); }
 
 /* Date: quiet, never wraps. Description: the row's own name, weight 500. */
 .budget-app-root #view-transactions .table tbody td:nth-child(1) {
@@ -204,12 +191,13 @@
   }
 }
 
-/* Note field, level with the other inputs on the page. */
+/* Note field: the in-row field every table now uses (foundation.css,
+   --st-control-*-cell), which this one was the model for. */
 .budget-app-root #view-transactions .table tbody td:nth-child(7) input {
-  height: 36px;
+  height: var(--st-control-h-cell);
   padding: 0 12px;
-  border-radius: 12px;
-  font-size: 14px;
+  border-radius: var(--st-control-radius);
+  font-size: var(--st-control-font-cell);
 }
 
 /* Split and Delete: quiet round icon buttons that show their edge on hover,
@@ -326,9 +314,26 @@
 
   /* The rail runs to the card's edges (negative margin = the 14px card-h side
      padding, padded back inside) so a button scrolling away is cut by the
-     screen edge, not by an invisible box 14px short of it. The primary action
-     and the row count are ordered first: Save changes would otherwise be the
-     LAST item of a scrolling strip, off screen exactly when it matters. */
+     screen edge, not by an invisible box 14px short of it.
+
+     THE TWO ACTIONS THAT MATTER COME FIRST. In the markup Add transaction and
+     Save changes are the last two of seven (shell.js), and on a 375px phone
+     Add started 822px from the left of a rail with its scrollbar hidden: off
+     screen, with nothing to say it was there (2026-11-25 audit, VIS-1/FUN-5).
+     `order` puts them at the start and the row count after them; the rest keep
+     their markup order. `order` moves the boxes, not the focus: Tab still walks
+     the markup (Export, Report, Delete these rows, New account, Add
+     transaction, Save changes), which is the order a keyboard reader on a
+     wider window has always had, so nothing about it changes on a phone.
+
+     THE RIGHT EDGE FADES (VIS-2). A mask, not a painted gradient: the card is
+     a translucent glass panel, so no solid colour could match it, and a mask
+     takes only the alpha of its gradient, so it carries no colour of its own
+     and reads the same in both themes. CSS on the iOS 15 floor cannot tell
+     whether more of the rail lies to the right, so the fade is permanent; the
+     ::after is a short spacer at the far end, so a reader who has scrolled all
+     the way sees the last button come clear of it. -webkit-mask-image is the
+     iOS 15 spelling (unprefixed is Safari 15.4+). */
   .budget-app-root #view-transactions .tx-actions {
     flex-wrap: nowrap;
     overflow-x: auto;
@@ -337,11 +342,15 @@
     scrollbar-width: none;
     margin: 0 -14px;
     padding: 0 14px 2px;
+    -webkit-mask-image: linear-gradient(to right, var(--text-primary) calc(100% - 24px), transparent);
+    mask-image: linear-gradient(to right, var(--text-primary) calc(100% - 24px), transparent);
   }
   .budget-app-root #view-transactions .tx-actions::-webkit-scrollbar { display: none; }
+  .budget-app-root #view-transactions .tx-actions::after { content: ''; flex: none; width: 12px; order: 99; }
   .budget-app-root #view-transactions .tx-actions > * { flex: none; white-space: nowrap; }
-  .budget-app-root #view-transactions .tx-actions > #txCount { order: -2; }
-  .budget-app-root #view-transactions .tx-actions > #txSave { order: -1; }
+  .budget-app-root #view-transactions .tx-actions > #txAdd { order: -3; }
+  .budget-app-root #view-transactions .tx-actions > #txSave { order: -2; }
+  .budget-app-root #view-transactions .tx-actions > #txCount { order: -1; }
 
   .budget-app-root #txTable tbody tr { gap: 6px 16px; padding: 14px 4px; }
 

@@ -90,6 +90,25 @@
   --st-cur-gap-display:   -.28em;
   --st-cur-gap-statement: -.27em;
   --st-cur-gap:           var(--st-cur-gap-figure);
+
+  /* ONE FIELD. A text field or a select is 40px tall, rounds at 12px and
+     prints its value at 15px (the body size) — the geometry the Transactions
+     filters and the Budget table's amount field already had when the
+     2026-11-25 audit (VIS-3, CSS-7) measured the other twelve pages drawing
+     29-31px fields at 8px and 12.8px. primitives.css applies these to every
+     .form-control / .form-select under the root; the lanes that size a field
+     of their own read the same three tokens rather than restating 40/12/15.
+     A touch screen still lifts every field to 44px and 16px (phone.css,
+     section 9): those rules are later and win, so this is the pointer size. */
+  --st-control-h:      40px;
+  --st-control-radius: 12px;
+  --st-control-font:   15px;
+  /* A field inside a table row: the Transactions note field's 36px and 14px,
+     the table's own body size. At 40px / 15px the older pages' edit tables
+     (Assets, Owed, Services, Tax) grew 10px a row and clipped their selects
+     ("Household conten") in columns sized for the old 12.8px text. */
+  --st-control-h-cell:    36px;
+  --st-control-font-cell: 14px;
 }
 
 /* ------------------------------------------------------------
@@ -113,10 +132,41 @@
    change must not reach tables that inherit), now with a quiet sentence-case
    heading row instead of the old tracked capitals. */
 .budget-app-root .table { font-size: 14px; }
+/* ONE TABLE VOICE. The heading row is the quiet caption the Transactions and
+   Budget tables were restyled to (weight 500 in --text-light); a money cell
+   is a step up from the 14px body at 15px / 500 with lining tabular figures,
+   as on Budget. Those two pages used to carry these as lane rules while the
+   other tables (Debts, Owed, Assets, Services, Tax, Import, Food, Loans, the
+   Dashboard's budget table) kept the older 600-weight muted heading and 14px
+   figures: two table styles in one app (2026-11-25 audit, CSS-1). Now it is
+   one rule here and the lane copies are gone; Transactions still sets its own
+   16px figure, which is that page's statement and stays its lane's call.
+
+   The money cell sets no colour: a tone class on the cell (.text-danger,
+   .text-warning, .text-success) is how a view says what the figure means,
+   and it must keep winning. */
 .budget-app-root .table thead th {
   font-size: var(--st-small);
-  font-weight: 600;
+  font-weight: var(--st-weight-label);
+  color: var(--text-light);
   letter-spacing: 0;
+}
+.budget-app-root .table td.num {
+  font-size: var(--st-body);
+  font-weight: var(--st-weight-label);
+  font-variant-numeric: tabular-nums lining-nums;
+}
+/* One row hover on every data table, in CSS so no view has to opt in: the
+   faint --line-soft wash Transactions uses, where the base sheet gave the nine
+   tables marked .table-hover a green tint and the other eight nothing.
+   Behind @media (hover: hover) so a tap on a phone does not leave a row lit.
+   Not on a group bar (.type-row is a heading, not a row to pick) and not on an
+   Accounts ledger row, whose own hover, selection and rail rules beside
+   .acct-row in src/styles.css say more than a wash would. (0,4,2): the same
+   weight as the base .table-hover rule it replaces, and later than it. A
+   :not() with a list is Safari 9+, and counts as its heaviest argument. */
+@media (hover: hover) {
+  .budget-app-root .table tbody tr:not(.type-row, .acct-row):hover { background: var(--line-soft); }
 }
 .budget-app-root .table .type-row td {
   font-size: var(--st-label);
