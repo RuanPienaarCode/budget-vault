@@ -677,7 +677,13 @@ module.exports = function registerLoad(ctx) {
       if (rows.length) T.rulesHeader = rows[0];
       let prev = null;
       for (const row of rows.slice(1)) {
-        if (row.length >= 2 && row[0]) {
+        /* A line needs a pattern AND a category to be a rule. `pattern,` is what
+           a spreadsheet writes for an empty category cell; read as a rule it
+           outranked the broader correct one (longest pattern wins), left its
+           rows uncategorised, and its key stopped the merchant being learned
+           (2026-11-25 audit, RUL-12). Like a comment or a one-cell line it is
+           kept verbatim in rulesExtras and written back where it stood. */
+        if (row.length >= 2 && row[0] && String(row[1]).trim()) {
           prev = { pattern: row[0], category: row[1], extra: row.slice(2) };
           T.rules.push(prev);
         } else {

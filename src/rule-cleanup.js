@@ -38,6 +38,18 @@
      2026-10-07 a nine-character place name, pointed at a grocery category,
      would have taken thirteen specific merchant rules with it (TIDY-COVER).
 
+   • Exact duplicates (same normalised pattern, same category) are judged
+     apart from the replay. The copy that sits first in the file always beats
+     the later ones in matchRule, so a later copy can never answer anything the
+     first does not: the first stays and the rest are redundant whatever the
+     history holds. Judging them by replay made the verdict depend on which
+     transaction file loaded first (2026-11-25 audit, RUL-11).
+
+   • Same pattern with DIFFERENT categories is a conflict, not a duplicate. The
+     later copy is already dead, but which of the two the household meant is
+     theirs to say, so neither is removed and the pair is reported in
+     `conflicts` for the preview to list.
+
    Pure: no vault, no DOM, no Obsidian. Tested directly.  */
 
 const { matchRule, autoCategorise, ruleText, patternMatches, patternCovers } = require('./rules');
@@ -49,9 +61,11 @@ const { matchRule, autoCategorise, ruleText, patternMatches, patternCovers } = r
    and is only ever used as evidence that a cover is ambiguous (below). It
    never changes what the replay compares, which is the rules' own answers.
 
-   Returns { remove, redundant, dormant, blank, kept, checked, total } where
-   `remove` is the full set safe to delete — `redundant` plus `blank`, and
-   deliberately NOT `dormant`. */
+   Returns { remove, redundant, dormant, blank, conflicts, kept, checked, total }
+   where `remove` is the full set safe to delete — `redundant` plus `blank`, and
+   deliberately NOT `dormant`. `conflicts` is [{ pattern, categories, indices }],
+   one per pattern the file answers with more than one category; nothing in it
+   is ever in `remove` unless it is also a true duplicate of an earlier line. */
 function analyseRules(rules, descriptions) {
   const all = rules || [];
   const prepared = [];
@@ -124,29 +138,87 @@ function analyseRules(rules, descriptions) {
     return hits;
   });
 
+  /* Same pattern, grouped. Within a group the first line beats every later
+     one in matchRule (an exact match returns the first, and the longest-match
+     scan only replaces on a strictly longer pattern), so a later line with the
+     first's category adds nothing in any statement, present or future. Those
+     are the duplicates. A group holding more than one category is a conflict:
+     reported, and none of its lines is a candidate below. The category is
+     compared as written (trimmed): categories are looked up by name, so
+     "food" is not asserted to be "Food". */
+  const groups = new Map();
+  prepared.forEach((r, pi) => {
+    if (!groups.has(r.p)) groups.set(r.p, []);
+    groups.get(r.p).push(pi);
+  });
+  const catOf = pi => String(prepared[pi].category ?? '').trim();
+  const dupes = new Set();
+  const inConflict = new Set();
+  const conflicts = [];
+  for (const [p, members] of groups) {
+    if (members.length < 2) continue;
+    const firstOf = new Map();
+    for (const pi of members) {
+      const c = catOf(pi);
+      if (firstOf.has(c)) dupes.add(pi); else firstOf.set(c, pi);
+    }
+    if (firstOf.size > 1) {
+      members.forEach(pi => inConflict.add(pi));
+      conflicts.push({
+        pattern: p,
+        categories: [...firstOf.keys()],
+        indices: members.map(pi => prepared[pi].i),
+      });
+    }
+  }
+  conflicts.sort((a, b) => a.indices[0] - b.indices[0]);
+
   const order = prepared.map((_, pi) => pi)
     .sort((a, b) => prepared[b].p.length - prepared[a].p.length || a - b);
 
-  const working = prepared.slice();
+  /* The duplicates are out of the working set before any replay, so no other
+     candidate's verdict can lean on a copy that is about to go, and the
+     survivor of each set is the one the replay sees. Removing them changes no
+     answer (above), so `base` needs no recomputing. */
   const redundant = [];
+  for (const pi of dupes) {
+    const rule = prepared[pi];
+    redundant.push({
+      index: rule.i,
+      pattern: all[rule.i].pattern,
+      category: rule.category,
+      coveredBy: rule.p,
+      hits: touches[pi].length,
+    });
+  }
+  const working = prepared.filter((_, pi) => !dupes.has(pi));
   const dormant = [];
   for (const pi of order) {
+    if (dupes.has(pi)) continue;
     const rule = prepared[pi];
     const hits = touches[pi];
     if (!hits.length) {
       dormant.push({ index: rule.i, pattern: all[rule.i].pattern, category: rule.category });
       continue;
     }
+    if (inConflict.has(pi)) continue;   // the household's call, never ours
     const at = working.indexOf(rule);
     if (at === -1) continue;
+    /* The descriptions this rule actually ANSWERS today. A hit that a longer
+       rule wins before and after is no evidence about this rule, so it must not
+       be the one the cover is judged on: with the history in another order the
+       verdict used to change (RUL-11). */
+    const won = hits.filter(di => matchRule(descs[di], working) === rule);
     working.splice(at, 1);
     if (!hits.every(di => autoCategorise(descs[di], working) === base[di])) {
       working.splice(at, 0, rule);   // same slot: order decides ties
       continue;
     }
-    // Name the rule that now answers for it, so the preview can say why this
-    // one is safe to lose rather than just asserting that it is.
-    const cover = matchRule(descs[hits[0]], working);
+    /* Every description it wins needs an acceptable cover, not just the first.
+       A rule that wins nothing is not removed on this evidence: there is no
+       answer to check a cover against. */
+    const covers = won.map(di => matchRule(descs[di], working));
+    const cover = covers[0];
     /* Only ever delete the MORE SPECIFIC of the two. Passing the replay proves
        a removal is safe for the transactions already in the vault; it does not
        prove it for next month's statement. A rule its cover covers (every
@@ -167,7 +239,7 @@ function analyseRules(rules, descriptions) {
        And the cover must not be ambiguous (see `ambiguous` above). A cover
        that also answers for other kinds of spending is safe today and not a
        rule to keep the specific ones on. */
-    if (!cover || !patternCovers(cover.p, rule.p) || ambiguous(cover)) {
+    if (!covers.length || covers.some(c => !c || !patternCovers(c.p, rule.p) || ambiguous(c))) {
       working.splice(at, 0, rule);
       continue;
     }
@@ -175,7 +247,7 @@ function analyseRules(rules, descriptions) {
       index: rule.i,
       pattern: all[rule.i].pattern,
       category: rule.category,
-      coveredBy: cover ? cover.p : '',
+      coveredBy: cover.p,
       hits: hits.length,
     });
   }
@@ -188,6 +260,7 @@ function analyseRules(rules, descriptions) {
     redundant,
     dormant,
     blank,
+    conflicts,
     kept: all.length - remove.length,
     checked: descs.length,
     total: all.length,
