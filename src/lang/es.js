@@ -1824,6 +1824,7 @@ module.exports = {
   'plan.env.collapseAria': "Contraer {name}",
   'plan.env.deleteAria': "Quitar la bolsa de gasto {name}",
   'plan.actions.deleteAria': "Eliminar plan",
+  'plan.err.nameRequired': 'Necesita un nombre',
 
   /* Accessible names (audit of 11 Nov 2026, task 19) — machine-assisted, not native-reviewed. */
   'plan.pickerAria': 'Elegir un plan',
@@ -1981,6 +1982,9 @@ module.exports = {
   },
   'ctl.toast.repointFailed': 'No se pudieron redirigir las notas por el cambio de nombre "{from}" → "{to}" ({error})',
   'ctl.notice.unsavedReloadSkipped': 'Presupuesto: cambios sin guardar — recarga omitida. Guarde (o use "Recargar desde el disco" para descartar) y vuelva a intentarlo.',
+  'ctl.reload.confirmTitle': 'Cambios sin guardar',
+  'ctl.reload.confirmMessage': 'Recargar desde el disco descartará los cambios sin guardar. ¿Continuar?',
+  'ctl.reload.confirmDiscard': 'Descartar y recargar',
   'ctl.toast.fileFailed': 'No se pudo procesar "{name}" ({error})',
   'ctl.toast.thatFile': 'ese archivo',
   'settings.exchangeRates.source': 'Fuente de los tipos de cambio',

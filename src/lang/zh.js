@@ -1742,6 +1742,7 @@ module.exports = {
   'plan.env.collapseAria': "收起 {name}",
   'plan.env.deleteAria': "移除支出信封 {name}",
   'plan.actions.deleteAria': "删除计划",
+  'plan.err.nameRequired': '需要填写名称',
 
   /* Accessible names (audit of 11 Nov 2026, task 19) — machine-assisted, not native-reviewed. */
   'plan.pickerAria': '选择计划',
@@ -1887,6 +1888,9 @@ module.exports = {
   },
   'ctl.toast.repointFailed': '无法为重命名“{from}”→“{to}”重新指向笔记（{error}）',
   'ctl.notice.unsavedReloadSkipped': '预算：有未保存的更改 — 已跳过重新加载。请先保存（或选择“从磁盘重新加载”以放弃更改），然后重试。',
+  'ctl.reload.confirmTitle': '未保存的更改',
+  'ctl.reload.confirmMessage': '从磁盘重新加载将放弃未保存的更改。是否继续？',
+  'ctl.reload.confirmDiscard': '放弃并重新加载',
   'ctl.toast.fileFailed': '无法处理“{name}”（{error}）',
   'ctl.toast.thatFile': '该文件',
   'settings.exchangeRates.source': '汇率来源',

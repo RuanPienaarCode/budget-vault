@@ -1836,6 +1836,7 @@ module.exports = {
   'plan.env.collapseAria': "Replier {name}",
   'plan.env.deleteAria': "Retirer l'enveloppe {name}",
   'plan.actions.deleteAria': "Supprimer le plan",
+  'plan.err.nameRequired': 'Il lui faut un nom',
 
   /* Accessible names (audit of 11 Nov 2026, task 19) — machine-assisted, not native-reviewed. */
   'plan.pickerAria': 'Choisir un plan',
@@ -1993,6 +1994,9 @@ module.exports = {
   },
   'ctl.toast.repointFailed': 'Impossible de rediriger les notes pour le renommage "{from}" → "{to}" ({error})',
   'ctl.notice.unsavedReloadSkipped': 'Budget : modifications non enregistrées — rechargement ignoré. Enregistrez (ou « Recharger depuis le disque » pour abandonner), puis réessayez.',
+  'ctl.reload.confirmTitle': 'Modifications non enregistrées',
+  'ctl.reload.confirmMessage': 'Le rechargement depuis le disque abandonnera vos modifications non enregistrées. Continuer ?',
+  'ctl.reload.confirmDiscard': 'Abandonner et recharger',
   'ctl.toast.fileFailed': 'Impossible de traiter "{name}" ({error})',
   'ctl.toast.thatFile': 'ce fichier',
   'settings.exchangeRates.source': 'Source des taux de change',

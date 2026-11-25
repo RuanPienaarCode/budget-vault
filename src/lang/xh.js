@@ -1845,6 +1845,7 @@ module.exports = {
   'plan.env.collapseAria': "Songa {name}",
   'plan.env.deleteAria': "Susa ibhakethe yokuchitha {name}",
   'plan.actions.deleteAria': "Cima i-plan",
+  'plan.err.nameRequired': 'Kufuneka igama',
 
   /* Accessible names (audit of 11 Nov 2026, task 19) — machine-assisted, not native-reviewed. */
   'plan.pickerAria': 'Khetha i-plan',
@@ -2002,6 +2003,9 @@ module.exports = {
   },
   'ctl.toast.repointFailed': 'Ayikwazanga ukuqondisa kwakhona amanqaku ngenxa yokuthiywa kwakhona kwegama "{from}" → "{to}" ({error})',
   'ctl.notice.unsavedReloadSkipped': 'Ibhajethi: kukho utshintsho olungagciniwe — ukulayisha kwakhona kutsitywe. Gcina (okanye ukhethe "Layisha kwakhona kwidiski" ukululahla), uze uzame kwakhona.',
+  'ctl.reload.confirmTitle': 'Utshintsho olungasindisiwe',
+  'ctl.reload.confirmMessage': 'Ukulayisha kwakhona kwidiski kuya kulahla utshintsho olungasindisiwe. Qhubeka?',
+  'ctl.reload.confirmDiscard': 'Lahla uze ulayishe kwakhona',
   'ctl.toast.fileFailed': 'Ayikwazanga ukusebenzisa ifayile "{name}" ({error})',
   'ctl.toast.thatFile': 'loo fayile',
   'settings.exchangeRates.source': 'Umthombo wamaxabiso otshintshiselwano',

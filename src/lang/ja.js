@@ -1742,6 +1742,7 @@ module.exports = {
   'plan.env.collapseAria': "{name} を折りたたむ",
   'plan.env.deleteAria': "支出バケット {name} を削除",
   'plan.actions.deleteAria': "プランを削除",
+  'plan.err.nameRequired': '名前が必要です',
 
   /* Accessible names (audit of 11 Nov 2026, task 19) — machine-assisted, not native-reviewed. */
   'plan.pickerAria': 'プランを選択',
@@ -1887,6 +1888,9 @@ module.exports = {
   },
   'ctl.toast.repointFailed': '「{from}」→「{to}」の名前変更に伴うメモの付け替えができませんでした（{error}）',
   'ctl.notice.unsavedReloadSkipped': '予算: 未保存の変更があるため、再読み込みを見送りました。保存するか（破棄する場合は「ディスクから再読み込み」）、もう一度お試しください。',
+  'ctl.reload.confirmTitle': '未保存の変更',
+  'ctl.reload.confirmMessage': 'ディスクから再読み込みすると、未保存の変更は破棄されます。続行しますか？',
+  'ctl.reload.confirmDiscard': '破棄して再読み込み',
   'ctl.toast.fileFailed': '「{name}」を処理できませんでした（{error}）',
   'ctl.toast.thatFile': 'そのファイル',
   'settings.exchangeRates.source': '為替レートの取得元',

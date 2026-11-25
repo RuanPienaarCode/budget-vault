@@ -1838,6 +1838,7 @@ module.exports = {
   'plan.env.collapseAria': "Recolher {name}",
   'plan.env.deleteAria': "Remover o envelope de gasto {name}",
   'plan.actions.deleteAria': "Excluir plano",
+  'plan.err.nameRequired': 'Precisa de um nome',
 
   /* Accessible names (audit of 11 Nov 2026, task 19) — machine-assisted, not native-reviewed. */
   'plan.pickerAria': 'Escolher um plano',
@@ -1995,6 +1996,9 @@ module.exports = {
   },
   'ctl.toast.repointFailed': 'Não foi possível redirecionar as notas para a renomeação "{from}" → "{to}" ({error})',
   'ctl.notice.unsavedReloadSkipped': 'Orçamento: alterações não salvas — recarga ignorada. Salve (ou use "Recarregar do disco" para descartar) e tente de novo.',
+  'ctl.reload.confirmTitle': 'Alterações não salvas',
+  'ctl.reload.confirmMessage': 'Recarregar do disco descartará as alterações não salvas. Continuar?',
+  'ctl.reload.confirmDiscard': 'Descartar e recarregar',
   'ctl.toast.fileFailed': 'Não foi possível processar "{name}" ({error})',
   'ctl.toast.thatFile': 'esse arquivo',
   'settings.exchangeRates.source': 'Fonte das cotações',

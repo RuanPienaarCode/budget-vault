@@ -2134,6 +2134,7 @@ module.exports = {
   'plan.env.collapseAria': "Collapse {name}",
   'plan.env.deleteAria': "Remove spending bucket {name}",
   'plan.actions.deleteAria': "Delete plan",
+  'plan.err.nameRequired': 'It needs a name',
 
   /* The Plan page's remaining spoken-only strings (audit of 11 Nov 2026, task
      19). `plan.split.aria.*` is the split bar's name, read as two or three
@@ -2311,6 +2312,9 @@ module.exports = {
   },
   'ctl.toast.repointFailed': 'Could not re-point notes for the "{from}" → "{to}" rename ({error})',
   'ctl.notice.unsavedReloadSkipped': 'Budget: unsaved changes — reload skipped. Save (or "Reload from disk" to discard), then retry.',
+  'ctl.reload.confirmTitle': 'Unsaved changes',
+  'ctl.reload.confirmMessage': 'Reloading from disk will discard your unsaved changes. Continue?',
+  'ctl.reload.confirmDiscard': 'Discard & reload',
   'ctl.toast.fileFailed': 'Could not process "{name}" ({error})',
   'ctl.toast.thatFile': 'that file',
   'settings.exchangeRates.source': 'Exchange-rate source',
