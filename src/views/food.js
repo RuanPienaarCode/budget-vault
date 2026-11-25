@@ -99,15 +99,18 @@ module.exports = function registerFood(ctx) {
       t => catType(t.row.cat) === 'food' && !t.row.excluded);
 
     const tile = kpiTiles($('#foodKpis'));
-    tile('Spent on receipts', money(sum.spend), '', `${sum.receipts} receipt${sum.receipts === 1 ? '' : 's'} this period`);
-    tile('Discounts', money(sum.saved), sum.saved > 0 ? 'text-success' : '', 'XTRASAVE, specials and till rounding');
+    tile('Spent on receipts', money(sum.spend), 'st-money', `${sum.receipts} receipt${sum.receipts === 1 ? '' : 's'} this period`);
+    tile('Discounts', money(sum.saved), sum.saved > 0 ? 'text-success st-money' : 'st-money', 'XTRASAVE, specials and till rounding');
     tile('Healthy', sum.spend > 0 ? `${Math.round(sum.healthyShare * 100)}%` : '—', '',
       sum.spend > 0 ? `${money(sum.healthy)} on (V) HealthyFood lines` : 'no receipts this period');
     /* How much of the period's receipt spend is filed into a real category,
        and how much still sits in Other (blank cells included) — the rand
        figure the By category list cannot be trusted past until it is small. */
+    /* st-money only when there IS a figure: the stylesheet shrinks the first
+       character of a .st-money value, and on the '—' placeholder that
+       character is the dash itself (2026-11-25 audit, VIS-8). */
     tile('Categorised', sum.spend > 0 ? money(sum.categorised) : '—',
-      sum.spend > 0 && sum.uncategorised < 0.005 ? 'text-success' : '',
+      sum.spend > 0 ? (sum.uncategorised < 0.005 ? 'text-success st-money' : 'st-money') : '',
       sum.spend > 0 ? `${money(sum.uncategorised)} uncategorised (in ${OTHER})` : 'no receipts this period');
     const covTile = tile('With a receipt', foodSpend > 0 ? `${Math.round((covered / foodSpend) * 100)}%` : '—', '',
       foodSpend > 0 ? `${money(covered)} of ${money(foodSpend)} grocery spend` : 'no Food spend on the bank this period');

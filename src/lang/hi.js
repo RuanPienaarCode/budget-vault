@@ -1866,6 +1866,7 @@ module.exports = {
   'plan.env.collapseAria': "{name} समेटें",
   'plan.env.deleteAria': "ख़र्च बकेट {name} हटाएँ",
   'plan.actions.deleteAria': "प्लान हटाएँ",
+  'plan.err.nameRequired': 'इसका नाम ज़रूरी है',
 
   /* Accessible names (audit of 11 Nov 2026, task 19) — machine-assisted, not native-reviewed. */
   'plan.pickerAria': 'प्लान चुनें',
@@ -2027,6 +2028,9 @@ module.exports = {
   },
   'ctl.toast.repointFailed': '"{from}" → "{to}" नाम बदलने के लिए नोट्स को नए नाम पर नहीं मोड़ा जा सका ({error})',
   'ctl.notice.unsavedReloadSkipped': 'बजट: बिना सहेजे बदलाव हैं — फिर से लोड करना छोड़ दिया गया। सहेजें (या छोड़ने के लिए "डिस्क से फिर पढ़ें" चुनें), फिर दोबारा कोशिश करें।',
+  'ctl.reload.confirmTitle': 'बिना सहेजे बदलाव',
+  'ctl.reload.confirmMessage': 'डिस्क से फिर पढ़ने पर आपके बिना सहेजे बदलाव छूट जाएँगे। जारी रखें?',
+  'ctl.reload.confirmDiscard': 'छोड़ें और फिर पढ़ें',
   'ctl.toast.fileFailed': '"{name}" को प्रोसेस नहीं किया जा सका ({error})',
   'ctl.toast.thatFile': 'वह फ़ाइल',
   'settings.exchangeRates.source': 'विनिमय-दर का स्रोत',

@@ -633,6 +633,10 @@ body.is-tablet .budget-app-root button:where(.src2-pill) { padding: 4px 11px; }
   color: #fff;
 }
 .budget-app-root .brand-logo .ico svg { width: 22px; height: 22px; }
+/* White on the dark theme's primary measured about 2.5:1 (2026-11-25 audit,
+   CSS-15). Dark swaps the glyph to the near-black --ink-on-accent and keeps the
+   gradient, exactly as .topbar-avatar and the dark .btn-gradient do. */
+.budget-app-root.bud-dark .brand-logo { color: var(--ink-on-accent); }
 .budget-app-root .brand-text { display: flex; flex-direction: column; line-height: 1.15; min-width: 0; }
 .budget-app-root .brand-text b { font-size: 16px; font-weight: 600; letter-spacing: .2px; color: var(--text-primary); white-space: nowrap; }
 .budget-app-root .brand-sub { font-size: 11px; color: var(--text-light); letter-spacing: .4px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
@@ -1467,6 +1471,13 @@ body.is-phone .budget-app-root .drawer-book:not(.hidden) { display: block; }
   font-size: 0.85rem;
   font-weight: 700;
   cursor: pointer;
+  /* The same icon-and-label row as .btn-ghost above. Without the gap the
+     plus on "Add receipt" / "New note" and the file glyph on "Create report"
+     touched their words, and with a glyph in one button and none in its
+     neighbour the two sat on different baselines (2026-11-25 audit, VIS-4). */
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
   transition: filter 0.15s, opacity 0.15s;
 }
 .budget-app-root .btn-gradient:hover { filter: brightness(1.06); }
@@ -1832,7 +1843,15 @@ body.is-phone .budget-app-root .drawer-book:not(.hidden) { display: block; }
 .budget-app-root .caveat-chip-btn {
   font: inherit; font-size: 11.5px; line-height: 1.3; cursor: pointer;
   min-height: 24px;
-  padding: 2px 9px; border-radius: 999px;
+  /* 12px, not 999px: it is the pill's own radius on a one-line chip (24px tall,
+     so the corners are identical), but a chip whose sentence wraps is taller
+     than it is wide at table width and 999px turned it into a 90x66px oval
+     with text poking out of the curve (2026-11-25 audit, VIS-7). A wrapped
+     chip reads from the left edge, which is how its detail line below reads;
+     justify-content because the button is a flex box (see
+     css-button-text-align) and text-align alone would centre the text block. */
+  padding: 2px 9px; border-radius: 12px;
+  text-align: left; justify-content: flex-start;
   border: 1px solid var(--color-primary); background: var(--color-primary-light);
   color: var(--color-primary);
 }
@@ -4445,6 +4464,8 @@ body.is-phone .budget-app-root .drawer-book:not(.hidden) { display: block; }
   color: #fff;
 }
 .budget-app-root .splash-logo .ico svg { width: 40px; height: 40px; }
+/* The topbar logo's dark swap (see .brand-logo): same gradient, same glyph. */
+.budget-app-root.bud-dark .splash-logo { color: var(--ink-on-accent); }
 .budget-app-root .splash-title {
   margin: 0;
   font-size: 1.65rem;
@@ -6623,6 +6644,8 @@ body.is-phone .budget-app-root .drawer-book:not(.hidden) { display: block; }
   width: 20px; height: 20px; border-radius: 50%; border: 2px solid var(--border-color); box-sizing: border-box;
 }
 .budget-app-root .fs-mark.is-done { background: var(--color-primary); border-color: var(--color-primary); color: #ffffff; }
+/* The tick on a dark primary: --ink-on-accent, as .ei-tick.done does. */
+.budget-app-root.bud-dark .fs-mark.is-done { color: var(--ink-on-accent); }
 .budget-app-root .fs-mark .fs-tick { display: inline-flex; width: 12px; height: 12px; overflow: hidden; }
 .budget-app-root .fs-mark .fs-tick svg { flex: none; width: 12px; height: 12px; stroke-width: 3; }
 .budget-app-root .fs-mark.is-new { animation: fs-pop .45s cubic-bezier(.34, 1.25, .64, 1) both; }

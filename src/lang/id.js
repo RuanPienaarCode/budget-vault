@@ -1788,6 +1788,7 @@ module.exports = {
   'plan.env.collapseAria': "Ciutkan {name}",
   'plan.env.deleteAria': "Hapus kantong belanja {name}",
   'plan.actions.deleteAria': "Hapus rencana",
+  'plan.err.nameRequired': 'Perlu diberi nama',
 
   /* Accessible names (audit of 11 Nov 2026, task 19) — machine-assisted, not native-reviewed. */
   'plan.pickerAria': 'Pilih rencana',
@@ -1936,6 +1937,9 @@ module.exports = {
   },
   'ctl.toast.repointFailed': 'Tidak bisa mengalihkan catatan untuk penggantian nama "{from}" → "{to}" ({error})',
   'ctl.notice.unsavedReloadSkipped': 'Anggaran: ada perubahan yang belum disimpan — muat ulang dilewati. Simpan (atau pilih "Muat ulang dari disk" untuk membuangnya), lalu coba lagi.',
+  'ctl.reload.confirmTitle': 'Perubahan belum disimpan',
+  'ctl.reload.confirmMessage': 'Memuat ulang dari disk akan membuang perubahan yang belum disimpan. Lanjutkan?',
+  'ctl.reload.confirmDiscard': 'Buang dan muat ulang',
   'ctl.toast.fileFailed': '"{name}" tidak bisa diproses ({error})',
   'ctl.toast.thatFile': 'berkas itu',
   'settings.exchangeRates.source': 'Sumber kurs',

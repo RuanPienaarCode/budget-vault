@@ -1879,6 +1879,7 @@ module.exports = {
   'plan.env.collapseAria': "Goqa u-{name}",
   'plan.env.deleteAria': "Susa ibhakede yokuchitha {name}",
   'plan.actions.deleteAria': "Susa uhlelo",
+  'plan.err.nameRequired': 'Idinga igama',
 
   /* Accessible names (audit of 11 Nov 2026, task 19) — machine-assisted, not native-reviewed. */
   'plan.pickerAria': 'Khetha uhlelo',
@@ -2040,6 +2041,9 @@ module.exports = {
   },
   'ctl.toast.repointFailed': 'Ayikwazanga ukuqondisa kabusha amanothi ngenxa yokuqanjwa kabusha kwegama "{from}" → "{to}" ({error})',
   'ctl.notice.unsavedReloadSkipped': 'Isabelomali: kukhona izinguquko ezingalondolozwanga — ukulayisha kabusha kweqiwe. Londoloza (noma ukhethe "Layisha kabusha kudiski" ukuzilahla), bese uzama futhi.',
+  'ctl.reload.confirmTitle': 'Izinguquko ezingakagcinwa',
+  'ctl.reload.confirmMessage': 'Ukulayisha kabusha kudiski kuzolahla izinguquko ezingakagcinwa. Qhubeka?',
+  'ctl.reload.confirmDiscard': 'Lahla bese ulayisha kabusha',
   'ctl.toast.fileFailed': 'Ayikwazanga ukucubungula ifayela "{name}" ({error})',
   'ctl.toast.thatFile': 'lelo fayela',
   'settings.exchangeRates.source': 'Umthombo wamanani okushintshisana',

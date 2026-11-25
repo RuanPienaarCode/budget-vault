@@ -1851,6 +1851,7 @@ module.exports = {
   'plan.env.collapseAria': "Vou {name} toe",
   'plan.env.deleteAria': "Verwyder bestedingsbak {name}",
   'plan.actions.deleteAria': "Verwyder plan",
+  'plan.err.nameRequired': 'Dit het ’n naam nodig',
 
   /* Accessible names (audit of 11 Nov 2026, task 19) — machine-assisted, not native-reviewed. */
   'plan.pickerAria': "Kies 'n plan",
@@ -2012,6 +2013,9 @@ module.exports = {
   },
   'ctl.toast.repointFailed': 'Kon nie notas herlei vir die hernoeming "{from}" → "{to}" nie ({error})',
   'ctl.notice.unsavedReloadSkipped': 'Begroting: ongestoorde wysigings — herlaai oorgeslaan. Stoor (of kies "Herlaai vanaf skyf" om weg te gooi) en probeer weer.',
+  'ctl.reload.confirmTitle': 'Wysigings nie gestoor nie',
+  'ctl.reload.confirmMessage': 'Herlaai vanaf skyf sal jou wysigings wat nie gestoor is nie weggooi. Gaan voort?',
+  'ctl.reload.confirmDiscard': 'Gooi weg en herlaai',
   'ctl.toast.fileFailed': 'Kon "{name}" nie verwerk nie ({error})',
   'ctl.toast.thatFile': 'daardie lêer',
   'settings.exchangeRates.source': 'Wisselkoersbron',

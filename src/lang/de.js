@@ -1852,6 +1852,7 @@ module.exports = {
   'plan.env.collapseAria': "{name} einklappen",
   'plan.env.deleteAria': "Ausgabentopf {name} entfernen",
   'plan.actions.deleteAria': "Plan löschen",
+  'plan.err.nameRequired': 'Es braucht einen Namen',
 
   /* Accessible names (audit of 11 Nov 2026, task 19) — machine-assisted, not native-reviewed. */
   'plan.pickerAria': 'Plan auswählen',
@@ -2013,6 +2014,9 @@ module.exports = {
   },
   'ctl.toast.repointFailed': 'Notizen für die Umbenennung "{from}" → "{to}" konnten nicht umgestellt werden ({error})',
   'ctl.notice.unsavedReloadSkipped': 'Budget: nicht gespeicherte Änderungen — Neuladen übersprungen. Speichern (oder zum Verwerfen "Vom Datenträger neu laden") und dann erneut versuchen.',
+  'ctl.reload.confirmTitle': 'Nicht gespeicherte Änderungen',
+  'ctl.reload.confirmMessage': 'Beim Neuladen vom Datenträger gehen nicht gespeicherte Änderungen verloren. Fortfahren?',
+  'ctl.reload.confirmDiscard': 'Verwerfen und neu laden',
   'ctl.toast.fileFailed': '"{name}" konnte nicht verarbeitet werden ({error})',
   'ctl.toast.thatFile': 'diese Datei',
   'settings.exchangeRates.source': 'Wechselkursquelle',
