@@ -954,9 +954,32 @@ module.exports = function registerTransactions(ctx) {
        money is all there under the old name. "Parts not found" is the true
        sentence; Un-split (below) refuses on it rather than un-excluding a line
        whose parts would then count it twice. */
+    /* Two more facts a chip that only weighed the parts against the line could
+       not tell (2026-11-25 audit, TXN-4).
+
+       The parent's own tick. Its Excluded cell is the one place the reader
+       could undo it, and the chip replaced that cell — so a parent whose tick
+       was removed by hand in the markdown (the reversal the file invites,
+       "untick Excluded, delete the parts", done half-way) read "split into 2"
+       while the budget counted it AND its two parts. Said on the chip, and
+       pressing it offers the tick back (reexcludeSplitParent) instead of the
+       un-split: the parts are fine, only the tick is gone. Only with parts to
+       double it: a parent with none found is an ordinary row carrying a stale
+       role word, counted once, and "counted twice" would be false of it.
+
+       The direction of a mismatch. splitShortfall is signed like the parent
+       when the parts fall short of it and the other way when they overshoot,
+       and "R 400 unaccounted" is the right sentence only for the first: the
+       second is money counted too often, which "unaccounted" reads as missing.
+       Compared on magnitude in cents, so a parent of zero (hand-edited; the
+       dialog refuses one) still has a side to be on. */
+    const partsCents = parts.reduce((n, p) => n + amountCents(p.amount), 0);
+    const over = !!gap && Math.abs(partsCents) > Math.abs(amountCents(r.amount));
+    const counted = !!parts.length && !r.excluded;
     const label = !parts.length ? i18n.t('tx.split.chipMissing')
       : i18n.t('tx.split.chip', { count: parts.length })
-        + (gap ? ' · ' + i18n.t('tx.split.chipGap', { amount: rowMoney(Math.abs(gap), item) }) : '');
+        + (counted ? ' · ' + i18n.t('tx.split.chipTwice') : '')
+        + (gap ? ' · ' + i18n.t(over ? 'tx.split.chipOver' : 'tx.split.chipGap', { amount: rowMoney(Math.abs(gap), item) }) : '');
     /* A real <button>, so it is in the tab order and takes the focus ring for
        free. caveat-chip-btn rather than a class of its own: it is dom.js's own
        pill button, already legible in both themes with a :focus-visible
@@ -964,9 +987,35 @@ module.exports = function registerTransactions(ctx) {
        scripts/presets.cjs and src/styles.css together for an affordance that
        already exists. */
     const b = el('button', { type: 'button', class: 'caveat-chip-btn', 'data-focus-key': `excl:${i}`,
-      'aria-label': i18n.t('tx.aria.splitChip', { desc: r.desc, date: r.date }) }, label);
-    b.addEventListener('click', () => unsplitTransaction(item, i));
+      'aria-label': i18n.t(counted ? 'tx.aria.splitChipTwice' : 'tx.aria.splitChip', { desc: r.desc, date: r.date }) }, label);
+    b.addEventListener('click', () => (counted ? reexcludeSplitParent(item, i) : unsplitTransaction(item, i)));
     return b;
+  }
+
+  /* Put the Excluded tick back on a split parent that lost it — one confirm,
+     then `excluded = true`, which is what applySplit sets on a fresh split. The
+     parts are not touched, and nor is the role: the row was never un-split, it
+     only stopped being superseded, and the tick is all that is missing.
+
+     In memory and marked dirty, like the un-split and the delete beside it:
+     the page's Save is the one door to disk, and "Reload from disk" stays a
+     working undo. Not refused on ambiguous parts, unlike an un-split — nothing
+     is removed here, so which parts are whose does not matter. */
+  async function reexcludeSplitParent(item, i) {
+    const r = item._row, f = item._file;
+    const op = opWriterOf(ctx);
+    const go = await confirmModal(app, {
+      title: i18n.t('tx.reexclude.title'),
+      message: i18n.t('tx.reexclude.msg', { desc: r.desc, amount: rowFlow(r.amount, item) }),
+      confirmText: i18n.t('tx.reexclude.action'),
+    });
+    if (!go || afterDialog(op)) return;
+    r.excluded = true;
+    f.dirty = true;
+    $('#txSave').disabled = false;
+    renderTransactions();
+    // The chip pressed is redrawn in the same cell, now the plain "split into N".
+    refocus($('#txTable'), `excl:${i}`);
   }
 
   /* Two refusals before the dialog, both because un-excluding the parent is
@@ -1594,6 +1643,48 @@ module.exports = function registerTransactions(ctx) {
      the next time it opens, so a refusal costs a Save and a tap, not retyping.
      An edit in another month never blocks — only the month written matters. */
   let addDraft = null;
+
+  /* The date Add transaction opens on. Today — unless the reader is looking at
+     another period, because the row then lands in that period's month file and
+     never shows in the list they are looking at (only the toast named the
+     month; 2026-11-25 audit, FUN-4). Reading August in October and adding a
+     cash spend used to file it under October and leave August exactly as it
+     was.
+
+     So: a past period gets its last day, a future one its first, and a period
+     that holds today gets today. The nearest day INSIDE the viewed period, not
+     its first day, for a past one: the reader is almost always catching up on
+     recent days, and the last day is the one closest to now. "Whole history"
+     has no period on screen, so it is today. Judged by the period's own
+     boundaries (periodRange), which for a payday month are not the calendar
+     month. An unreadable period falls back to today rather than guess. */
+  function defaultAddDate() {
+    const today = todayIso();
+    const whole = $('#txWholeHistory');
+    if (whole && whole.checked) return today;
+    let range = null;
+    try { range = typeof ctx.periodRange === 'function' && S.period ? ctx.periodRange(S.period) : null; } catch (e) { range = null; }
+    if (!range || !ISO_DATE.test(range.start || '') || !ISO_DATE.test(range.end || '')) return today;
+    if (today < range.start) return range.start;
+    if (today > range.end) return range.end;
+    return today;
+  }
+
+  /* One check for the whole form, run by the dialog while it is still open
+     (askFields' `validate`, so a missing description keeps everything else the
+     reader typed) and again on what comes back, so a caller that is handed the
+     values some other way is held to the same rules. `{ field, message }`
+     names the control to put the cursor in. */
+  function checkNewTransaction(r) {
+    if (!ISO_DATE.test(String(r.date || '').trim())) return { field: 'date', message: i18n.t('tx.err.date') };
+    if (!String(r.desc || '').trim()) return { field: 'desc', message: i18n.t('tx.err.desc') };
+    // txSegment, not safeSeg: see the path further down.
+    if (!txSegment(r.label)) return { field: 'label', message: i18n.t('tx.err.account') };
+    const amount = normalizeAmount(r.amount);
+    if (amount == null || amount === 0) return { field: 'amount', message: i18n.t('tx.err.amount') };
+    return null;
+  }
+
   async function addTransaction() {
     const labels = [...new Set([
       ...S.accounts.map(a => a.tx_label || a.name),
@@ -1606,7 +1697,7 @@ module.exports = function registerTransactions(ctx) {
        open must not file it in the next one (afterDialog). */
     const op = opWriterOf(ctx, { book: true });   // bound to the BOOK, not the exact load: this only creates from what is typed (io.js opWriter({ book: true }))
     const r = await askFields(app, i18n.t('tx.add.title'), [
-      { key: 'date', label: i18n.t('tx.field.date'), type: 'date', value: kept('date', todayIso()) },
+      { key: 'date', label: i18n.t('tx.field.date'), type: 'date', value: kept('date', defaultAddDate()) },
       { key: 'desc', label: i18n.t('tx.field.desc'), type: 'text', placeholder: i18n.t('tx.field.descPlaceholder'), value: kept('desc', undefined) },
       { key: 'label', label: i18n.t('tx.field.account'), type: 'select', options: labels,
         value: draft && labels.includes(draft.label) ? draft.label : ($('#txAccount').value || labels[0]) },
@@ -1616,19 +1707,17 @@ module.exports = function registerTransactions(ctx) {
       { key: 'cat', label: i18n.t('tx.field.category'), type: 'select', options: [
         { value: '', label: i18n.t('tx.field.none') }, ...S.categories.map(c => ({ value: c.name, label: c.name }))], value: kept('cat', '') },
       { key: 'note', label: i18n.t('tx.field.note'), type: 'text', placeholder: i18n.t('tx.field.notePlaceholder'), value: kept('note', undefined) },
-    ]);
+    ], { validate: checkNewTransaction });
     if (!r) return;
     if (afterDialog(op)) { addDraft = r; return; }
+    const bad = checkNewTransaction(r);
+    if (bad) return toast(bad.message, true);
     const date = r.date.trim();
-    if (!ISO_DATE.test(date)) return toast(i18n.t('tx.err.date'), true);
     const desc = r.desc.trim();
-    if (!desc) return toast(i18n.t('tx.err.desc'), true);
     // txSegment, not safeSeg: the key below and the path further down must be
     // the same string, and an existing folder keeps its on-disk name.
     const label = txSegment(r.label);
-    if (!label) return toast(i18n.t('tx.err.account'), true);
     let amount = normalizeAmount(r.amount);
-    if (amount == null || amount === 0) return toast(i18n.t('tx.err.amount'), true);
     amount = parseFloat((r.dir === 'in' ? Math.abs(amount) : -Math.abs(amount)).toFixed(2));
 
     const month = date.slice(0, 7);

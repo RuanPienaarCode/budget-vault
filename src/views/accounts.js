@@ -558,6 +558,22 @@ module.exports = function registerAccounts(ctx) {
        figure, same as they would for a brand-new account. */
     const balancePrefill = unreadableBalance(a) ? '' : a.balance.toFixed(2);
     let op = opWriterOf(ctx);   // `a` is this load's account — see below
+    /* TODO(i18n): reword acct.err.nan from "Not a number" to "{field} isn't a
+       number — try a plain figure like {example}." Both params are passed at
+       every call site now (here and in addAccount below) — the old text said
+       neither which field was wrong nor what a valid answer looks like, so a
+       reader who mistyped "R 1 500" learned only that SOMETHING failed.
+
+       Run by the dialog while it is still open (askFields' `validate`), so a
+       mistyped figure leaves the date they set where it was instead of closing
+       the form on a toast (2026-11-25 audit, FUN-1), and again on what comes
+       back below. */
+    const checkBalance = v => {
+      const n = parseAmount(v.balance);
+      return n === null || isNaN(n)
+        ? { field: 'balance', message: i18n.t('acct.err.nan', { field: i18n.t('acct.balance.field'), example: '1500.00' }) }
+        : null;
+    };
     const r = await askFields(app, i18n.t('acct.balance.title', { name: a.name }), [
       { key: 'balance', label: i18n.t('acct.balance.field'), type: 'number', value: balancePrefill,
         // Which currency the figure being typed is IN. Nothing converts it, so
@@ -575,7 +591,7 @@ module.exports = function registerAccounts(ctx) {
          frontmatter the app never mentions. */
       { key: 'as_at', label: i18n.t('acct.balance.asAt'), type: 'date', value: todayIso(),
         desc: i18n.t('acct.balance.asAtDesc') },
-    ]);
+    ], { validate: checkBalance });
     if (!r) return;
     /* What is written is the dialog's own two answers — the figure and its
        date — patched onto the account's frontmatter. So a SAME-book reload
@@ -592,15 +608,9 @@ module.exports = function registerAccounts(ctx) {
       a = cur;
       op = opWriterOf(ctx);
     }
+    const badBalance = checkBalance(r);
+    if (badBalance) return toast(badBalance.message, true);
     const num = parseAmount(r.balance);
-    /* TODO(i18n): reword acct.err.nan from "Not a number" to "{field} isn't a
-       number — try a plain figure like {example}." Both params are passed at
-       every call site now (here and in addAccount below) — the old text said
-       neither which field was wrong nor what a valid answer looks like, so a
-       reader who mistyped "R 1 500" learned only that SOMETHING failed. */
-    if (num === null || isNaN(num)) {
-      return toast(i18n.t('acct.err.nan', { field: i18n.t('acct.balance.field'), example: '1500.00' }), true);
-    }
     const now = todayIso();
     /* A confirmation cannot be dated in the future — reconcile() reads such a
        date as unplaceable, which would silence the account rather than
@@ -739,6 +749,44 @@ module.exports = function registerAccounts(ctx) {
     };
     const shown = fieldsForType(a.type, a);
 
+    /* Every refusal this form can make, in one place: the dialog runs it while
+       still open (askFields' `validate`) so a mistyped figure or currency code
+       keeps the rest of the edit on screen (2026-11-25 audit, FUN-1), and the
+       save runs it again on what comes back. Returns `{ bad }` with the control
+       to put the cursor in, or the two values read on the way — the code and
+       the amounts — so neither is parsed a second way further down.
+
+       TODO(i18n): reword acct.err.type from "Invalid type" to "{field} isn't
+       valid — pick one from the list, e.g. {example}." — the type control is
+       a closed <select>, so this fires only when something OTHER than a
+       reader's own click supplied the value; naming the field and showing a
+       real option still beats a bare "Invalid type" for whoever hits it. */
+    const readEdit = v => {
+      if (!ACCT_TYPES.includes(v.type)) {
+        return { bad: { field: 'type', message: i18n.t('acct.err.type', { field: i18n.t('acct.field.type'), example: i18n.t('acctType.savings') }) } };
+      }
+      const code = readCode(v.currency_code);
+      if (code === null) {
+        return { bad: { field: 'currency_code', message: i18n.t('acct.err.code', { field: i18n.t('acct.field.currencyCode'), example: 'CNY' }) } };
+      }
+      /* Only the fields this dialog actually SHOWED are read back. A field the
+         type hid was never on screen, so treating its absent result as "the
+         user cleared it" would write a decision nobody made — and only the keys
+         whose line differs from the model's are handed to saveAccount (below),
+         so the untouched ones stay exactly as the file spells them. */
+      const nums = {};
+      for (const k of shown) {
+        // The two dates and the earmark are not amounts — the earmark's control
+        // is a select whose values are words, and parseAmount('all') is NaN,
+        // which would reject the whole save as "not a number".
+        if (k === 'target_date' || k === 'inception_date' || k === 'emergency_fund') continue;
+        const n = parseAmount(v[k]);
+        if (n !== null && isNaN(n)) return { bad: { field: k, message: i18n.t('acct.err.notNumber', { field: k.replace(/_/g, ' ') }) } };
+        nums[k] = n;
+      }
+      return { code, nums };
+    };
+
     const op = opWriterOf(ctx);
     const r = await askFields(app, i18n.t('acct.edit.title', { name: a.name }), [
       { key: 'type', label: i18n.t('acct.field.type'), type: 'select', options: acctTypeOptions(), value: a.type },
@@ -758,36 +806,12 @@ module.exports = function registerAccounts(ctx) {
         desc: i18n.t('acct.field.muteDesc'),
         value: [...mutedWarnings(a)],
         options: WARNINGS.map(w => ({ value: w, label: i18n.t('acct.mute.' + w) })) },
-    ]);
+    ], { validate: v => readEdit(v).bad || null });
     if (!r || afterDialog(op)) return;
 
-    /* TODO(i18n): reword acct.err.type from "Invalid type" to "{field} isn't
-       valid — pick one from the list, e.g. {example}." — the type control is
-       a closed <select>, so this fires only when something OTHER than a
-       reader's own click supplied the value; naming the field and showing a
-       real option still beats a bare "Invalid type" for whoever hits it. */
-    if (!ACCT_TYPES.includes(r.type)) {
-      return toast(i18n.t('acct.err.type', { field: i18n.t('acct.field.type'), example: i18n.t('acctType.savings') }), true);
-    }
-    const code = readCode(r.currency_code);
-    if (code === null) {
-      return toast(i18n.t('acct.err.code', { field: i18n.t('acct.field.currencyCode'), example: 'CNY' }), true);
-    }
-    /* Only the fields this dialog actually SHOWED are read back. A field the
-       type hid was never on screen, so treating its absent result as "the user
-       cleared it" would write a decision nobody made — and only the keys whose
-       line differs from the model's are handed to saveAccount (below), so the
-       untouched ones stay exactly as the file spells them. */
-    const nums = {};
-    for (const k of shown) {
-      // The two dates and the earmark are not amounts — the earmark's control
-      // is a select whose values are words, and parseAmount('all') is NaN,
-      // which would reject the whole save as "not a number".
-      if (k === 'target_date' || k === 'inception_date' || k === 'emergency_fund') continue;
-      const n = parseAmount(r[k]);
-      if (n !== null && isNaN(n)) return toast(i18n.t('acct.err.notNumber', { field: k.replace(/_/g, ' ') }), true);
-      nums[k] = n;
-    }
+    const read = readEdit(r);
+    if (read.bad) return toast(read.bad.message, true);
+    const { code, nums } = read;
     // Validate everything BEFORE assigning any of it: a half-applied edit would
     // be written to disk by the save below with no way to tell what changed.
     // `before` is what the file holds (the model as loaded or last saved): the
@@ -2302,6 +2326,18 @@ module.exports = function registerAccounts(ctx) {
       el('div', { class: 'acct-drawer-l' }, label),
       el('div', { class: 'acct-drawer-val' }, value)));
 
+    /* "+R 45 000 · −R 30 860" as two figures with the separator between them,
+       not one run of text. One text node wraps wherever it likes, and in the
+       inspector's narrow column that was between the sign-and-symbol and its
+       number — "−R" on one line, "30 860" on the next (2026-11-25 audit,
+       VIS-13). Each figure is its own nowrap element (acct-insp-fig), so the
+       only place the line can break is the separator. The text is the same
+       characters in the same order, so on a line that fits nothing changes. */
+    const inOut = (inAmt, outAmt) => [
+      el('span', { class: 'acct-insp-fig' }, `+${acctMoney(a, inAmt, 0)}`),
+      ' · ',
+      el('span', { class: 'acct-insp-fig' }, `−${acctMoney(a, outAmt, 0)}`),
+    ];
     f(i18n.t('acct.col.confirmed'), a.balance_updated || i18n.t('acct.noDate'));
     f(i18n.t('acct.col.state'), statePill(r));
     const progress = goalCell(r);
@@ -2344,8 +2380,7 @@ module.exports = function registerAccounts(ctx) {
     }
     if (a.monthly_contribution) f(i18n.t('acct.drawer.monthly'), acctMoney(a, a.monthly_contribution));
     if (r.act.count) {
-      f(i18n.t('acct.drawer.flow'),
-        `+${acctMoney(a, r.act.inAmt, 0)} · −${acctMoney(a, r.act.outAmt, 0)}`);
+      f(i18n.t('acct.drawer.flow'), inOut(r.act.inAmt, r.act.outAmt));
       f(i18n.t('acct.drawer.rows', { count: r.act.count }), periodMonthName(S.period));
     }
     /* ISSUE 42. What the pill stops short of. The pill is now as-of today, so
@@ -2353,8 +2388,7 @@ module.exports = function registerAccounts(ctx) {
        inspector is where this page says what it knows about an account, and
        "nothing here" would read as "nothing coming". */
     if (r.act.ahead && r.act.ahead.count) {
-      f(i18n.t('acct.drawer.ahead'),
-        `+${acctMoney(a, r.act.ahead.inAmt, 0)} · −${acctMoney(a, r.act.ahead.outAmt, 0)}`);
+      f(i18n.t('acct.drawer.ahead'), inOut(r.act.ahead.inAmt, r.act.ahead.outAmt));
       f(i18n.t('acct.drawer.aheadRows', { count: r.act.ahead.count }), periodMonthName(S.period));
     }
     /* Stated even when unset, unlike the list's sub-line: this is where a reader
@@ -2963,6 +2997,45 @@ module.exports = function registerAccounts(ctx) {
        trade than a second click. */
     const opt = fieldsForType(preType, null);
     const op = opWriterOf(ctx, { book: true });   // bound to the BOOK, not the exact load: this only creates from what is typed (io.js opWriter({ book: true }))
+    /* Every refusal this form can make, in one place — see editAccount's
+       readEdit for why: the dialog runs it while still open (askFields'
+       `validate`; 2026-11-25 audit, FUN-1, a new account is a blank name or a
+       mistyped balance away from being typed again from nothing) and the code
+       below runs it again on what comes back. Returns `{ bad }` naming the
+       control to put the cursor in, or `{ name, code, balance, goal, invested }`
+       read on the way, so none is parsed a second way. */
+    const readNew = v => {
+      // The loader takes an account's name from its FILENAME, and saveAccount
+      // writes back to `Accounts/<name>.md` — so the name held in memory has to be
+      // the sanitised path segment. Store anything else and the first balance edit
+      // would write to a different file than the one created here.
+      const name = safeSeg(v.name);
+      if (!name) return { bad: { field: 'name', message: i18n.t('acct.err.nameRequired') } };
+      if (S.accounts.some(x => x.name.toLowerCase() === name.toLowerCase())) return { bad: { field: 'name', message: i18n.t('acct.err.exists') } };
+      if (!ACCT_TYPES.includes(v.type)) {
+        return { bad: { field: 'type', message: i18n.t('acct.err.type', { field: i18n.t('acct.field.type'), example: i18n.t('acctType.savings') }) } };
+      }
+      const code = readCode(v.currency_code);
+      if (code === null) {
+        return { bad: { field: 'currency_code', message: i18n.t('acct.err.code', { field: i18n.t('acct.field.currencyCode'), example: 'CNY' }) } };
+      }
+      const balance = parseAmount(v.balance) ?? 0;
+      const goal = parseAmount(v.goal_amount);
+      const invested = parseAmount(v.total_invested);
+      /* Which of the three failed, not just that one did — same fix as
+         editBalance's single-field check above, extended to a form that offers
+         three amounts at once. `find`, not `some`: the message can only carry
+         one field, so the first bad one found is the one named. A reader who
+         fixes it and resubmits gets told about the next one if there is one,
+         rather than three unnamed failures in a row. */
+      const badAmount = [
+        ['balance', balance, i18n.t('acct.field.balance'), '1500.00'],
+        ['goal_amount', goal, i18n.t('acct.field.goalOpt'), '50000.00'],
+        ['total_invested', invested, i18n.t('acct.field.investedOpt'), '20000.00'],
+      ].find(([, n]) => n !== null && isNaN(n));
+      if (badAmount) return { bad: { field: badAmount[0], message: i18n.t('acct.err.nan', { field: badAmount[2], example: badAmount[3] }) } };
+      return { name, code, balance, goal, invested };
+    };
     const r = await askFields(app, i18n.t('acct.new.title'), [
       { key: 'name', label: i18n.t('acct.field.name'), type: 'text', placeholder: i18n.t('acct.new.namePlaceholder'), value: pre('name') },
       { key: 'type', label: i18n.t('acct.field.type'), type: 'select', options: acctTypeOptions(), value: preType },
@@ -2980,44 +3053,12 @@ module.exports = function registerAccounts(ctx) {
         options: [{ value: 'yes', label: i18n.t('acct.counts.yes') },
           { value: 'no', label: i18n.t('acct.counts.no') }],
         desc: i18n.t('acct.field.countsDesc') },
-    ]);
+    ], { validate: v => readNew(v).bad || null });
     if (!r || afterDialog(op)) return null;
 
-    // The loader takes an account's name from its FILENAME, and saveAccount
-    // writes back to `Accounts/<name>.md` — so the name held in memory has to be
-    // the sanitised path segment. Store anything else and the first balance edit
-    // would write to a different file than the one created here.
-    const name = safeSeg(r.name);
-    if (!name) { toast(i18n.t('acct.err.nameRequired'), true); return null; }
-    if (S.accounts.some(a => a.name.toLowerCase() === name.toLowerCase())) { toast(i18n.t('acct.err.exists'), true); return null; }
-    if (!ACCT_TYPES.includes(r.type)) {
-      toast(i18n.t('acct.err.type', { field: i18n.t('acct.field.type'), example: i18n.t('acctType.savings') }), true);
-      return null;
-    }
-    const code = readCode(r.currency_code);
-    if (code === null) {
-      toast(i18n.t('acct.err.code', { field: i18n.t('acct.field.currencyCode'), example: 'CNY' }), true);
-      return null;
-    }
-
-    const balance = parseAmount(r.balance) ?? 0;
-    const goal = parseAmount(r.goal_amount);
-    const invested = parseAmount(r.total_invested);
-    /* Which of the three failed, not just that one did — same fix as
-       editBalance's single-field check above, extended to a form that offers
-       three amounts at once. `find`, not `some`: the toast can only carry one
-       field, so the first bad one found is the one named. A reader who fixes
-       it and resubmits gets told about the next one if there is one, rather
-       than three unnamed failures in a row. */
-    const badAmount = [
-      ['balance', balance, i18n.t('acct.field.balance'), '1500.00'],
-      ['goal_amount', goal, i18n.t('acct.field.goalOpt'), '50000.00'],
-      ['total_invested', invested, i18n.t('acct.field.investedOpt'), '20000.00'],
-    ].find(([, n]) => n !== null && isNaN(n));
-    if (badAmount) {
-      toast(i18n.t('acct.err.nan', { field: badAmount[2], example: badAmount[3] }), true);
-      return null;
-    }
+    const read = readNew(r);
+    if (read.bad) { toast(read.bad.message, true); return null; }
+    const { name, code, balance, goal, invested } = read;
 
     const acct = {
       name, type: r.type, institution: (r.institution || '').trim(),

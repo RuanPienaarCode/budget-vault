@@ -654,8 +654,16 @@ module.exports = {
   'tx.split.chip': 'split into {count}',
   'tx.split.chipGap': '{amount} unaccounted',
   'tx.split.chipMissing': 'split · parts not found',
+  'tx.split.chipOver': '{amount} more than the line',
+  /* `chipOver` replaces `chipGap` when the parts add up to MORE than the line:
+     "unaccounted" reads as money missing, and this is money counted too often.
+     `chipTwice` is a parent whose Excluded tick was removed by hand while its
+     parts are still in the file — both are counted. Pressing that chip offers
+     to put the tick back (tx.reexclude.*). */
+  'tx.split.chipTwice': 'no longer excluded, counted twice',
   'tx.split.ambiguous': "This split's parts cannot be told apart from those of another identical split on the same day, so nothing was changed. In {file}, put each original line's parts directly under it, adding up to it, then try again.",
   'tx.aria.splitChip': 'Split options for {desc} on {date}',
+  'tx.aria.splitChipTwice': 'Put the Excluded tick back on {desc} on {date}: it is counted twice',
 
   /* The split dialog (modal.js SplitModal). Its three fields per part carry no
      visible label — the row is amount, category, note — so these are the only
@@ -664,6 +672,16 @@ module.exports = {
   'tx.split.aria.category': 'Category for part {n}',
   'tx.split.aria.note': 'Note for part {n}',
   'tx.split.aria.remove': 'Remove part {n}',
+  /* The rest of the split dialog's own words (modal.js SplitModal). The
+     '— none —' category option is tx.field.none and the Cancel button bx.cancel. */
+  'tx.split.title': 'Split transaction',
+  'tx.split.addPart': '＋ Add part',
+  'tx.split.submit': 'Split',
+  'tx.split.notePlaceholder': 'Note (optional)',
+  'tx.split.unallocated': 'Unallocated: {amount}',
+  'tx.split.balanced': 'Allocated {amount} — balanced',
+  'tx.split.needAmount': 'Every part needs an amount',
+  'tx.split.hint': 'Amounts are entered as positive — the split keeps the original’s direction. The original line stays in the file marked Excluded, so the totals are unchanged and re-importing this statement will not duplicate it.',
 
   'tx.unsplit.action': 'Un-split',
   'tx.unsplit.title': 'Un-split this transaction?',
@@ -672,6 +690,11 @@ module.exports = {
     other: 'This removes the {count} parts and puts {desc} back as a single transaction of {amount}.',
   },
   'tx.unsplit.noParts': "No split parts with this line's date and description were found in {file}, so it stays split and out of the totals. If its date or description was edited, change it back to match its parts; if its parts were deleted, clear this line's Excluded and Split cells in the file.",
+  /* Putting the Excluded tick back on a split parent that lost it. Nothing
+     but the tick changes: the parts are left exactly as they are. */
+  'tx.reexclude.title': 'Exclude this line again?',
+  'tx.reexclude.msg': '{desc} ({amount}) was split, but its Excluded tick has been removed, so it is counted once as itself and again through its parts. This puts the tick back, so only the parts count. The parts are not changed.',
+  'tx.reexclude.action': 'Exclude it again',
 
   'tx.add.noAccount': 'Add an account first — every transaction belongs to one',
   'tx.add.title': 'Add transaction',
@@ -782,6 +805,8 @@ module.exports = {
   'bx.folder': 'Save to folder',
   'bx.folder.desc': 'A folder in this vault. Exporting the same selection again replaces the earlier files.',
   'bx.cancel': 'Cancel',
+  'modal.ok': 'OK',
+  'modal.close': 'Close',
   'bx.go': 'Export',
   'bx.preview': {
     one: '{count} period · {range} · {cats} categories',
