@@ -1110,6 +1110,8 @@ module.exports = {
   'dash.hero.sub': '支出予算 {budgeted} のうち {spent} を支出',
   'dash.hero.assumedIncluded': '支出済みの {amount} を含む',
   'dash.hero.nettedOff': '返金 {amount} はこの数値から差し引かれていません',
+  'dash.hero.importedTo': '明細は {date} まで取り込み済み',
+  'dash.hero.setUpBudget': 'この期間の予算を立てる',
   'dash.stat.income': '収入合計',
   'dash.stat.budgeted': '予算',
   'dash.stat.spent': '支出合計',
@@ -1119,6 +1121,7 @@ module.exports = {
   'dash.stat.setAside': '貯蓄用 {amount}',
   'dash.stat.setAsideMoved': '{amount} のうち {moved} を貯蓄済み',
   'dash.stat.ofWhichSetAside': '{amount} のうち {moved} を貯蓄済み',
+  'dash.stat.setAsideUnseen': '貯蓄用 {amount} — 積立口座の明細が {date} で止まっているため、貯蓄額はまだ確認できません',
   'dash.scheduledAhead': '本日まで · この期間の後の日付に {amount} があります',
   'dash.fundedFromSavings': {
     other: '別に {amount} が資金から出ています（{count} 件）。この予算には含まれません',
@@ -1209,6 +1212,9 @@ module.exports = {
     other: '直近 {count} 期間の平均',
   },
   'dash.health.subNone': '平均できる完了期間がまだありません',
+  'dash.health.leftOut': {
+    other: '{periods} は除外：明細が期間の終わりより前で止まっています',
+  },
   'dash.health.monthsUnit': 'か月',
   'dash.health.months': '分の必要支出をカバー',
   'dash.health.meterTip': {
@@ -1400,6 +1406,7 @@ module.exports = {
   'dash.left.cycleUnder': '{date} の決済まで {amount} の余裕があります。',
   'dash.left.cycleOver': '{date} に決済する収入を {amount} 上回っています。',
   'dash.left.incoming': '{date} に {amount} が入金',
+  'dash.left.incomingNotImported': '{date} に {amount} の入金予定 — まだ取り込まれていません',
   'dash.left.incomingCovers': '上記をすべて賄い、約 {amount} が残ります。',
   'dash.left.incomingShort': 'それでも {amount} 不足します。',
   'dash.left.days': {
@@ -1425,7 +1432,7 @@ module.exports = {
   'dash.left.asListed': '記載どおり（請求履歴なし）',
   'dash.left.settledInFull': '全額清算、現在の残高',
   'dash.left.contracted': '契約上の返済額',
-  'dash.left.source': '金額は通常請求される額（直近3回の請求の中央値）であり、サービス画面に入力した数字ではありません。サービス一覧と負債ページのみを読み取ります。どちらにも無い定期的な請求はここには数えません。',
+  'dash.left.source': '金額は通常請求される額（直近3回の請求の中央値）であり、サービス画面に入力した数字ではありません。数えるのは、サービス一覧、負債ページ、そして毎月ほぼ同じ日に同じ金額で引き落とされている口座振替です。日によって変わる手動の支払い（振込で払う家賃など）は、サービス一覧に載っていない限り数えません。',
   'dash.split.colCat': 'カテゴリ',
   'dash.split.colSpent': '支出',
   'dash.split.colChange': '増減',

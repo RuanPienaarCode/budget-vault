@@ -119,10 +119,11 @@ async function heroAndApi(files, today, budgetFolder) {
     seen[name] = lines.length;
   }
   /* Not a comparison over nothing: the household alone prints two lines, and
-     the six-qualifier vault prints four (one of them two sentences joined, as
-     the hero joins them). */
+     the six-qualifier vault prints five (one of them two sentences joined, as
+     the hero joins them) — the fifth, since 2026-11-25 (NUM-1), the day its
+     statements stop, which the API must hand over as the hero prints it. */
   ok(seen.household >= 2, `the committed household lights real lines (${seen.household})`);
-  eq(seen['all six qualifiers'], 4, 'all six qualifiers print on four lines: spent, scheduled, funds, foreign');
+  eq(seen['all six qualifiers'], 5, 'all six qualifiers print on five lines: spent, scheduled, funds, statements, foreign');
   ok(lit >= 6, `the fixtures between them light real lines (${lit})`);
 
   /* The joined line is the hero's joiner, not a second spelling of the three

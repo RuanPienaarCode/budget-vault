@@ -68,8 +68,11 @@ async function mount(files, { today, period, budgetFolder }) {
     /* Taken from the module the view was registered from: mountFor purges
        src/ from the require cache, so a copy required at the top of this
        file would be a different instance with its own i18n state. */
-    const { heroQualifiers } = require('../src/views/dashboard');
-    return { ...M, F: M.ctx.periodFigures(period), heroQualifiers };
+    const { heroQualifiers, heroFacts } = require('../src/views/dashboard');
+    /* The facts the period figures cannot carry (how far the statements
+       reach, 2026-11-25 audit NUM-1/NUM-2), read while the clock is pinned,
+       exactly as renderHero reads them. */
+    return { ...M, F: M.ctx.periodFigures(period), facts: heroFacts(M.ctx, period), heroQualifiers };
   } finally { unpin(); }
 }
 
@@ -85,7 +88,7 @@ function rendered(nodes) {
 
 /* renderHero's qualifier lines as they were spelled before heroQualifiers()
    existed, verbatim. The oracle for "the hero did not move". */
-function oracle(F, money, i18n) {
+function oracle(F, money, i18n, facts) {
   const sum = F.summary, used = F.used;
   const nettedRefunds = F.gap.netted;
   const spentNoteParts = [
@@ -100,6 +103,11 @@ function oracle(F, money, i18n) {
   if (spentNoteParts.length) ahead.push(spentNoteParts.join(' · '));
   if (scheduledAhead > 0) ahead.push(i18n.t('dash.scheduledAhead', { amount: money(scheduledAhead, 0) }));
   if (fromFunds.count > 0) ahead.push(i18n.t('dash.fundedFromSavings', { amount: money(fromFunds.spend, 0), count: fromFunds.count }));
+  /* Added 2026-11-25 (NUM-1/NUM-2), after every line above, as the last of
+     the hero's lines. The DAY is heroFacts' (pinned in
+     tests/statement-reach.test.cjs); what this pins is the wording and the
+     place, and that every older line is untouched. */
+  if (facts && facts.importedTo) ahead.push(i18n.t('dash.hero.importedTo', { date: facts.dateText(facts.importedTo) }));
   const foreign = sum.foreign && sum.foreign.count
     ? [i18n.t('dash.foreignExcluded', { count: sum.foreign.count, symbols: sum.foreign.symbols.join(' · ') })]
     : [];
@@ -109,13 +117,17 @@ function oracle(F, money, i18n) {
 (async () => {
   /* ---- 1. the contract ---- */
   {
-    const { ctx, nodes, F, heroQualifiers } = await mount(ALL, { today: '2026-09-15', period: '2026-09', budgetFolder: B });
-    const Q = heroQualifiers(F, ctx.money);
+    const { ctx, nodes, F, facts, heroQualifiers } = await mount(ALL, { today: '2026-09-15', period: '2026-09', budgetFolder: B });
+    const Q = heroQualifiers(F, ctx.money, facts);
     eq(Q.map(q => [q.key, q.line]), [
       ['setAside', 'spent'], ['assumed', 'spent'], ['netted', 'spent'],
-      ['scheduledAhead', 'scheduled'], ['fundedFromSavings', 'funds'], ['foreign', 'foreign'],
-    ], 'all six, in the order the hero prints them, each on its own line');
-    eq(Q.map(q => q.amount), [1500, 500, 300, 800, 1200, undefined], 'with the raw figure each sentence states');
+      ['scheduledAhead', 'scheduled'], ['fundedFromSavings', 'funds'], ['importedTo', 'imported'],
+      ['foreign', 'foreign'],
+    ], 'all seven, in the order the hero prints them, each on its own line');
+    eq(Q.map(q => q.amount), [1500, 500, 300, 800, 1200, undefined, undefined], 'with the raw figure each sentence states');
+    eq(Q.find(q => q.key === 'importedTo').date, '2026-09-04',
+      'the statements line carries the day they stop: the earliest in-budget account (the Rainy fund\'s 4th, before the cheque\'s 5th); the euro account is not household money');
+    eq(heroQualifiers(F, ctx.money).some(q => q.key === 'importedTo'), false, 'a caller passing no facts gets no statements line');
     eq(Q.find(q => q.key === 'fundedFromSavings').count, 1, 'the funds line carries its count');
     eq([Q.find(q => q.key === 'foreign').count, Q.find(q => q.key === 'foreign').symbols], [1, ['€']],
       'the foreign line carries how many accounts and which symbols');
@@ -125,7 +137,7 @@ function oracle(F, money, i18n) {
     /* `rendered` reads through textOf, which maps the U+00A0 gluing a figure
        in a sentence back to a space; the builder's text is read the same way. */
     const lineText = line => Q.filter(q => q.line === line).map(q => readable(q.text));
-    eq(r.ahead, [lineText('spent').join(' · '), ...lineText('scheduled'), ...lineText('funds')],
+    eq(r.ahead, [lineText('spent').join(' · '), ...lineText('scheduled'), ...lineText('funds'), ...lineText('imported')],
       'the hero prints the builder\'s lines and nothing else under its figure');
     eq(r.foreign, lineText('foreign'), 'and the foreign note is the builder\'s');
   }
@@ -145,9 +157,9 @@ function oracle(F, money, i18n) {
     ];
     let lit = 0;
     for (const [name, files, today, period, bf] of cases) {
-      const { ctx, nodes, F } = await mount(files, { today, period, budgetFolder: bf });
+      const { ctx, nodes, F, facts } = await mount(files, { today, period, budgetFolder: bf });
       const i18n = require('../src/i18n');
-      const spelled = oracle(F, ctx.money, i18n);
+      const spelled = oracle(F, ctx.money, i18n, facts);
       const want = { ahead: spelled.ahead.map(readable), foreign: spelled.foreign.map(readable) };
       eq(rendered(nodes), want, `${name}: the hero's qualifier lines are exactly the pre-builder ones`);
       lit += want.ahead.length + want.foreign.length;

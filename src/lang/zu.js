@@ -1185,6 +1185,8 @@ module.exports = {
   'dash.hero.sub': '{spent} okuchithiwe ku-{budgeted} wesabelomali sokuchitha',
   'dash.hero.assumedIncluded': 'kufaka {amount} esivele ichithiwe',
   'dash.hero.nettedOff': '{amount} yezimbuyiselo ayikhishwanga kule nombolo',
+  'dash.hero.importedTo': 'Izitatimende zingeniswe kuze kube ngu-{date}',
+  'dash.hero.setUpBudget': 'Hlela isabelomali salesi sikhathi',
   'dash.stat.income': 'Umholo uwonke',
   'dash.stat.budgeted': 'Okwabelwe',
   'dash.stat.spent': 'Okuchithiwe sekukonke',
@@ -1194,6 +1196,7 @@ module.exports = {
   'dash.stat.setAside': 'i-{amount} yokonga',
   'dash.stat.setAsideMoved': 'i-{moved} kwe-{amount} isilondoloziwe',
   'dash.stat.ofWhichSetAside': 'i-{moved} kwe-{amount} isilondoloziwe',
+  'dash.stat.setAsideUnseen': 'i-{amount} yokonga — izitatimende zezikhwama ziyama ngo-{date}, ngakho okulondoloziwe akukabonakali',
   'dash.scheduledAhead': 'Kuze kube namuhla · enye i-{amount} inosuku olulandelayo kule nkathi',
   'dash.fundedFromSavings': {
     one: 'enye i-{amount} iphume ezikhwameni zakho ({count} ukuthengiselana), engabalwa kule bhajethi',
@@ -1299,6 +1302,10 @@ module.exports = {
     other: 'Kubalwe isilinganiso sezikhathi zakho ezingu-{count} eziqediwe',
   },
   'dash.health.subNone': 'Azikho izikhathi eziqediwe zokubala isilinganiso okwamanje',
+  'dash.health.leftOut': {
+    one: '{periods} kushiywe ngaphandle: izitatimende ziyama ngaphambi kokuthi siphele',
+    other: '{periods} kushiywe ngaphandle: izitatimende ziyama ngaphambi kokuthi ziphele',
+  },
   'dash.health.monthsUnit': 'izinyanga',
   'dash.health.months': 'zokuchitha okubalulekile okumbozwayo',
   'dash.health.meterTip': {
@@ -1501,6 +1508,7 @@ module.exports = {
   'dash.left.cycleUnder': '{amount} yendawo ngaphambi kokukhokhwa kwe-{date}.',
   'dash.left.cycleOver': '{amount} NGAPHEZULU kunomholo olikhokhayo ngo-{date}.',
   'dash.left.incoming': '{amount} ifika ngo-{date}',
+  'dash.left.incomingNotImported': '{amount} kulindeleke ngo-{date} — akukangeniswa',
   'dash.left.incomingCovers': 'Lokho kumboza konke okungenhla futhi kushiya cishe u-{amount}.',
   'dash.left.incomingShort': 'Ngisho nangemuva kwalokho ushoda nge-{amount}.',
   'dash.left.days': {
@@ -1527,7 +1535,7 @@ module.exports = {
   'dash.left.asListed': 'njengoba kubhaliwe, awukho umlando wezinkokhelo',
   'dash.left.contracted': 'ingxenye evumelene nenkontileka',
   'dash.left.settledInFull': 'kukhokhwe ngokugcwele, ibhalansi yamanje',
-  'dash.left.source': 'Amanani yilawo ahlala ekhokhiswa (inani eliphakathi kwezinkokhelo ezintathu zokugcina), hhayi inani elithayiphwe ekhasini lezinsizakalo. Kufundwa ohlwini lwakho lwezinsizakalo nasekhasini lezikweletu kuphela — inkokhelo ephindaphindwayo engekho kukho kokubili ayibalwa lapha.',
+  'dash.left.source': 'Amanani yilawo ahlala ekhokhiswa (inani eliphakathi kwezinkokhelo ezintathu zokugcina), hhayi inani elithayiphwe ekhasini lezinsizakalo. Okubalwayo: uhlu lwakho lwezinsizakalo, ikhasi lezikweletu, nama-debit order enani elifanayo abonakala ehamba njalo ngenyanga cishe ngosuku olufanayo. Inkokhelo oyenza ngesandla ngezinsuku ezahlukene — irenti ekhokhwa nge-EFT, isibonelo — ayibalwa ngaphandle uma isohlwini lwakho lwezinsizakalo.',
   'dash.split.colCat': 'Isigaba',
   'dash.split.colSpent': 'Okuchithiwe',
   'dash.split.colChange': 'Ushintsho',

@@ -14,6 +14,7 @@
 
 const { ISO_DATE, isRealIsoDate, daysBetween: isoDaysBetween, isoDayNumber, isoFromDayNumber } = require('./dates');
 const { isPoolAccount, accountType } = require('./vocabulary');
+const { isForeign } = require('./currency');
 const { matchCharges, chargeStats, chargeStatus, addCycles, normDesc, findRecurringCredit, STEP_DAYS, usualDay, circularGap } = require('./recurring');
 
 /* ADR-0007 · Whole-month placement window. An instalment with no known
@@ -140,6 +141,41 @@ function knownTo(a, today) {
   const imported = usable(a && a.importedTo) ? a.importedTo : '';
   const confirmed = usable(a && a.balanceDate) ? a.balanceDate : '';
   return (imported > confirmed ? imported : confirmed) || null;
+}
+
+/* ADR-0007 · How far the statements reach, one rule. `feeders`: household-
+   currency, in-budget accounts with a row in the window; `funds`: the
+   household-currency savings pool, in the budget or not. Each is its newest
+   row through knownTo, never the typed-balance leg (a balance brings no rows
+   in); `through`/`fundsThrough` are the earliest. Manual entry: no import. */
+function statementReach({ accounts, rowsOf, currency, windowStart, today, manual }) {
+  const feeders = [], funds = [];
+  for (const a of manual ? [] : (accounts || [])) {
+    if (!a || isForeign(a, currency)) continue;
+    const inBudget = a.in_budget !== false, isFund = isPoolAccount(a);
+    if (!inBudget && !isFund) continue;
+    let newest = '', inWindow = false;
+    for (const r of rowsOf(a) || []) {
+      if (!isRealIsoDate(r.date) || r.date > today) continue;
+      if (r.date > newest) newest = r.date;
+      if (r.date >= windowStart) inWindow = true;
+    }
+    if (!inWindow) continue;
+    const reach = { name: a.name, through: knownTo({ importedTo: newest }, today) || '' };
+    if (inBudget) feeders.push(reach);
+    if (isFund) funds.push(reach);
+  }
+  const earliest = list => list.reduce((m, f) => (m === null || f.through < m ? f.through : m), null);
+  return { windowStart, feeders, funds, through: earliest(feeders), fundsThrough: earliest(funds) };
+}
+
+/* ADR-0007 · Statements stop short of a period. The day they stop, when it is
+   before what the period could hold by now — its end, or today while it runs.
+   Null for a period not yet begun, and when the statements reach the line. */
+function statementsStopShort(through, start, end, today) {
+  if (!through || !start || !today || start > today) return null;
+  const line = end < today ? end : today;
+  return through < line ? through : null;
 }
 
 /* The account a service is paid from: whichever folder holds its most recent
@@ -555,6 +591,18 @@ function cardsOwed(accounts) {
   return { owed, cards, entries };
 }
 
+/* ADR-0007 · A salary past its day but not imported yet is held. The credit's
+   account is the one its newest row sits in; held only while that account is
+   known to a day BEFORE the due date, never counted as cash. */
+function heldCredit(credit, incomeRows, accountOfRow, now) {
+  if (!credit || !now || !accountOfRow || !(credit.next < now)) return null;
+  const mine = (incomeRows || []).filter(r => r && r.date === credit.last && r.amount > 0 && normDesc(r.desc) === credit.desc);
+  const payee = mine.length ? accountOfRow.get(mine[mine.length - 1]) : null;
+  const asOf = payee ? knownTo(payee, now) : null;
+  if (!asOf || !(credit.next > asOf)) return null;
+  return { ...credit, notImported: true, account: payee.name, asOf };
+}
+
 /* ------------------------------ the card -------------------------------- */
 
 /* ADR-0007 · whatsLeft inputs and outputs. Implied accounts from reconcile(),
@@ -631,7 +679,8 @@ function whatsLeft({ accounts, services, debts, rows, settleRows, incomeRows, ca
      Gated on the period too: a salary arriving after the window closes cannot
      resolve this window's shortfall, and saying so would be a false comfort. */
   const credit = findRecurringCredit(incomeRows || [], now);
-  const incoming = (credit && now && credit.next >= now && credit.next <= periodEnd) ? credit : null;
+  const incoming = (credit && now && credit.next >= now && credit.next <= periodEnd) ? credit
+    : heldCredit(credit, incomeRows, accountOfRow, now);
 
   /* ADR-0007 · The settlement cycle. Card spend this period against the
      income that settles it (not gated on periodEnd); R16 958 "short" every
@@ -762,5 +811,5 @@ function printedChain(L) {
 
 module.exports = {
   WHOLE_MONTH_DAYS, nextOnDay, isCreditCard, isSettleCard,
-  knownTo, cashOnHand, cardsOwed, serviceCommitments, debitOrderCommitments, debtCommitments, cardCommitments, whatsLeft, printedChain, debtMonthly,
+  knownTo, statementReach, statementsStopShort, cashOnHand, cardsOwed, serviceCommitments, debitOrderCommitments, debtCommitments, cardCommitments, whatsLeft, printedChain, debtMonthly,
 };

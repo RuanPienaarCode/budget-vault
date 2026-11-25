@@ -1161,6 +1161,8 @@ module.exports = {
   'dash.hero.sub': '{spent} gastado de {budgeted} de presupuesto de gastos',
   'dash.hero.assumedIncluded': 'incluye {amount} ya gastado',
   'dash.hero.nettedOff': '{amount} en reembolsos sin descontar de esta cifra',
+  'dash.hero.importedTo': 'Extractos importados hasta el {date}',
+  'dash.hero.setUpBudget': 'Preparar el presupuesto de este periodo',
   'dash.stat.income': 'Ingresos totales',
   'dash.stat.budgeted': 'Presupuestado',
   'dash.stat.spent': 'Total gastado',
@@ -1170,6 +1172,7 @@ module.exports = {
   'dash.stat.setAside': '{amount} para ahorro',
   'dash.stat.setAsideMoved': '{moved} de {amount} ahorrado hasta ahora',
   'dash.stat.ofWhichSetAside': '{moved} de {amount} ahorrado hasta ahora',
+  'dash.stat.setAsideUnseen': '{amount} para ahorro — los extractos de los fondos terminan el {date}, así que aún no se ve lo ahorrado',
   'dash.scheduledAhead': 'Hasta hoy · {amount} más con fecha posterior en este periodo',
   'dash.fundedFromSavings': {
     one: '{amount} más salió de tus fondos ({count} movimiento), que este presupuesto no cuenta',
@@ -1273,6 +1276,10 @@ module.exports = {
     other: 'Promedio de tus últimos {count} períodos completados',
   },
   'dash.health.subNone': 'Aún no hay períodos completados para promediar',
+  'dash.health.leftOut': {
+    one: '{periods} queda fuera: los extractos terminan antes de que acabe',
+    other: '{periods} quedan fuera: los extractos terminan antes de que acaben',
+  },
   'dash.health.monthsUnit': 'meses',
   'dash.health.months': 'de gastos esenciales cubiertos',
   'dash.health.meterTip': {
@@ -1475,6 +1482,7 @@ module.exports = {
   'dash.left.cycleUnder': '{amount} de margen antes de la liquidación del {date}.',
   'dash.left.cycleOver': '{amount} MÁS que el ingreso que la liquida el {date}.',
   'dash.left.incoming': '{amount} entra el {date}',
+  'dash.left.incomingNotImported': '{amount} previsto el {date} — aún sin importar',
   'dash.left.incomingCovers': 'Eso cubre todo lo anterior y deja unos {amount}.',
   'dash.left.incomingShort': 'Incluso después te faltan {amount}.',
   'dash.left.days': {
@@ -1501,7 +1509,7 @@ module.exports = {
   'dash.left.asListed': 'según la lista, sin historial de cargos',
   'dash.left.settledInFull': 'liquidada por completo, saldo actual',
   'dash.left.contracted': 'cuota contratada',
-  'dash.left.source': 'Los importes son lo que se cobra normalmente (el valor central de los últimos tres cargos), no la cifra escrita en la página Servicios. Solo se leen de tu lista de Servicios y de la página Deudas — un cargo recurrente que no esté en ninguna de las dos no se cuenta aquí.',
+  'dash.left.source': 'Los importes son lo que se cobra normalmente (el valor central de los últimos tres cargos), no la cifra escrita en la página Servicios. Se cuentan: tu lista de Servicios, la página Deudas y las domiciliaciones que se cobran cada mes por el mismo importe más o menos el mismo día. Un pago que haces tú mismo en días distintos — el alquiler por transferencia, por ejemplo — no se cuenta salvo que esté en tu lista de Servicios.',
   'dash.split.colCat': 'Categoría',
   'dash.split.colSpent': 'Gastado',
   'dash.split.colChange': 'Cambio',

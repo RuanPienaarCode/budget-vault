@@ -1160,6 +1160,8 @@ module.exports = {
   'dash.hero.sub': '{spent} von {budgeted} Ausgabenbudget ausgegeben',
   'dash.hero.assumedIncluded': 'enthält {amount} bereits ausgegeben',
   'dash.hero.nettedOff': '{amount} an Erstattungen nicht von dieser Zahl abgezogen',
+  'dash.hero.importedTo': 'Kontoauszüge importiert bis {date}',
+  'dash.hero.setUpBudget': 'Budget für diesen Zeitraum anlegen',
   'dash.stat.income': 'Einnahmen gesamt',
   'dash.stat.budgeted': 'Budgetiert',
   'dash.stat.spent': 'Ausgegeben gesamt',
@@ -1169,6 +1171,7 @@ module.exports = {
   'dash.stat.setAside': '{amount} zum Sparen',
   'dash.stat.setAsideMoved': '{moved} von {amount} bisher gespart',
   'dash.stat.ofWhichSetAside': '{moved} von {amount} bisher gespart',
+  'dash.stat.setAsideUnseen': '{amount} zum Sparen — die Kontoauszüge der Sparkonten enden am {date}, das Gesparte ist also noch nicht zu sehen',
   'dash.scheduledAhead': 'Bis heute · {amount} mehr sind später in dieser Periode datiert',
   'dash.fundedFromSavings': {
     one: '{amount} mehr ging aus Ihren Rücklagen ({count} Buchung) und zählt in diesem Budget nicht mit',
@@ -1272,6 +1275,10 @@ module.exports = {
     other: 'Im Durchschnitt der letzten {count} abgeschlossenen Zeiträume',
   },
   'dash.health.subNone': 'Noch keine abgeschlossenen Zeiträume zum Mitteln',
+  'dash.health.leftOut': {
+    one: '{periods} nicht mitgezählt: die Kontoauszüge enden vor Ende des Zeitraums',
+    other: '{periods} nicht mitgezählt: die Kontoauszüge enden vor Ende der Zeiträume',
+  },
   'dash.health.monthsUnit': 'Monate',
   'dash.health.months': 'notwendiger Ausgaben gedeckt',
   'dash.health.meterTip': {
@@ -1474,6 +1481,7 @@ module.exports = {
   'dash.left.cycleUnder': '{amount} Spielraum bis zum Ausgleich am {date}.',
   'dash.left.cycleOver': '{amount} MEHR als das Einkommen, das am {date} ausgleicht.',
   'dash.left.incoming': '{amount} kommt am {date}',
+  'dash.left.incomingNotImported': '{amount} erwartet am {date} — noch nicht importiert',
   'dash.left.incomingCovers': 'Das deckt alles oben und lässt etwa {amount} übrig.',
   'dash.left.incomingShort': 'Auch danach fehlen dir {amount}.',
   'dash.left.days': {
@@ -1500,7 +1508,7 @@ module.exports = {
   'dash.left.asListed': 'wie eingetragen, ohne Abbuchungsverlauf',
   'dash.left.settledInFull': 'vollständig ausgeglichen, aktueller Saldo',
   'dash.left.contracted': 'vertragliche Rate',
-  'dash.left.source': 'Die Beträge sind das, was üblicherweise abgebucht wird (der mittlere Wert der letzten drei Abbuchungen), nicht die auf der Seite „Dienste“ eingetragene Zahl. Gelesen wird nur aus deiner Dienste-Liste und der Schulden-Seite — eine wiederkehrende Abbuchung, die auf keiner von beiden steht, zählt hier nicht.',
+  'dash.left.source': 'Die Beträge sind das, was üblicherweise abgebucht wird (der mittlere Wert der letzten drei Abbuchungen), nicht die auf der Seite „Dienste“ eingetragene Zahl. Gezählt werden: deine Dienste-Liste, die Schulden-Seite und Lastschriften, die jeden Monat in gleicher Höhe an etwa demselben Tag abgehen. Eine Zahlung, die du selbst an wechselnden Tagen überweist — etwa die Miete —, zählt nicht, außer sie steht in deiner Dienste-Liste.',
   'dash.split.colCat': 'Kategorie',
   'dash.split.colSpent': 'Ausgegeben',
   'dash.split.colChange': 'Änderung',

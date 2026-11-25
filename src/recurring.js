@@ -615,9 +615,15 @@ function nextDue(stats, cycle, today) {
      - THREE occurrences at least. Two is a coincidence with a witness.
      - A MONTHLY rhythm. Median gap 26-35 days, which absorbs weekends and the
        difference between February and July without admitting a quarterly bonus.
-     - A STABLE amount. The last three within 15% of each other, the same test
-       `varies` applies to a price. A salary that swings is not predictable, and
-       a card that says "about R40 000, give or take twelve" helps nobody.
+     - A STABLE amount. The last three within 15% of their median, the same
+       test `varies` applies to a price. A salary that swings is not
+       predictable, and a card that says "about R40 000, give or take twelve"
+       helps nobody. ONE of the three may be LARGER than that and is set aside
+       — a bonus paid with or on top of the salary — so long as the other two
+       still agree (2026-11-25 audit, NUM-4: one month of 74 378 among
+       salaries of 40 240 hid the salary, its "lands on" line and the card's
+       settlement panel for three periods). A smaller outlier is a short month
+       and two outliers are no pattern; both are still refused.
      - NOT excluded. An excluded row is vetoed from income by the reader's own
        hand, which is exactly how transfers between their own accounts and that
        UIF pass-through get out of the way.
@@ -631,6 +637,22 @@ function nextDue(stats, cycle, today) {
 const CREDIT_MIN_COUNT = 3;
 const CREDIT_GAP_MIN = 26, CREDIT_GAP_MAX = 35;
 const CREDIT_SPREAD = 0.15;
+
+/* Whether the recent credits are one salary: all within CREDIT_SPREAD of their
+   median, or — failing that — all but the single LARGEST, provided that one
+   really is above the median (a bonus on top). Removing the largest is the
+   only allowance: if what is left still disagrees, or the odd one out is the
+   smallest, the answer stays no. The spread is measured against the median
+   either way, so the bonus never widens the band the others must sit in. */
+function creditSteady(recent, med) {
+  const spread = list => (Math.max(...list) - Math.min(...list)) / med;
+  if (spread(recent) <= CREDIT_SPREAD) return true;
+  const top = Math.max(...recent);
+  if (!(top > med)) return false;
+  const rest = [...recent];
+  rest.splice(rest.indexOf(top), 1);
+  return rest.length >= 2 && spread(rest) <= CREDIT_SPREAD;
+}
 
 function findRecurringCredit(rows, today) {
   const groups = new Map();
@@ -661,7 +683,7 @@ function findRecurringCredit(rows, today) {
     const recent = sorted.slice(-3).map(r => r.amount);
     const amount = median(recent);
     if (!(amount > 0)) continue;
-    if ((Math.max(...recent) - Math.min(...recent)) / amount > CREDIT_SPREAD) continue;
+    if (!creditSteady(recent, amount)) continue;
 
     const last = sorted[sorted.length - 1].date;
     /* A salary that stopped is not a salary that is coming. Two whole cycles of

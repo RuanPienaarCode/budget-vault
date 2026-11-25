@@ -1180,6 +1180,8 @@ module.exports = {
   'dash.hero.sub': '{spent} echithiweyo kwi-{budgeted} yebhajethi yokuchitha',
   'dash.hero.assumedIncluded': 'iquka {amount} sele ichithiwe',
   'dash.hero.nettedOff': '{amount} yembuyekezo ayikhutshwanga kweli nani',
+  'dash.hero.importedTo': 'Izitheyitmenti zingeniswe ukuya ku-{date}',
+  'dash.hero.setUpBudget': 'Lungisa ibhajethi yeli xesha',
   'dash.stat.income': 'Ingeniso iyonke',
   'dash.stat.budgeted': 'Ebhajethiweyo',
   'dash.stat.spent': 'Echithiweyo iyonke',
@@ -1189,6 +1191,7 @@ module.exports = {
   'dash.stat.setAside': 'i-{amount} yokonga',
   'dash.stat.setAsideMoved': 'i-{moved} kwi-{amount} sele igciniwe',
   'dash.stat.ofWhichSetAside': 'i-{moved} kwi-{amount} sele igciniwe',
+  'dash.stat.setAsideUnseen': 'i-{amount} yokonga — izitheyitmenti zeengxowa-mali ziyeka ngo-{date}, ngoko okugciniweyo akukabonakali',
   'dash.scheduledAhead': 'Ukuza kuthi ga namhlanje · enye i-{amount} inomhla okamva kweli xesha',
   'dash.fundedFromSavings': {
     one: 'enye i-{amount} iphume kwiingxowa-mali zakho ({count} intengiselwano), engabalwayo kule bhajethi',
@@ -1294,6 +1297,10 @@ module.exports = {
     other: 'Kubalwe umndilili wamaxesha akho angu-{count} agqityiweyo',
   },
   'dash.health.subNone': 'Akukho maxesha agqityiweyo okubalwa umndilili okwangoku',
+  'dash.health.leftOut': {
+    one: '{periods} ishiyiwe ngaphandle: izitheyitmenti ziyeka phambi kokuba liphele',
+    other: '{periods} ashiyiwe ngaphandle: izitheyitmenti ziyeka phambi kokuba aphele',
+  },
   'dash.health.monthsUnit': 'iinyanga',
   'dash.health.months': 'zenkcitho ebalulekileyo ezigutyungelweyo',
   'dash.health.meterTip': {
@@ -1496,6 +1503,7 @@ module.exports = {
   'dash.left.cycleUnder': '{amount} yendawo ngaphambi kokuhlawulwa kwe-{date}.',
   'dash.left.cycleOver': '{amount} NGAPHEZULU kunengeniso elihlawulayo nga-{date}.',
   'dash.left.incoming': '{amount} ifika nga-{date}',
+  'dash.left.incomingNotImported': '{amount} ilindeleke nga-{date} — ayikangeniswa',
   'dash.left.incomingCovers': 'Oko kugubungela yonke into engentla kwaye kushiya malunga ne-{amount}.',
   'dash.left.incomingShort': 'Nasemva koko usilela nge-{amount}.',
   'dash.left.days': {
@@ -1522,7 +1530,7 @@ module.exports = {
   'dash.left.asListed': 'njengoko idweliswe, akukho mbali yeentlawulo',
   'dash.left.contracted': 'inxalenye engqinelene nekhontrakthi',
   'dash.left.settledInFull': 'ihlawulwe ngokupheleleyo, ibhalansi yangoku',
-  'dash.left.source': 'Izixa zezo zihlawuliswa rhoqo (eliphakathi kwentlawulo ezintathu zokugqibela), kungekhona inani elichwethezwe kwiphepha leeNkonzo. Kufundwa kuluhlu lwakho lweeNkonzo nakwiphepha lamaTyala kuphela — intlawulo ephindaphindwayo engekho kuwo womabini ayibalwa apha.',
+  'dash.left.source': 'Izixa zezo zihlawuliswa rhoqo (eliphakathi kwentlawulo ezintathu zokugqibela), kungekhona inani elichwethezwe kwiphepha leeNkonzo. Okubalwayo: uluhlu lwakho lweeNkonzo, iphepha lamaTyala, nee-debit order zesixa esifanayo ezibonwa zihamba nyanga nganye malunga nosuku olufanayo. Intlawulo oyenza ngesandla ngeentsuku ezahlukeneyo — irenti ehlawulwa nge-EFT, umzekelo — ayibalwa ngaphandle kokuba ikuluhlu lwakho lweeNkonzo.',
   'dash.split.colCat': 'Udidi',
   'dash.split.colSpent': 'Echithiweyo',
   'dash.split.colChange': 'Utshintsho',

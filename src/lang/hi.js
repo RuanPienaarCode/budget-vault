@@ -1179,6 +1179,8 @@ module.exports = {
   'dash.hero.sub': '{budgeted} के खर्च बजट में से {spent} ख़र्च',
   'dash.hero.assumedIncluded': 'इसमें {amount} पहले ही ख़र्च शामिल',
   'dash.hero.nettedOff': '{amount} की वापसी इस आँकड़े से नहीं घटाई गई',
+  'dash.hero.importedTo': 'स्टेटमेंट {date} तक आयात किए गए',
+  'dash.hero.setUpBudget': 'इस अवधि का बजट बनाएँ',
   'dash.stat.income': 'कुल आय',
   'dash.stat.budgeted': 'बजट में',
   'dash.stat.spent': 'कुल ख़र्च',
@@ -1188,6 +1190,7 @@ module.exports = {
   'dash.stat.setAside': 'बचत के लिए {amount}',
   'dash.stat.setAsideMoved': '{amount} में से {moved} अब तक बचाया',
   'dash.stat.ofWhichSetAside': '{amount} में से {moved} अब तक बचाया',
+  'dash.stat.setAsideUnseen': 'बचत के लिए {amount} — फ़ंड के स्टेटमेंट {date} पर रुक जाते हैं, इसलिए बचाई गई रकम अभी दिख नहीं सकती',
   'dash.scheduledAhead': 'आज तक · {amount} और इस अवधि में बाद की तारीख का है',
   'dash.fundedFromSavings': {
     one: '{amount} और आपके फंड से गया ({count} लेनदेन), जिसे यह बजट नहीं गिनता',
@@ -1291,6 +1294,10 @@ module.exports = {
     other: 'आपकी पिछली {count} पूरी हुई अवधियों का औसत',
   },
   'dash.health.subNone': 'औसत निकालने के लिए अभी कोई पूरी हुई अवधि नहीं है',
+  'dash.health.leftOut': {
+    one: '{periods} शामिल नहीं: स्टेटमेंट उसके ख़त्म होने से पहले रुक जाते हैं',
+    other: '{periods} शामिल नहीं: स्टेटमेंट उनके ख़त्म होने से पहले रुक जाते हैं',
+  },
   'dash.health.monthsUnit': 'महीने',
   'dash.health.months': 'ज़रूरी ख़र्च का कवर',
   'dash.health.meterTip': {
@@ -1493,6 +1500,7 @@ module.exports = {
   'dash.left.cycleUnder': '{date} के भुगतान से पहले {amount} की गुंजाइश।',
   'dash.left.cycleOver': '{date} को इसे चुकाने वाली आय से {amount} ज़्यादा।',
   'dash.left.incoming': '{date} को {amount} आते हैं',
+  'dash.left.incomingNotImported': '{date} को {amount} अपेक्षित — अभी आयात नहीं हुआ',
   'dash.left.incomingCovers': 'उससे ऊपर का सब कुछ पूरा हो जाता है और क़रीब {amount} बच भी जाते हैं।',
   'dash.left.incomingShort': 'उसके बाद भी आपके पास {amount} कम पड़ते हैं।',
   'dash.left.days': {
@@ -1519,7 +1527,7 @@ module.exports = {
   'dash.left.asListed': 'जैसा दर्ज है, कटौती का कोई इतिहास नहीं',
   'dash.left.contracted': 'अनुबंधित क़िस्त',
   'dash.left.settledInFull': 'पूरा चुकाया, मौजूदा बैलेंस',
-  'dash.left.source': 'रकमें वही हैं जो आमतौर पर काटी जाती हैं (पिछली तीन कटौतियों का बीच का मान), न कि वे जो सेवाएँ पेज पर लिखी हैं। सिर्फ़ आपकी सेवाओं की सूची और कर्ज़ पेज से पढ़ी जाती हैं — जो नियमित कटौती इन दोनों में से किसी में नहीं है, वह यहाँ नहीं गिनी जाती।',
+  'dash.left.source': 'रकमें वही हैं जो आमतौर पर काटी जाती हैं (पिछली तीन कटौतियों का बीच का मान), न कि वे जो सेवाएँ पेज पर लिखी हैं। गिना जाता है: आपकी सेवाओं की सूची, कर्ज़ पेज, और वे ऑटो-डेबिट जो हर महीने उतनी ही रकम के लगभग उसी दिन कटते दिखते हैं। जो भुगतान आप ख़ुद अलग-अलग दिनों पर करते हैं — जैसे EFT से दिया गया किराया — वह तब तक नहीं गिना जाता जब तक वह आपकी सेवाओं की सूची में न हो।',
   'dash.split.colCat': 'श्रेणी',
   'dash.split.colSpent': 'ख़र्च',
   'dash.split.colChange': 'बदलाव',

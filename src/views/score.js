@@ -22,7 +22,7 @@ const { sharePercentLabel } = require('../share-percents');
 const { formatSigned, otherHoldings } = require('../currency');
 const { otherCurrencyNet, worth } = require('../worth');
 const { decimalText } = require('../locale');
-const { yearsNumber: yearsNumberOf, gapSentence } = require('../health-copy');
+const { yearsNumber: yearsNumberOf, gapSentence, leftOutClause } = require('../health-copy');
 
 /* A pillar counts as "going well" a little below the top. Demanding 100% would
    put a household at 97% of its target in the same list as one at 4%, which is
@@ -99,13 +99,13 @@ module.exports = function registerScore(ctx) {
       return;
     }
 
-    renderHero(hero, breakdown, M, target, earmarks, snap.otherCurrencies);
+    renderHero(hero, breakdown, M, target, earmarks, snap.otherCurrencies, snap.incompletePeriods);
     renderGood(good, breakdown, debtsRecorded, debtRateUnknown);
     renderWork(work, breakdown, M, target, earmarks);
   }
 
   /* ------------------------------- the hero ------------------------------ */
-  function renderHero(hero, breakdown, M, target, earmarks, otherCurrencies) {
+  function renderHero(hero, breakdown, M, target, earmarks, otherCurrencies, incompletePeriods) {
     const band = breakdown.band;
     const wrap = el('div', { class: `score-hero is-${band}` });
 
@@ -121,8 +121,12 @@ module.exports = function registerScore(ctx) {
     el('i', { class: 'score-meter-fill', style: `width:${breakdown.total}%` })));
 
     const counted = M.countedPeriods;
-    wrap.append(el('p', { class: 'score-hero-sub' },
-      counted ? i18n.t('score.hero.sub', { count: counted }) : i18n.t('dash.health.subNone')));
+    /* The periods the averages left out, and why — the Dashboard's health card
+       says the same clause from the same list (health-copy.js, NUM-2). */
+    wrap.append(el('p', { class: 'score-hero-sub' }, [
+      counted ? i18n.t('score.hero.sub', { count: counted }) : i18n.t('dash.health.subNone'),
+      leftOutClause(incompletePeriods, periodMonthName),
+    ].filter(Boolean).join(' · ')));
 
     /* ISSUE 30. Every pillar of this score is a RATIO — months of cover,
        savings rate, instalment share, net-worth multiple — and a ratio built

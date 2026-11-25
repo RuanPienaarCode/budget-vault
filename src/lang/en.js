@@ -1287,6 +1287,8 @@ module.exports = {
   'dash.hero.sub': '{spent} spent of {budgeted} spending budget',
   'dash.hero.assumedIncluded': 'includes {amount} already spent',
   'dash.hero.nettedOff': '{amount} in refunds not taken off this figure',
+  'dash.hero.importedTo': 'Statements imported to {date}',
+  'dash.hero.setUpBudget': 'Set up this period\'s budget',
   'dash.stat.income': 'Total income',
   'dash.stat.budgeted': 'Budgeted',
   'dash.stat.spent': 'Total spent',
@@ -1296,6 +1298,7 @@ module.exports = {
   'dash.stat.setAside': '{amount} for savings',
   'dash.stat.setAsideMoved': '{moved} of {amount} saved so far',
   'dash.stat.ofWhichSetAside': '{moved} of {amount} saved so far',
+  'dash.stat.setAsideUnseen': '{amount} for savings — fund statements stop on {date}, so what was saved cannot be seen yet',
   'dash.scheduledAhead': 'Up to today · {amount} more is dated later this period',
   'dash.fundedFromSavings': {
     one: '{amount} more went out of your funds ({count} transaction), which this budget does not count',
@@ -1419,6 +1422,10 @@ module.exports = {
     other: 'Averaged over your last {count} completed periods',
   },
   'dash.health.subNone': 'No completed periods to average yet',
+  'dash.health.leftOut': {
+    one: '{periods} left out: statements stop before it ended',
+    other: '{periods} left out: statements stop before they ended',
+  },
   'dash.health.monthsUnit': 'months',
   'dash.health.months': 'of essential spending covered',
   /* The emergency-fund earmarks, worded as the Score's reserves line words the
@@ -1674,6 +1681,7 @@ module.exports = {
   'dash.left.cycleUnder': '{amount} of headroom before the {date} settlement.',
   'dash.left.cycleOver': '{amount} MORE than the income that settles it on {date}.',
   'dash.left.incoming': '{amount} lands on {date}',
+  'dash.left.incomingNotImported': '{amount} expected {date} — not imported yet',
   'dash.left.incomingCovers': 'That covers everything above and leaves about {amount}.',
   'dash.left.incomingShort': 'Even after that you are {amount} short.',
   'dash.left.days': {
@@ -1721,7 +1729,7 @@ module.exports = {
   'dash.left.asListed': 'as listed, no charge history',
   'dash.left.contracted': 'contracted instalment',
   'dash.left.settledInFull': 'settled in full, current balance',
-  'dash.left.source': 'Amounts are what is usually charged (the middle of the last three charges), not the figure typed on the Services page. Read from your Services list and Debt page only — a recurring charge on neither is not counted here.',
+  'dash.left.source': 'Amounts are what is usually charged (the middle of the last three charges), not the figure typed on the Services page. Counted: your Services list, your Debt page, and debit orders seen going off for the same amount on about the same day each month. A charge paid by hand on different days — rent paid by EFT, say — is not counted unless it is on your Services list.',
   'dash.split.colCat': 'Category',
   'dash.split.colSpent': 'Spent',
   'dash.split.colChange': 'Change',
