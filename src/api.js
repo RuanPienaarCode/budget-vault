@@ -192,7 +192,7 @@ const registerPeriod = require('./period');
 const registerLoad = require('./load');
 const registerTrendMath = require('./trend-math');
 const registerFigures = require('./figures');
-const { heroQualifiers } = require('./views/dashboard');
+const { heroQualifiers, heroFacts } = require('./views/dashboard');
 const { formatAmount } = require('./currency');
 const { localeFor } = require('./locale');
 const books = require('./books');
@@ -271,10 +271,10 @@ function moneyFor(ctx) {
    order they first appear in. Through i18n, inside the builder, so every
    sentence is the household's own — the string the Dashboard is showing on
    screen, not a second English-only copy of it. */
-function heroNotes(F, money) {
+function heroNotes(F, money, facts) {
   const order = [];
   const parts = new Map();
-  for (const q of heroQualifiers(F, money)) {
+  for (const q of heroQualifiers(F, money, facts)) {
     if (!parts.has(q.line)) { parts.set(q.line, []); order.push(q.line); }
     parts.get(q.line).push(q.text);
   }
@@ -598,7 +598,7 @@ function buildApi(plugin) {
       budgeted, spent, left: noBudget ? null : budgeted - spent, noBudget,
       over: overCategories(F.rows),
       currency: code ? { symbol, code } : { symbol },
-      notes: heroNotes(F, moneyFor(c)),
+      notes: heroNotes(F, moneyFor(c), heroFacts(c, p)),
       book,
     };
   }

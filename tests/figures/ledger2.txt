@@ -2,6 +2,7 @@
 number	13 100	-	heroCard/div.hero-grid/div[0]/div.hero-num[1]
 money	R 1 500	1500	heroCard/@hero-budget
 money	R 14 600	14600	heroCard/@hero-budget
+number	25	-	heroCard/div.hero-grid/div[0]/div.hero-sub[3]/span.fact
 money	R 30 000	30000	heroCard/div.hero-grid/div.stat-col[1]/div.stat[0]/div[1]/div.sv
 money	R 14 600	14600	heroCard/div.hero-grid/div.stat-col[1]/div.stat[1]/div[1]/div.sv[0]
 percent	49%	-	heroCard/div.hero-grid/div.stat-col[1]/div.stat[1]/div[1]/div.st[1]/span.fact
@@ -431,8 +432,8 @@ number	2	-	acctInspector/div.acct-insp-recon[4]/div.acct-insp-line[2]/span[0]
 money	R 28 500,00	28500	acctInspector/@acct-insp-delta
 money	R 48 500,00	48500	acctInspector/@acct-insp-implied
 money	R 48 500,00	48500	acctInspector/div.acct-insp-acts[5]/button.acct-insp-btn
-money	R 30 000	30000	acctInspector/div.acct-insp-grid[7]/div.acct-drawer-f[2]/div.acct-drawer-val[1]
-money	R 1 500	1500	acctInspector/div.acct-insp-grid[7]/div.acct-drawer-f[2]/div.acct-drawer-val[1]
+money	R 30 000	30000	acctInspector/div.acct-insp-grid[7]/div.acct-drawer-f[2]/div.acct-drawer-val[1]/span.acct-insp-fig[0]
+money	R 1 500	1500	acctInspector/div.acct-insp-grid[7]/div.acct-drawer-f[2]/div.acct-drawer-val[1]/span.acct-insp-fig[1]
 number	2	-	acctInspector/div.acct-insp-grid[7]/div.acct-drawer-f[3]/div.acct-drawer-l[0]
 number	2026	-	acctInspector/div.acct-insp-grid[7]/div.acct-drawer-f[3]/div.acct-drawer-val[1]
 number	2	-	acctTblSub/

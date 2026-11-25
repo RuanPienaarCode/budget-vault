@@ -446,10 +446,6 @@
   .budget-app-root .mini-kpis-5 .mini .v { font-size: clamp(18px, 1.8vw, 22px); }
 }
 
-/* The Savings KPI tile that prints a long text value keeps its small size (the
-   legacy rule is more specific than the line above). */
-.budget-app-root #savingsKpis > .mini:nth-child(4) .v { font-size: 18px; }
-
 /* A few smaller figures: same weight and numerals, no size change */
 .budget-app-root .acct-bal,
 .budget-app-root .acct-owner-net,

@@ -587,8 +587,8 @@ number	2	-	acctInspector/div.acct-recon[5]/div.acct-recon-txt
 number	1	-	acctInspector/div.acct-recon[5]/div.acct-recon-txt
 money	R 21 000,00	21000	acctInspector/div.acct-recon[5]/div.acct-recon-txt
 money	R 14 400,00	14400	acctInspector/div.acct-insp-acts[6]/button.acct-insp-btn
-money	R 30 000	30000	acctInspector/div.acct-insp-grid[8]/div.acct-drawer-f[2]/div.acct-drawer-val[1]
-money	R 14 600	14600	acctInspector/div.acct-insp-grid[8]/div.acct-drawer-f[2]/div.acct-drawer-val[1]
+money	R 30 000	30000	acctInspector/div.acct-insp-grid[8]/div.acct-drawer-f[2]/div.acct-drawer-val[1]/span.acct-insp-fig[0]
+money	R 14 600	14600	acctInspector/div.acct-insp-grid[8]/div.acct-drawer-f[2]/div.acct-drawer-val[1]/span.acct-insp-fig[1]
 number	7	-	acctInspector/div.acct-insp-grid[8]/div.acct-drawer-f[3]/div.acct-drawer-l[0]
 number	2026	-	acctInspector/div.acct-insp-grid[8]/div.acct-drawer-f[3]/div.acct-drawer-val[1]
 number	5	-	acctTblSub/

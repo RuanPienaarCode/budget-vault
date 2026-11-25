@@ -1231,9 +1231,9 @@ function financialReportMarkdown(data, money, fmt) {
        nothing else. Same key and same gate as the card: no line at all when
        the count never reached this object (a hand-built fixture). */
     if (health.countedPeriods !== null && health.countedPeriods !== undefined) {
-      out.push('', health.countedPeriods
+      out.push('', [health.countedPeriods
         ? i18n.t('dash.health.sub', { count: health.countedPeriods })
-        : i18n.t('dash.health.subNone'));
+        : i18n.t('dash.health.subNone'), health.leftOut].filter(Boolean).join(' · '));
     }
     const rows = [[i18n.t('report.health.score'), health.score !== null ? String(health.score) : '—']];
     /* In the household's decimal mark (2026-10-20 audit, D2-07/M2-09): this
