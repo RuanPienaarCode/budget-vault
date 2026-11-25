@@ -27,6 +27,30 @@ function isReferenceToken(w) {
     (digits > 0 && w.length >= 8 && /^[A-Z0-9]+$/.test(w));  // long caps+digit ref: VODREF0000000
 }
 
+/* A foreign-currency card row ends in the price it was charged at:
+   "SpotifyZA 79.99 ZAR". The amount is a reference token on its own, but the
+   code after it is not, so learnPattern stopped at the code and the learned
+   rule only ever matched that one price (2026-11-25 audit, RUL-4).
+
+   The pair is trimmed only when both halves look like what they are. The
+   amount must carry decimals, so a model number ("BMW 320 GTI") is not one;
+   thousands groups are allowed in either convention. The code must be an ISO
+   4217 code, so a merchant that ends in a three-letter word ("PICK N PAY",
+   "CAPE GAS") is not eaten. The list is spelled out HERE rather than shared
+   with amount.js's UNIT_WORDS: that set is for letters stuck to a number and
+   mixes in non-ISO markers ("KR", "RM", "FR"), which would be wrong for a
+   merchant-name tail, and this module stays free of imports it does not need.
+   Upper case only, because that is how a statement prints a code. */
+const ISO_CODES = new Set((
+  'AED AFN ALL AMD ANG AOA ARS AUD AWG AZN BAM BBD BDT BGN BHD BIF BMD BND BOB BRL BSD BTN BWP BYN BZD CAD CDF CHF CLP CNY ' +
+  'COP CRC CUP CVE CZK DJF DKK DOP DZD EGP ERN ETB EUR FJD FKP GBP GEL GHS GIP GMD GNF GTQ GYD HKD HNL HTG HUF IDR ILS INR ' +
+  'IQD IRR ISK JMD JOD JPY KES KGS KHR KMF KPW KRW KWD KYD KZT LAK LBP LKR LRD LSL LYD MAD MDL MGA MKD MMK MNT MOP MRU MUR ' +
+  'MVR MWK MXN MYR MZN NAD NGN NIO NOK NPR NZD OMR PAB PEN PGK PHP PKR PLN PYG QAR RON RSD RUB RWF SAR SBD SCR SDG SEK SGD ' +
+  'SHP SLE SOS SRD SSP STN SVC SYP SZL THB TJS TMT TND TOP TRY TTD TWD TZS UAH UGX USD UYU UZS VES VND VUV WST XAF XCD XOF ' +
+  'XPF YER ZAR ZMW ZWL'
+).split(' '));
+const PRICE_TAIL = /^(.*\S)[ \t]+\d+(?:[.,]\d{3})*[.,]\d{2}[ \t]+([A-Z]{3})$/;
+
 /* Trim trailing reference noise (masked card numbers, statement refs, phone /
    meter numbers, caps+digit ref codes) from a transaction description so a
    learned categorisation rule generalises to next month's version of the same
@@ -45,6 +69,8 @@ function learnPattern(desc) {
   const capped = (desc ?? '').toString().trim().slice(0, 512);
   let s = capped;
   for (;;) {
+    const price = s.match(PRICE_TAIL);
+    if (price && ISO_CODES.has(price[2])) { s = price[1]; continue; }
     const m = s.match(/^(.*\S)[ \t]+(\S+)$/);
     if (!m) break;
     if (!isReferenceToken(m[2])) break;
