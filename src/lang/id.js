@@ -465,6 +465,9 @@ module.exports = {
   'bud.copy.done': {
     other: '{count} kategori disalin dari periode sebelumnya',
   },
+  'bud.copy.doneFrom': {
+    other: '{count} kategori disalin dari {period}, periode sebelumnya terbaru yang punya anggaran',
+  },
   'bud.copy.nothing': 'Tidak ada yang perlu disalin — setiap kategori sudah punya angka',
 
   /* =========================== Transactions page ========================== */
@@ -545,7 +548,10 @@ module.exports = {
   },
   'tx.bulk.backup': 'Baris-baris itu ditulis dulu ke {path}, jadi masih bisa dikembalikan — tempat sampah vault tidak bisa membatalkan ini sendiri, karena berkas bulanannya disunting, bukan dihapus.',
   'tx.bulk.splits': {
-    other: '{count} di antaranya milik transaksi yang dipecah, yang baris-baris lainnya mungkin tidak ikut terpilih oleh penyaring.',
+    other: '{count} baris lagi ikut terhapus, total {total}: transaksi yang dipecah dihapus utuh — baris asli dan semua bagiannya — agar tidak ada bagian yang tersisa untuk baris yang sudah tidak ada.',
+  },
+  'tx.bulk.splitsLeft': {
+    other: '{count} baris yang cocok dibiarkan: baris itu milik pecahan identik pada hari yang sama, yang bagian-bagiannya tidak dapat dibedakan. Letakkan bagian-bagian setiap baris asli tepat di bawahnya di berkasnya, berjumlah sama dengan baris itu, lalu hapus lagi.',
   },
   'tx.bulk.confirm': {
     other: 'Hapus {count} baris',
@@ -576,19 +582,36 @@ module.exports = {
      split parent row (the why is in en.js) --- */
   'tx.split.chip': 'dipecah menjadi {count}',
   'tx.split.chipGap': '{amount} belum tercatat',
+  'tx.split.chipMissing': 'dipecah · bagian tidak ditemukan',
+  'tx.split.chipOver': '{amount} lebih dari baris',
+  'tx.split.chipTwice': 'tidak lagi dikecualikan, dihitung dua kali',
+  'tx.split.ambiguous': 'Bagian-bagian pecahan ini tidak dapat dibedakan dari bagian pecahan lain yang identik pada hari yang sama, jadi tidak ada yang diubah. Di {file}, letakkan bagian-bagian setiap baris asli tepat di bawahnya, berjumlah sama dengan baris itu, lalu coba lagi.',
   'tx.aria.splitChip': 'Opsi pecahan untuk {desc} pada {date}',
+  'tx.aria.splitChipTwice': 'Pasang kembali centang Excluded pada {desc} tanggal {date}: baris ini dihitung dua kali',
 
   /* Accessible names (audit of 11 Nov 2026, task 19) — machine-assisted, not native-reviewed. */
   'tx.split.aria.amount': 'Jumlah untuk bagian {n}',
   'tx.split.aria.category': 'Kategori untuk bagian {n}',
   'tx.split.aria.note': 'Catatan untuk bagian {n}',
   'tx.split.aria.remove': 'Hapus bagian {n}',
+  'tx.split.title': 'Pecah transaksi',
+  'tx.split.addPart': '＋ Tambah bagian',
+  'tx.split.submit': 'Pecah',
+  'tx.split.notePlaceholder': 'Catatan (opsional)',
+  'tx.split.unallocated': 'Belum dialokasikan: {amount}',
+  'tx.split.balanced': '{amount} dialokasikan — seimbang',
+  'tx.split.needAmount': 'Setiap bagian perlu jumlah',
+  'tx.split.hint': 'Jumlah dimasukkan sebagai angka positif — pecahan mempertahankan arah transaksi asli. Baris asli tetap di berkas dengan tanda Excluded, jadi total tidak berubah dan mengimpor ulang rekening koran ini tidak akan menggandakannya.',
 
   'tx.unsplit.action': 'Batalkan pecahan',
   'tx.unsplit.title': 'Batalkan pecahan transaksi ini?',
   'tx.unsplit.msg': {
     other: 'Ini menghapus {count} bagian dan mengembalikan {desc} menjadi satu transaksi sebesar {amount}.',
   },
+  'tx.unsplit.noParts': 'Tidak ada bagian pecahan dengan tanggal dan deskripsi baris ini di {file}, jadi baris ini tetap dipecah dan di luar total. Jika tanggal atau deskripsinya diubah, kembalikan agar cocok dengan bagian-bagiannya; jika bagian-bagiannya dihapus, kosongkan sel Excluded dan Split baris ini di berkas.',
+  'tx.reexclude.title': 'Kecualikan baris ini lagi?',
+  'tx.reexclude.msg': '{desc} ({amount}) pernah dipecah, tetapi centang Excluded-nya sudah dihapus, sehingga dihitung sekali sebagai dirinya sendiri dan sekali lagi lewat bagian-bagiannya. Ini memasang kembali centang, sehingga hanya bagian-bagiannya yang dihitung. Bagian-bagiannya tidak diubah.',
+  'tx.reexclude.action': 'Kecualikan lagi',
 
   'tx.add.noAccount': 'Tambahkan rekening dulu — setiap transaksi menempel pada satu rekening',
   'tx.add.title': 'Tambah transaksi',
@@ -685,6 +708,8 @@ module.exports = {
   'bx.folder': 'Simpan ke folder',
   'bx.folder.desc': 'Sebuah folder di vault ini. Mengekspor pilihan yang sama lagi akan mengganti file sebelumnya.',
   'bx.cancel': 'Batal',
+  'modal.ok': 'OK',
+  'modal.close': 'Tutup',
   'bx.go': 'Ekspor',
   'bx.preview': {
     other: '{count} periode · {range} · {cats} kategori',
@@ -790,6 +815,22 @@ module.exports = {
   /* Accessible names (audit of 11 Nov 2026, task 19) — machine-assisted, not native-reviewed. */
   'cat.aria.current': '{label} — saat ini {value}',
   'cat.aria.currentNone': '{label} — saat ini tanpa kategori',
+
+  'cat.delete.title': 'Hapus kategori',
+  'cat.delete.confirm': 'Hapus',
+  'cat.delete.lead': 'Hapus "{name}"?',
+  'cat.delete.unused': 'Tidak ada transaksi yang memakainya. File anggaran sebelumnya tidak berubah.',
+  'cat.delete.used': {
+    other: '{count} transaksi dicatat di bawahnya.',
+  },
+  'cat.delete.kindLost': 'Jenis sebuah kategori ("{kind}") dibaca dari filenya, jadi menghapus file itu menghilangkan jenis tersebut dari uang yang dicatat di bawahnya.',
+  'cat.delete.effect.income': 'Uang yang masuk di bawahnya tidak lagi dihitung sebagai pemasukan, di setiap periode, termasuk yang lalu, sampai dikategorikan ulang.',
+  'cat.delete.effect.transfer': 'Uang yang dipindahkan di bawahnya bukan lagi transfer dan dihitung sebagai pengeluaran tanpa kategori, di setiap periode, termasuk yang lalu, sampai dikategorikan ulang.',
+  'cat.delete.effect.other': 'Uang yang dicatat di bawahnya dihitung sebagai pengeluaran tanpa kategori di setiap periode, termasuk yang lalu, sampai dikategorikan ulang.',
+  'cat.delete.rules': {
+    other: '{count} aturan kategorisasi masih mencatat impor baru di bawah "{name}" dan akan terus begitu.',
+  },
+  'cat.delete.trash': 'File kategori masuk ke tempat sampah vault Anda.',
 
   'acct.err.exists': 'Rekening itu sudah ada',
   'acct.err.save': '{name} tidak bisa disimpan ({error}) — tidak ada yang tertulis ke berkasnya; coba tindakan yang sama sekali lagi.',
@@ -1105,6 +1146,8 @@ module.exports = {
   'dash.hero.sub': '{spent} terpakai dari anggaran pengeluaran {budgeted}',
   'dash.hero.assumedIncluded': 'termasuk {amount} yang sudah dibelanjakan',
   'dash.hero.nettedOff': '{amount} pengembalian dana tidak dikurangkan dari angka ini',
+  'dash.hero.importedTo': 'Rekening koran diimpor sampai {date}',
+  'dash.hero.setUpBudget': 'Siapkan anggaran periode ini',
   'dash.stat.income': 'Total pemasukan',
   'dash.stat.budgeted': 'Dianggarkan',
   'dash.stat.spent': 'Total pengeluaran',
@@ -1114,6 +1157,7 @@ module.exports = {
   'dash.stat.setAside': '{amount} untuk tabungan',
   'dash.stat.setAsideMoved': '{moved} dari {amount} sudah ditabung',
   'dash.stat.ofWhichSetAside': '{moved} dari {amount} sudah ditabung',
+  'dash.stat.setAsideUnseen': '{amount} untuk tabungan — rekening koran dana berhenti pada {date}, jadi yang ditabung belum terlihat',
   'dash.scheduledAhead': 'Sampai hari ini · {amount} lagi bertanggal lebih lanjut dalam periode ini',
   'dash.fundedFromSavings': {
     other: '{amount} lagi keluar dari dana Anda ({count} transaksi), yang tidak dihitung anggaran ini',
@@ -1210,6 +1254,9 @@ module.exports = {
     other: 'Rata-rata dari {count} periode terakhir Anda yang sudah selesai',
   },
   'dash.health.subNone': 'Belum ada periode selesai untuk dirata-ratakan',
+  'dash.health.leftOut': {
+    other: '{periods} tidak dihitung: rekening koran berhenti sebelum periodenya berakhir',
+  },
   'dash.health.monthsUnit': 'bulan',
   'dash.health.months': 'pengeluaran pokok yang tertutupi',
   'dash.health.meterTip': {
@@ -1401,6 +1448,7 @@ module.exports = {
   'dash.left.cycleUnder': '{amount} kelonggaran sebelum pelunasan {date}.',
   'dash.left.cycleOver': '{amount} LEBIH BANYAK daripada pemasukan yang melunasinya pada {date}.',
   'dash.left.incoming': '{amount} masuk pada {date}',
+  'dash.left.incomingNotImported': '{amount} diperkirakan {date} — belum diimpor',
   'dash.left.incomingCovers': 'Itu menutup semua yang di atas dan masih menyisakan sekitar {amount}.',
   'dash.left.incomingShort': 'Bahkan setelah itu Anda masih kurang {amount}.',
   'dash.left.days': {
@@ -1426,7 +1474,7 @@ module.exports = {
   'dash.left.asListed': 'sesuai yang tercatat, tanpa riwayat penagihan',
   'dash.left.contracted': 'cicilan sesuai kontrak',
   'dash.left.settledInFull': 'dilunasi penuh, saldo saat ini',
-  'dash.left.source': 'Angkanya adalah yang biasanya ditagih (nilai tengah dari tiga tagihan terakhir), bukan angka yang diketik di halaman Layanan. Dibaca hanya dari daftar Layanan dan halaman Utang Anda — tagihan berulang yang tidak ada di keduanya tidak dihitung di sini.',
+  'dash.left.source': 'Angkanya adalah yang biasanya ditagih (nilai tengah dari tiga tagihan terakhir), bukan angka yang diketik di halaman Layanan. Yang dihitung: daftar Layanan Anda, halaman Utang, dan autodebet dengan jumlah yang sama yang terlihat terpotong setiap bulan pada hari yang kurang lebih sama. Pembayaran yang Anda lakukan sendiri pada hari yang berbeda-beda — misalnya sewa yang dibayar lewat transfer — tidak dihitung kecuali ada di daftar Layanan Anda.',
   'dash.split.colCat': 'Kategori',
   'dash.split.colSpent': 'Pengeluaran',
   'dash.split.colChange': 'Perubahan',
@@ -1763,6 +1811,7 @@ module.exports = {
   'plan.env.collapseAria': "Ciutkan {name}",
   'plan.env.deleteAria': "Hapus kantong belanja {name}",
   'plan.actions.deleteAria': "Hapus rencana",
+  'plan.err.nameRequired': 'Perlu diberi nama',
 
   /* Accessible names (audit of 11 Nov 2026, task 19) — machine-assisted, not native-reviewed. */
   'plan.pickerAria': 'Pilih rencana',
@@ -1872,6 +1921,9 @@ module.exports = {
   'tx.bulkCat.msg': {
     other: '{count} baris akan diatur ke {cat}.',
   },
+  'tx.bulkCat.splitsSkipped': {
+    other: '{count} baris yang cocok termasuk pecahan dan kategorinya tetap — ubah di barisnya masing-masing.',
+  },
   'tx.bulkCat.confirm': {
     other: 'Atur kategori ({count})',
   },
@@ -1908,6 +1960,9 @@ module.exports = {
   },
   'ctl.toast.repointFailed': 'Tidak bisa mengalihkan catatan untuk penggantian nama "{from}" → "{to}" ({error})',
   'ctl.notice.unsavedReloadSkipped': 'Anggaran: ada perubahan yang belum disimpan — muat ulang dilewati. Simpan (atau pilih "Muat ulang dari disk" untuk membuangnya), lalu coba lagi.',
+  'ctl.reload.confirmTitle': 'Perubahan belum disimpan',
+  'ctl.reload.confirmMessage': 'Memuat ulang dari disk akan membuang perubahan yang belum disimpan. Lanjutkan?',
+  'ctl.reload.confirmDiscard': 'Buang dan muat ulang',
   'ctl.toast.fileFailed': '"{name}" tidak bisa diproses ({error})',
   'ctl.toast.thatFile': 'berkas itu',
   'settings.exchangeRates.source': 'Sumber kurs',

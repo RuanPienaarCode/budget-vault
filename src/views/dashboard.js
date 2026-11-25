@@ -7,12 +7,14 @@ const { typeOrder, typeRank } = require('../groups');
 /* Namespace import: this file binds `t` as a local (`const t = $('#dashBudget')`). */
 const i18n = require('../i18n');
 const { stalenessSummary, isStale } = require('../reconcile');
-const { whatsLeft, printedChain, isSettleCard } = require('../committed');
+const { whatsLeft, printedChain, isSettleCard, statementsStopShort } = require('../committed');
+/* How far the statements reach: the health card's own rule and window. */
+const { statementReachFor } = require('../health-data');
 const { scoreBand, pillarRows, scoreScale } = require('../health-math');
-const { gapSentence, yearsNumber } = require('../health-copy');
+const { gapSentence, yearsNumber, leftOutClause } = require('../health-copy');
 const { decimalText } = require('../locale');
 const { todayIso, isRealIsoDate } = require('../dates');
-const { balanceReadable, printedRemainder, printedParts, usedToneClass } = require('../figures');
+const { balanceReadable, printedRemainder, printedParts, usedToneClass, assumedNoteAmount } = require('../figures');
 const { worth, cardOverlap, otherCurrencyNet } = require('../worth');
 const { owedSummary } = require('../owed-math');
 const { currenciesIn, symbolOf, isForeign, splitByCurrency, formatSigned } = require('../currency');
@@ -190,9 +192,12 @@ module.exports = function registerDashboard(ctx) {
 
     const sub = $('#healthSub');
     if (sub) {
-      sub.textContent = H.countedPeriods
-        ? i18n.t('dash.health.sub', { count: H.countedPeriods })
-        : i18n.t('dash.health.subNone');
+      /* And which periods it did NOT average, and why (NUM-2): the hero of a
+         period left out says the same thing about its statements. */
+      sub.textContent = [
+        H.countedPeriods ? i18n.t('dash.health.sub', { count: H.countedPeriods }) : i18n.t('dash.health.subNone'),
+        leftOutClause(snap.incompletePeriods, periodMonthName),
+      ].filter(Boolean).join(' · ');
     }
 
     /* The score slab is a real <button> that routes to the Score page: a
@@ -1162,7 +1167,10 @@ module.exports = function registerDashboard(ctx) {
       body.append(el('div', { class: 'left-incoming' },
         icoEl(['arrow-down-circle', 'circle-arrow-down', 'arrow-down']),
         el('div', {},
-          el('div', { class: 'li-t' }, i18n.t('dash.left.incoming', {
+          /* A salary past its day on an account not imported that far is held
+             (committed.js heldCredit, NUM-4) and said so, the debit orders'
+             own words: expected, not imported yet — never cash. */
+          el('div', { class: 'li-t' }, i18n.t(L.incoming.notImported ? 'dash.left.incomingNotImported' : 'dash.left.incoming', {
             amount: money(L.incoming.amount, 0), date: dateText(L.incoming.next),
           })),
           el('div', { class: 'li-s' }, i18n.t(
@@ -1858,7 +1866,16 @@ module.exports = function registerDashboard(ctx) {
        headless API (src/api.js) can hand a sibling plugin the sentences that
        qualify this figure rather than its own copy of one of them (2026-10-07
        audit). Grouped here by the line each one prints on. */
-    const qualifiers = heroQualifiers(F, money);
+    /* HOW FAR THE STATEMENTS REACH (2026-11-25 audit, NUM-1/NUM-2). Every
+       figure on this card is right for the rows it was given, and on the
+       owner's vault the rows stopped a week before his new period began: a
+       huge "R 0 spent" read as a fact about the period rather than about the
+       import. committed.js statementReach is the ONE rule — the same accounts
+       and the same knownTo date the health card leaves a half-imported period
+       out by — so the hero of a period the card left out says why. heroFacts
+       (foot of this file) is shared with the headless API. */
+    const facts = heroFacts(ctx, S.period);
+    const qualifiers = heroQualifiers(F, money, facts);
     const linesOf = line => qualifiers.filter(q => q.line === line).map(q => q.text);
     const subLine = parts => (parts.length ? el('div', { class: 'hero-sub hero-sub--ahead' }, factLines(parts)) : '');
     const spentNoteParts = [...linesOf('spent')];
@@ -1886,11 +1903,19 @@ module.exports = function registerDashboard(ctx) {
        `plan.setAside` is planFigures' own — budgetTotalsOf's bucket — not a
        recomputation. */
     const moved = (plan.setAside || 0) > 0 ? movedToFunds(S.period) : 0;
-    const setAsideNote = (plan.setAside || 0) > 0
-      ? i18n.t('dash.stat.ofWhichSetAside', {
-        amount: money(plan.setAside, 0), moved: money(moved, 0),
-      })
-      : '';
+    /* SAVING THAT CANNOT BE SEEN YET (2026-11-25 audit, NUM-3). Saving is
+       counted only when the money is seen ARRIVING in a fund (ADR-0006
+       amendment), so a fund whose own statements stop before this period read
+       "R 0 of R 2 000 saved so far" — a claim about the household that is only
+       a fact about the import. Said that way instead, the set-aside amount kept.
+       Only where the sentence would print R 0: anything seen moving was moved. */
+    const fundsShort = Math.round(moved) === 0 ? facts.fundsBefore : null;
+    const setAsideNote = (plan.setAside || 0) <= 0 ? ''
+      : fundsShort
+        ? i18n.t('dash.stat.setAsideUnseen', { amount: money(plan.setAside, 0), date: dateText(fundsShort) })
+        : i18n.t('dash.stat.ofWhichSetAside', {
+          amount: money(plan.setAside, 0), moved: money(moved, 0),
+        });
 
     const hero = $('#heroCard'); hero.empty();
     const cur = S.settings.currency;
@@ -1922,6 +1947,18 @@ module.exports = function registerDashboard(ctx) {
        app, so the sentence goes here rather than only on the page where the
        accounts live. */
     const foreignNote = factLines(linesOf('foreign'));
+    /* With no budget the big figure IS what was spent and its own sub-line says
+       "Total spent"; a third stat printing the same words over the same number
+       said it twice (2026-11-25 audit, NUM-1). The stat steps aside there. */
+    const spentStat = noBudget ? '' : el('div', { class: 'stat' },
+      el('div', {}, el('div', { class: 'sl' }, i18n.t('dash.stat.spent'))),
+      el('div', {}, el('div', { class: 'sv' }, money(used.spent, 0)),
+        /* Toned by ONE rule shared with the Budget strip (figures.js
+           usedToneClass, 2026-10-20 audit MT-14): plain under the 85% mark,
+           warning from it, danger past 100%. It was `tag warn` always, so
+           49% used with a day of the period left read as a warning and the
+           colour said nothing at all. */
+        usedPct !== null ? el('div', { class: 'st' }, el('span', { class: `tag${usedToneClass(used) ? ' ' + usedToneClass(used) : ''}` }, i18n.t('dash.stat.used', { pct: usedPct }))) : ''));
     const statCol = el('div', { class: 'stat-col' },
       el('div', { class: 'stat' },
         el('div', {}, el('div', { class: 'sl' }, i18n.t('dash.stat.income'))),
@@ -1938,15 +1975,7 @@ module.exports = function registerDashboard(ctx) {
               setAsideNote,
             ]))
             : '')),
-      el('div', { class: 'stat' },
-        el('div', {}, el('div', { class: 'sl' }, i18n.t('dash.stat.spent'))),
-        el('div', {}, el('div', { class: 'sv' }, money(used.spent, 0)),
-          /* Toned by ONE rule shared with the Budget strip (figures.js
-             usedToneClass, 2026-10-20 audit MT-14): plain under the 85% mark,
-             warning from it, danger past 100%. It was `tag warn` always, so
-             49% used with a day of the period left read as a warning and the
-             colour said nothing at all. */
-          usedPct !== null ? el('div', { class: 'st' }, el('span', { class: `tag${usedToneClass(used) ? ' ' + usedToneClass(used) : ''}` }, i18n.t('dash.stat.used', { pct: usedPct }))) : '')));
+      spentStat);
     if (foreignNote.length) statCol.append(el('div', { class: 'stat stat-note' }, el('div', { class: 'st' }, foreignNote)));
     /* A real <button>, not a plain <div> — this is the app's clearest
        statement of outstanding work and, until now, the one figure on the
@@ -2061,10 +2090,23 @@ module.exports = function registerDashboard(ctx) {
            grocery envelope being blown — and therefore said out loud, because
            a figure this card stopped counting is an exclusion like any other. */
         subLine(linesOf('funds')),
-        /* A meter of spent against nothing is a full bar with no meaning. */
-        noBudget ? '' : meter),
+        /* How far the statements reach (NUM-1/NUM-2), quiet and last: a fact
+           about the import that qualifies every figure above it. */
+        subLine(linesOf('imported')),
+        /* A meter of spent against nothing is a full bar with no meaning. In
+           its place, for a period still to be planned, the way on: the Budget
+           page, whose banner copies the most recent earlier budget. The
+           Dashboard only navigates — the copy is that page's act, with its
+           draft and its Save, not something to do behind the reader's back. */
+        noBudget
+          ? (S.period >= currentPeriod()
+            ? el('button', { type: 'button', class: 'btn btn-ghost hero-next', onclick: () => ctx.switchView('budgets') },
+              i18n.t('dash.hero.setUpBudget'))
+            : '')
+          : meter),
       statCol));
   }
+
 
   /* The category rows behind the Budget-vs-Actual table — and, since ADR
      "the report reads what the view reads" (see views/report.js), the ONLY
@@ -3064,8 +3106,12 @@ module.exports = function registerDashboard(ctx) {
    'scheduled', 'funds', and 'foreign' (the stat column). `count` is passed
    beside `amount` on the funds line because i18n.t() picks a plural off
    `count` alone. Thresholds are the hero's own: a qualifier under one
-   currency unit is rounding, and says nothing. */
-function heroQualifiers(F, money) {
+   currency unit is rounding, and says nothing.
+
+   `facts` is optional and carries what the period figures cannot: how far the
+   statements reach (`importedTo`, an ISO day, with the caller's `dateText`).
+   The view passes it; a caller that does not simply gets no such line. */
+function heroQualifiers(F, money, facts) {
   const sum = (F && F.summary) || {};
   const used = (F && F.used) || {};
   const out = [];
@@ -3073,8 +3119,11 @@ function heroQualifiers(F, money) {
   if (used.setAside >= 1) {
     add('setAside', 'spent', i18n.t('dash.stat.setAside', { amount: money(used.setAside, 0) }), { amount: used.setAside });
   }
-  if (used.assumed >= 1) {
-    add('assumed', 'spent', i18n.t('dash.hero.assumedIncluded', { amount: money(used.assumed, 0) }), { amount: used.assumed });
+  /* The threshold and the whole-rand rounding are figures.js assumedNoteAmount,
+     the one rule the Budget strip and the Report read as well (NUM-7). */
+  const assumedAmount = assumedNoteAmount(used.assumed, money);
+  if (assumedAmount) {
+    add('assumed', 'spent', i18n.t('dash.hero.assumedIncluded', { amount: assumedAmount }), { amount: used.assumed });
   }
   /* EVERY refund the period kept, in full: periodSummary().refunds (ledger.js
      tally), not the donut's gap (2026-10-20 audit, M1-02). The sentence says
@@ -3119,6 +3168,15 @@ function heroQualifiers(F, money) {
       amount: money(fromFunds.spend, 0), count: fromFunds.count,
     }), { amount: fromFunds.spend, count: fromFunds.count });
   }
+  /* 2026-11-25 audit, NUM-1/NUM-2: the statements stop before this period
+     could be whole — the day is committed.js statementReach's, via heroFacts.
+     Last of the lines under the figure, so before the stat column's note:
+     print order is the order a reader (and the API) meets them. */
+  const importedTo = facts && facts.importedTo;
+  if (importedTo) {
+    const day = typeof facts.dateText === 'function' ? facts.dateText(importedTo) : importedTo;
+    add('importedTo', 'imported', i18n.t('dash.hero.importedTo', { date: day }), { date: importedTo });
+  }
   if (sum.foreign && sum.foreign.count) {
     add('foreign', 'foreign', i18n.t('dash.foreignExcluded', {
       count: sum.foreign.count, symbols: sum.foreign.symbols.join(' · '),
@@ -3127,6 +3185,22 @@ function heroQualifiers(F, money) {
   return out;
 }
 module.exports.heroQualifiers = heroQualifiers;
+
+/* The facts heroQualifiers takes beside the period figures, for period `p`,
+   read off any ctx carrying the period and index helpers — this view's, or
+   the headless API's, so the two hand out the same lines (2026-11-25 audit,
+   NUM-1/NUM-2/NUM-3). `importedTo`: the day the in-budget accounts'
+   statements stop, when short of what the period could hold by now.
+   `fundsBefore`: the day the savings funds' statements stop, when that is
+   before the period began, so its saving cannot have been seen arriving. */
+function heroFacts(c, p) {
+  const today = todayIso();
+  const { start, end } = c.periodRange(p);
+  const reach = statementReachFor(c, { today });
+  const fundsBefore = reach.fundsThrough && start <= today && reach.fundsThrough < start ? reach.fundsThrough : null;
+  return { importedTo: statementsStopShort(reach.through, start, end, today), fundsBefore, dateText: c.dateText };
+}
+module.exports.heroFacts = heroFacts;
 
 /* Exposed for a direct, DOM-free unit test of the rounding algorithm itself —
    the six-equal / three-equal / exact-tie / single-slice / zero-slice cases

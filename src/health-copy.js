@@ -36,4 +36,18 @@ function gapSentence(g, { money, target }) {
           : i18n.t('score.gap.fixBuild', { amount, times: FULL_MARKS.netWorthMultiple });
 }
 
-module.exports = { yearsNumber, gapSentence };
+/* The trailing periods the averages left out because their statements stop
+   before the period ended (healthSnapshot's `incompletePeriods`), as one short
+   clause, or '' when none were (2026-11-25 audit, NUM-2). health-data.js has
+   named them since L1-04, and no surface read the list: the card said
+   "Averaged over your last 5 completed periods" under a hero presenting the
+   sixth as finished. `nameOf` is the caller's period namer (periodMonthName);
+   `count` picks the plural, as i18n.t() reads it off `count` alone. */
+function leftOutClause(incompletePeriods, nameOf) {
+  const list = incompletePeriods || [];
+  if (!list.length) { return ''; }
+  const names = list.map(p => (typeof nameOf === 'function' ? nameOf(p.period) : p.period));
+  return i18n.t('dash.health.leftOut', { periods: names.join(', '), count: list.length });
+}
+
+module.exports = { yearsNumber, gapSentence, leftOutClause };

@@ -70,6 +70,7 @@ const { safeName, txHeaderLines, transactionRow } = require('./exporter');
    multi-period merge below rather than summed per period. */
 const { budgetRowStatus, budgetSpent, budgetUsedShare, categoryGap: gapOf } = require('./money-flow');
 const { growthRate } = require('./savings-math');
+const { assumedNoteAmount } = require('./figures');
 const { sharePercents, sharePercentLabel } = require('./share-percents');
 /* splitRole only, for the JSON transaction rows — same reason exporter.js
    reads it instead of a raw r.split test: see src/tx-role.js's own header
@@ -950,7 +951,11 @@ function financialReportMarkdown(data, money, fmt) {
   if (bu && ((bu.spent || 0) > 0 || (bu.budgeted || 0) > 0)) {
     const usedPct = bu.used === null || bu.used === undefined ? null : sharePercentLabel(bu.used, dec);
     parts.push(i18n.t('dash.hero.sub', { spent: money(bu.spent), budgeted: money(bu.budgeted) }));
-    if ((bu.assumed || 0) > 0) parts.push(i18n.t('bud.total.spentNoteAssumed', { pct: usedPct ?? 0, amount: money(bu.assumed) }));
+    /* From R 1 and in whole rands, as the Dashboard and the Budget strip say it
+       (figures.js assumedNoteAmount, NUM-7) — it was named from a cent, to the
+       cent. */
+    const assumedAmount = assumedNoteAmount(bu.assumed, money);
+    if (assumedAmount) parts.push(i18n.t('bud.total.spentNoteAssumed', { pct: usedPct ?? 0, amount: assumedAmount }));
     else if (usedPct !== null) parts.push(i18n.t('bud.total.spentNote', { pct: usedPct }));
     /* The set-aside PAID this selection, held out of the numerator above —
        the fragment the Dashboard hero prints beside this same sub-line
@@ -1226,9 +1231,9 @@ function financialReportMarkdown(data, money, fmt) {
        nothing else. Same key and same gate as the card: no line at all when
        the count never reached this object (a hand-built fixture). */
     if (health.countedPeriods !== null && health.countedPeriods !== undefined) {
-      out.push('', health.countedPeriods
+      out.push('', [health.countedPeriods
         ? i18n.t('dash.health.sub', { count: health.countedPeriods })
-        : i18n.t('dash.health.subNone'));
+        : i18n.t('dash.health.subNone'), health.leftOut].filter(Boolean).join(' · '));
     }
     const rows = [[i18n.t('report.health.score'), health.score !== null ? String(health.score) : '—']];
     /* In the household's decimal mark (2026-10-20 audit, D2-07/M2-09): this

@@ -14,8 +14,11 @@
    too; a lo-big row printed through tariffMoney() is marked only when the
    tariff prints the household's own currency.
 
-   (Prepared by lane L7 for lanes L4 and L5; drop into tests/ once the view
-   diffs land.)
+   Food joined the list in the 2026-11-25 audit (VIS-8): its three money tiles
+   passed an empty class and drew the R full-size beside every sibling page's
+   muted one. Its tiles also print '—' when there is nothing to total, and the
+   mark would shrink the DASH (the rule styles the first character), so a tile
+   that can print '—' marks itself only on the branch that prints money.
 
      node tests/kpi-money-symbol.test.cjs */
 
@@ -38,7 +41,7 @@ const splitArgs = s => { const out = []; let d = 0, cur = '', q = null;
   if (cur.trim()) out.push(cur.trim());
   return out; };
 let seen = 0;
-for (const f of ['savings.js', 'debts.js', 'owed.js', 'services.js']) {
+for (const f of ['savings.js', 'debts.js', 'owed.js', 'services.js', 'food.js']) {
   const t = read(f);
   for (const m of t.matchAll(/\btile\(/g)) {
     const args = splitArgs(t.slice(m.index + 5, m.index + 600));
@@ -48,7 +51,24 @@ for (const f of ['savings.js', 'debts.js', 'owed.js', 'services.js']) {
     ok(/st-money/.test(args[2] || ''), `${f}:${line} tile(${args[0]}, ${args[1].slice(0, 30)}…) prints money but does not pass 'st-money'`);
   }
 }
-ok(seen >= 8, `sanity: the money tiles of Savings, Debt, Owed and Services are found (${seen})`);
+ok(seen >= 10, `sanity: the money tiles of Savings, Debt, Owed, Services and Food are found (${seen})`);
+
+/* A tile whose value is `<test> ? money(...) : '—'` is money on one branch and a
+   dash on the other. The class argument must then be conditional too (carry a
+   '?'), and its dash branch must not carry the mark. */
+{
+  const t = read('food.js');
+  let guarded = 0;
+  for (const m of t.matchAll(/\btile\(/g)) {
+    const args = splitArgs(t.slice(m.index + 5, m.index + 600));
+    if (!/\bmoney\(/.test(args[1] || '') || !/'—'/.test(args[1])) continue;
+    guarded++;
+    const line = t.slice(0, m.index).split('\n').length;
+    ok(/\?/.test(args[2] || '') && /st-money/.test(args[2]), `food.js:${line} tile(${args[0]}) prints money or '—' but its class is not conditional`);
+    ok(/:\s*''\s*\)?\s*$/.test(args[2] || ''), `food.js:${line} tile(${args[0]}) marks the '—' branch st-money (the dash would be shrunk)`);
+  }
+  ok(guarded >= 1, `sanity: Food's money-or-dash tile is found (${guarded})`);
+}
 
 const loans = read('loans.js');
 let rows = 0;

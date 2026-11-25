@@ -151,6 +151,9 @@
 }
 .budget-app-root .acct-insp-line > span:first-child { color: var(--text-muted); }
 .budget-app-root .acct-insp-line .num { white-space: nowrap; }
+/* One figure of the inspector's "This period" / "Still to come" pair. Nowrap so
+   the line can break at the " · " between them and never inside "−R 30 860". */
+.budget-app-root .acct-insp-fig { white-space: nowrap; }
 /* The sum's last line, set off by a rule and in bold: it is the figure the
    primary button below offers, and the one the other two add up to. */
 .budget-app-root .acct-insp-line.is-total {

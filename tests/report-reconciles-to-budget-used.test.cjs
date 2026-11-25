@@ -175,7 +175,10 @@ class PinnedDate extends RealDate {
   /* ---- 3. the percentage, and the two amounts that move the numerator --- */
   {
     const pct = sharePercentLabel(bu.used, '.');
-    ok(md.includes(i18n.t('bud.total.spentNoteAssumed', { pct, amount: money(bu.assumed) })),
+    /* The provision in whole rands, from R 1: the Dashboard's rule, one for all
+       three surfaces (figures.js assumedNoteAmount, 2026-11-25 audit NUM-7).
+       It was printed to the cent here, from a cent. */
+    ok(md.includes(i18n.t('bud.total.spentNoteAssumed', { pct, amount: money(bu.assumed, 0) })),
       `"% used" is the label the hero and the Budget tile print (${pct}%), and the assume-spent provision added into it is named`);
     /* In the hero's own fragments, to the cent: the document prints every
        figure in cents, and the hero's whole rands are the hero's (2026-10-20

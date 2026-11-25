@@ -461,6 +461,10 @@ module.exports = {
     one: '{count} Kategorie aus dem vorherigen Zeitraum kopiert',
     other: '{count} Kategorien aus dem vorherigen Zeitraum kopiert',
   },
+  'bud.copy.doneFrom': {
+    one: '{count} Kategorie aus {period} kopiert, dem letzten früheren Zeitraum mit Budget',
+    other: '{count} Kategorien aus {period} kopiert, dem letzten früheren Zeitraum mit Budget',
+  },
   'bud.copy.nothing': 'Nichts zu kopieren — jede Kategorie hat bereits einen Wert',
 
   /* =========================== Transactions page ========================== */
@@ -553,8 +557,12 @@ module.exports = {
   },
   'tx.bulk.backup': 'Sie werden zuerst nach {path} geschrieben und lassen sich so zurückholen — der Papierkorb des Tresors kann das nicht allein rückgängig machen, weil die Monatsdateien bearbeitet und nicht gelöscht werden.',
   'tx.bulk.splits': {
-    one: '1 davon gehört zu einer Aufteilung, deren übrige Zeilen die Filter womöglich nicht erfassen.',
-    other: '{count} davon gehören zu Aufteilungen, deren übrige Zeilen die Filter womöglich nicht erfassen.',
+    one: '1 weitere Zeile wird mitgelöscht, insgesamt {total}: Eine Aufteilung wird nur als Ganzes gelöscht — die Originalzeile mit allen Teilen —, damit kein Teil eine Zeile beschreibt, die es nicht mehr gibt.',
+    other: '{count} weitere Zeilen werden mitgelöscht, insgesamt {total}: Eine Aufteilung wird nur als Ganzes gelöscht — die Originalzeile mit allen Teilen —, damit kein Teil eine Zeile beschreibt, die es nicht mehr gibt.',
+  },
+  'tx.bulk.splitsLeft': {
+    one: '1 passende Zeile bleibt stehen: Sie gehört zu gleichen Aufteilungen am selben Tag, deren Teile sich nicht auseinanderhalten lassen. Setzen Sie in der Datei die Teile jeder Originalzeile direkt darunter, sodass sie deren Betrag ergeben, und löschen Sie dann erneut.',
+    other: '{count} passende Zeilen bleiben stehen: Sie gehören zu gleichen Aufteilungen am selben Tag, deren Teile sich nicht auseinanderhalten lassen. Setzen Sie in der Datei die Teile jeder Originalzeile direkt darunter, sodass sie deren Betrag ergeben, und löschen Sie dann erneut.',
   },
   'tx.bulk.confirm': {
     one: '1 Zeile löschen',
@@ -590,13 +598,26 @@ module.exports = {
      split parent row (the why is in en.js) --- */
   'tx.split.chip': 'auf {count} aufgeteilt',
   'tx.split.chipGap': '{amount} nicht zugeordnet',
+  'tx.split.chipMissing': 'aufgeteilt · Teile nicht gefunden',
+  'tx.split.chipOver': '{amount} mehr als die Zeile',
+  'tx.split.chipTwice': 'nicht mehr ausgeschlossen, doppelt gezählt',
+  'tx.split.ambiguous': 'Die Teile dieser Aufteilung lassen sich nicht von denen einer gleichen Aufteilung am selben Tag unterscheiden, daher wurde nichts geändert. Setzen Sie in {file} die Teile jeder Originalzeile direkt darunter, sodass sie deren Betrag ergeben, und versuchen Sie es dann erneut.',
   'tx.aria.splitChip': 'Aufteilungsoptionen für {desc} vom {date}',
+  'tx.aria.splitChipTwice': 'Ausschluss-Haken bei {desc} vom {date} wieder setzen: die Zeile wird doppelt gezählt',
 
   /* Accessible names (audit of 11 Nov 2026, task 19) — machine-assisted, not native-reviewed. */
   'tx.split.aria.amount': 'Betrag für Teil {n}',
   'tx.split.aria.category': 'Kategorie für Teil {n}',
   'tx.split.aria.note': 'Notiz zu Teil {n}',
   'tx.split.aria.remove': 'Teil {n} entfernen',
+  'tx.split.title': 'Transaktion aufteilen',
+  'tx.split.addPart': '＋ Teil hinzufügen',
+  'tx.split.submit': 'Aufteilen',
+  'tx.split.notePlaceholder': 'Notiz (optional)',
+  'tx.split.unallocated': 'Nicht zugeordnet: {amount}',
+  'tx.split.balanced': '{amount} zugeordnet — ausgeglichen',
+  'tx.split.needAmount': 'Jeder Teil braucht einen Betrag',
+  'tx.split.hint': 'Beträge werden positiv eingegeben — die Aufteilung behält die Richtung des Originals bei. Die ursprüngliche Zeile bleibt in der Datei als Excluded markiert, daher ändern sich die Summen nicht, und ein erneuter Import dieses Kontoauszugs legt sie nicht doppelt an.',
 
   'tx.unsplit.action': 'Aufteilung aufheben',
   'tx.unsplit.title': 'Aufteilung dieser Transaktion aufheben?',
@@ -604,6 +625,10 @@ module.exports = {
     one: 'Das entfernt den 1 Teil und stellt {desc} wieder als einzelne Transaktion über {amount} her.',
     other: 'Das entfernt die {count} Teile und stellt {desc} wieder als einzelne Transaktion über {amount} her.',
   },
+  'tx.unsplit.noParts': 'In {file} wurden keine Aufteilungsteile mit Datum und Beschreibung dieser Zeile gefunden, daher bleibt sie aufgeteilt und außerhalb der Summen. Wurde Datum oder Beschreibung geändert, stellen Sie sie passend zu den Teilen wieder her; wurden die Teile gelöscht, leeren Sie die Zellen Excluded und Split dieser Zeile in der Datei.',
+  'tx.reexclude.title': 'Diese Zeile wieder ausschließen?',
+  'tx.reexclude.msg': '{desc} ({amount}) wurde aufgeteilt, aber ihr Ausschluss-Haken wurde entfernt, daher wird sie einmal als sie selbst und noch einmal über ihre Teile gezählt. Das setzt den Haken wieder, sodass nur die Teile zählen. Die Teile bleiben unverändert.',
+  'tx.reexclude.action': 'Wieder ausschließen',
 
   'tx.add.noAccount': 'Lege zuerst ein Konto an — jede Transaktion gehört zu einem',
   'tx.add.title': 'Transaktion hinzufügen',
@@ -704,6 +729,8 @@ module.exports = {
   'bx.folder': 'In Ordner speichern',
   'bx.folder.desc': 'Ein Ordner in diesem Vault. Der erneute Export derselben Auswahl ersetzt die vorherigen Dateien.',
   'bx.cancel': 'Abbrechen',
+  'modal.ok': 'OK',
+  'modal.close': 'Schließen',
   'bx.go': 'Exportieren',
   'bx.preview': {
     one: '{count} Zeitraum · {range} · {cats} Kategorien',
@@ -813,6 +840,24 @@ module.exports = {
   /* Accessible names (audit of 11 Nov 2026, task 19) — machine-assisted, not native-reviewed. */
   'cat.aria.current': '{label} — derzeit {value}',
   'cat.aria.currentNone': '{label} — derzeit ohne Kategorie',
+
+  'cat.delete.title': 'Kategorie löschen',
+  'cat.delete.confirm': 'Löschen',
+  'cat.delete.lead': '„{name}“ löschen?',
+  'cat.delete.unused': 'Keine Buchung verwendet sie. Frühere Budgetdateien bleiben unverändert.',
+  'cat.delete.used': {
+    one: '{count} Buchung ist ihr zugeordnet.',
+    other: '{count} Buchungen sind ihr zugeordnet.',
+  },
+  'cat.delete.kindLost': 'Die Art einer Kategorie („{kind}“) wird aus ihrer Datei gelesen. Mit dem Löschen der Datei verliert das zugeordnete Geld diese Art.',
+  'cat.delete.effect.income': 'Geld, das dort eingegangen ist, zählt nicht mehr als Einnahme, in jedem Zeitraum, auch in früheren, bis es neu kategorisiert wird.',
+  'cat.delete.effect.transfer': 'Geld, das dort bewegt wurde, ist keine Umbuchung mehr und zählt als nicht kategorisierte Ausgabe, in jedem Zeitraum, auch in früheren, bis es neu kategorisiert wird.',
+  'cat.delete.effect.other': 'Geld, das ihr zugeordnet ist, zählt als nicht kategorisierte Ausgabe, in jedem Zeitraum, auch in früheren, bis es neu kategorisiert wird.',
+  'cat.delete.rules': {
+    one: '{count} Kategorisierungsregel ordnet neue Importe weiterhin „{name}“ zu und wird das auch weiter tun.',
+    other: '{count} Kategorisierungsregeln ordnen neue Importe weiterhin „{name}“ zu und werden das auch weiter tun.',
+  },
+  'cat.delete.trash': 'Die Kategoriedatei kommt in den Papierkorb deines Tresors.',
 
   'acct.err.exists': 'Konto existiert bereits',
   'acct.err.save': '{name} konnte nicht gespeichert werden ({error}) — es wurde nichts in die Datei geschrieben; versuch es noch einmal.',
@@ -1131,6 +1176,8 @@ module.exports = {
   'dash.hero.sub': '{spent} von {budgeted} Ausgabenbudget ausgegeben',
   'dash.hero.assumedIncluded': 'enthält {amount} bereits ausgegeben',
   'dash.hero.nettedOff': '{amount} an Erstattungen nicht von dieser Zahl abgezogen',
+  'dash.hero.importedTo': 'Kontoauszüge importiert bis {date}',
+  'dash.hero.setUpBudget': 'Budget für diesen Zeitraum anlegen',
   'dash.stat.income': 'Einnahmen gesamt',
   'dash.stat.budgeted': 'Budgetiert',
   'dash.stat.spent': 'Ausgegeben gesamt',
@@ -1140,6 +1187,7 @@ module.exports = {
   'dash.stat.setAside': '{amount} zum Sparen',
   'dash.stat.setAsideMoved': '{moved} von {amount} bisher gespart',
   'dash.stat.ofWhichSetAside': '{moved} von {amount} bisher gespart',
+  'dash.stat.setAsideUnseen': '{amount} zum Sparen — die Kontoauszüge der Sparkonten enden am {date}, das Gesparte ist also noch nicht zu sehen',
   'dash.scheduledAhead': 'Bis heute · {amount} mehr sind später in dieser Periode datiert',
   'dash.fundedFromSavings': {
     one: '{amount} mehr ging aus Ihren Rücklagen ({count} Buchung) und zählt in diesem Budget nicht mit',
@@ -1243,6 +1291,10 @@ module.exports = {
     other: 'Im Durchschnitt der letzten {count} abgeschlossenen Zeiträume',
   },
   'dash.health.subNone': 'Noch keine abgeschlossenen Zeiträume zum Mitteln',
+  'dash.health.leftOut': {
+    one: '{periods} nicht mitgezählt: die Kontoauszüge enden vor Ende des Zeitraums',
+    other: '{periods} nicht mitgezählt: die Kontoauszüge enden vor Ende der Zeiträume',
+  },
   'dash.health.monthsUnit': 'Monate',
   'dash.health.months': 'notwendiger Ausgaben gedeckt',
   'dash.health.meterTip': {
@@ -1445,6 +1497,7 @@ module.exports = {
   'dash.left.cycleUnder': '{amount} Spielraum bis zum Ausgleich am {date}.',
   'dash.left.cycleOver': '{amount} MEHR als das Einkommen, das am {date} ausgleicht.',
   'dash.left.incoming': '{amount} kommt am {date}',
+  'dash.left.incomingNotImported': '{amount} erwartet am {date} — noch nicht importiert',
   'dash.left.incomingCovers': 'Das deckt alles oben und lässt etwa {amount} übrig.',
   'dash.left.incomingShort': 'Auch danach fehlen dir {amount}.',
   'dash.left.days': {
@@ -1471,7 +1524,7 @@ module.exports = {
   'dash.left.asListed': 'wie eingetragen, ohne Abbuchungsverlauf',
   'dash.left.settledInFull': 'vollständig ausgeglichen, aktueller Saldo',
   'dash.left.contracted': 'vertragliche Rate',
-  'dash.left.source': 'Die Beträge sind das, was üblicherweise abgebucht wird (der mittlere Wert der letzten drei Abbuchungen), nicht die auf der Seite „Dienste“ eingetragene Zahl. Gelesen wird nur aus deiner Dienste-Liste und der Schulden-Seite — eine wiederkehrende Abbuchung, die auf keiner von beiden steht, zählt hier nicht.',
+  'dash.left.source': 'Die Beträge sind das, was üblicherweise abgebucht wird (der mittlere Wert der letzten drei Abbuchungen), nicht die auf der Seite „Dienste“ eingetragene Zahl. Gezählt werden: deine Dienste-Liste, die Schulden-Seite und Lastschriften, die jeden Monat in gleicher Höhe an etwa demselben Tag abgehen. Eine Zahlung, die du selbst an wechselnden Tagen überweist — etwa die Miete —, zählt nicht, außer sie steht in deiner Dienste-Liste.',
   'dash.split.colCat': 'Kategorie',
   'dash.split.colSpent': 'Ausgegeben',
   'dash.split.colChange': 'Änderung',
@@ -1823,6 +1876,7 @@ module.exports = {
   'plan.env.collapseAria': "{name} einklappen",
   'plan.env.deleteAria': "Ausgabentopf {name} entfernen",
   'plan.actions.deleteAria': "Plan löschen",
+  'plan.err.nameRequired': 'Es braucht einen Namen',
 
   /* Accessible names (audit of 11 Nov 2026, task 19) — machine-assisted, not native-reviewed. */
   'plan.pickerAria': 'Plan auswählen',
@@ -1939,6 +1993,10 @@ module.exports = {
     one: '1 Zeile wird auf {cat} gesetzt.',
     other: '{count} Zeilen werden auf {cat} gesetzt.',
   },
+  'tx.bulkCat.splitsSkipped': {
+    one: '1 passende Zeile gehört zu einer Aufteilung und behält ihre Kategorie — ändern Sie sie in ihrer eigenen Zeile.',
+    other: '{count} passende Zeilen gehören zu Aufteilungen und behalten ihre Kategorien — ändern Sie sie jeweils in der eigenen Zeile.',
+  },
   'tx.bulkCat.confirm': {
     one: 'Kategorie setzen (1)',
     other: 'Kategorie setzen ({count})',
@@ -1980,6 +2038,9 @@ module.exports = {
   },
   'ctl.toast.repointFailed': 'Notizen für die Umbenennung "{from}" → "{to}" konnten nicht umgestellt werden ({error})',
   'ctl.notice.unsavedReloadSkipped': 'Budget: nicht gespeicherte Änderungen — Neuladen übersprungen. Speichern (oder zum Verwerfen "Vom Datenträger neu laden") und dann erneut versuchen.',
+  'ctl.reload.confirmTitle': 'Nicht gespeicherte Änderungen',
+  'ctl.reload.confirmMessage': 'Beim Neuladen vom Datenträger gehen nicht gespeicherte Änderungen verloren. Fortfahren?',
+  'ctl.reload.confirmDiscard': 'Verwerfen und neu laden',
   'ctl.toast.fileFailed': '"{name}" konnte nicht verarbeitet werden ({error})',
   'ctl.toast.thatFile': 'diese Datei',
   'settings.exchangeRates.source': 'Wechselkursquelle',

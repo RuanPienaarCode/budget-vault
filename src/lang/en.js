@@ -504,6 +504,10 @@ module.exports = {
     one: 'Copied {count} category from the previous period',
     other: 'Copied {count} categories from the previous period',
   },
+  'bud.copy.doneFrom': {
+    one: 'Copied {count} category from {period}, the latest earlier period with a budget',
+    other: 'Copied {count} categories from {period}, the latest earlier period with a budget',
+  },
   'bud.copy.nothing': 'Nothing to copy — every category already has a value',
 
   /* =========================== Transactions page ========================== */
@@ -601,8 +605,12 @@ module.exports = {
   },
   'tx.bulk.backup': 'They are written to {path} first, so they can be brought back — the vault trash cannot undo this on its own, because the monthly files are edited rather than deleted.',
   'tx.bulk.splits': {
-    one: '1 of them belongs to a split, whose other rows the filters may not have selected.',
-    other: '{count} of them belong to splits, whose other rows the filters may not have selected.',
+    one: '1 more row goes with them, {total} in all: a split is deleted whole — its original line and every part — so no part is left describing a line that is gone.',
+    other: '{count} more rows go with them, {total} in all: a split is deleted whole — its original line and every part — so no part is left describing a line that is gone.',
+  },
+  'tx.bulk.splitsLeft': {
+    one: "1 matching row is left alone: it belongs to identical splits on the same day whose parts cannot be told apart. Put each original line's parts directly under it in its file, adding up to it, then delete again.",
+    other: "{count} matching rows are left alone: they belong to identical splits on the same day whose parts cannot be told apart. Put each original line's parts directly under it in its file, adding up to it, then delete again.",
   },
   'tx.bulk.confirm': {
     one: 'Delete 1 row',
@@ -645,7 +653,17 @@ module.exports = {
      and this app argues rather than quietly absorbing the difference. */
   'tx.split.chip': 'split into {count}',
   'tx.split.chipGap': '{amount} unaccounted',
+  'tx.split.chipMissing': 'split · parts not found',
+  'tx.split.chipOver': '{amount} more than the line',
+  /* `chipOver` replaces `chipGap` when the parts add up to MORE than the line:
+     "unaccounted" reads as money missing, and this is money counted too often.
+     `chipTwice` is a parent whose Excluded tick was removed by hand while its
+     parts are still in the file — both are counted. Pressing that chip offers
+     to put the tick back (tx.reexclude.*). */
+  'tx.split.chipTwice': 'no longer excluded, counted twice',
+  'tx.split.ambiguous': "This split's parts cannot be told apart from those of another identical split on the same day, so nothing was changed. In {file}, put each original line's parts directly under it, adding up to it, then try again.",
   'tx.aria.splitChip': 'Split options for {desc} on {date}',
+  'tx.aria.splitChipTwice': 'Put the Excluded tick back on {desc} on {date}: it is counted twice',
 
   /* The split dialog (modal.js SplitModal). Its three fields per part carry no
      visible label — the row is amount, category, note — so these are the only
@@ -654,6 +672,16 @@ module.exports = {
   'tx.split.aria.category': 'Category for part {n}',
   'tx.split.aria.note': 'Note for part {n}',
   'tx.split.aria.remove': 'Remove part {n}',
+  /* The rest of the split dialog's own words (modal.js SplitModal). The
+     '— none —' category option is tx.field.none and the Cancel button bx.cancel. */
+  'tx.split.title': 'Split transaction',
+  'tx.split.addPart': '＋ Add part',
+  'tx.split.submit': 'Split',
+  'tx.split.notePlaceholder': 'Note (optional)',
+  'tx.split.unallocated': 'Unallocated: {amount}',
+  'tx.split.balanced': 'Allocated {amount} — balanced',
+  'tx.split.needAmount': 'Every part needs an amount',
+  'tx.split.hint': 'Amounts are entered as positive — the split keeps the original’s direction. The original line stays in the file marked Excluded, so the totals are unchanged and re-importing this statement will not duplicate it.',
 
   'tx.unsplit.action': 'Un-split',
   'tx.unsplit.title': 'Un-split this transaction?',
@@ -661,6 +689,12 @@ module.exports = {
     one: 'This removes the 1 part and puts {desc} back as a single transaction of {amount}.',
     other: 'This removes the {count} parts and puts {desc} back as a single transaction of {amount}.',
   },
+  'tx.unsplit.noParts': "No split parts with this line's date and description were found in {file}, so it stays split and out of the totals. If its date or description was edited, change it back to match its parts; if its parts were deleted, clear this line's Excluded and Split cells in the file.",
+  /* Putting the Excluded tick back on a split parent that lost it. Nothing
+     but the tick changes: the parts are left exactly as they are. */
+  'tx.reexclude.title': 'Exclude this line again?',
+  'tx.reexclude.msg': '{desc} ({amount}) was split, but its Excluded tick has been removed, so it is counted once as itself and again through its parts. This puts the tick back, so only the parts count. The parts are not changed.',
+  'tx.reexclude.action': 'Exclude it again',
 
   'tx.add.noAccount': 'Add an account first — every transaction belongs to one',
   'tx.add.title': 'Add transaction',
@@ -771,6 +805,8 @@ module.exports = {
   'bx.folder': 'Save to folder',
   'bx.folder.desc': 'A folder in this vault. Exporting the same selection again replaces the earlier files.',
   'bx.cancel': 'Cancel',
+  'modal.ok': 'OK',
+  'modal.close': 'Close',
   'bx.go': 'Export',
   'bx.preview': {
     one: '{count} period · {range} · {cats} categories',
@@ -892,6 +928,30 @@ module.exports = {
      sentence, not a category called "uncategorised" dropped into one. */
   'cat.aria.current': '{label} — currently {value}',
   'cat.aria.currentNone': '{label} — currently uncategorised',
+
+  /* The delete-category confirm (categories.js promptDeleteCategory), built
+     from sentences so each can be left out: the count and the rule sentence
+     take `count` for their plural, and a category's kind is a word the file
+     itself holds ({kind} is its translated group name). What a delete changes
+     is told by kind, because a transaction's kind is read from the category's
+     note — income stops counting as income, a transfer becomes spending. */
+  'cat.delete.title': 'Delete category',
+  'cat.delete.confirm': 'Delete',
+  'cat.delete.lead': 'Delete "{name}"?',
+  'cat.delete.unused': 'No transaction uses it. Past budget files are not changed.',
+  'cat.delete.used': {
+    one: '{count} transaction is filed under it.',
+    other: '{count} transactions are filed under it.',
+  },
+  'cat.delete.kindLost': 'A category\'s kind ("{kind}") is read from its file, so deleting the file removes that kind from the money filed under it.',
+  'cat.delete.effect.income': 'Money that came in under it stops counting as income, in every period, past ones included, until it is re-categorised.',
+  'cat.delete.effect.transfer': 'Money that moved under it stops being a transfer and counts as uncategorised spending, in every period, past ones included, until it is re-categorised.',
+  'cat.delete.effect.other': 'Money filed under it counts as uncategorised spending in every period, past ones included, until it is re-categorised.',
+  'cat.delete.rules': {
+    one: '{count} categorisation rule still files new imports under "{name}", and will keep doing so.',
+    other: '{count} categorisation rules still file new imports under "{name}", and will keep doing so.',
+  },
+  'cat.delete.trash': 'The category file goes to your vault trash.',
 
   'acct.err.exists': 'Account already exists',
   'acct.err.save': 'Could not save {name} ({error}) — nothing was written to the file; try the same action again.',
@@ -1252,6 +1312,8 @@ module.exports = {
   'dash.hero.sub': '{spent} spent of {budgeted} spending budget',
   'dash.hero.assumedIncluded': 'includes {amount} already spent',
   'dash.hero.nettedOff': '{amount} in refunds not taken off this figure',
+  'dash.hero.importedTo': 'Statements imported to {date}',
+  'dash.hero.setUpBudget': 'Set up this period\'s budget',
   'dash.stat.income': 'Total income',
   'dash.stat.budgeted': 'Budgeted',
   'dash.stat.spent': 'Total spent',
@@ -1261,6 +1323,7 @@ module.exports = {
   'dash.stat.setAside': '{amount} for savings',
   'dash.stat.setAsideMoved': '{moved} of {amount} saved so far',
   'dash.stat.ofWhichSetAside': '{moved} of {amount} saved so far',
+  'dash.stat.setAsideUnseen': '{amount} for savings — fund statements stop on {date}, so what was saved cannot be seen yet',
   'dash.scheduledAhead': 'Up to today · {amount} more is dated later this period',
   'dash.fundedFromSavings': {
     one: '{amount} more went out of your funds ({count} transaction), which this budget does not count',
@@ -1384,6 +1447,10 @@ module.exports = {
     other: 'Averaged over your last {count} completed periods',
   },
   'dash.health.subNone': 'No completed periods to average yet',
+  'dash.health.leftOut': {
+    one: '{periods} left out: statements stop before it ended',
+    other: '{periods} left out: statements stop before they ended',
+  },
   'dash.health.monthsUnit': 'months',
   'dash.health.months': 'of essential spending covered',
   /* The emergency-fund earmarks, worded as the Score's reserves line words the
@@ -1639,6 +1706,7 @@ module.exports = {
   'dash.left.cycleUnder': '{amount} of headroom before the {date} settlement.',
   'dash.left.cycleOver': '{amount} MORE than the income that settles it on {date}.',
   'dash.left.incoming': '{amount} lands on {date}',
+  'dash.left.incomingNotImported': '{amount} expected {date} — not imported yet',
   'dash.left.incomingCovers': 'That covers everything above and leaves about {amount}.',
   'dash.left.incomingShort': 'Even after that you are {amount} short.',
   'dash.left.days': {
@@ -1686,7 +1754,7 @@ module.exports = {
   'dash.left.asListed': 'as listed, no charge history',
   'dash.left.contracted': 'contracted instalment',
   'dash.left.settledInFull': 'settled in full, current balance',
-  'dash.left.source': 'Amounts are what is usually charged (the middle of the last three charges), not the figure typed on the Services page. Read from your Services list and Debt page only — a recurring charge on neither is not counted here.',
+  'dash.left.source': 'Amounts are what is usually charged (the middle of the last three charges), not the figure typed on the Services page. Counted: your Services list, your Debt page, and debit orders seen going off for the same amount on about the same day each month. A charge paid by hand on different days — rent paid by EFT, say — is not counted unless it is on your Services list.',
   'dash.split.colCat': 'Category',
   'dash.split.colSpent': 'Spent',
   'dash.split.colChange': 'Change',
@@ -2134,6 +2202,7 @@ module.exports = {
   'plan.env.collapseAria': "Collapse {name}",
   'plan.env.deleteAria': "Remove spending bucket {name}",
   'plan.actions.deleteAria': "Delete plan",
+  'plan.err.nameRequired': 'It needs a name',
 
   /* The Plan page's remaining spoken-only strings (audit of 11 Nov 2026, task
      19). `plan.split.aria.*` is the split bar's name, read as two or three
@@ -2270,6 +2339,10 @@ module.exports = {
     one: '1 row will be set to {cat}.',
     other: '{count} rows will be set to {cat}.',
   },
+  'tx.bulkCat.splitsSkipped': {
+    one: '1 matching row belongs to a split and keeps its category — change it on its own row.',
+    other: '{count} matching rows belong to splits and keep their categories — change them on their own rows.',
+  },
   'tx.bulkCat.confirm': {
     one: 'Set category (1)',
     other: 'Set category ({count})',
@@ -2311,6 +2384,9 @@ module.exports = {
   },
   'ctl.toast.repointFailed': 'Could not re-point notes for the "{from}" → "{to}" rename ({error})',
   'ctl.notice.unsavedReloadSkipped': 'Budget: unsaved changes — reload skipped. Save (or "Reload from disk" to discard), then retry.',
+  'ctl.reload.confirmTitle': 'Unsaved changes',
+  'ctl.reload.confirmMessage': 'Reloading from disk will discard your unsaved changes. Continue?',
+  'ctl.reload.confirmDiscard': 'Discard & reload',
   'ctl.toast.fileFailed': 'Could not process "{name}" ({error})',
   'ctl.toast.thatFile': 'that file',
   'settings.exchangeRates.source': 'Exchange-rate source',

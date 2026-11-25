@@ -480,6 +480,10 @@ module.exports = {
     one: 'Kukopishwe isigaba esingu-{count} kusukela esikhathini esedlule',
     other: 'Kukopishwe izigaba ezingu-{count} kusukela esikhathini esedlule',
   },
+  'bud.copy.doneFrom': {
+    one: 'Kukopishwe isigaba esingu-{count} kusuka ku-{period}, isikhathi sangaphambilini sakamuva esinebhajethi',
+    other: 'Kukopishwe izigaba ezingu-{count} kusuka ku-{period}, isikhathi sangaphambilini sakamuva esinebhajethi',
+  },
   'bud.copy.nothing': 'Akukho lutho lokukopisha — zonke izigaba sezinenani',
 
   /* =========================== Transactions page ========================== */
@@ -572,8 +576,12 @@ module.exports = {
   },
   'tx.bulk.backup': 'Ibhalwa ku-{path} kuqala, ngakho ingabuyiswa — udoti wevolti awukwazi ukuhlehlisa lokhu ngokwawo, ngoba amafayela enyanga ayahlelwa esikhundleni sokususwa.',
   'tx.bulk.splits': {
-    one: 'Owodwa kuyo ngowokuhlukanisa, lapho eminye imigqa yawo kungenzeka ingakhethwanga izihlungi.',
-    other: 'Emingu-{count} kuyo ingeyokuhlukanisa, lapho eminye imigqa yayo kungenzeka ingakhethwanga izihlungi.',
+    one: 'Omunye umugqa uhamba nawo, engu-{total} isiyonke: ukuhlukanisa kususwa kuphelele — umugqa wokuqala nazo zonke izingxenye — ukuze kungasali ngxenye echaza umugqa ongasekho.',
+    other: 'Eminye imigqa engu-{count} ihamba nawo, engu-{total} isiyonke: ukuhlukanisa kususwa kuphelele — umugqa wokuqala nazo zonke izingxenye — ukuze kungasali ngxenye echaza umugqa ongasekho.',
+  },
+  'tx.bulk.splitsLeft': {
+    one: 'Umugqa owodwa ovumelanayo ushiywa unjalo: ungowokuhlukanisa okufanayo ngosuku olufanayo, lapho izingxenye zingahlukaniseki. Efayeleni lawo, beka izingxenye zomugqa ngamunye wokuqala ngqo ngaphansi kwawo, zihlangane zibe yinani lawo, bese uyasusa futhi.',
+    other: 'Imigqa engu-{count} evumelanayo ishiywa injalo: ingeyokuhlukanisa okufanayo ngosuku olufanayo, lapho izingxenye zingahlukaniseki. Efayeleni layo, beka izingxenye zomugqa ngamunye wokuqala ngqo ngaphansi kwawo, zihlangane zibe yinani lawo, bese uyasusa futhi.',
   },
   'tx.bulk.confirm': {
     one: 'Susa umugqa owodwa',
@@ -609,13 +617,26 @@ module.exports = {
      split parent row (the why is in en.js) --- */
   'tx.split.chip': 'kuhlukaniswe kwaba ngu-{count}',
   'tx.split.chipGap': '{amount} engabalwanga',
+  'tx.split.chipMissing': 'kuhlukanisiwe · izingxenye azitholakalanga',
+  'tx.split.chipOver': '{amount} ngaphezu komugqa',
+  'tx.split.chipTwice': 'akusasukhishiwe, kubalwa kabili',
+  'tx.split.ambiguous': 'Izingxenye zalokhu kuhlukanisa azikwazi ukuhlukaniswa nezokunye ukuhlukanisa okufanayo ngosuku olufanayo, ngakho akukho okushintshiwe. Ku-{file}, beka izingxenye zomugqa ngamunye wokuqala ngqo ngaphansi kwawo, zihlangane zibe yinani lawo, bese uzama futhi.',
   'tx.aria.splitChip': 'Izinketho zokuhlukanisa {desc} ngomhla {date}',
+  'tx.aria.splitChipTwice': 'Buyisela uphawu lwe-Excluded ku-{desc} ngomhla {date}: kubalwa kabili',
 
   /* Accessible names (audit of 11 Nov 2026, task 19) — machine-assisted, not native-reviewed. */
   'tx.split.aria.amount': 'Inani lengxenye {n}',
   'tx.split.aria.category': 'Isigaba sengxenye {n}',
   'tx.split.aria.note': 'Inothi lengxenye {n}',
   'tx.split.aria.remove': 'Susa ingxenye {n}',
+  'tx.split.title': 'Hlukanisa umsebenzi wemali',
+  'tx.split.addPart': '＋ Engeza ingxenye',
+  'tx.split.submit': 'Hlukanisa',
+  'tx.split.notePlaceholder': 'Inothi (akuphoqelekile)',
+  'tx.split.unallocated': 'Akunikeziwe: {amount}',
+  'tx.split.balanced': '{amount} inikeziwe — kuyalingana',
+  'tx.split.needAmount': 'Ingxenye ngayinye idinga inani',
+  'tx.split.hint': 'Amanani afakwa njengamanani aphozithivu — ukuhlukanisa kugcina indlela yokuqala. Umugqa wokuqala uhlala efayeleni uphawulwe nge-Excluded, ngakho amasamba awashintshi futhi ukungenisa lesi sitatimende kabusha ngeke kuwuphinde.',
 
   'tx.unsplit.action': 'Khansela ukuhlukanisa',
   'tx.unsplit.title': 'Khansela ukuhlukaniswa kwalo msebenzi wemali?',
@@ -623,6 +644,10 @@ module.exports = {
     one: 'Lokhu kususa ingxenye eyodwa, bese {desc} ibuyela ibe umsebenzi wemali owodwa ka-{amount}.',
     other: 'Lokhu kususa izingxenye ezingu-{count}, bese {desc} ibuyela ibe umsebenzi wemali owodwa ka-{amount}.',
   },
+  'tx.unsplit.noParts': 'Azikho izingxenye zokuhlukanisa ezinosuku nencazelo yalo mugqa ezitholakele ku-{file}, ngakho uhlala uhlukanisiwe futhi ungaphandle kwamasamba. Uma usuku noma incazelo yawo ishintshiwe, yibuyisele ivumelane nezingxenye zawo; uma izingxenye zawo zisusiwe, sula amaseli e-Excluded ne-Split alo mugqa efayeleni.',
+  'tx.reexclude.title': 'Khipha lo mugqa futhi?',
+  'tx.reexclude.msg': 'Umugqa {desc} ({amount}) uhlukanisiwe, kodwa uphawu lwawo lwe-Excluded lususiwe, ngakho ubalwa kanye njengawo futhi kabusha ngezingxenye zawo. Lokhu kubuyisela uphawu, ukuze kubalwe izingxenye kuphela. Izingxenye azishintshi.',
+  'tx.reexclude.action': 'Khipha futhi',
 
   'tx.add.noAccount': 'Engeza i-akhawunti kuqala — wonke umsebenzi wemali unewakhe',
   'tx.add.title': 'Engeza umsebenzi wemali',
@@ -723,6 +748,8 @@ module.exports = {
   'bx.folder': 'Londoloza efoldeni',
   'bx.folder.desc': 'Ifolda kule volti. Ukukhipha lokhu okukhethiwe futhi kubuyisela amafayela angaphambilini.',
   'bx.cancel': 'Khansela',
+  'modal.ok': 'Kulungile',
+  'modal.close': 'Vala',
   'bx.go': 'Khipha',
   'bx.preview': {
     one: 'Isikhathi esingu-{count} · {range} · izigaba ezingu-{cats}',
@@ -832,6 +859,24 @@ module.exports = {
   /* Accessible names (audit of 11 Nov 2026, task 19) — machine-assisted, not native-reviewed. */
   'cat.aria.current': '{label} — okwamanje {value}',
   'cat.aria.currentNone': '{label} — okwamanje akunasigaba',
+
+  'cat.delete.title': 'Susa isigaba',
+  'cat.delete.confirm': 'Susa',
+  'cat.delete.lead': 'Susa "{name}"?',
+  'cat.delete.unused': 'Alukho ukuthengiselana okusisebenzisayo. Amafayela ebhajethi adlule awashintshi.',
+  'cat.delete.used': {
+    one: '{count} ukuthengiselana kufayiliwe ngaphansi kwaso.',
+    other: '{count} ukuthengiselana kufayiliwe ngaphansi kwaso.',
+  },
+  'cat.delete.kindLost': 'Uhlobo lwesigaba ("{kind}") lufundwa kufayela laso, ngakho ukususa ifayela kususa lolo hlobo emalini efayiliwe ngaphansi kwaso.',
+  'cat.delete.effect.income': 'Imali engene ngaphansi kwaso ayisabalwa njengemali engenayo, kuzo zonke izikhathi, kuhlanganise nezedlule, kuze kube yilapho ihlukaniswa kabusha.',
+  'cat.delete.effect.transfer': 'Imali ehambe ngaphansi kwaso ayisiyo-ntuthuko futhi ibalwa njengokusetshenziswa okungenasigaba, kuzo zonke izikhathi, kuhlanganise nezedlule, kuze kube yilapho ihlukaniswa kabusha.',
+  'cat.delete.effect.other': 'Imali efayiliwe ngaphansi kwaso ibalwa njengokusetshenziswa okungenasigaba kuzo zonke izikhathi, kuhlanganise nezedlule, kuze kube yilapho ihlukaniswa kabusha.',
+  'cat.delete.rules': {
+    one: '{count} umthetho wokuhlukanisa usafayila okungeniswe okusha ngaphansi kwe-"{name}" futhi uzoqhubeka kanjalo.',
+    other: '{count} imithetho yokuhlukanisa isafayila okungeniswe okusha ngaphansi kwe-"{name}" futhi izoqhubeka kanjalo.',
+  },
+  'cat.delete.trash': 'Ifayela lesigaba liya kudoti wevolti yakho.',
 
   'acct.err.exists': 'I-akhawunti isivele ikhona',
   'acct.err.save': 'Ayikwazanga ukulondoloza u-{name} ({error})',
@@ -1156,6 +1201,8 @@ module.exports = {
   'dash.hero.sub': '{spent} okuchithiwe ku-{budgeted} wesabelomali sokuchitha',
   'dash.hero.assumedIncluded': 'kufaka {amount} esivele ichithiwe',
   'dash.hero.nettedOff': '{amount} yezimbuyiselo ayikhishwanga kule nombolo',
+  'dash.hero.importedTo': 'Izitatimende zingeniswe kuze kube ngu-{date}',
+  'dash.hero.setUpBudget': 'Hlela isabelomali salesi sikhathi',
   'dash.stat.income': 'Umholo uwonke',
   'dash.stat.budgeted': 'Okwabelwe',
   'dash.stat.spent': 'Okuchithiwe sekukonke',
@@ -1165,6 +1212,7 @@ module.exports = {
   'dash.stat.setAside': 'i-{amount} yokonga',
   'dash.stat.setAsideMoved': 'i-{moved} kwe-{amount} isilondoloziwe',
   'dash.stat.ofWhichSetAside': 'i-{moved} kwe-{amount} isilondoloziwe',
+  'dash.stat.setAsideUnseen': 'i-{amount} yokonga — izitatimende zezikhwama ziyama ngo-{date}, ngakho okulondoloziwe akukabonakali',
   'dash.scheduledAhead': 'Kuze kube namuhla · enye i-{amount} inosuku olulandelayo kule nkathi',
   'dash.fundedFromSavings': {
     one: 'enye i-{amount} iphume ezikhwameni zakho ({count} ukuthengiselana), engabalwa kule bhajethi',
@@ -1270,6 +1318,10 @@ module.exports = {
     other: 'Kubalwe isilinganiso sezikhathi zakho ezingu-{count} eziqediwe',
   },
   'dash.health.subNone': 'Azikho izikhathi eziqediwe zokubala isilinganiso okwamanje',
+  'dash.health.leftOut': {
+    one: '{periods} kushiywe ngaphandle: izitatimende ziyama ngaphambi kokuthi siphele',
+    other: '{periods} kushiywe ngaphandle: izitatimende ziyama ngaphambi kokuthi ziphele',
+  },
   'dash.health.monthsUnit': 'izinyanga',
   'dash.health.months': 'zokuchitha okubalulekile okumbozwayo',
   'dash.health.meterTip': {
@@ -1472,6 +1524,7 @@ module.exports = {
   'dash.left.cycleUnder': '{amount} yendawo ngaphambi kokukhokhwa kwe-{date}.',
   'dash.left.cycleOver': '{amount} NGAPHEZULU kunomholo olikhokhayo ngo-{date}.',
   'dash.left.incoming': '{amount} ifika ngo-{date}',
+  'dash.left.incomingNotImported': '{amount} kulindeleke ngo-{date} — akukangeniswa',
   'dash.left.incomingCovers': 'Lokho kumboza konke okungenhla futhi kushiya cishe u-{amount}.',
   'dash.left.incomingShort': 'Ngisho nangemuva kwalokho ushoda nge-{amount}.',
   'dash.left.days': {
@@ -1498,7 +1551,7 @@ module.exports = {
   'dash.left.asListed': 'njengoba kubhaliwe, awukho umlando wezinkokhelo',
   'dash.left.contracted': 'ingxenye evumelene nenkontileka',
   'dash.left.settledInFull': 'kukhokhwe ngokugcwele, ibhalansi yamanje',
-  'dash.left.source': 'Amanani yilawo ahlala ekhokhiswa (inani eliphakathi kwezinkokhelo ezintathu zokugcina), hhayi inani elithayiphwe ekhasini lezinsizakalo. Kufundwa ohlwini lwakho lwezinsizakalo nasekhasini lezikweletu kuphela — inkokhelo ephindaphindwayo engekho kukho kokubili ayibalwa lapha.',
+  'dash.left.source': 'Amanani yilawo ahlala ekhokhiswa (inani eliphakathi kwezinkokhelo ezintathu zokugcina), hhayi inani elithayiphwe ekhasini lezinsizakalo. Okubalwayo: uhlu lwakho lwezinsizakalo, ikhasi lezikweletu, nama-debit order enani elifanayo abonakala ehamba njalo ngenyanga cishe ngosuku olufanayo. Inkokhelo oyenza ngesandla ngezinsuku ezahlukene — irenti ekhokhwa nge-EFT, isibonelo — ayibalwa ngaphandle uma isohlwini lwakho lwezinsizakalo.',
   'dash.split.colCat': 'Isigaba',
   'dash.split.colSpent': 'Okuchithiwe',
   'dash.split.colChange': 'Ushintsho',
@@ -1850,6 +1903,7 @@ module.exports = {
   'plan.env.collapseAria': "Goqa u-{name}",
   'plan.env.deleteAria': "Susa ibhakede yokuchitha {name}",
   'plan.actions.deleteAria': "Susa uhlelo",
+  'plan.err.nameRequired': 'Idinga igama',
 
   /* Accessible names (audit of 11 Nov 2026, task 19) — machine-assisted, not native-reviewed. */
   'plan.pickerAria': 'Khetha uhlelo',
@@ -1966,6 +2020,10 @@ module.exports = {
     one: 'Umugqa owodwa uzosethwa ku-{cat}.',
     other: 'Imigqa engu-{count} izosethwa ku-{cat}.',
   },
+  'tx.bulkCat.splitsSkipped': {
+    one: 'Umugqa owodwa ovumelanayo ungowokuhlukanisa futhi ugcina isigaba sawo — sishintshe emugqeni wawo.',
+    other: 'Imigqa engu-{count} evumelanayo ingeyokuhlukanisa futhi igcina izigaba zayo — zishintshe emigqeni yayo.',
+  },
   'tx.bulkCat.confirm': {
     one: 'Setha isigaba (1)',
     other: 'Setha isigaba ({count})',
@@ -2007,6 +2065,9 @@ module.exports = {
   },
   'ctl.toast.repointFailed': 'Ayikwazanga ukuqondisa kabusha amanothi ngenxa yokuqanjwa kabusha kwegama "{from}" → "{to}" ({error})',
   'ctl.notice.unsavedReloadSkipped': 'Isabelomali: kukhona izinguquko ezingalondolozwanga — ukulayisha kabusha kweqiwe. Londoloza (noma ukhethe "Layisha kabusha kudiski" ukuzilahla), bese uzama futhi.',
+  'ctl.reload.confirmTitle': 'Izinguquko ezingakagcinwa',
+  'ctl.reload.confirmMessage': 'Ukulayisha kabusha kudiski kuzolahla izinguquko ezingakagcinwa. Qhubeka?',
+  'ctl.reload.confirmDiscard': 'Lahla bese ulayisha kabusha',
   'ctl.toast.fileFailed': 'Ayikwazanga ukucubungula ifayela "{name}" ({error})',
   'ctl.toast.thatFile': 'lelo fayela',
   'settings.exchangeRates.source': 'Umthombo wamanani okushintshisana',

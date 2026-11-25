@@ -17,7 +17,7 @@
 const { normalizeAmount } = require('./amount');
 const { isRealIsoDate, daysBetween } = require('./dates');
 const { parseDelimited, sniffDelimiter } = require('./csv');
-const { isSplitPart } = require('./tx-role');
+const { isSplitPart, splitRole, splitPartsOf, SPLIT_PARENT, SPLIT_PART } = require('./tx-role');
 
 /* Parse a foreign statement: sniff the delimiter, then read it. */
 const parseStatement = text => parseDelimited(text, sniffDelimiter(text));
@@ -121,15 +121,52 @@ function parseStatementDate(raw, dayFirst = true) {
     if (mo > 12 && d <= 12) { const t = d; d = mo; mo = t; }     // tolerate the other order
     return isoParts(+m[3], mo, d);
   }
+  /* DD/MM/YY or MM/DD/YY (2026-11-25 audit, IMP-6). A two-digit year is
+     ALWAYS 20YY — the pivot is "never 19YY". A bank export with a two-digit
+     year is a recent download; were one ever a 1990s file, 20YY puts its rows
+     in the future, where decideDayFirst and the review's own dates show them up,
+     rather than quietly in a past decade nobody would look at.
+
+     The YEAR is the last field, never the first: `26/11/22` is 26 November
+     2022, not 22 November 2026. YY/MM/DD is not read at all — no bank this app
+     has met writes it, and the one year-first form it does read (above) has
+     four digits, so the two can never be confused. Day and month are decided
+     exactly as for a four-digit year, profile first and a day past 12
+     correcting the order.
+
+     The two separators must MATCH, unlike the four-digit rule. A six-digit
+     cell is short enough to be a reference or a code ("12-34/56"), and a
+     consistent separator is what keeps one of those from reading as a date. */
+  m = s.match(/^(\d{1,2})([/.-])(\d{1,2})\2(\d{2})$/);
+  if (m) {
+    let d = dayFirst ? +m[1] : +m[3], mo = dayFirst ? +m[3] : +m[1];
+    if (mo > 12 && d <= 12) { const t = d; d = mo; mo = t; }
+    return isoParts(2000 + +m[4], mo, d);
+  }
   m = s.match(/^(\d{4})(\d{2})(\d{2})$/);                        // YYYYMMDD (Absa/SB)
   if (m) return isoParts(+m[1], +m[2], +m[3]);
   // DD Mon YYYY, separated ("24 Jul 2021") or run together ("24Jul2021" — how
-  // Nedbank's cheque-account export writes every date).
-  m = s.match(/^(\d{1,2})[ -]?(\p{L}{3,})\.?[ -]?(\d{4})$/u);
+  // Nedbank's cheque-account export writes every date). DD-Mon-YY too
+  // ("22-Nov-26"), its year read by the same 20YY rule as above.
+  m = s.match(/^(\d{1,2})[ -]?(\p{L}{3,})\.?[ -]?(\d{4}|\d{2})$/u);
   if (m) {
     const mo = monthNum(m[2]);
-    if (mo) return isoParts(+m[3], mo, +m[1]);
+    if (mo) return isoParts(m[3].length === 2 ? 2000 + +m[3] : +m[3], mo, +m[1]);
   }
+  /* Mon DD, YYYY — month name first ("Nov 22, 2026", "November 22 2026"), the
+     way a US-style export spells it. Four-digit year only: "Nov 22, 26" puts
+     two bare numbers side by side and nothing says which is the day. */
+  m = s.match(/^(\p{L}{3,})\.?[ -](\d{1,2}),?[ -](\d{4})$/u);
+  if (m) {
+    const mo = monthNum(m[1]);
+    if (mo) return isoParts(+m[3], mo, +m[2]);
+  }
+  /* Year-less dates ("22 Dec", "03 Jan") are deliberately NOT read. This
+     function sees one cell; the only year it could supply is today's, from the
+     clock, which is not the statement's evidence — a two-year-old export would
+     land in the wrong year with every row looking right. Reading them soundly
+     needs a year the FILE states (a preamble's statement period), which is a
+     rule for the caller to add with that evidence in hand, not a guess here. */
   /* No last-resort `new Date(s)`. It used to sit here and it was the one path
      in this function that broke its own contract — measured 10 Aug 2026 against
      node v22 (V8) and macOS jsc, the JavaScriptCore line Obsidian mobile runs:
@@ -266,8 +303,46 @@ function applyCounterparties(items, accounts, selfLabel, legsOf) {
     it.excluded = !!leg;
     it.transferTo = other ? (other.tx_label || other.name) : '';
     it.transferLeg = leg ? leg.date : '';
+    /* The vault row itself, so the review can ask whether that half is still
+       counted (transferLegStanding, below; 2026-11-25 audit, IMP-5). A
+       reference to the caller's row, never a copy and never written to here. */
+    it.transferLegRow = leg || null;
   }
   return items;
+}
+
+/* WHERE THE OTHER HALF STANDS (2026-11-25 audit, IMP-5). applyCounterparties
+   excludes the row coming IN when the vault already holds its other leg —
+   but that vault leg was imported first, when its partner did not exist yet,
+   so nothing excluded it then, and nothing reached back to it now. Import
+   Cheque, then Savings: the Savings half arrived excluded and the Cheque half
+   stayed counted, and spending carried the whole R5 000 transfer with no
+   screen saying so. This is the question the review asks of that vault row
+   before it says anything about it:
+
+     'excluded'  already out of the budget totals — nothing to say;
+     'counted'   an ordinary row the totals still count — the review names it
+                 and offers to mark it excluded with this import;
+     'split'     a split row: the bank's line is the parent, and what the
+                 totals count is its parts (tx-role.js). Named, never changed:
+                 the parts are the reader's own slices under their own
+                 categories, and which of them were "the transfer" is not a
+                 question this importer can answer for them. A parent whose
+                 Excluded tick was taken off by hand is counted itself, and is
+                 'split' for the same reason.
+
+   `fileRows` are the rows of the leg's OWN month file — the only place its
+   parts can be (splitPartsOf's join is date and description within one
+   file). Pure, and here beside oppositeLeg, which found the row. */
+function transferLegStanding(leg, fileRows) {
+  if (!leg) return 'excluded';
+  const role = splitRole(leg.split);
+  if (role === SPLIT_PARENT) {
+    const counted = !leg.excluded || splitPartsOf(fileRows || [], leg).some(p => !p.excluded);
+    return counted ? 'split' : 'excluded';
+  }
+  if (role === SPLIT_PART) return leg.excluded ? 'excluded' : 'split';
+  return leg.excluded ? 'excluded' : 'counted';
 }
 
 /* Check a statement's amounts against its own running-balance column, and say
@@ -324,6 +399,82 @@ function reconcileAmounts(rows, { liability = false } = {}) {
   // reversal or out-of-order row, not for a half-right guess.
   best.verified = best.agreement >= Math.ceil(best.pairs * 0.8);
   return best;
+}
+
+/* Row by row, does each row's own balance step agree with its amount under a
+   given reading of the file? (2026-11-25 audit, IMP-1.)
+
+   reconcileAmounts answers for the FILE, with 80% slack — and the slack is
+   exactly where a wrong answer hid. A statement of six purchases and one
+   salary, every amount positive, reconciles on five pairs of six with every
+   amount negated: verified, flip:true, and the salary flipped with the rest
+   into R25 000 of spending under "checked and corrected". The one pair that
+   disagreed was the salary's own step, saying plainly that it went UP.
+
+   So the caller asks this, for the orientation reconcileAmounts chose, and
+   whatever a row's own step contradicts is put in front of the reader rather
+   than carried along by the majority. `rows`, `order` and the step rule are
+   reconcileAmounts' own, so the two cannot judge a row differently: oldest-
+   first, a row is judged by the balance before it; newest-first, by the
+   balance after it (in file order). Returns an array parallel to `rows`: true
+   (agrees), false (disagrees) or null (no balance, no amount, or no neighbour
+   with a balance — the oldest row of a statement has nothing before it). */
+/** @param {Array<{amount: (number|null|undefined), balance: (number|null|undefined)}>} rows
+    @param {{order?: (string|null), flip?: boolean, liability?: boolean}} [opts] */
+function balanceStepVerdicts(rows, { order = null, flip = false, liability = false } = {}) {
+  const c = v => Math.round(v * 100);
+  const list = rows || [];
+  const out = list.map(() => null);
+  if (order !== 'fwd' && order !== 'rev') return out;
+  const dir = liability ? -1 : 1, sign = flip ? -1 : 1;
+  const pts = [];
+  list.forEach((r, i) => { if (r && r.amount != null && r.balance != null) pts.push(i); });
+  pts.forEach((i, k) => {
+    const nb = order === 'fwd' ? pts[k - 1] : pts[k + 1];
+    if (nb == null) return;
+    out[i] = c(list[i].balance) - c(list[nb].balance) === dir * sign * c(list[i].amount);
+  });
+  return out;
+}
+
+/* A row that carries a balance INTO or OUT OF the statement rather than moving
+   money (2026-11-25 audit, IMP-4).
+
+   Some exports open with `OPENING BALANCE` or `BALANCE BROUGHT FORWARD` and
+   print the balance in the Amount cell as well. That row imported as income —
+   R5 000 on the audit's file — under the green banner, because the oldest
+   row's amount is the one reconcileAmounts never tests: nothing comes before
+   it. At the other end, a `CLOSING BALANCE` row cost the file a pair.
+
+   Both halves must hold, and neither is fuzzy:
+     - the description, folded for case, spacing and trailing punctuation, IS
+       one of the phrases below — not merely contains one, so "OPENING BALANCE
+       DEPOSIT FROM MUM" is an ordinary row;
+     - the amount equals the balance beside it, to the cent, in size. A row
+       whose amount happens to equal its balance is also the first deposit into
+       a new account, which is why the phrase is required too; and an "Opening
+       balance" row with some other amount is a real deposit oddly described.
+   Size, not sign: an overdrawn opening balance prints "-500.00" in both cells,
+   and a credit-marked column (amount.js) may have negated the amount already.
+
+   The caller UNTICKS such a row and says why; it never deletes one, because
+   the reader may know better (a household opening an account with a deposit
+   its bank labels "Opening balance"). English and Afrikaans, the languages
+   this app was built against; another language is one line here, added with
+   a real statement in hand. */
+const CARRY_PHRASES = new Set([
+  'opening balance', 'closing balance', 'balance brought forward', 'balance carried forward',
+  'brought forward', 'carried forward', 'balance b/f', 'balance c/f', 'balance forward',
+  // af
+  'openingsaldo', 'opening saldo', 'beginsaldo', 'aanvangsaldo', 'slotsaldo', 'sluitingsaldo', 'afsluitingsaldo',
+  'saldo oorgebring', 'saldo oorgedra', 'oorgebring', 'oorgedra',
+]);
+const carryText = s => String(s == null ? '' : s).toLowerCase().replace(/\s+/g, ' ').trim().replace(/[\s.:*]+$/, '');
+function isBalanceCarry(desc, amount, balance) {
+  if (amount == null || balance == null || !Number.isFinite(amount) || !Number.isFinite(balance)) return false;
+  const a = Math.abs(Math.round(amount * 100));
+  if (!a || a !== Math.abs(Math.round(balance * 100))) return false;
+  return CARRY_PHRASES.has(carryText(desc));
 }
 
 /* A Fee column read BESIDE an amount — what the balance column says it is.
@@ -667,6 +818,66 @@ const FEE_COLS = ['fee', 'fees', 'fee amount', 'bank charge', 'bank charges', 's
 const BALANCE_COLS = ['balance', 'running balance', 'closing balance', 'account balance', 'balance (zar)',
   'saldo', 'kontostand', 'solde', 'sisa saldo', '余额', '残高', 'शेष', 'शेष राशि'];
 
+/* A column that says WHICH WAY each amount went, beside one Amount column
+   whose values are all positive (2026-11-25 audit, IMP-1).
+
+     Date,Description,Amount,Dr/Cr,Balance
+     2026/11/04,SALARY ACME,25000.00,Cr,29400.00
+
+   Nothing read this column, so the sign was left to the balance column — and
+   reconcileAmounts, with its 80% slack, found that "every amount negated" fit
+   five pairs of six and flipped the salary into spending with the rest.
+   Without a balance column every purchase was income. The marker is the
+   statement saying, row by row, what the balance can only infer.
+
+   A heading alone never makes a marker column: "Type" is as often a column of
+   transaction kinds ("POS Purchase", "EFT"). The column counts only when EVERY
+   non-blank cell in it is a marker (drCrOf) — see drCrColumn. Headings are
+   compared exactly, after the spacing around a slash is folded ("DR / CR"). The
+   translated pairs are the languages this app ships, the same rule as the
+   heading lists above. */
+const DRCR_COLS = ['dr/cr', 'cr/dr', 'debit/credit', 'credit/debit', 'd/c', 'c/d', 'db/cr', 'drcr', 'crdr',
+  'debit or credit', 'type', 'transaction type', 'trans type', 'txn type',
+  // af, de, es/pt, fr, id
+  'dt/kt', 'kt/dt', 'debiet/krediet', 'krediet/debiet', 'tipe', 'soll/haben', 'haben/soll', 's/h', 'typ',
+  'cargo/abono', 'débito/crédito', 'crédito/débito', 'tipo', 'débit/crédit', 'crédit/débit', 'sens',
+  'debet/kredit', 'kredit/debet', 'd/k', 'k/d', 'jenis'];
+/* What a single cell may say. The debit and credit HEADING vocabularies above
+   are reused as cell values, so a "Type" column of "Withdrawal" / "Deposit"
+   reads by the same words a two-column statement is headed with, plus the
+   abbreviations banks print: Dr/Cr, D/C, DB, and Afrikaans Dt/Kt, Indonesian
+   D/K. German S/H is left out — one letter that is also a word in too many
+   other columns to be evidence on its own. */
+const DRCR_DEBIT = new Set(['dr', 'd', 'db', 'dt', 'deb', ...DEBIT_COLS]);
+const DRCR_CREDIT = new Set(['cr', 'c', 'kt', 'k', 'cred', ...CREDIT_COLS]);
+/* 'debit' / 'credit' / null for one marker cell. A trailing full stop is
+   folded ("Dr."), nothing else: "Debit order" is not a marker. */
+function drCrOf(cell) {
+  const v = String(cell == null ? '' : cell).trim().toLowerCase().replace(/\.$/, '');
+  if (!v) return null;
+  if (DRCR_DEBIT.has(v)) return 'debit';
+  if (DRCR_CREDIT.has(v)) return 'credit';
+  return null;
+}
+/* The index of the marker column among `low` (the lowercased header row), or
+   -1. A heading in DRCR_COLS whose cells below — every one that is not blank
+   and not the heading itself repeated (a statement that reprints its header
+   per page) — are all markers, at least one of them. */
+function drCrColumn(rows, headerIdx, low) {
+  const fold = c => c.replace(/\s*\/\s*/g, '/');
+  for (let i = 0; i < low.length; i++) {
+    if (!DRCR_COLS.includes(fold(low[i]))) continue;
+    let marks = 0, other = 0;
+    for (const r of rows.slice(headerIdx + 1)) {
+      const v = String(r[i] == null ? '' : r[i]).trim();
+      if (!v || v.toLowerCase() === low[i]) continue;
+      if (drCrOf(v)) marks++; else { other++; break; }
+    }
+    if (marks && !other) return i;
+  }
+  return -1;
+}
+
 /* Does this (lowercased) header row name ANY money column — a signed amount, a
    debit/credit pair, or the amount vocabulary as a substring?
 
@@ -753,6 +964,21 @@ function detectStatementColumns(rows, dayFirst = true) {
        column is headed "Fee" is a fee schedule, not a statement. So iFee is
        resolved here but the required-columns test below is unchanged. */
     let iFee = col(FEE_COLS);
+    /* The Dr/Cr marker column (see DRCR_COLS). Resolved before the collision
+       rules below because a heading like "Debit/Credit" answers the debit AND
+       credit substring fallbacks above: left alone it reads as a one-column
+       "pair" of text cells. A marker column is no amount column, so those
+       two step aside for it. Any stronger role landing on the same column —
+       date, description, amount, balance — keeps it, and the marker goes. */
+    let iDrCr = drCrColumn(rows, headerIdx, low);
+    if (iDrCr !== -1) {
+      if ([iDate, iDesc, iAmount, iBalance].includes(iDrCr)) iDrCr = -1;
+      else {
+        if (iDebit === iDrCr) iDebit = -1;
+        if (iCredit === iDrCr) iCredit = -1;
+        if (iFee === iDrCr) iFee = -1;
+      }
+    }
     /* One column, one role — the rule the fee line has always been a single
        instance of, now spelled once instead of guarding one of four.
 
@@ -813,14 +1039,18 @@ function detectStatementColumns(rows, dayFirst = true) {
        side to the same rule; nothing is guessed. */
     if (collides(iAmount, iDebit, iCredit)) iAmount = -1;
     if (iDate === -1 || iDesc === -1 || (iAmount === -1 && (iDebit === -1 || iCredit === -1))) return null;
-    return { iDate, iDesc, iAmount, iDebit, iCredit, iFee, iBalance, iExtra: -1, headerIdx, dataStart: headerIdx + 1 };
+    /* The marker only ever qualifies ONE signed Amount column; beside a
+       debit/credit pair the pair's own names already say which way. */
+    if (iAmount === -1) iDrCr = -1;
+    return { iDate, iDesc, iAmount, iDebit, iCredit, iFee, iBalance, iDrCr, iExtra: -1, headerIdx, dataStart: headerIdx + 1 };
   }
   const shape = detectHeaderlessColumns(rows, dayFirst);
   if (!shape) return null;
   /* A headerless file has no column NAMES, so nothing can identify a fee column
      in one — and inferring it from shape would mean guessing which of several
-     numeric columns is which. Left at -1; the manual mapper is the door. */
-  return { iDebit: -1, iCredit: -1, ...shape, iFee: -1, iExtra: -1, headerIdx: -1 };
+     numeric columns is which. Left at -1; the manual mapper is the door. The
+     same goes for a Dr/Cr marker column. */
+  return { iDebit: -1, iCredit: -1, ...shape, iFee: -1, iDrCr: -1, iExtra: -1, headerIdx: -1 };
 }
 
 /* ------------------------- whose statement is this? -----------------------
@@ -895,7 +1125,8 @@ function sameAccountNumber(a, b) {
 
 module.exports = {
   parseStatement, decodeStatement, parseStatementDate,
-  counterpartyAccount, applyCounterparties, oppositeLeg, TRANSFER_LEG_DAYS, reconcileAmounts, reconcileFeesBesideAmount,
+  counterpartyAccount, applyCounterparties, oppositeLeg, transferLegStanding, TRANSFER_LEG_DAYS, reconcileAmounts, reconcileFeesBesideAmount,
+  balanceStepVerdicts, isBalanceCarry, drCrOf,
   detectHeaderlessColumns, detectStatementColumns, hasAmountColumn,
   statementAccountNumber, sameAccountNumber,
 };

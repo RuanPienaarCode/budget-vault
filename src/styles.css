@@ -606,8 +606,10 @@ body.is-tablet .budget-app-root button:where(.src2-pill) { padding: 4px 11px; }
   transition: background 0.15s, border-color 0.15s;
 }
 .budget-app-root .menu-btn span { width: 16px; height: 2px; border-radius: 2px; background: var(--text-muted); transition: background 0.2s; }
-.budget-app-root .menu-btn:hover { background: var(--color-primary-light); }
-.budget-app-root .menu-btn:hover span { background: var(--text-primary); }
+@media (hover: hover) {
+  .budget-app-root .menu-btn:hover { background: var(--color-primary-light); }
+  .budget-app-root .menu-btn:hover span { background: var(--text-primary); }
+}
 .budget-app-root .menu-btn:focus-visible { outline: 2px solid var(--color-primary); outline-offset: 2px; }
 .budget-app-root .menu-btn[aria-expanded="true"] {
   background: linear-gradient(135deg, var(--color-accent), var(--color-primary));
@@ -623,7 +625,9 @@ body.is-tablet .budget-app-root button:where(.src2-pill) { padding: 4px 11px; }
   background: none; border: 0; padding: 0; margin: 0; font: inherit; color: inherit;
   cursor: pointer; text-align: left; box-shadow: none;
 }
-.budget-app-root .topbar .brand:hover .brand-text b { color: var(--color-primary); }
+@media (hover: hover) {
+  .budget-app-root .topbar .brand:hover .brand-text b { color: var(--color-primary); }
+}
 .budget-app-root .topbar .brand:focus-visible { outline: 2px solid var(--color-primary); outline-offset: 3px; border-radius: 14px; }
 .budget-app-root .brand-logo {
   width: 40px; height: 40px; border-radius: 14px; flex: none;
@@ -633,6 +637,10 @@ body.is-tablet .budget-app-root button:where(.src2-pill) { padding: 4px 11px; }
   color: #fff;
 }
 .budget-app-root .brand-logo .ico svg { width: 22px; height: 22px; }
+/* White on the dark theme's primary measured about 2.5:1 (2026-11-25 audit,
+   CSS-15). Dark swaps the glyph to the near-black --ink-on-accent and keeps the
+   gradient, exactly as .topbar-avatar and the dark .btn-gradient do. */
+.budget-app-root.bud-dark .brand-logo { color: var(--ink-on-accent); }
 .budget-app-root .brand-text { display: flex; flex-direction: column; line-height: 1.15; min-width: 0; }
 .budget-app-root .brand-text b { font-size: 16px; font-weight: 600; letter-spacing: .2px; color: var(--text-primary); white-space: nowrap; }
 .budget-app-root .brand-sub { font-size: 11px; color: var(--text-light); letter-spacing: .4px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
@@ -657,7 +665,9 @@ body.is-tablet .budget-app-root button:where(.src2-pill) { padding: 4px 11px; }
   padding: 0;
   transition: background 0.15s, color 0.15s;
 }
-.budget-app-root .header-period-pill .pnav-btn:hover { background: var(--color-primary-light); color: var(--color-primary); }
+@media (hover: hover) {
+  .budget-app-root .header-period-pill .pnav-btn:hover { background: var(--color-primary-light); color: var(--color-primary); }
+}
 .budget-app-root .header-period-pill .pnav-btn:focus-visible { outline: 2px solid var(--color-primary); outline-offset: 2px; }
 .budget-app-root .header-period-pill .pnav-label { font-size: 0.8rem; font-weight: 600; color: var(--text-primary); white-space: nowrap; }
 .budget-app-root .pnav-dot { width: 7px; height: 7px; border-radius: 50%; flex: none; background: var(--color-accent); box-shadow: 0 0 12px var(--color-accent); }
@@ -685,7 +695,9 @@ body.is-tablet .budget-app-root button:where(.src2-pill) { padding: 4px 11px; }
   padding: 0; border: none; cursor: pointer; box-shadow: none;
   -webkit-tap-highlight-color: transparent;
 }
-.budget-app-root .topbar-avatar:hover { filter: brightness(1.06); }
+@media (hover: hover) {
+  .budget-app-root .topbar-avatar:hover { filter: brightness(1.06); }
+}
 .budget-app-root .topbar-avatar:focus-visible { outline: 2px solid var(--color-primary); outline-offset: 2px; }
 /* Dark keeps the whole run, as the dark gradient button does: its initials are
    the near-black --ink-on-accent, against which the bright accent end is the
@@ -711,7 +723,9 @@ body.is-tablet .budget-app-root button:where(.src2-pill) { padding: 4px 11px; }
   transition: background 0.15s, border-color 0.15s, color 0.15s;
 }
 .budget-app-root .topbar-icon-btn .ico svg { width: 18px; height: 18px; }
-.budget-app-root .topbar-icon-btn:hover { background: var(--color-primary-light); color: var(--color-primary); }
+@media (hover: hover) {
+  .budget-app-root .topbar-icon-btn:hover { background: var(--color-primary-light); color: var(--color-primary); }
+}
 .budget-app-root .topbar-icon-btn:focus-visible { outline: 2px solid var(--color-primary); outline-offset: 2px; }
 
 /* The book switcher (ADR 0009, src/book-switcher.js): a native <select>, shown
@@ -757,7 +771,9 @@ body.is-tablet .budget-app-root button:where(.src2-pill) { padding: 4px 11px; }
   cursor: pointer;
   transition: background 0.15s, border-color 0.15s, color 0.15s;
 }
-.budget-app-root .book-switch:hover { background: var(--color-primary-light); color: var(--color-primary); }
+@media (hover: hover) {
+  .budget-app-root .book-switch:hover { background: var(--color-primary-light); color: var(--color-primary); }
+}
 .budget-app-root .book-switch .ico {
   position: absolute; top: 50%; transform: translateY(-50%);
   display: grid; place-items: center;
@@ -931,7 +947,9 @@ body.is-phone .budget-app-root .drawer-book:not(.hidden) { display: block; }
   padding: 0;
   transition: background 0.15s, color 0.15s;
 }
-.budget-app-root .drawer-close:hover { background: var(--color-primary-light); color: var(--text-primary); }
+@media (hover: hover) {
+  .budget-app-root .drawer-close:hover { background: var(--color-primary-light); color: var(--text-primary); }
+}
 .budget-app-root .drawer-close:focus-visible { outline: 2px solid var(--color-primary); outline-offset: 2px; }
 
 .budget-app-root .drawer-section-label {
@@ -953,7 +971,9 @@ body.is-phone .budget-app-root .drawer-book:not(.hidden) { display: block; }
   font-size: 14px; font-weight: 520;
   transition: background 0.15s, color 0.15s;
 }
-.budget-app-root .drawer-link:hover { background: var(--color-primary-light); color: var(--text-primary); }
+@media (hover: hover) {
+  .budget-app-root .drawer-link:hover { background: var(--color-primary-light); color: var(--text-primary); }
+}
 .budget-app-root .drawer-link:focus-visible { outline: 2px solid var(--color-primary); outline-offset: 2px; }
 .budget-app-root .drawer-link .di { width: 30px; height: 30px; border-radius: 9px; display: grid; place-items: center; flex: none; background: color-mix(in srgb, var(--text-muted) 8%, transparent); font-size: 13px; }
 .budget-app-root .drawer-link .di svg { width: 15px; height: 15px; }
@@ -1266,7 +1286,9 @@ body.is-phone .budget-app-root .drawer-book:not(.hidden) { display: block; }
   cursor: pointer;
 }
 .budget-app-root .health-fig.is-link { transition: transform .16s ease, box-shadow .16s ease; }
-.budget-app-root .health-fig.is-link:hover { transform: translateY(-1px); box-shadow: var(--shadow-md); }
+@media (hover: hover) {
+  .budget-app-root .health-fig.is-link:hover { transform: translateY(-1px); box-shadow: var(--shadow-md); }
+}
 @media (prefers-reduced-motion: reduce) {
   .budget-app-root .health-fig.is-link { transition: none; }
 }
@@ -1381,7 +1403,9 @@ body.is-phone .budget-app-root .drawer-book:not(.hidden) { display: block; }
 }
 .budget-app-root .table tbody tr:last-child td { border-bottom: none; }
 .budget-app-root .table tbody tr { transition: background 0.12s; }
-.budget-app-root .table.table-hover tbody tr:hover { background: var(--color-primary-light); }
+@media (hover: hover) {
+  .budget-app-root .table.table-hover tbody tr:hover { background: var(--color-primary-light); }
+}
 /* A row that focus LANDS on: the first row "Show more" reveals on Transactions
    and the import review, and a service's row once its offered billing date is
    taken (src/dom.js refocus). A row is the landing there because nothing in it
@@ -1434,7 +1458,9 @@ body.is-phone .budget-app-root .drawer-book:not(.hidden) { display: block; }
   gap: 6px;
   transition: background 0.15s, border-color 0.15s;
 }
-.budget-app-root .btn-ghost:hover { background: var(--color-primary-light); border-color: var(--color-primary); }
+@media (hover: hover) {
+  .budget-app-root .btn-ghost:hover { background: var(--color-primary-light); border-color: var(--color-primary); }
+}
 .budget-app-root .btn-ghost:focus-visible { outline: 2px solid var(--color-primary); outline-offset: 2px; }
 
 /* The gradient starts part-way in, on purpose. Run from 0% it began on the
@@ -1467,9 +1493,18 @@ body.is-phone .budget-app-root .drawer-book:not(.hidden) { display: block; }
   font-size: 0.85rem;
   font-weight: 700;
   cursor: pointer;
+  /* The same icon-and-label row as .btn-ghost above. Without the gap the
+     plus on "Add receipt" / "New note" and the file glyph on "Create report"
+     touched their words, and with a glyph in one button and none in its
+     neighbour the two sat on different baselines (2026-11-25 audit, VIS-4). */
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
   transition: filter 0.15s, opacity 0.15s;
 }
-.budget-app-root .btn-gradient:hover { filter: brightness(1.06); }
+@media (hover: hover) {
+  .budget-app-root .btn-gradient:hover { filter: brightness(1.06); }
+}
 .budget-app-root .btn-gradient:focus-visible { outline: 2px solid var(--color-primary); outline-offset: 2px; }
 /* Dark keeps the whole run. Its label is the near-black --ink-on-accent, and
    against that the bright accent end is the STRONG one (13.20:1 on
@@ -1664,7 +1699,9 @@ body.is-phone .budget-app-root .drawer-book:not(.hidden) { display: block; }
 .budget-app-root .mini button.v:focus-visible { outline: 2px solid var(--color-primary); outline-offset: 3px; border-radius: 6px; }
 /* Plain underline only — the thickness/offset longhands are flagged as
    partially supported by the directory's CSS lint at minAppVersion 1.4. */
-.budget-app-root .mini .v:hover { text-decoration: underline; }
+@media (hover: hover) {
+  .budget-app-root .mini .v:hover { text-decoration: underline; }
+}
 .budget-app-root .mini .s { font-size: 12px; color: var(--text-muted); margin-top: 4px; }
 .budget-app-root .mini .s2 { font-size: 11.5px; color: var(--ink-faint); margin-top: 2px; }
 /* Fixed N-up KPI rows (summary tiles) — not clickable, unlike account tiles. */
@@ -1672,7 +1709,9 @@ body.is-phone .budget-app-root .drawer-book:not(.hidden) { display: block; }
 .budget-app-root .mini-kpis-4 { grid-template-columns: repeat(4, 1fr); }
 .budget-app-root .mini-kpis-3 { grid-template-columns: repeat(3, 1fr); }
 .budget-app-root .mini-kpis-5 .v, .budget-app-root .mini-kpis-4 .v, .budget-app-root .mini-kpis-3 .v { cursor: default; }
-.budget-app-root .mini-kpis-5 .v:hover, .budget-app-root .mini-kpis-4 .v:hover, .budget-app-root .mini-kpis-3 .v:hover { text-decoration: none; }
+@media (hover: hover) {
+  .budget-app-root .mini-kpis-5 .v:hover, .budget-app-root .mini-kpis-4 .v:hover, .budget-app-root .mini-kpis-3 .v:hover { text-decoration: none; }
+}
 /* …except where the tiles are drill-throughs. The dashboard's position band is
    a fixed 4-up grid whose values ARE buttons into the Debt, Owed and Savings
    pages, so the pointer and underline the rules above just turned off have to
@@ -1680,7 +1719,9 @@ body.is-phone .budget-app-root .drawer-book:not(.hidden) { display: block; }
    below them — order is what decides it. Named like .donut-legend--linked, the
    other place a summary row doubles as navigation. */
 .budget-app-root .mini-grid--linked .v { cursor: pointer; }
-.budget-app-root .mini-grid--linked .v:hover { text-decoration: underline; }
+@media (hover: hover) {
+  .budget-app-root .mini-grid--linked .v:hover { text-decoration: underline; }
+}
 .budget-app-root .mini .v small { font-size: 15px; color: var(--ink-faint); font-weight: 500; }
 @media (max-width: 1100px) { .budget-app-root .mini-kpis-5 { grid-template-columns: repeat(3, 1fr); } }
 /* -3 had no step between its base and the 640px single-column rule, so it held
@@ -1721,7 +1762,9 @@ body.is-phone .budget-app-root .drawer-book:not(.hidden) { display: block; }
   font: inherit; font-weight: 650; font-size: 13.5px; letter-spacing: -.01em;
   color: var(--text-primary);
 }
-.budget-app-root .acct-name-btn:hover { text-decoration: underline; }
+@media (hover: hover) {
+  .budget-app-root .acct-name-btn:hover { text-decoration: underline; }
+}
 .budget-app-root .acct-name-btn.is-plain { cursor: default; }
 .budget-app-root .acct-name-btn:focus-visible { outline: 2px solid var(--color-primary); outline-offset: 3px; border-radius: 6px; }
 
@@ -1832,7 +1875,15 @@ body.is-phone .budget-app-root .drawer-book:not(.hidden) { display: block; }
 .budget-app-root .caveat-chip-btn {
   font: inherit; font-size: 11.5px; line-height: 1.3; cursor: pointer;
   min-height: 24px;
-  padding: 2px 9px; border-radius: 999px;
+  /* 12px, not 999px: it is the pill's own radius on a one-line chip (24px tall,
+     so the corners are identical), but a chip whose sentence wraps is taller
+     than it is wide at table width and 999px turned it into a 90x66px oval
+     with text poking out of the curve (2026-11-25 audit, VIS-7). A wrapped
+     chip reads from the left edge, which is how its detail line below reads;
+     justify-content because the button is a flex box (see
+     css-button-text-align) and text-align alone would centre the text block. */
+  padding: 2px 9px; border-radius: 12px;
+  text-align: left; justify-content: flex-start;
   border: 1px solid var(--color-primary); background: var(--color-primary-light);
   color: var(--color-primary);
 }
@@ -1968,7 +2019,9 @@ body.is-phone .budget-app-root .drawer-book:not(.hidden) { display: block; }
   border: 1px solid transparent; border-radius: var(--radius-sm);
   background: transparent; color: inherit; padding: 9px 10px; margin-bottom: 2px;
 }
-.budget-app-root .acct-owner-row:hover { background: rgba(127, 127, 127, .07); }
+@media (hover: hover) {
+  .budget-app-root .acct-owner-row:hover { background: rgba(127, 127, 127, .07); }
+}
 .budget-app-root .acct-owner-row.is-on { border-color: var(--color-primary); background: var(--color-primary-light); }
 .budget-app-root .acct-owner-row:focus-visible { outline: 2px solid var(--color-primary); outline-offset: 2px; }
 .budget-app-root .acct-owner-top { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; }
@@ -1996,15 +2049,6 @@ body.is-phone .budget-app-root .drawer-book:not(.hidden) { display: block; }
   background: var(--color-warning); box-shadow: 0 0 0 4px var(--color-warning-light);
 }
 .budget-app-root .acct-deck-sub { font-size: 12.5px; color: var(--text-muted); margin-bottom: 16px; }
-.budget-app-root .acct-deck-list { display: flex; flex-direction: column; gap: 8px; }
-.budget-app-root .acct-deck-item {
-  display: flex; align-items: center; justify-content: space-between; gap: 14px; flex-wrap: wrap;
-  padding: 12px 16px; border-radius: 16px;
-  background: var(--surface); border: 1px solid var(--border-color);
-}
-.budget-app-root .acct-deck-name { font-weight: 650; font-size: 13.5px; }
-.budget-app-root .acct-deck-why { font-size: 12px; color: var(--text-muted); margin-top: 2px; }
-.budget-app-root .acct-deck-acts { display: flex; gap: 8px; flex-wrap: wrap; }
 .budget-app-root .acct-deck-btn {
   display: inline-flex; align-items: center; gap: 5px; flex: none;
   font: inherit; font-size: 12px; font-weight: 600; cursor: pointer;
@@ -2013,9 +2057,10 @@ body.is-phone .budget-app-root .drawer-book:not(.hidden) { display: block; }
 }
 .budget-app-root .acct-deck-btn .ico svg { width: 0.8rem; height: 0.8rem; }
 .budget-app-root .acct-deck-btn.ghost { border-color: var(--border-color); background: transparent; color: var(--text-muted); }
-.budget-app-root .acct-deck-btn.ghost:hover { color: var(--text-primary); border-color: var(--text-muted); }
+@media (hover: hover) {
+  .budget-app-root .acct-deck-btn.ghost:hover { color: var(--text-primary); border-color: var(--text-muted); }
+}
 .budget-app-root .acct-deck-btn:focus-visible { outline: 2px solid var(--color-primary); outline-offset: 2px; }
-.budget-app-root .acct-deck-more { width: 100%; justify-content: center; margin-top: 10px; padding: 9px 13px; background: var(--surface); }
 /* An empty queue is not an empty shelf — the band becomes one quiet green line. */
 .budget-app-root .acct-deck.is-clear {
   border-color: var(--color-primary); background: var(--color-primary-light); padding: 16px 24px;
@@ -2034,7 +2079,9 @@ body.is-phone .budget-app-root .drawer-book:not(.hidden) { display: block; }
   padding: 6px 15px; border-radius: 999px; border: 0; background: transparent;
   color: var(--text-muted); display: inline-flex; align-items: center; gap: 7px;
 }
-.budget-app-root .acct-seg:hover { color: var(--text-primary); }
+@media (hover: hover) {
+  .budget-app-root .acct-seg:hover { color: var(--text-primary); }
+}
 .budget-app-root .acct-seg[aria-pressed="true"] { background: var(--surface); color: var(--text-primary); box-shadow: var(--shadow-sm); }
 .budget-app-root .acct-seg:focus-visible { outline: 2px solid var(--color-primary); outline-offset: 2px; }
 .budget-app-root .acct-seg-n {
@@ -2082,7 +2129,9 @@ body.is-phone .budget-app-root .drawer-book:not(.hidden) { display: block; }
    selected row that is also flagged keeps the warning rail — the amber is the
    information, the tint is only where the reader's attention is. */
 .budget-app-root .table tbody tr.acct-row { cursor: pointer; }
-.budget-app-root .table tbody tr.acct-row:hover { background: rgba(127, 127, 127, .07); }
+@media (hover: hover) {
+  .budget-app-root .table tbody tr.acct-row:hover { background: rgba(127, 127, 127, .07); }
+}
 .budget-app-root .table tbody tr.acct-row.is-selected { background: var(--color-primary-light); }
 .budget-app-root .table tbody tr.acct-row:focus-visible { outline: 2px solid var(--color-primary); outline-offset: -2px; }
 .budget-app-root .table tbody tr.acct-row.is-selected td:first-child { box-shadow: inset 3px 0 0 var(--color-primary); }
@@ -2101,7 +2150,9 @@ body.is-phone .budget-app-root .drawer-book:not(.hidden) { display: block; }
   font-size: 15px; font-weight: 700; letter-spacing: -.01em; color: var(--text-primary);
   font-variant-numeric: tabular-nums; text-align: right; justify-content: flex-end; width: 100%;
 }
-.budget-app-root .acct-bal:hover { text-decoration: underline; }
+@media (hover: hover) {
+  .budget-app-root .acct-bal:hover { text-decoration: underline; }
+}
 .budget-app-root .acct-bal:focus-visible { outline: 2px solid var(--color-primary); outline-offset: 3px; border-radius: 6px; }
 .budget-app-root .acct-chip {
   display: inline-flex; align-items: center; gap: 5px;
@@ -2144,7 +2195,6 @@ body.is-phone .budget-app-root .drawer-book:not(.hidden) { display: block; }
 .budget-app-root .acct-mbar--split i.seg-in { background: var(--color-info); }
 .budget-app-root .acct-mbar--split i.seg-growth { background: var(--color-success); }
 .budget-app-root .acct-mbar--split i.seg-growth.neg { background: var(--color-danger); }
-.budget-app-root .acct-when { font-size: 12px; color: var(--text-muted); white-space: nowrap; }
 .budget-app-root .acct-dash { color: var(--ink-faint); }
 /* The unsorted column's "↕" is quiet through its INK, not through opacity: at
    .4 on the muted heading ink it measured 1.91:1 on the light card and 2.51:1
@@ -2158,21 +2208,13 @@ body.is-phone .budget-app-root .drawer-book:not(.hidden) { display: block; }
   font: inherit; background: none; border: 0; padding: 0; color: inherit; cursor: pointer;
   display: inline-flex; align-items: center; gap: 5px;
 }
-.budget-app-root .table thead th button:hover { color: var(--text-primary); }
+@media (hover: hover) {
+  .budget-app-root .table thead th button:hover { color: var(--text-primary); }
+}
 .budget-app-root .table thead th button:focus-visible { outline: 2px solid var(--color-primary); outline-offset: 2px; }
 .budget-app-root .acct-group-total {
   float: right; font-size: .92rem; letter-spacing: 0; text-transform: none;
   color: var(--text-primary); font-variant-numeric: tabular-nums;
-}
-/* The asterisk beside a group total that has added more than one currency
-   together. RETIRED (issue 28): no figure in this app mixes currencies any
-   more, so there is nothing left for the mark to warn about — the table's
-   group rows, the "Whose it is" owner rows and the Ring's legend all name
-   their foreign side figures outright instead (.acct-group-other, below).
-   The rule is kept, unreferenced, only so a stale cached view mid-upgrade
-   does not render a bare unstyled asterisk. */
-.budget-app-root .acct-mixed {
-  margin-left: 3px; color: var(--text-muted); font-weight: 700; cursor: help;
 }
 /* The "plus €640" side figure — a foreign total named outright beside a
    household-currency total that (correctly) excludes it. Shared by the
@@ -2235,7 +2277,9 @@ body.is-phone .budget-app-root .drawer-book:not(.hidden) { display: block; }
   padding: 5px 13px; border-radius: 999px;
   border: 1px solid var(--border-color); background: var(--surface); color: var(--text-muted);
 }
-.budget-app-root .acct-drawer-act:hover { color: var(--text-primary); border-color: var(--text-muted); }
+@media (hover: hover) {
+  .budget-app-root .acct-drawer-act:hover { color: var(--text-primary); border-color: var(--text-muted); }
+}
 .budget-app-root .acct-drawer-act:focus-visible { outline: 2px solid var(--color-primary); outline-offset: 2px; }
 /* The one action in this row that removes something. Pushed to the right edge
    rather than sitting a thumb's width from Edit — on the phone these wrap into
@@ -2244,7 +2288,9 @@ body.is-phone .budget-app-root .drawer-book:not(.hidden) { display: block; }
    end of whatever line it lands on, which is the behaviour wanted at both
    widths. The ink token, not the fill: see --color-danger-ink. */
 .budget-app-root .acct-drawer-del { margin-left: auto; color: var(--color-danger-ink); }
-.budget-app-root .acct-drawer-del:hover { color: var(--color-danger-ink); border-color: var(--color-danger); }
+@media (hover: hover) {
+  .budget-app-root .acct-drawer-del:hover { color: var(--color-danger-ink); border-color: var(--color-danger); }
+}
 .budget-app-root .acct-drawer-del:focus-visible { outline-color: var(--color-danger); }
 
 /* The import-undo banner on the Transactions page. Deliberately NOT styled as
@@ -2268,7 +2314,9 @@ body.is-phone .budget-app-root .drawer-book:not(.hidden) { display: block; }
   padding: 7px 15px; border-radius: 999px; min-height: 34px;
   border: 1px solid var(--color-primary); background: transparent; color: var(--color-primary);
 }
-.budget-app-root .tx-undo-btn:hover { background: var(--color-primary-light); }
+@media (hover: hover) {
+  .budget-app-root .tx-undo-btn:hover { background: var(--color-primary-light); }
+}
 .budget-app-root .tx-undo-btn:focus-visible { outline: 2px solid var(--color-primary); outline-offset: 2px; }
 .budget-app-root .tx-undo-x {
   font: inherit; font-size: 13px; line-height: 1; cursor: pointer;
@@ -2277,7 +2325,9 @@ body.is-phone .budget-app-root .drawer-book:not(.hidden) { display: block; }
   width: 34px; height: 34px; border-radius: 999px;
   border: 1px solid transparent; background: transparent; color: var(--ink-faint);
 }
-.budget-app-root .tx-undo-x:hover { color: var(--text-primary); border-color: var(--border-color); }
+@media (hover: hover) {
+  .budget-app-root .tx-undo-x:hover { color: var(--text-primary); border-color: var(--border-color); }
+}
 .budget-app-root .tx-undo-x:focus-visible { outline: 2px solid var(--color-primary); outline-offset: 2px; }
 
 @media (max-width: 900px) { .budget-app-root .top-grid { grid-template-columns: 1fr; } }
@@ -2506,6 +2556,25 @@ body.is-phone .budget-app-root .drawer-book:not(.hidden) { display: block; }
 .budget-app-root .loan-amort > summary {
   cursor: pointer; font-size: 13px; font-weight: 600; padding: 6px 0; color: var(--text-muted);
 }
+/* The year-by-year schedule is five money columns, and on a 375px phone they
+   came to 390px in a 365px scroller: "Closing", the column a reader opens the
+   table for, was cut at the edge with nothing to say there was more (audit
+   2026-11-25, VIS-6). statement/phone-tables.css already tightens the cell
+   padding to 0.3rem and holds the 12px floor, and that left it 25px short.
+   The rest is taken here, in the one place left that costs no information:
+   0.2rem each side (the money keeps its full "R 1 349 670,71", digits
+   tabular so the columns still line up) and a 0.02em tighter track on the
+   figures, which Geist's tabular digits carry without crowding — the type
+   system already tracks its figures at -.01em to -.02em. That prints the
+   table in about 361px, 4px inside the scroller, so nothing scrolls and
+   nothing is cut. The doubled .table lifts this over phone-tables.css's
+   padding (a later file, one selector shorter) without moving either rule.
+   Under 600px only: wider than that the scroller already holds 390px. */
+@media (max-width: 600px) {
+  .budget-app-root .loan-amort .table.table thead th,
+  .budget-app-root .loan-amort .table.table tbody td { padding-left: 0.2rem; padding-right: 0.2rem; }
+  .budget-app-root .loan-amort .table.table tbody td { letter-spacing: -0.02em; }
+}
 
 .budget-app-root .svc-inactive td { color: var(--text-muted); }
 /* Was `opacity: 0.5` on the cells: opacity multiplies the INK, and --text-primary
@@ -2654,12 +2723,24 @@ body.is-phone .budget-app-root .drawer-book:not(.hidden) { display: block; }
   background-color: color-mix(in srgb, var(--body-bg) 55%, transparent);
   color: var(--text-muted);
 }
-.budget-app-root .upload-area:hover, .budget-app-root .upload-area.dragover {
+@media (hover: hover) {
+  .budget-app-root .upload-area:hover {
+    border-color: var(--color-primary);
+    background-color: var(--color-primary-light);
+  }
+}
+/* Dragging a file over the zone is a state, not a hover: it must light the
+   zone on a touch screen too, so it is NOT inside the hover media block the
+   rule above ends up in. */
+.budget-app-root .upload-area.dragover {
   border-color: var(--color-primary);
   background-color: var(--color-primary-light);
 }
 .budget-app-root .upload-area:focus-visible { outline: 2px solid var(--color-primary); outline-offset: 3px; }
-.budget-app-root .upload-area:hover > .ico, .budget-app-root .upload-area.dragover > .ico { color: var(--color-primary); }
+@media (hover: hover) {
+  .budget-app-root .upload-area:hover > .ico { color: var(--color-primary); }
+}
+.budget-app-root .upload-area.dragover > .ico { color: var(--color-primary); }
 .budget-app-root .upload-area > .ico { color: var(--text-light); display: flex; justify-content: center; margin-bottom: 0.75rem; }
 .budget-app-root .upload-area > .ico svg { width: 2rem; height: 2rem; }
 .budget-app-root .upload-area > .ua-line { display: block; color: var(--text-muted); margin: 0; }
@@ -2901,7 +2982,9 @@ body.is-phone .budget-app-root .drawer-book:not(.hidden) { display: block; }
      3px track padding and the row's own spacing are counted. */
   padding: 7px 13px; border-radius: 999px; line-height: 1;
 }
-.budget-app-root .chart-range-btn:hover { color: var(--text-primary); }
+@media (hover: hover) {
+  .budget-app-root .chart-range-btn:hover { color: var(--text-primary); }
+}
 .budget-app-root .chart-range-btn.is-active {
   background: var(--surface); color: var(--text-primary); box-shadow: var(--shadow-sm);
 }
@@ -3108,7 +3191,9 @@ body.is-phone .budget-app-root .drawer-book:not(.hidden) { display: block; }
   background: none; border: 0; margin: 0; padding: 7px 0;
   cursor: pointer; border-radius: 6px;
 }
-.budget-app-root .donut-legend .dl-link:hover .dl-name { color: var(--color-primary); }
+@media (hover: hover) {
+  .budget-app-root .donut-legend .dl-link:hover .dl-name { color: var(--color-primary); }
+}
 /* Opens the category's markdown note. Faint but always drawn — revealing it on
    hover would put it out of reach on every touch device. */
 .budget-app-root .donut-legend .dl-note {
@@ -3117,7 +3202,9 @@ body.is-phone .budget-app-root .drawer-book:not(.hidden) { display: block; }
   background: none; border: 0; border-radius: 6px;
   color: var(--ink-faint); cursor: pointer;
 }
-.budget-app-root .donut-legend .dl-note:hover { color: var(--color-primary); }
+@media (hover: hover) {
+  .budget-app-root .donut-legend .dl-note:hover { color: var(--color-primary); }
+}
 .budget-app-root .donut-legend .dl-note .ico svg { width: 15px; height: 15px; }
 /* Fallbacks for iOS 15.0-15.3 live in the @supports block at the foot of this
    file, where the parity guard can see them — not inline. */
@@ -3126,7 +3213,9 @@ body.is-phone .budget-app-root .drawer-book:not(.hidden) { display: block; }
 /* Wedges drill through too. Pointer only — they are inside a role="img" svg,
    so the legend buttons are the keyboard and screen-reader path. */
 .budget-app-root svg.donut .donut-slice { cursor: pointer; }
-.budget-app-root svg.donut .donut-slice:hover { fill-opacity: 0.82; }
+@media (hover: hover) {
+  .budget-app-root svg.donut .donut-slice:hover { fill-opacity: 0.82; }
+}
 
 /* Under the net-worth stack the legend runs as chips, not rows — the bars
    above already carry the ranking, so a vertical list would repeat it. */
@@ -3224,7 +3313,9 @@ body.is-phone .budget-app-root .drawer-book:not(.hidden) { display: block; }
 .budget-onb-echo { font-size: 13.5px; line-height: 1.45; opacity: .72; margin: 0 0 4px; }
 .budget-onb-why { margin: 10px 0 2px; font-size: 12.5px; line-height: 1.5; }
 .budget-onb-why > summary { cursor: pointer; opacity: .7; width: max-content; max-width: 100%; }
-.budget-onb-why > summary:hover { opacity: 1; }
+@media (hover: hover) {
+  .budget-onb-why > summary:hover { opacity: 1; }
+}
 .budget-onb-why > p { margin: 6px 0 0; opacity: .75; }
 
 /* The step body slides in from the side the reader came from. A fresh node
@@ -3265,7 +3356,7 @@ body.is-phone .budget-app-root .drawer-book:not(.hidden) { display: block; }
    motion, the animations are dropped and every scene shows settled. */
 .budget-onb-motion {
   --bvm-green: #2c6b57; --bvm-on-green: #ffffff; --bvm-mint: #e7f2ec; --bvm-mint-2: #cfe4da;
-  --bvm-gold: #a6843f; --bvm-clay: #b06f5b;
+  --bvm-clay: #b06f5b;
   --bvm-surface: var(--background-primary, #ffffff);
   --bvm-ground: var(--background-secondary, #f2f5f3);
   --bvm-ink: var(--text-normal, #13211d);
@@ -3278,7 +3369,7 @@ body.is-phone .budget-app-root .drawer-book:not(.hidden) { display: block; }
 }
 .theme-dark .budget-onb-motion {
   --bvm-green: #7cc3a6; --bvm-on-green: #0b1210; --bvm-mint: #1a2e28; --bvm-mint-2: #26453b;
-  --bvm-gold: #d3b274; --bvm-clay: #dc9b87;
+  --bvm-clay: #dc9b87;
 }
 .budget-onb-motion.is-paused { --bvm-play: paused; }
 .bvm-frame {
@@ -3585,7 +3676,9 @@ body.is-phone .budget-app-root .drawer-book:not(.hidden) { display: block; }
 .budget-split-part input.budget-split-amt { width: 90px; }
 .budget-split-part input.budget-split-note { width: auto; }
 .budget-split-del { flex: none; padding: 0 8px; opacity: .6; cursor: pointer; }
-.budget-split-del:hover { opacity: 1; }
+@media (hover: hover) {
+  .budget-split-del:hover { opacity: 1; }
+}
 .budget-split-add { margin-top: 10px; font-size: 13px; cursor: pointer; }
 .budget-split-foot { margin-top: 12px; font-size: 13.5px; font-weight: 600; font-variant-numeric: tabular-nums; }
 .budget-split-foot.is-off { color: var(--text-error, #e5534b); }
@@ -3675,14 +3768,23 @@ body.is-phone .budget-app-root .drawer-book:not(.hidden) { display: block; }
   color: var(--text-normal); background: transparent; box-shadow: none;
   border: 1px solid var(--background-modifier-border, rgba(128,128,128,.35));
 }
-.budget-export-modal button.budget-export-pill:hover { background: var(--background-modifier-hover, rgba(128,128,128,.12)); }
+@media (hover: hover) {
+  .budget-export-modal button.budget-export-pill:hover { background: var(--background-modifier-hover, rgba(128,128,128,.12)); }
+}
+/* The chosen pill takes the HOST's accent, not the app's green, on purpose
+   (audit CSS-17 / VIS-14 asked; tests/css-host-cascade.test.cjs holds the
+   decision): the dialog is Obsidian's furniture, the plugin's tokens
+   (--color-primary, --ink-on-accent) are declared on .budget-app-root and do
+   not reach a modal mounted on document.body, and giving the dialog its own
+   copy of them would take plugin markup. Its OK button and focus ring are the
+   host's too, so the dialog is one colour, the host's. */
 .budget-export-modal button.budget-export-pill.is-active {
-  color: var(--text-on-accent, #fff); background: var(--interactive-accent, #5b6cff);
-  border-color: var(--interactive-accent, #5b6cff);
+  color: var(--text-on-accent, #fff); background: var(--interactive-accent, #7c6cf5);
+  border-color: var(--interactive-accent, #7c6cf5);
 }
 .budget-export-modal button.budget-export-pill:focus-visible,
 .budget-export-modal button.budget-export-link:focus-visible {
-  outline: 2px solid var(--interactive-accent, #5b6cff); outline-offset: 2px;
+  outline: 2px solid var(--interactive-accent, #7c6cf5); outline-offset: 2px;
 }
 .budget-export-folder { width: 100%; }
 /* The two date fields share a row and wrap to two on a narrow phone. A native
@@ -3704,9 +3806,11 @@ body.is-phone .budget-app-root .drawer-book:not(.hidden) { display: block; }
 .budget-export-count { margin-left: auto; font-size: 12px; opacity: .7; font-variant-numeric: tabular-nums; }
 .budget-export-modal button.budget-export-link {
   padding: 0; height: auto; border: 0; background: none; box-shadow: none; cursor: pointer;
-  font-size: 12.5px; font-weight: 600; color: var(--text-accent, var(--interactive-accent, #5b6cff));
+  font-size: 12.5px; font-weight: 600; color: var(--text-accent, var(--interactive-accent, #7c6cf5));
 }
-.budget-export-modal button.budget-export-link:hover { text-decoration: underline; background: none; }
+@media (hover: hover) {
+  .budget-export-modal button.budget-export-link:hover { text-decoration: underline; background: none; }
+}
 .budget-export-cats-list { max-height: 34vh; overflow-y: auto; -webkit-overflow-scrolling: touch; padding: 4px 0 6px; }
 .budget-export-cats-type {
   padding: 8px 10px 2px; font-size: 11px; font-weight: 700; letter-spacing: .04em;
@@ -3725,7 +3829,7 @@ body.is-phone .budget-app-root .drawer-book:not(.hidden) { display: block; }
    the button it explains. */
 .budget-export-actions { border-top: 0; padding-top: 6px; }
 .budget-export-files { white-space: pre-line; overflow-wrap: break-word; opacity: .75; font-variant-numeric: tabular-nums; }
-.budget-export-problem { color: var(--text-error, #d33); font-weight: 600; }
+.budget-export-problem { color: var(--text-error, #e5534b); font-weight: 600; }
 .budget-export-replaces { margin-top: 6px; color: var(--text-warning, #b7791f); overflow-wrap: break-word; }
 .budget-export-done { margin: 0 0 4px; }
 .budget-export-done-row { display: flex; align-items: baseline; gap: 12px; padding: 7px 0; }
@@ -4275,7 +4379,6 @@ body.is-phone .budget-app-root .drawer-book:not(.hidden) { display: block; }
      on a range input leaves a keyboard user dragging money with no idea which
      envelope they are in. */
   .budget-app-root .plan-seg:focus { outline: 2px solid var(--color-primary); outline-offset: 2px; }
-  .budget-app-root .env-name:focus { outline: 2px solid var(--color-primary); outline-offset: 2px; }
   .budget-app-root .env-amt-btn:focus { outline: 2px solid var(--color-primary); outline-offset: 2px; border-radius: 6px; }
   .budget-app-root .env-slider:focus { outline: 2px solid var(--color-primary); outline-offset: 3px; }
   .budget-app-root .loan-range:focus { outline: 2px solid var(--color-primary); outline-offset: 3px; }
@@ -4304,7 +4407,7 @@ body.is-phone .budget-app-root .drawer-book:not(.hidden) { display: block; }
      the format and range pills had no focus indicator at all, because
      Obsidian's own `button { outline: none }` had already removed the native one. */
   .budget-export-modal button.budget-export-pill:focus,
-  .budget-export-modal button.budget-export-link:focus { outline: 2px solid var(--interactive-accent, #5b6cff); outline-offset: 2px; }
+  .budget-export-modal button.budget-export-link:focus { outline: 2px solid var(--interactive-accent, #7c6cf5); outline-offset: 2px; }
 
   /* The welcome animation's pause button and scene dots, in the setup wizard. */
   .budget-onb-motion .bvm-controls button.bvm-toggle:focus,
@@ -4336,7 +4439,9 @@ body.is-phone .budget-app-root .drawer-book:not(.hidden) { display: block; }
   text-overflow: ellipsis;
   white-space: nowrap;
 }
-.budget-app-root .cat-cell-btn:hover { border-color: var(--border-color); background: var(--surface); }
+@media (hover: hover) {
+  .budget-app-root .cat-cell-btn:hover { border-color: var(--border-color); background: var(--surface); }
+}
 .budget-app-root .cat-cell-btn:focus-visible { outline: 2px solid var(--color-accent); outline-offset: 1px; }
 /* On touch this is the app's highest-frequency target (categorise a row), and
    the overlay technique in the shared coarse block cannot reach it — the
@@ -4445,6 +4550,8 @@ body.is-phone .budget-app-root .drawer-book:not(.hidden) { display: block; }
   color: #fff;
 }
 .budget-app-root .splash-logo .ico svg { width: 40px; height: 40px; }
+/* The topbar logo's dark swap (see .brand-logo): same gradient, same glyph. */
+.budget-app-root.bud-dark .splash-logo { color: var(--ink-on-accent); }
 .budget-app-root .splash-title {
   margin: 0;
   font-size: 1.65rem;
@@ -4494,7 +4601,9 @@ body.is-phone .budget-app-root .drawer-book:not(.hidden) { display: block; }
   padding: 6px 15px; border-radius: 999px; border: 0; background: transparent;
   color: var(--text-muted);
 }
-.budget-app-root .plan-seg:hover { color: var(--text-primary); }
+@media (hover: hover) {
+  .budget-app-root .plan-seg:hover { color: var(--text-primary); }
+}
 .budget-app-root .plan-seg[aria-pressed="true"] { background: var(--surface); color: var(--text-primary); box-shadow: var(--shadow-sm); }
 .budget-app-root .plan-seg:focus-visible { outline: 2px solid var(--color-primary); outline-offset: 2px; }
 /* .section-h is a plain block everywhere else, and it stays one here: the row
@@ -4529,47 +4638,12 @@ body.is-phone .budget-app-root .drawer-book:not(.hidden) { display: block; }
 }
 .budget-app-root .plan-split i { display: block; height: 100%; }
 .budget-app-root .plan-split .s-spent { background: linear-gradient(90deg, var(--color-primary-dark), var(--color-primary)); }
-.budget-app-root .plan-split .s-alloc { background: var(--color-accent); }
 .budget-app-root .plan-split .s-free {
   background: repeating-linear-gradient(135deg, var(--color-warning) 0 6px, transparent 6px 12px);
   opacity: .5;
 }
-.budget-app-root .split-key { display: flex; flex-wrap: wrap; gap: 22px; margin-top: 14px; }
-.budget-app-root .split-key > div { min-width: 118px; }
-.budget-app-root .sk-top {
-  display: flex; align-items: center; gap: 7px;
-  font-size: 11.5px; color: var(--text-muted); font-weight: 600;
-}
-.budget-app-root .sk-top i { width: 10px; height: 10px; border-radius: 3px; flex: none; }
-.budget-app-root .sk-fig {
-  font-size: 19px; font-weight: 700; margin-top: 3px; letter-spacing: -.01em;
-  font-variant-numeric: tabular-nums;
-}
 .budget-app-root .plan-free-fig { color: var(--color-gold); }
-/* The subtotal, not a fourth segment: no swatch, so the border-inline-start is
-   the only thing marking it off from the three bands above it — it must not
-   read as a fourth slice of the bar it sits under. */
-.budget-app-root .sk-left {
-  border-inline-start: 1px solid var(--border-color);
-  padding-inline-start: 22px;
-}
-.budget-app-root .sk-left .sk-top { font-style: italic; }
 
-/* ---- money in: any source at all, and when it actually lands ---- */
-.budget-app-root .src-row {
-  display: flex; align-items: center; gap: 14px; flex-wrap: wrap;
-  padding: 14px 0; border-top: 1px solid var(--line-soft);
-}
-.budget-app-root .src-row:first-child { border-top: 0; }
-.budget-app-root .src-main { flex: 1; min-width: 200px; }
-.budget-app-root .src-name { display: flex; align-items: center; gap: 4px; flex-wrap: wrap; }
-.budget-app-root .src-name-input {
-  font: inherit; font-size: 13.5px; font-weight: 650; color: var(--text-primary);
-  background: none; border: 0; padding: 2px 0; min-width: 140px; flex: 1;
-  border-bottom: 1px solid transparent;
-}
-.budget-app-root .src-name-input:hover { border-bottom-color: var(--border-color); }
-.budget-app-root .src-name-input:focus { outline: none; border-bottom-color: var(--color-primary); }
 /* The kind is a grouping aid; the source's NAME is what is worth reading, so
    this stays deliberately quiet. Free text — the dropdown only seeds it. */
 .budget-app-root .kind {
@@ -4583,19 +4657,6 @@ body.is-phone .budget-app-root .drawer-book:not(.hidden) { display: block; }
    pass; the tint is what carries the accent. The dark accent is a pale mint on
    a dark tint and clears 4.5 on every palette, so it stays. */
 .budget-app-root:not(.bud-dark) .kind { color: var(--text-muted); }
-.budget-app-root .src-when {
-  display: flex; align-items: center; gap: 9px; flex-wrap: wrap;
-  font-size: 12px; color: var(--text-muted); margin-top: 5px;
-}
-.budget-app-root .src-date { width: 140px; }
-/* Sat with no rule of its own — it inherited .src-when's 12px/text-muted by
-   accident, reading identically to the date sitting right next to it. Given
-   the sibling note treatment every other page uses (.dp-note, .tx-undo-note,
-   .acct-ring-note), it earns the same quiet/small styling rather than losing
-   the class outright. */
-.budget-app-root .src-note { font-size: 11.5px; color: var(--ink-faint); }
-.budget-app-root .src-amt { width: 130px; }
-.budget-app-root .src-amt input { width: 100%; text-align: right; }
 .budget-app-root .plan-empty-row { padding: 14px 0; font-size: 13px; }
 
 /* ---- the envelopes: the act of dividing, made draggable ---- */
@@ -4605,13 +4666,16 @@ body.is-phone .budget-app-root .drawer-book:not(.hidden) { display: block; }
   box-shadow: var(--shadow-sm); display: flex; flex-direction: column; overflow: hidden;
   transition: border-color .14s, transform .14s;
 }
-.budget-app-root .env:hover { border-color: var(--color-primary); transform: translateY(-2px); }
+/* The card's hover lift (border to primary, 2px rise) used to be here. It never
+   showed: src/statement/plan.css restates .env:hover with `transform: none` and
+   its own border, later in the cascade, at every width, so the rule could not
+   win and was removed when the hover rules were guarded for touch screens. */
 .budget-app-root .env:focus-within { border-color: var(--color-primary); }
 /* The whole card reads as in-trouble, not just one line of text buried in the
    rail note — border AND a faint tint, so it is visible in peripheral vision
-   the way the tint wash below already is. Declared AFTER :hover/:focus-within
-   (same specificity, later wins) so a card that is in trouble stays visibly so
-   even while hovered — hover must not hide the warning it is sitting on.
+   the way the tint wash below already is. Declared AFTER :focus-within (same
+   specificity, later wins) so a card that is in trouble stays visibly so
+   even while focused — focus must not hide the warning it is sitting on.
    is-overspent is declared after is-overcommitted so a card that is BOTH (the
    list claims more than the bucket AND the money is actually gone) reads as
    the more urgent of the two rather than an arbitrary one. */
@@ -4625,35 +4689,6 @@ body.is-phone .budget-app-root .drawer-book:not(.hidden) { display: block; }
   background: radial-gradient(140% 100% at 0% 0%, var(--tint, transparent), transparent 62%);
 }
 .budget-app-root .env > * { position: relative; }
-.budget-app-root .env-top { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; }
-/* The rename target. Its 11px label made a 16px-tall button, under the 24px
-   WCAG 2.2 AA floor (2.5.8). Padding grows the target and the equal negative
-   margin gives the room straight back, so the hit area is 26px while the
-   label, and the header row it sits in, do not move by a pixel. */
-.budget-app-root .env-name {
-  font: inherit; font-size: 11px;
-  font-weight: 600; color: var(--ink-faint); background: none; border: 0;
-  padding: 5px 0; margin-block: -5px;
-  cursor: pointer; text-align: left;
-  /* A flex button (host and reset both make it inline-flex), so the side is
-     justify-content's to set; text-align alone left the name centred in the
-     space its row gave it (2026-10-20 audit, D1-02). */
-  justify-content: flex-start;
-}
-.budget-app-root .env-name:hover { color: var(--text-primary); text-decoration: underline; }
-.budget-app-root .env-name:focus-visible { outline: 2px solid var(--color-primary); outline-offset: 2px; }
-/* The pencil that says this name is editable. Visible at rest — not a
-   hover-only affordance, which a touch device can never trigger — and quiet
-   about it (low opacity, no colour) so six cards don't turn into a row of
-   pencils; hover/focus (mouse and keyboard, not touch) bring it to full
-   strength as the reader's attention actually lands on one card. Plain
-   :hover/:focus rather than :focus-visible: this is a decoration riding along
-   with the button's own focus state, not a new ring that needs an iOS-15
-   fallback of its own. */
-.budget-app-root .env-name-ico { margin-inline-start: 5px; opacity: .45; }
-.budget-app-root .env-name-ico svg { width: 11px; height: 11px; }
-.budget-app-root .env-name:hover .env-name-ico,
-.budget-app-root .env-name:focus .env-name-ico { opacity: 1; color: var(--color-primary); }
 .budget-app-root .env-share {
   font-size: 11.5px; font-weight: 700; padding: 2px 9px; border-radius: 999px; flex: none;
   background: rgba(127, 127, 127, .16); color: var(--text-muted);
@@ -4666,7 +4701,9 @@ body.is-phone .budget-app-root .drawer-book:not(.hidden) { display: block; }
   background: none; border: 0; padding: 0; cursor: pointer; font: inherit;
   display: block; width: 100%; text-align: left;
 }
-.budget-app-root .env-amt-btn:hover .env-amt { text-decoration: underline; }
+@media (hover: hover) {
+  .budget-app-root .env-amt-btn:hover .env-amt { text-decoration: underline; }
+}
 .budget-app-root .env-amt-btn:focus-visible { outline: 2px solid var(--color-primary); outline-offset: 2px; border-radius: 6px; }
 .budget-app-root .env-amt {
   font-size: 29px; font-weight: 700; letter-spacing: -.025em; margin-top: 10px;
@@ -4744,8 +4781,8 @@ body.is-phone .budget-app-root .drawer-book:not(.hidden) { display: block; }
    was squeezed to its narrowest fitting width by the amount beside it, so
    "Books and sensory toys" wrapped onto four lines in a card with room to
    spare. It takes the slack; the amount keeps its nowrap and stays right. */
-/* The item's edit target, 18px tall at rest. Same move as .env-name: 4px of
-   padding top and bottom makes the hit area 26px, and the matching negative
+/* The item's edit target, 18px tall at rest. 4px of padding top and
+   bottom makes the hit area 26px, and the matching negative
    margin hands the space back, so neither a one-line name nor a wrapped one
    moves, and the 9px between rows still keeps neighbouring targets apart. */
 .budget-app-root .ei-name {
@@ -4754,7 +4791,9 @@ body.is-phone .budget-app-root .drawer-book:not(.hidden) { display: block; }
   cursor: pointer; text-align: left; justify-content: flex-start; color: var(--text-primary);
   flex: 1 1 55%; min-width: 0;
 }
-.budget-app-root .ei-name:hover { text-decoration: underline; }
+@media (hover: hover) {
+  .budget-app-root .ei-name:hover { text-decoration: underline; }
+}
 .budget-app-root .ei-name:focus-visible { outline: 2px solid var(--color-primary); outline-offset: 2px; }
 .budget-app-root .ei-name.done { color: var(--text-muted); text-decoration: line-through; }
 .budget-app-root .ei-amt, .budget-app-root .ei-actual {
@@ -4769,7 +4808,9 @@ body.is-phone .budget-app-root .drawer-book:not(.hidden) { display: block; }
   border-radius: 999px; border: 1px dashed var(--border-color);   /* padding: src/statement/plan.css */
   background: transparent; color: var(--text-muted);
 }
-.budget-app-root .env-add:hover { border-style: solid; border-color: var(--color-primary); color: var(--color-primary); }
+@media (hover: hover) {
+  .budget-app-root .env-add:hover { border-style: solid; border-color: var(--color-primary); color: var(--color-primary); }
+}
 .budget-app-root .env-add:focus-visible { outline: 2px solid var(--color-primary); outline-offset: 2px; }
 .budget-app-root .env-foot {
   display: flex; align-items: center; justify-content: space-between; gap: 10px;
@@ -4838,6 +4879,18 @@ body.is-phone .budget-app-root .drawer-book:not(.hidden) { display: block; }
 .budget-app-root .food-price-detail { padding: 4px 0 10px; }
 .budget-app-root .food-price-sum { margin: 0 0 6px; font-size: 13.5px; }
 .budget-app-root .food-price-svg { display: block; width: 100%; max-width: 640px; height: auto; }
+/* Every other table card keeps its table off the card's edge with a
+   .body-pad-tight wrapper (20px a side, plus the card's 1px border = the 21px
+   the Assets, Debts and Tax tables sit at). Food's two tables are children of
+   the card itself — the Items card puts only its filters in a wrapper, the
+   Receipts card has none — so they ran 1px from the edge (2026-11-25 audit,
+   VIS-9). The same 20px goes on their scroll region here rather than a
+   wrapper in shell.js, and only from 641px: under it each row folds into its
+   own padded card (the 640px block below), and the phone's table cards are
+   near edge-to-edge by design. */
+@media (min-width: 641px) {
+  .budget-app-root #view-food .card > .table-responsive { padding-left: 20px; padding-right: 20px; }
+}
 @media (hover: hover) {
   .budget-app-root .food-cat-row:hover { background: var(--color-primary-light); }
 }
@@ -4898,7 +4951,7 @@ body.is-phone .budget-app-root .drawer-book:not(.hidden) { display: block; }
 .bv-receipt-example-banner {
   margin: 0 0 10px; padding: 8px 12px; border-radius: 6px; font-size: 13px; font-weight: 600;
   background: var(--background-modifier-hover, rgba(128,128,128,.1));
-  border-left: 3px solid var(--interactive-accent, #7c5cff);
+  border-left: 3px solid var(--interactive-accent, #7c6cf5);
 }
 .bv-receipt-paste {
   width: 100%; min-height: 180px; font-family: var(--font-monospace, monospace); font-size: 12.5px;
@@ -4910,7 +4963,7 @@ body.is-phone .budget-app-root .drawer-book:not(.hidden) { display: block; }
 .bv-receipt-problems {
   margin: 0 0 10px; padding: 8px 12px 8px 28px; font-size: 13px; line-height: 1.45;
   border-radius: 6px; background: var(--background-modifier-hover, rgba(128,128,128,.1));
-  border-left: 3px solid var(--text-warning, #d4a017);
+  border-left: 3px solid var(--text-warning, #b7791f);
 }
 .bv-receipt-lines {
   display: flex; flex-direction: column; gap: 6px;
@@ -4983,7 +5036,9 @@ body.is-phone .budget-app-root .drawer-book:not(.hidden) { display: block; }
   justify-content: flex-start;
   color: var(--text-primary);
 }
-.budget-app-root .note-title:hover { color: var(--color-primary); }
+@media (hover: hover) {
+  .budget-app-root .note-title:hover { color: var(--color-primary); }
+}
 .budget-app-root .note-title:focus-visible { outline: 2px solid var(--color-primary); outline-offset: 3px; border-radius: 6px; }
 .budget-app-root .note-date { flex: 0 0 auto; font-size: 11.5px; color: var(--ink-faint); }
 
@@ -5055,7 +5110,9 @@ body.is-phone .budget-app-root .drawer-book:not(.hidden) { display: block; }
 }
 .budget-app-root .note-chip .ico svg { width: 0.72rem; height: 0.72rem; }
 .budget-app-root .note-chip.has-notes { border-color: var(--color-primary); background: var(--color-primary-light); color: var(--color-primary); }
-.budget-app-root .note-chip:hover { border-color: var(--color-primary); color: var(--color-primary); }
+@media (hover: hover) {
+  .budget-app-root .note-chip:hover { border-color: var(--color-primary); color: var(--color-primary); }
+}
 .budget-app-root .note-chip:focus-visible { outline: 2px solid var(--color-primary); outline-offset: 2px; }
 
 /* The Accounts table's notes column. `width: 1%` is the standard way to ask a
@@ -5104,12 +5161,7 @@ body.is-phone .budget-app-root .drawer-book:not(.hidden) { display: block; }
       color-mix(in srgb, var(--color-gold) 38%, transparent) 0 6px, transparent 6px 12px);
     opacity: 1;
   }
-  .budget-app-root .plan-split .s-alloc {
-    background: linear-gradient(90deg, var(--color-accent),
-      color-mix(in srgb, var(--color-accent) 55%, transparent));
-  }
   .budget-app-root .env::before { opacity: .5; }
-  .budget-app-root .env:hover { border-color: color-mix(in srgb, var(--color-primary) 45%, var(--border-color)); }
   .budget-app-root .env-share { background: color-mix(in srgb, var(--text-primary) 9%, transparent); }
   .budget-app-root .kind { background: color-mix(in srgb, var(--color-accent) 14%, transparent); }
   .budget-app-root .env-slider,
@@ -5118,7 +5170,7 @@ body.is-phone .budget-app-root .drawer-book:not(.hidden) { display: block; }
   .budget-app-root .plan-free.is-over { background: color-mix(in srgb, var(--color-danger) 7%, transparent); }
 }
 
-/* The Plan page's phone block is at the END of this section (after .env-accent),
+/* The Plan page's phone block is at the END of this section (after the accordion rules),
    not here: see the note there. */
 
 /* ============================== Score page ==============================
@@ -5503,7 +5555,9 @@ body.is-phone .budget-app-root .drawer-book:not(.hidden) { display: block; }
   background: transparent; color: inherit;
 }
 .budget-app-root .score-ring-row + .score-ring-row { margin-top: 2px; }
-.budget-app-root .score-ring-row:hover { background: var(--border-color); }
+@media (hover: hover) {
+  .budget-app-root .score-ring-row:hover { background: var(--border-color); }
+}
 .budget-app-root .score-ring-row[aria-pressed="true"] { background: var(--border-color); border-color: var(--line-soft); }
 .budget-app-root .score-ring-row:focus-visible { outline: 2px solid var(--color-primary); outline-offset: 2px; }
 .budget-app-root .score-ring-mid:focus-visible { outline: 2px solid var(--color-primary); outline-offset: 3px; border-radius: 50%; }
@@ -5596,7 +5650,6 @@ body.is-phone .budget-app-root .drawer-book:not(.hidden) { display: block; }
   .budget-app-root .plan-strip > .row > * { flex: none; }
   .budget-app-root .acct-segs { display: flex; flex-wrap: nowrap; overflow-x: auto; max-width: 100%; border-radius: 18px; -webkit-overflow-scrolling: touch; }
   .budget-app-root .acct-segs > * { flex: none; }
-  .budget-app-root .acct-toolbar, .budget-app-root .acct-search-row { flex-direction: column; align-items: stretch; }
   .budget-app-root .mini-grid { grid-template-columns: 1fr; }
 }
 
@@ -5606,7 +5659,7 @@ body.is-phone .budget-app-root .drawer-book:not(.hidden) { display: block; }
    Additive only: every rule here targets a class introduced by the redesign
    (suffixed 2/-v2, or new to this file), scoped under .budget-app-root so
    nothing here can leak into another view. Existing Plan classes in
-   src/styles.css (.env, .env-slider, .split-key, .src-row, ...) are left
+   src/styles.css (.env, .env-slider, ...) are left
    exactly as they are — plan.js still uses several of them unchanged, and
    this file only adds what the redesign needed on top.
 
@@ -5650,42 +5703,7 @@ body.is-phone .budget-app-root .drawer-book:not(.hidden) { display: block; }
 }
 .budget-app-root .pot-fig-block { min-width: 0; }
 .budget-app-root .pot-fig-block .pot-fig { margin-top: 6px; }
-.budget-app-root .pot-fig-2 {
-  font-size: 30px; font-weight: 700; letter-spacing: -.02em; line-height: 1.02;
-  margin-top: 6px; color: var(--text-primary); font-variant-numeric: tabular-nums;
-}
-.budget-app-root .pot-fig-2.text-danger { color: var(--color-danger-ink); }
-/* The second block's eyebrow is the same size as the first — the hierarchy is
-   carried by the figures, not by shrinking the label until it is unreadable. */
-.budget-app-root .pot-fig-block-2 .pot-eyebrow { color: var(--ink-faint); }
-/* The second slot turns red as a whole when it is carrying the overspend — the
-   label as much as the figure, because "Overspent" in muted grey over a red
-   number reads as a caption on a styling accident rather than as an alarm. */
-.budget-app-root .pot-eyebrow-danger { color: var(--color-danger-ink); }
 .budget-app-root .split-key2 { margin-top: 14px; }
-.budget-app-root .sk2-row {
-  display: flex; align-items: center; justify-content: space-between; gap: 10px;
-  padding: 7px 0; border-top: 1px solid var(--line-soft);
-}
-.budget-app-root .sk2-row:first-child { border-top: 0; padding-top: 0; }
-.budget-app-root .sk2-label {
-  display: inline-flex; align-items: center; gap: 7px;
-  font-size: 12.5px; color: var(--text-muted); font-weight: 600;
-}
-.budget-app-root .sk2-label i { width: 10px; height: 10px; border-radius: 3px; flex: none; }
-.budget-app-root .sk2-fig { font-size: 14px; font-weight: 700; font-variant-numeric: tabular-nums; }
-/* The one row that is a subtotal, not a fourth swatch — same convention as
-   .sk-left had: a border rather than a dot marks it off from the three rows
-   above it, and it only ever renders when it disagrees with the hero figure
-   (an overspent plan) — see the note beside its call site in plan.js. */
-.budget-app-root .sk2-left { border-top-style: dashed; font-style: italic; }
-.budget-app-root .sk2-left .sk2-label { font-style: italic; }
-/* The overspend row: no swatch, because it is not a fourth slice of the bar —
-   it is the number that explains why "Not spoken for" above it is larger than
-   the figure in the hero. Dashed rule marks it off, same convention as the
-   subtotal it replaced. */
-.budget-app-root .sk2-over { border-top-style: dashed; }
-.budget-app-root .sk2-over .sk2-label { color: var(--color-danger-ink); font-weight: 700; }
 
 /* ---- money in: compact read-only ledger rows, ~62px each ---- */
 .budget-app-root .src2-list { display: flex; flex-direction: column; }
@@ -5707,7 +5725,9 @@ body.is-phone .budget-app-root .drawer-book:not(.hidden) { display: block; }
      row that carries the spacing), and so is its iPad twin: one base rule,
      one twin, or the two disagree about which is the base. */
 }
-.budget-app-root .src2-main:hover .src2-name { text-decoration: underline; }
+@media (hover: hover) {
+  .budget-app-root .src2-main:hover .src2-name { text-decoration: underline; }
+}
 .budget-app-root .src2-main:focus-visible {
   outline: 2px solid var(--color-primary); outline-offset: 2px; border-radius: 6px;
 }
@@ -5721,7 +5741,6 @@ body.is-phone .budget-app-root .drawer-book:not(.hidden) { display: block; }
 .budget-app-root .src2-status-exp { color: var(--color-warning-ink); font-weight: 700; }
 .budget-app-root .src2-amt { flex: none; white-space: nowrap; }
 .budget-app-root .src2-amt-muted { color: var(--text-muted); font-weight: 600; }
-.budget-app-root .src2-del { flex: none; }
 
 /* ---- spending buckets: accordion — collapsed rows, one card open ---- */
 /* Overrides the base .mini-grid this host also carries (two classes beat one
@@ -5730,8 +5749,7 @@ body.is-phone .budget-app-root .drawer-book:not(.hidden) { display: block; }
 .budget-app-root .plan-env-accordion.mini-grid { display: flex; flex-direction: column; gap: 8px; }
 /* The tint wash on .env::before bled past the tighter accordion card's own
    rounded corner — this switches it off for accordion cards only; the
-   collapsed swatch dot and the expanded card's 3px accent bar (.env-accent)
-   carry the same colour cue without the bleed. */
+   collapsed swatch dot carries the same colour cue without the bleed. */
 .budget-app-root .plan-env-accordion .env::before { opacity: 0; }
 
 .budget-app-root .env-sum {
@@ -5743,7 +5761,9 @@ body.is-phone .budget-app-root .drawer-book:not(.hidden) { display: block; }
      base rule now and states it (with its iPad twin, which must name one
      base rule, not two that disagree). */
 }
-.budget-app-root .env-sum:hover { border-color: var(--color-primary); }
+@media (hover: hover) {
+  .budget-app-root .env-sum:hover { border-color: var(--color-primary); }
+}
 .budget-app-root .env-sum:focus-visible { outline: 2px solid var(--color-primary); outline-offset: 2px; }
 .budget-app-root .env-sum.is-overcommitted { border-color: var(--color-warning); background: var(--color-warning-light); }
 .budget-app-root .env-sum.is-overspent { border-color: var(--color-danger); background: var(--color-danger-light); }
@@ -5789,33 +5809,25 @@ body.is-phone .budget-app-root .drawer-book:not(.hidden) { display: block; }
   min-width: 34px; text-align: right;
 }
 
-/* The expanded card's own header row grows a collapse chevron on the left and
-   a delete icon on the right, either side of the existing rename button and
-   share chip — the redesign's "destructive action off in its own corner"
-   rule, kept out of the footer where it used to sit beside nothing else. */
-.budget-app-root .env-top { gap: 8px; }
+/* The expanded card's collapse chevron (its header) and delete icon — the
+   redesign's "destructive action off in its own corner" rule, kept out of the
+   footer where it used to sit beside nothing else. */
 .budget-app-root .env-collapse, .budget-app-root .env-del-ico {
   flex: none; width: 26px; height: 26px; padding: 0; border: 0; background: none;
   display: inline-flex; align-items: center; justify-content: center;
   border-radius: 7px; color: var(--ink-faint); cursor: pointer;
 }
-.budget-app-root .env-collapse:hover, .budget-app-root .env-del-ico:hover {
-  background: rgba(127, 127, 127, .12); color: var(--text-primary);
+@media (hover: hover) {
+  .budget-app-root .env-collapse:hover, .budget-app-root .env-del-ico:hover {
+    background: rgba(127, 127, 127, .12); color: var(--text-primary);
+  }
+  .budget-app-root .env-del-ico:hover { color: var(--color-danger-ink); }
 }
-.budget-app-root .env-del-ico:hover { color: var(--color-danger-ink); }
 .budget-app-root .env-collapse:focus-visible, .budget-app-root .env-del-ico:focus-visible {
   outline: 2px solid var(--color-primary); outline-offset: 2px;
 }
 .budget-app-root .env-collapse .ico svg, .budget-app-root .env-del-ico .ico svg { width: 15px; height: 15px; }
-.budget-app-root .env-name { flex: 1; min-width: 0; }
 
-/* 3px accent rule, contained by the card's own overflow:hidden — replaces the
-   radial-gradient tint wash on the expanded card, per the note above .env in
-   this file. Negative margins pull it flush to the card's own edges and
-   corner radius rather than leaving a border gap around it. */
-.budget-app-root .env-accent {
-  height: 3px; margin: -22px -24px 16px; border-radius: 24px 24px 0 0;
-}
 
 /* THE PLAN PAGE ON A PHONE, after every base rule it overrides.
 
@@ -5838,7 +5850,6 @@ body.is-phone .budget-app-root .drawer-book:not(.hidden) { display: block; }
      — it sits on its own line under the name, where it takes no width from
      it. */
   .budget-app-root .pot-figs { gap: 10px 26px; }
-  .budget-app-root .src-amt { width: 110px; }
 }
 
 /* ---- mobile redesign: savings view ---- */
@@ -5876,7 +5887,9 @@ body.is-phone .budget-app-root .drawer-book:not(.hidden) { display: block; }
   font: inherit;
   color: inherit;
 }
-.budget-app-root .sav-row:hover { background: var(--color-primary-light, rgba(99,102,241,.06)); }
+@media (hover: hover) {
+  .budget-app-root .sav-row:hover { background: var(--color-primary-light, rgba(99,102,241,.06)); }
+}
 .budget-app-root .sav-row:focus-visible { outline: 2px solid var(--color-primary); outline-offset: -2px; }
 
 .budget-app-root .sav-row-main { min-width: 0; }
@@ -5977,13 +5990,19 @@ body.is-phone .budget-app-root .drawer-book:not(.hidden) { display: block; }
   .budget-app-root #savingsKpis > .mini:nth-child(1),
   .budget-app-root #savingsKpis > .mini:nth-child(2) { grid-column: 1 / -1; }
 }
-/* Shorter — less padding, a smaller value — on the two tiles that pair up,
-   at every width, not only the narrow one: they read as a pair even where
-   the grid already sat them side by side above 640px. */
-.budget-app-root #savingsKpis > .mini:nth-child(3),
-.budget-app-root #savingsKpis > .mini:nth-child(4) { padding: 12px 14px; }
-.budget-app-root #savingsKpis > .mini:nth-child(3) .v,
-.budget-app-root #savingsKpis > .mini:nth-child(4) .v { font-size: 18px; }
+/* Shorter — less padding, a smaller value — on the two tiles that pair up
+   side by side under the full-width Net worth and Savings. That is the phone
+   layout only: from 641px the four tiles sit in one row of equal width, and a
+   row of four equal tiles reads as four equals — the same padding, the same
+   figure size, one baseline. Left at every width, as it was until 26 Nov
+   2026, the last two tiles' figures printed at 18px beside 22px ones (and 18px
+   beside 30px on a 1000px window) with their labels 8px higher. The smaller
+   value is owed only where a half-width tile has to hold "R 305 224,00". */
+@media (max-width: 640px) {
+  .budget-app-root #savingsKpis > .mini:nth-child(3),
+  .budget-app-root #savingsKpis > .mini:nth-child(4) { padding: 12px 14px; }
+  .budget-app-root #savingsKpis > .mini:nth-child(n+3) .v { font-size: 18px; }
+}
 
 /* The staleness / stale-valuation caveats — a compact bordered banner with
    the review button inside it, replacing a paragraph with a button
@@ -6002,11 +6021,11 @@ body.is-phone .budget-app-root .drawer-book:not(.hidden) { display: block; }
   align-items: center;
   justify-content: space-between;
   gap: 8px 12px;
-  border: 1px solid var(--color-warning, #f5a524);
+  border: 1px solid var(--color-warning);
   border-radius: 10px;
   padding: 10px 12px;
   margin-bottom: 10px;
-  background: var(--color-warning-light, rgba(245,165,36,.08));
+  background: var(--color-warning-light);
 }
 
 /* The composition bars' ranked list, replacing `.donut-legend`'s grid. One
@@ -6029,7 +6048,9 @@ body.is-phone .budget-app-root .drawer-book:not(.hidden) { display: block; }
   font: inherit;
   color: inherit;
 }
-.budget-app-root .sav-worth-btn:hover { background: var(--color-primary-light, rgba(99,102,241,.06)); }
+@media (hover: hover) {
+  .budget-app-root .sav-worth-btn:hover { background: var(--color-primary-light, rgba(99,102,241,.06)); }
+}
 .budget-app-root .sav-worth-btn:focus-visible { outline: 2px solid var(--color-primary); outline-offset: -2px; }
 .budget-app-root .sav-worth-swatch { width: 10px; height: 10px; border-radius: 3px; flex-shrink: 0; display: inline-block; }
 .budget-app-root .sav-worth-name { font-size: 13px; font-weight: 600; flex: 1; min-width: 0; }
@@ -6067,7 +6088,15 @@ body.is-phone .budget-app-root .drawer-book:not(.hidden) { display: block; }
 
 .budget-app-root .assets-hero-wrap.mini-grid { display: block; }
 
-.budget-app-root .assets-hero { padding: 18px 20px; }
+/* The Assets hero is the Accounts hero's sibling in kind (one big figure under
+   a label, a strip of facts below), so it takes that card's padding and its
+   narrow-window step (.acct-hero, 34px 34px 30px, then 26px 22px under 760px)
+   rather than a third value of its own: it was 18px 20px, which put the label
+   16px nearer the card edge than the Accounts one (2026-11-25 audit, VIS-15). */
+.budget-app-root .assets-hero { padding: 34px 34px 30px; }
+@media (max-width: 760px) {
+  .budget-app-root .assets-hero { padding: 26px 22px; }
+}
 
 .budget-app-root .assets-hero-top {
   display: flex;
@@ -6107,7 +6136,7 @@ body.is-phone .budget-app-root .drawer-book:not(.hidden) { display: block; }
 }
 
 .budget-app-root .assets-hero-badge-warn {
-  background: var(--color-warning-light, rgba(154, 92, 9, .12));
+  background: var(--color-warning-light);
   color: var(--color-warning-ink);
   border-color: rgba(154, 92, 9, .28);
 }
@@ -6338,13 +6367,12 @@ body.is-phone .budget-app-root .drawer-book:not(.hidden) { display: block; }
 /* Bucket items read left to right: tick, name, amount. */
 .budget-app-root .env-item .ei-name, .budget-app-root .env-item .ei-name > * { text-align: left; justify-content: flex-start; }
 
-/* Accounts view, phone gutter: the two filter rails and the toolbar are
-   direct children of the view with no padding of their own, so they sat on
-   the screen edge while every card beside them kept a gutter. */
+/* Accounts view, phone gutter: the two filter rails are direct children
+   of the view with no padding of their own, so they sat on the screen edge
+   while every card beside them kept a gutter. */
 @media (max-width: 640px) {
   .budget-app-root #acctOwners,
-  .budget-app-root #acctFilters,
-  .budget-app-root .acct-toolbar { margin-left: 16px; margin-right: 16px; max-width: calc(100% - 32px); }
+  .budget-app-root #acctFilters { margin-left: 16px; margin-right: 16px; max-width: calc(100% - 32px); }
 }
 
 /* ============================================================
@@ -6623,6 +6651,8 @@ body.is-phone .budget-app-root .drawer-book:not(.hidden) { display: block; }
   width: 20px; height: 20px; border-radius: 50%; border: 2px solid var(--border-color); box-sizing: border-box;
 }
 .budget-app-root .fs-mark.is-done { background: var(--color-primary); border-color: var(--color-primary); color: #ffffff; }
+/* The tick on a dark primary: --ink-on-accent, as .ei-tick.done does. */
+.budget-app-root.bud-dark .fs-mark.is-done { color: var(--ink-on-accent); }
 .budget-app-root .fs-mark .fs-tick { display: inline-flex; width: 12px; height: 12px; overflow: hidden; }
 .budget-app-root .fs-mark .fs-tick svg { flex: none; width: 12px; height: 12px; stroke-width: 3; }
 .budget-app-root .fs-mark.is-new { animation: fs-pop .45s cubic-bezier(.34, 1.25, .64, 1) both; }

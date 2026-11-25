@@ -534,6 +534,29 @@ function makePeriodChanger({ S, ctx, confirm, render }) {
   };
 }
 
+/* The menu's "Reload from disk" asks before it throws work away.
+
+   reloadFromDisk() resets every section to what the files say, which drops each
+   page's unsaved edits, the Budget draft and a pending import review. The file
+   watcher already refuses to reload over any of that (hasDirty, below) and the
+   period pill asks first (makePeriodChanger), but this menu item went straight
+   through on every page, so a tap on it with Save lit lost the work with no
+   dialog (2026-11-25 audit, FUN-3). `hasDirty` is the watcher's own predicate,
+   not a second list of what counts: a page that registers a dirty check later
+   is covered here without a change. Clean state asks nothing. Exported, with the
+   confirm injected, so a bare-node test can drive it (mountApp needs a DOM). */
+function makeReloadConfirmer({ hasDirty, confirm }) {
+  return async function confirmReloadFromDisk() {
+    if (!hasDirty()) return true;
+    return !!(await confirm({
+      title: i18n.t('ctl.reload.confirmTitle'),
+      message: i18n.t('ctl.reload.confirmMessage'),
+      confirmText: i18n.t('ctl.reload.confirmDiscard'),
+      cancelText: i18n.t('bx.cancel'),
+    }));
+  };
+}
+
 function mountApp(view) {
   const plugin = view.plugin;
   const app = view.app;
@@ -1325,8 +1348,11 @@ function mountApp(view) {
     const page = pageSaveBtn();
     if (page && !page.disabled) page.click();
   });
+  const confirmReload = makeReloadConfirmer({ hasDirty, confirm: opts => confirmModal(app, opts) });
   $('#reloadLink').addEventListener('click', async () => {
     if (!S.loaded) return closeDrawer();
+    // Declining leaves the drawer open and every edit where it was.
+    if (!(await confirmReload())) return;
     // Same guard connectVault() already gives the FIRST read of the vault —
     // a rejected reload here used to be an unhandled rejection with the
     // drawer left open and nothing on screen explaining why nothing moved.
@@ -1584,4 +1610,4 @@ function mountApp(view) {
   };
 }
 
-module.exports = { mountApp, makePeriodChanger, formatMoney, classifyRename, fsChangeInBudget, failedLoadShowsConnect, modalOpenIn, reloadFromDisk, applyInputMode, wireDropZone, makeReloadScheduler, makeRefusalHandler, unreadableSummary, visibleUnreadable, unreadableBannerText };
+module.exports = { mountApp, makePeriodChanger, makeReloadConfirmer, formatMoney, classifyRename, fsChangeInBudget, failedLoadShowsConnect, modalOpenIn, reloadFromDisk, applyInputMode, wireDropZone, makeReloadScheduler, makeRefusalHandler, unreadableSummary, visibleUnreadable, unreadableBannerText };

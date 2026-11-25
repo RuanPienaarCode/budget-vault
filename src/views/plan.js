@@ -1188,7 +1188,8 @@ module.exports = function registerPlan(ctx) {
       { key: 'date', label: 'When does it land?', type: 'date',
         desc: 'A date in the future counts toward the plan, but not toward what you can spend today.' },
     ]);
-    if (!r || !r.name.trim()) return;
+    if (!r) return;
+    if (!r.name.trim()) return toast(i18n.t('plan.err.nameRequired'), true);
     if (op.replaced()) return toast(op.replaced(), true);
     const amount = normalizeAmount(r.amount);
     if (amount === null) return toast('Not a number', true);
@@ -1211,7 +1212,8 @@ module.exports = function registerPlan(ctx) {
         value: suggested > 0 ? suggested.toFixed(2) : '0' },
       { key: 'note', label: 'Note (optional)', type: 'text' },
     ]);
-    if (!r || !r.name.trim()) return;
+    if (!r) return;
+    if (!r.name.trim()) return toast(i18n.t('plan.err.nameRequired'), true);
     if (op.replaced()) return toast(op.replaced(), true);
     const name = r.name.trim();
     if (p.envelopes.some(e => e.name === name)) return toast('That spending bucket already exists', true);
@@ -1230,7 +1232,8 @@ module.exports = function registerPlan(ctx) {
       { key: 'name', label: 'Name', type: 'text', value: env.name },
       { key: 'note', label: 'Note', type: 'text', value: env.note || '' },
     ]);
-    if (!r || !r.name.trim()) return;
+    if (!r) return;
+    if (!r.name.trim()) return toast(i18n.t('plan.err.nameRequired'), true);
     if (op.replaced()) return toast(op.replaced(), true);
     const name = r.name.trim();
     if (name !== env.name) {
@@ -1347,7 +1350,8 @@ module.exports = function registerPlan(ctx) {
         placeholder: 'Baby & catch-up',
         desc: 'Becomes the filename: Plans/<name>.md' },
     ]);
-    if (!r || !r.name.trim()) return;
+    if (!r) return;
+    if (!r.name.trim()) return toast(i18n.t('plan.err.nameRequired'), true);
     if (op.replaced()) return toast(op.replaced(), true);
     const name = r.name.trim();
     const key = safeSeg(name);

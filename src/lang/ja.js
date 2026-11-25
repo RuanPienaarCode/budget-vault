@@ -456,6 +456,9 @@ module.exports = {
   'bud.copy.done': {
     other: '前の期間から {count} 件のカテゴリをコピーしました',
   },
+  'bud.copy.doneFrom': {
+    other: '予算のある直近の過去の期間 {period} から {count} 件のカテゴリをコピーしました',
+  },
   'bud.copy.nothing': 'コピーするものがありません — すべてのカテゴリにすでに値があります',
 
   /* =========================== Transactions page ========================== */
@@ -534,7 +537,10 @@ module.exports = {
   },
   'tx.bulk.backup': '削除前に {path} へ書き出すので元に戻せます — 月別ファイルは削除ではなく編集されるため、保管庫のゴミ箱だけでは戻せません。',
   'tx.bulk.splits': {
-    other: 'そのうち {count} 件は分割に属し、対になる行は絞り込みに含まれていない可能性があります。',
+    other: '分割は丸ごと削除されるため、さらに {count} 行が一緒に削除され、合計 {total} 行になります（元の行とそのすべての明細）。なくなった行を指す明細は残りません。',
+  },
+  'tx.bulk.splitsLeft': {
+    other: '一致した {count} 行はそのまま残します。同じ日の同一の分割に属し、どの明細がどちらのものか区別できません。ファイル内で元の行それぞれの直下に、その金額と一致する明細を並べてから、もう一度削除してください。',
   },
   'tx.bulk.confirm': {
     other: '{count} 行を削除',
@@ -563,19 +569,36 @@ module.exports = {
      split parent row (the why is in en.js) --- */
   'tx.split.chip': '{count} 件に分割',
   'tx.split.chipGap': '{amount} が未計上',
+  'tx.split.chipMissing': '分割 · 明細が見つかりません',
+  'tx.split.chipOver': '元の行より {amount} 多い',
+  'tx.split.chipTwice': '除外が外れ、二重に計上',
+  'tx.split.ambiguous': 'この分割の明細は、同じ日の同一の分割の明細と区別できないため、何も変更していません。{file} で元の行それぞれの直下に、その金額と一致する明細を並べてから、もう一度お試しください。',
   'tx.aria.splitChip': '{date} の {desc} の分割オプション',
+  'tx.aria.splitChipTwice': '{date} の {desc} の除外チェックを元に戻す: 二重に計上されています',
 
   /* Accessible names (audit of 11 Nov 2026, task 19) — machine-assisted, not native-reviewed. */
   'tx.split.aria.amount': '{n} 件目の金額',
   'tx.split.aria.category': '{n} 件目のカテゴリ',
   'tx.split.aria.note': '{n} 件目のメモ',
   'tx.split.aria.remove': '{n} 件目を削除',
+  'tx.split.title': '取引を分割',
+  'tx.split.addPart': '＋ 明細を追加',
+  'tx.split.submit': '分割',
+  'tx.split.notePlaceholder': 'メモ（任意）',
+  'tx.split.unallocated': '未配分: {amount}',
+  'tx.split.balanced': '{amount} を配分済み — 一致',
+  'tx.split.needAmount': 'すべての明細に金額が必要です',
+  'tx.split.hint': '金額は正の数で入力します。分割しても元の取引の入出金の向きは保たれます。元の行はファイルに Excluded として残るため、合計は変わらず、この明細を再度取り込んでも重複しません。',
 
   'tx.unsplit.action': '分割を解除',
   'tx.unsplit.title': 'この取引の分割を解除しますか？',
   'tx.unsplit.msg': {
     other: '分割された {count} 件の明細を削除し、{desc} を {amount} の 1 件の取引に戻します。',
   },
+  'tx.unsplit.noParts': '{file} にこの行と同じ日付・説明の分割明細が見つからないため、分割のまま集計の対象外にしています。日付や説明を編集した場合は明細と一致するように戻してください。明細を削除した場合は、ファイル内のこの行の Excluded と Split のセルを空にしてください。',
+  'tx.reexclude.title': 'この行を再び除外しますか？',
+  'tx.reexclude.msg': '{desc}（{amount}）は分割されましたが、除外のチェックが外れているため、行そのものと明細の両方で計上されています。チェックを戻すと明細だけが計上されます。明細は変更されません。',
+  'tx.reexclude.action': '再び除外',
 
   'tx.add.noAccount': '先に口座を追加してください — 取引は必ずいずれかの口座に属します',
   'tx.add.title': '取引を追加',
@@ -672,6 +695,8 @@ module.exports = {
   'bx.folder': '保存先フォルダ',
   'bx.folder.desc': 'この保管庫内のフォルダ。同じ選択で再度書き出すと、以前のファイルが置き換わります。',
   'bx.cancel': 'キャンセル',
+  'modal.ok': 'OK',
+  'modal.close': '閉じる',
   'bx.go': '書き出す',
   'bx.preview': {
     other: '{count} 期間 · {range} · カテゴリ {cats} 件',
@@ -777,6 +802,22 @@ module.exports = {
   /* Accessible names (audit of 11 Nov 2026, task 19) — machine-assisted, not native-reviewed. */
   'cat.aria.current': '{label} — 現在は {value}',
   'cat.aria.currentNone': '{label} — 現在はカテゴリなし',
+
+  'cat.delete.title': 'カテゴリを削除',
+  'cat.delete.confirm': '削除',
+  'cat.delete.lead': '「{name}」を削除しますか？',
+  'cat.delete.unused': 'このカテゴリを使っている取引はありません。過去の予算ファイルは変わりません。',
+  'cat.delete.used': {
+    other: '{count} 件の取引がこのカテゴリに分類されています。',
+  },
+  'cat.delete.kindLost': 'カテゴリの種類（「{kind}」）はそのファイルから読み込まれるため、ファイルを削除すると、このカテゴリに分類されたお金からその種類が失われます。',
+  'cat.delete.effect.income': 'このカテゴリで入ったお金は、再分類するまで、過去の期間を含むすべての期間で収入として数えられなくなります。',
+  'cat.delete.effect.transfer': 'このカテゴリで動いたお金は、再分類するまで、過去の期間を含むすべての期間で振替ではなくなり、未分類の支出として数えられます。',
+  'cat.delete.effect.other': 'このカテゴリに分類されたお金は、再分類するまで、過去の期間を含むすべての期間で未分類の支出として数えられます。',
+  'cat.delete.rules': {
+    other: '{count} 件の分類ルールが、新しい取り込みを引き続き「{name}」に分類し、今後も続けます。',
+  },
+  'cat.delete.trash': 'カテゴリのファイルは保管庫のゴミ箱に移動します。',
 
   'acct.err.exists': 'その口座はすでに存在します',
   'acct.err.save': '{name} を保存できませんでした（{error}）— ファイルには何も書き込まれていません。もう一度お試しください。',
@@ -1085,6 +1126,8 @@ module.exports = {
   'dash.hero.sub': '支出予算 {budgeted} のうち {spent} を支出',
   'dash.hero.assumedIncluded': '支出済みの {amount} を含む',
   'dash.hero.nettedOff': '返金 {amount} はこの数値から差し引かれていません',
+  'dash.hero.importedTo': '明細は {date} まで取り込み済み',
+  'dash.hero.setUpBudget': 'この期間の予算を立てる',
   'dash.stat.income': '収入合計',
   'dash.stat.budgeted': '予算',
   'dash.stat.spent': '支出合計',
@@ -1094,6 +1137,7 @@ module.exports = {
   'dash.stat.setAside': '貯蓄用 {amount}',
   'dash.stat.setAsideMoved': '{amount} のうち {moved} を貯蓄済み',
   'dash.stat.ofWhichSetAside': '{amount} のうち {moved} を貯蓄済み',
+  'dash.stat.setAsideUnseen': '貯蓄用 {amount} — 積立口座の明細が {date} で止まっているため、貯蓄額はまだ確認できません',
   'dash.scheduledAhead': '本日まで · この期間の後の日付に {amount} があります',
   'dash.fundedFromSavings': {
     other: '別に {amount} が資金から出ています（{count} 件）。この予算には含まれません',
@@ -1184,6 +1228,9 @@ module.exports = {
     other: '直近 {count} 期間の平均',
   },
   'dash.health.subNone': '平均できる完了期間がまだありません',
+  'dash.health.leftOut': {
+    other: '{periods} は除外：明細が期間の終わりより前で止まっています',
+  },
   'dash.health.monthsUnit': 'か月',
   'dash.health.months': '分の必要支出をカバー',
   'dash.health.meterTip': {
@@ -1375,6 +1422,7 @@ module.exports = {
   'dash.left.cycleUnder': '{date} の決済まで {amount} の余裕があります。',
   'dash.left.cycleOver': '{date} に決済する収入を {amount} 上回っています。',
   'dash.left.incoming': '{date} に {amount} が入金',
+  'dash.left.incomingNotImported': '{date} に {amount} の入金予定 — まだ取り込まれていません',
   'dash.left.incomingCovers': '上記をすべて賄い、約 {amount} が残ります。',
   'dash.left.incomingShort': 'それでも {amount} 不足します。',
   'dash.left.days': {
@@ -1400,7 +1448,7 @@ module.exports = {
   'dash.left.asListed': '記載どおり（請求履歴なし）',
   'dash.left.settledInFull': '全額清算、現在の残高',
   'dash.left.contracted': '契約上の返済額',
-  'dash.left.source': '金額は通常請求される額（直近3回の請求の中央値）であり、サービス画面に入力した数字ではありません。サービス一覧と負債ページのみを読み取ります。どちらにも無い定期的な請求はここには数えません。',
+  'dash.left.source': '金額は通常請求される額（直近3回の請求の中央値）であり、サービス画面に入力した数字ではありません。数えるのは、サービス一覧、負債ページ、そして毎月ほぼ同じ日に同じ金額で引き落とされている口座振替です。日によって変わる手動の支払い（振込で払う家賃など）は、サービス一覧に載っていない限り数えません。',
   'dash.split.colCat': 'カテゴリ',
   'dash.split.colSpent': '支出',
   'dash.split.colChange': '増減',
@@ -1742,6 +1790,7 @@ module.exports = {
   'plan.env.collapseAria': "{name} を折りたたむ",
   'plan.env.deleteAria': "支出バケット {name} を削除",
   'plan.actions.deleteAria': "プランを削除",
+  'plan.err.nameRequired': '名前が必要です',
 
   /* Accessible names (audit of 11 Nov 2026, task 19) — machine-assisted, not native-reviewed. */
   'plan.pickerAria': 'プランを選択',
@@ -1851,6 +1900,9 @@ module.exports = {
   'tx.bulkCat.msg': {
     other: '{count} 行を {cat} に設定します。',
   },
+  'tx.bulkCat.splitsSkipped': {
+    other: '一致した {count} 行は分割に属するため、カテゴリはそのままです — 各行で個別に変更してください。',
+  },
   'tx.bulkCat.confirm': {
     other: 'カテゴリを設定（{count}）',
   },
@@ -1887,6 +1939,9 @@ module.exports = {
   },
   'ctl.toast.repointFailed': '「{from}」→「{to}」の名前変更に伴うメモの付け替えができませんでした（{error}）',
   'ctl.notice.unsavedReloadSkipped': '予算: 未保存の変更があるため、再読み込みを見送りました。保存するか（破棄する場合は「ディスクから再読み込み」）、もう一度お試しください。',
+  'ctl.reload.confirmTitle': '未保存の変更',
+  'ctl.reload.confirmMessage': 'ディスクから再読み込みすると、未保存の変更は破棄されます。続行しますか？',
+  'ctl.reload.confirmDiscard': '破棄して再読み込み',
   'ctl.toast.fileFailed': '「{name}」を処理できませんでした（{error}）',
   'ctl.toast.thatFile': 'そのファイル',
   'settings.exchangeRates.source': '為替レートの取得元',

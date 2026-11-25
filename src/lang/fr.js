@@ -466,6 +466,10 @@ module.exports = {
     one: '{count} catégorie copiée depuis la période précédente',
     other: '{count} catégories copiées depuis la période précédente',
   },
+  'bud.copy.doneFrom': {
+    one: '{count} catégorie copiée depuis {period}, la dernière période antérieure avec un budget',
+    other: '{count} catégories copiées depuis {period}, la dernière période antérieure avec un budget',
+  },
   'bud.copy.nothing': 'Rien à copier — chaque catégorie a déjà une valeur',
 
   /* =========================== Transactions page ========================== */
@@ -558,8 +562,12 @@ module.exports = {
   },
   'tx.bulk.backup': 'Elles sont d\'abord écrites dans {path}, donc récupérables — la corbeille du coffre ne peut pas annuler cela seule, car les fichiers mensuels sont modifiés et non supprimés.',
   'tx.bulk.splits': {
-    one: '1 d\'entre elles appartient à une ventilation dont les autres lignes ne sont peut-être pas sélectionnées.',
-    other: '{count} d\'entre elles appartiennent à des ventilations dont les autres lignes ne sont peut-être pas sélectionnées.',
+    one: "{count} ligne de plus part avec elles, {total} en tout : une ventilation se supprime en entier — la ligne d'origine et toutes ses parts — pour qu'aucune part ne décrive une ligne disparue.",
+    other: "{count} lignes de plus partent avec elles, {total} en tout : une ventilation se supprime en entier — la ligne d'origine et toutes ses parts — pour qu'aucune part ne décrive une ligne disparue.",
+  },
+  'tx.bulk.splitsLeft': {
+    one: "{count} ligne correspondante est laissée telle quelle : elle appartient à des ventilations identiques du même jour dont les parts ne peuvent pas être distinguées. Placez les parts de chaque ligne d'origine juste en dessous d'elle dans son fichier, de sorte qu'elles en fassent le montant, puis supprimez à nouveau.",
+    other: "{count} lignes correspondantes sont laissées telles quelles : elles appartiennent à des ventilations identiques du même jour dont les parts ne peuvent pas être distinguées. Placez les parts de chaque ligne d'origine juste en dessous d'elle dans son fichier, de sorte qu'elles en fassent le montant, puis supprimez à nouveau.",
   },
   'tx.bulk.confirm': {
     one: 'Supprimer 1 ligne',
@@ -595,13 +603,26 @@ module.exports = {
      split parent row (the why is in en.js) --- */
   'tx.split.chip': 'répartie en {count}',
   'tx.split.chipGap': '{amount} non affecté',
+  'tx.split.chipMissing': 'répartie · parts introuvables',
+  'tx.split.chipOver': '{amount} de plus que la ligne',
+  'tx.split.chipTwice': 'n’est plus exclue, comptée deux fois',
+  'tx.split.ambiguous': "Les parts de cette ventilation ne peuvent pas être distinguées de celles d'une autre ventilation identique du même jour, donc rien n'a été modifié. Dans {file}, placez les parts de chaque ligne d'origine juste en dessous d'elle, de sorte qu'elles en fassent le montant, puis réessayez.",
   'tx.aria.splitChip': 'Options de ventilation pour {desc} du {date}',
+  'tx.aria.splitChipTwice': 'Remettre la coche Excluded sur {desc} du {date} : elle est comptée deux fois',
 
   /* Accessible names (audit of 11 Nov 2026, task 19) — machine-assisted, not native-reviewed. */
   'tx.split.aria.amount': 'Montant de la part {n}',
   'tx.split.aria.category': 'Catégorie de la part {n}',
   'tx.split.aria.note': 'Note de la part {n}',
   'tx.split.aria.remove': 'Retirer la part {n}',
+  'tx.split.title': 'Répartir la transaction',
+  'tx.split.addPart': '＋ Ajouter une part',
+  'tx.split.submit': 'Répartir',
+  'tx.split.notePlaceholder': 'Note (facultatif)',
+  'tx.split.unallocated': 'Non affecté : {amount}',
+  'tx.split.balanced': '{amount} affecté — équilibré',
+  'tx.split.needAmount': 'Chaque part doit avoir un montant',
+  'tx.split.hint': 'Les montants se saisissent en positif — la répartition garde le sens de la ligne d’origine. La ligne d’origine reste dans le fichier marquée Excluded, donc les totaux ne changent pas et réimporter ce relevé ne la dupliquera pas.',
 
   'tx.unsplit.action': 'Annuler la ventilation',
   'tx.unsplit.title': 'Annuler la ventilation de cette transaction ?',
@@ -609,6 +630,10 @@ module.exports = {
     one: 'Cela supprime la part et rétablit {desc} comme une seule transaction de {amount}.',
     other: 'Cela supprime les {count} parts et rétablit {desc} comme une seule transaction de {amount}.',
   },
+  'tx.unsplit.noParts': "Aucune part de ventilation portant la date et la description de cette ligne n'a été trouvée dans {file} ; elle reste donc ventilée et hors des totaux. Si sa date ou sa description a été modifiée, remettez-la pour qu'elle corresponde à ses parts ; si ses parts ont été supprimées, videz les cellules Excluded et Split de cette ligne dans le fichier.",
+  'tx.reexclude.title': 'Exclure de nouveau cette ligne ?',
+  'tx.reexclude.msg': '{desc} ({amount}) a été répartie, mais sa coche Excluded a été retirée ; elle est donc comptée une fois comme ligne et une autre fois par ses parts. Cela remet la coche, pour que seules les parts comptent. Les parts ne sont pas modifiées.',
+  'tx.reexclude.action': 'Exclure de nouveau',
 
   'tx.add.noAccount': 'Ajoutez d\'abord un compte — chaque transaction appartient à un compte',
   'tx.add.title': 'Ajouter une transaction',
@@ -717,6 +742,8 @@ module.exports = {
   'bx.folder': 'Enregistrer dans le dossier',
   'bx.folder.desc': 'Un dossier dans ce coffre. Exporter à nouveau la même sélection remplace les fichiers précédents.',
   'bx.cancel': 'Annuler',
+  'modal.ok': 'OK',
+  'modal.close': 'Fermer',
   'bx.go': 'Exporter',
   'bx.preview': {
     one: '{count} période · {range} · {cats} catégories',
@@ -826,6 +853,24 @@ module.exports = {
   /* Accessible names (audit of 11 Nov 2026, task 19) — machine-assisted, not native-reviewed. */
   'cat.aria.current': '{label} — actuellement {value}',
   'cat.aria.currentNone': '{label} — actuellement sans catégorie',
+
+  'cat.delete.title': 'Supprimer la catégorie',
+  'cat.delete.confirm': 'Supprimer',
+  'cat.delete.lead': 'Supprimer « {name} » ?',
+  'cat.delete.unused': 'Aucune transaction ne l\'utilise. Les fichiers de budget passés ne changent pas.',
+  'cat.delete.used': {
+    one: '{count} transaction est classée dedans.',
+    other: '{count} transactions sont classées dedans.',
+  },
+  'cat.delete.kindLost': 'Le type d\'une catégorie (« {kind} ») est lu dans son fichier : supprimer le fichier retire ce type à l\'argent classé dedans.',
+  'cat.delete.effect.income': 'L\'argent entré dedans cesse de compter comme revenu, dans chaque période, y compris les passées, jusqu\'à ce qu\'il soit reclassé.',
+  'cat.delete.effect.transfer': 'L\'argent déplacé dedans cesse d\'être un virement et compte comme dépense non catégorisée, dans chaque période, y compris les passées, jusqu\'à ce qu\'il soit reclassé.',
+  'cat.delete.effect.other': 'L\'argent classé dedans compte comme dépense non catégorisée dans chaque période, y compris les passées, jusqu\'à ce qu\'il soit reclassé.',
+  'cat.delete.rules': {
+    one: '{count} règle de catégorisation classe encore les nouveaux imports sous « {name} » et continuera de le faire.',
+    other: '{count} règles de catégorisation classent encore les nouveaux imports sous « {name} » et continueront de le faire.',
+  },
+  'cat.delete.trash': 'Le fichier de la catégorie va dans la corbeille de ton coffre.',
 
   'acct.err.exists': 'Ce compte existe déjà',
   'acct.err.save': 'Impossible d\'enregistrer {name} ({error}) — rien n\'a été écrit dans le fichier ; réessayez la même action.',
@@ -1144,6 +1189,8 @@ module.exports = {
   'dash.hero.sub': '{spent} dépensé sur {budgeted} de budget de dépenses',
   'dash.hero.assumedIncluded': 'dont {amount} déjà dépensé',
   'dash.hero.nettedOff': '{amount} de remboursements non déduits de ce chiffre',
+  'dash.hero.importedTo': 'Relevés importés jusqu\'au {date}',
+  'dash.hero.setUpBudget': 'Préparer le budget de cette période',
   'dash.stat.income': 'Revenus totaux',
   'dash.stat.budgeted': 'Budgété',
   'dash.stat.spent': 'Total dépensé',
@@ -1153,6 +1200,7 @@ module.exports = {
   'dash.stat.setAside': '{amount} pour l\'épargne',
   'dash.stat.setAsideMoved': '{moved} sur {amount} épargnés à ce jour',
   'dash.stat.ofWhichSetAside': '{moved} sur {amount} épargnés à ce jour',
+  'dash.stat.setAsideUnseen': '{amount} pour l\'épargne — les relevés des comptes d\'épargne s\'arrêtent au {date}, l\'épargne n\'est donc pas encore visible',
   'dash.scheduledAhead': 'Jusqu’à aujourd’hui · {amount} de plus sont datés plus tard dans cette période',
   'dash.fundedFromSavings': {
     one: '{amount} de plus est sorti de vos réserves ({count} opération), non comptés dans ce budget',
@@ -1256,6 +1304,10 @@ module.exports = {
     other: 'Moyenne sur vos {count} dernières périodes terminées',
   },
   'dash.health.subNone': 'Aucune période terminée à moyenner pour l’instant',
+  'dash.health.leftOut': {
+    one: '{periods} laissé de côté : les relevés s\'arrêtent avant la fin de la période',
+    other: '{periods} laissés de côté : les relevés s\'arrêtent avant la fin de ces périodes',
+  },
   'dash.health.monthsUnit': 'mois',
   'dash.health.months': 'de dépenses essentielles couverts',
   'dash.health.meterTip': {
@@ -1458,6 +1510,7 @@ module.exports = {
   'dash.left.cycleUnder': '{amount} de marge avant le règlement du {date}.',
   'dash.left.cycleOver': '{amount} de PLUS que le revenu qui la règle le {date}.',
   'dash.left.incoming': '{amount} arrive le {date}',
+  'dash.left.incomingNotImported': '{amount} prévu le {date} — pas encore importé',
   'dash.left.incomingCovers': 'Cela couvre tout ce qui précède et laisse environ {amount}.',
   'dash.left.incomingShort': 'Même après cela, il vous manque {amount}.',
   'dash.left.days': {
@@ -1484,7 +1537,7 @@ module.exports = {
   'dash.left.asListed': 'tel qu’indiqué, sans historique',
   'dash.left.settledInFull': 'soldée intégralement, solde actuel',
   'dash.left.contracted': 'mensualité contractuelle',
-  'dash.left.source': 'Les montants correspondent à ce qui est habituellement prélevé (la valeur médiane des trois derniers prélèvements), pas au chiffre saisi sur la page Services. Lus uniquement depuis ta liste de Services et la page Dettes — un prélèvement récurrent absent des deux n’est pas compté ici.',
+  'dash.left.source': 'Les montants correspondent à ce qui est habituellement prélevé (la valeur médiane des trois derniers prélèvements), pas au chiffre saisi sur la page Services. Sont comptés : ta liste de Services, la page Dettes, et les prélèvements constatés chaque mois pour le même montant à peu près le même jour. Un paiement fait à la main à des dates variables — un loyer réglé par virement, par exemple — n’est pas compté, sauf s’il figure dans ta liste de Services.',
   'dash.split.colCat': 'Catégorie',
   'dash.split.colSpent': 'Dépensé',
   'dash.split.colChange': 'Écart',
@@ -1836,6 +1889,7 @@ module.exports = {
   'plan.env.collapseAria': "Replier {name}",
   'plan.env.deleteAria': "Retirer l'enveloppe {name}",
   'plan.actions.deleteAria': "Supprimer le plan",
+  'plan.err.nameRequired': 'Il lui faut un nom',
 
   /* Accessible names (audit of 11 Nov 2026, task 19) — machine-assisted, not native-reviewed. */
   'plan.pickerAria': 'Choisir un plan',
@@ -1952,6 +2006,10 @@ module.exports = {
     one: '1 ligne sera définie sur {cat}.',
     other: '{count} lignes seront définies sur {cat}.',
   },
+  'tx.bulkCat.splitsSkipped': {
+    one: '{count} ligne correspondante appartient à une ventilation et garde sa catégorie — modifiez-la sur sa propre ligne.',
+    other: '{count} lignes correspondantes appartiennent à des ventilations et gardent leurs catégories — modifiez-les sur leurs propres lignes.',
+  },
   'tx.bulkCat.confirm': {
     one: 'Définir la catégorie (1)',
     other: 'Définir la catégorie ({count})',
@@ -1993,6 +2051,9 @@ module.exports = {
   },
   'ctl.toast.repointFailed': 'Impossible de rediriger les notes pour le renommage "{from}" → "{to}" ({error})',
   'ctl.notice.unsavedReloadSkipped': 'Budget : modifications non enregistrées — rechargement ignoré. Enregistrez (ou « Recharger depuis le disque » pour abandonner), puis réessayez.',
+  'ctl.reload.confirmTitle': 'Modifications non enregistrées',
+  'ctl.reload.confirmMessage': 'Le rechargement depuis le disque abandonnera vos modifications non enregistrées. Continuer ?',
+  'ctl.reload.confirmDiscard': 'Abandonner et recharger',
   'ctl.toast.fileFailed': 'Impossible de traiter "{name}" ({error})',
   'ctl.toast.thatFile': 'ce fichier',
   'settings.exchangeRates.source': 'Source des taux de change',

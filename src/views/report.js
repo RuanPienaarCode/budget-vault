@@ -66,6 +66,7 @@ const { monthlyInterest } = require('../debt-math');
    for the reproduction. monthlyInterest above is still imported for the
    PER-ROW figure in the table, which is a different question. */
 const { debtInterestCoverage } = require('../health-math');
+const { leftOutClause } = require('../health-copy');
 const { todayIso, nowLocalMinute } = require('../dates');
 const { typeOrder, typeRank } = require('../groups');
 const {
@@ -577,6 +578,9 @@ module.exports = function registerReport(ctx) {
          above were taken over: the Dashboard health card's and the Score
          page's "Averaged over your last N completed periods". */
       countedPeriods: H.countedPeriods,
+      /* 2026-11-25 audit, NUM-2 — and the periods it left out, and why: the
+         card's and the Score page's own clause (health-copy.js), or ''. */
+      leftOut: leftOutClause(snap.incompletePeriods, periodMonthName),
       /* ISSUE 57. What this score was computed WITHOUT. The screen says it —
          the Score hero prints "N accounts in other currencies … are not in
          these figures" — and this function dropped it on the floor, so the

@@ -456,6 +456,9 @@ module.exports = {
   'bud.copy.done': {
     other: '已从上一周期复制 {count} 个分类',
   },
+  'bud.copy.doneFrom': {
+    other: '已从 {period}（最近一个有预算的更早周期）复制 {count} 个分类',
+  },
   'bud.copy.nothing': '没有可复制的内容 — 每个分类都已有数值',
 
   /* =========================== Transactions page ========================== */
@@ -534,7 +537,10 @@ module.exports = {
   },
   'tx.bulk.backup': '它们会先写入 {path}，因此可以找回 — 月度文件是被修改而非删除，库的回收站无法单独撤销这一步。',
   'tx.bulk.splits': {
-    other: '其中 {count} 行属于拆分，其配套行未必在筛选范围内。',
+    other: '拆分会整体删除，因此还会一并删除 {count} 行，共 {total} 行（原始行及其所有拆分行），不会留下指向已删除行的拆分行。',
+  },
+  'tx.bulk.splitsLeft': {
+    other: '符合条件的 {count} 行保持不变：它们属于同一天的相同拆分，无法分辨哪些拆分行属于哪一笔。请在文件中把每个原始行的拆分行放在它的正下方，并使其合计等于原始金额，然后再删除。',
   },
   'tx.bulk.confirm': {
     other: '删除 {count} 行',
@@ -563,19 +569,36 @@ module.exports = {
      split parent row (the why is in en.js) --- */
   'tx.split.chip': '拆分为 {count} 笔',
   'tx.split.chipGap': '{amount} 未分配',
+  'tx.split.chipMissing': '已拆分 · 未找到拆分行',
+  'tx.split.chipOver': '比原行多 {amount}',
+  'tx.split.chipTwice': '已不再排除，被重复计算',
+  'tx.split.ambiguous': '这次拆分的拆分行无法与同一天另一笔相同拆分的拆分行区分开，因此没有做任何更改。请在 {file} 中把每个原始行的拆分行放在它的正下方，并使其合计等于原始金额，然后重试。',
   'tx.aria.splitChip': '{date} {desc} 的拆分选项',
+  'tx.aria.splitChipTwice': '把 {date} {desc} 的 Excluded 勾选恢复：它被重复计算了',
 
   /* Accessible names (audit of 11 Nov 2026, task 19) — machine-assisted, not native-reviewed. */
   'tx.split.aria.amount': '第 {n} 部分的金额',
   'tx.split.aria.category': '第 {n} 部分的分类',
   'tx.split.aria.note': '第 {n} 部分的备注',
   'tx.split.aria.remove': '移除第 {n} 部分',
+  'tx.split.title': '拆分交易',
+  'tx.split.addPart': '＋ 添加拆分行',
+  'tx.split.submit': '拆分',
+  'tx.split.notePlaceholder': '备注（可选）',
+  'tx.split.unallocated': '未分配：{amount}',
+  'tx.split.balanced': '已分配 {amount} — 已平衡',
+  'tx.split.needAmount': '每个部分都需要金额',
+  'tx.split.hint': '金额请按正数输入 — 拆分会保留原交易的方向。原始行仍留在文件中并标记为 Excluded，因此合计不变，重新导入这份对账单也不会重复。',
 
   'tx.unsplit.action': '取消拆分',
   'tx.unsplit.title': '要取消这笔交易的拆分吗？',
   'tx.unsplit.msg': {
     other: '这会删除拆分出的 {count} 行，并把 {desc} 恢复为一笔 {amount} 的交易。',
   },
+  'tx.unsplit.noParts': '在 {file} 中没有找到与这一行日期和描述相同的拆分行，因此它仍保持拆分状态，不计入合计。如果改过它的日期或描述，请改回与拆分行一致；如果拆分行已被删除，请在文件中清空这一行的 Excluded 和 Split 单元格。',
+  'tx.reexclude.title': '再次排除这一行吗？',
+  'tx.reexclude.msg': '{desc}（{amount}）已被拆分，但它的 Excluded 勾选已被取消，所以它自己算一次，又通过拆分行再算一次。这会把勾选恢复，只让拆分行计入。拆分行不会改动。',
+  'tx.reexclude.action': '再次排除',
 
   'tx.add.noAccount': '请先添加一个账户 — 每笔交易都要归属于某个账户',
   'tx.add.title': '添加交易',
@@ -672,6 +695,8 @@ module.exports = {
   'bx.folder': '保存到文件夹',
   'bx.folder.desc': '仓库中的一个文件夹。再次导出相同的选择会替换之前的文件。',
   'bx.cancel': '取消',
+  'modal.ok': '确定',
+  'modal.close': '关闭',
   'bx.go': '导出',
   'bx.preview': {
     other: '{count} 个周期 · {range} · {cats} 个分类',
@@ -777,6 +802,22 @@ module.exports = {
   /* Accessible names (audit of 11 Nov 2026, task 19) — machine-assisted, not native-reviewed. */
   'cat.aria.current': '{label} — 当前为 {value}',
   'cat.aria.currentNone': '{label} — 当前未分类',
+
+  'cat.delete.title': '删除分类',
+  'cat.delete.confirm': '删除',
+  'cat.delete.lead': '删除“{name}”？',
+  'cat.delete.unused': '没有交易使用它。以往的预算文件不会改变。',
+  'cat.delete.used': {
+    other: '有 {count} 笔交易归在它名下。',
+  },
+  'cat.delete.kindLost': '分类的类型（“{kind}”）是从它的文件中读取的，所以删除文件会让归在它名下的钱失去该类型。',
+  'cat.delete.effect.income': '在它名下收到的钱，在每一个周期（包括过去的周期）都不再计为收入，直到重新分类。',
+  'cat.delete.effect.transfer': '在它名下转动的钱不再是转账，而会在每一个周期（包括过去的周期）计为未分类支出，直到重新分类。',
+  'cat.delete.effect.other': '归在它名下的钱会在每一个周期（包括过去的周期）计为未分类支出，直到重新分类。',
+  'cat.delete.rules': {
+    other: '有 {count} 条分类规则仍会把新导入的交易归到“{name}”，并会一直这样做。',
+  },
+  'cat.delete.trash': '分类文件会进入你的库的回收站。',
 
   'acct.err.exists': '该账户已存在',
   'acct.err.save': '无法保存 {name}（{error}）— 文件未写入任何内容；请重试同一操作。',
@@ -1085,6 +1126,8 @@ module.exports = {
   'dash.hero.sub': '支出预算 {budgeted}，已花 {spent}',
   'dash.hero.assumedIncluded': '含已支出的 {amount}',
   'dash.hero.nettedOff': '退款 {amount} 未从此数字中扣除',
+  'dash.hero.importedTo': '对账单已导入至 {date}',
+  'dash.hero.setUpBudget': '设置本周期的预算',
   'dash.stat.income': '收入合计',
   'dash.stat.budgeted': '预算',
   'dash.stat.spent': '支出合计',
@@ -1094,6 +1137,7 @@ module.exports = {
   'dash.stat.setAside': '储蓄 {amount}',
   'dash.stat.setAsideMoved': '{amount} 中已储蓄 {moved}',
   'dash.stat.ofWhichSetAside': '{amount} 中已储蓄 {moved}',
+  'dash.stat.setAsideUnseen': '储蓄 {amount} — 储蓄账户的对账单止于 {date}，所以还看不到存入的金额',
   'dash.scheduledAhead': '截至今天 · 本期稍后还有 {amount}',
   'dash.fundedFromSavings': {
     other: '另有 {amount} 从您的专款支出（{count} 笔），本预算不计入',
@@ -1184,6 +1228,9 @@ module.exports = {
     other: '按最近 {count} 个已完成周期平均',
   },
   'dash.health.subNone': '尚无已完成的周期可供平均',
+  'dash.health.leftOut': {
+    other: '{periods} 未计入：对账单在该周期结束前就停止了',
+  },
   'dash.health.monthsUnit': '个月',
   'dash.health.months': '的必要支出已覆盖',
   'dash.health.meterTip': {
@@ -1375,6 +1422,7 @@ module.exports = {
   'dash.left.cycleUnder': '距 {date} 结清尚有 {amount} 余量。',
   'dash.left.cycleOver': '比 {date} 结清的收入多出 {amount}。',
   'dash.left.incoming': '{date} 将有 {amount} 入账',
+  'dash.left.incomingNotImported': '预计 {date} 入账 {amount} — 尚未导入',
   'dash.left.incomingCovers': '足以支付上述所有款项，并剩余约 {amount}。',
   'dash.left.incomingShort': '即便如此仍短缺 {amount}。',
   'dash.left.days': {
@@ -1400,7 +1448,7 @@ module.exports = {
   'dash.left.asListed': '按列表填写，无扣款记录',
   'dash.left.settledInFull': '全额结清，当前余额',
   'dash.left.contracted': '合同约定还款额',
-  'dash.left.source': '金额取自通常的扣款额（最近三次扣款的中间值），而不是你在“订阅服务”页面填写的数字。只读取你的订阅服务列表和负债页面 — 两者都没有的定期扣款不会计入这里。',
+  'dash.left.source': '金额取自通常的扣款额（最近三次扣款的中间值），而不是你在“订阅服务”页面填写的数字。计入的有：你的订阅服务列表、负债页面，以及每月大约同一天扣同样金额的代扣。在不同日子手动支付的款项（例如通过转账支付的房租）不计入，除非它在你的订阅服务列表中。',
   'dash.split.colCat': '类别',
   'dash.split.colSpent': '支出',
   'dash.split.colChange': '变化',
@@ -1742,6 +1790,7 @@ module.exports = {
   'plan.env.collapseAria': "收起 {name}",
   'plan.env.deleteAria': "移除支出信封 {name}",
   'plan.actions.deleteAria': "删除计划",
+  'plan.err.nameRequired': '需要填写名称',
 
   /* Accessible names (audit of 11 Nov 2026, task 19) — machine-assisted, not native-reviewed. */
   'plan.pickerAria': '选择计划',
@@ -1851,6 +1900,9 @@ module.exports = {
   'tx.bulkCat.msg': {
     other: '{count} 行将被设置为 {cat}。',
   },
+  'tx.bulkCat.splitsSkipped': {
+    other: '符合条件的 {count} 行属于拆分，保留原有分类 — 请在各自的行上修改。',
+  },
   'tx.bulkCat.confirm': {
     other: '设置分类（{count}）',
   },
@@ -1887,6 +1939,9 @@ module.exports = {
   },
   'ctl.toast.repointFailed': '无法为重命名“{from}”→“{to}”重新指向笔记（{error}）',
   'ctl.notice.unsavedReloadSkipped': '预算：有未保存的更改 — 已跳过重新加载。请先保存（或选择“从磁盘重新加载”以放弃更改），然后重试。',
+  'ctl.reload.confirmTitle': '未保存的更改',
+  'ctl.reload.confirmMessage': '从磁盘重新加载将放弃未保存的更改。是否继续？',
+  'ctl.reload.confirmDiscard': '放弃并重新加载',
   'ctl.toast.fileFailed': '无法处理“{name}”（{error}）',
   'ctl.toast.thatFile': '该文件',
   'settings.exchangeRates.source': '汇率来源',

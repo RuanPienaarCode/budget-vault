@@ -125,14 +125,87 @@ function nameToggle(tg, label, names, descs) {
   };
 }
 
+/* ---- a form that says what is wrong and stays open ----------------------
+   Every caller used to validate AFTER the dialog had closed, so a missing
+   description, title or name closed the form with a toast and threw away
+   everything else typed — a long note body included (2026-11-25 audit,
+   FUN-1). The check has to run while the form is still on screen, which only
+   the dialog can arrange; so askFields takes an optional `validate(values)`.
+
+   It returns nothing when the values are fine, a message string when they are
+   not, or `{ field, message }` to also name the field at fault. On a message
+   the dialog stays OPEN with every value as typed, prints the message in the
+   dialog itself (a toast would sit behind the overlay on a phone), and moves
+   focus to that field. The promise settles only when validation passes or the
+   reader cancels, so a caller's own checks after `await askFields` can never
+   be reached with a value the hook refused. A caller that passes no hook gets
+   exactly the dialog it always had.
+
+   `validate` is handed a COPY of the values: a hook that tidies its argument
+   cannot change what the reader sees or what resolves.
+
+   The message is drawn with the split dialog's foot classes
+   (`budget-split-foot is-off`), which are unscoped like every dialog rule here
+   (a Modal renders outside the plugin root) and already carry the error
+   colour of this stylesheet — a rule of its own would be a second red. */
+function cloneValues(values) {
+  const out = {};
+  for (const k of Object.keys(values)) out[k] = Array.isArray(values[k]) ? [...values[k]] : values[k];
+  return out;
+}
+function readVerdict(verdict) {
+  if (!verdict) return null;
+  if (typeof verdict === 'string') return { field: null, message: verdict };
+  if (typeof verdict.message === 'string' && verdict.message) return { field: verdict.field ?? null, message: verdict.message };
+  return null;
+}
+
 class FieldModal extends Modal {
-  constructor(app, title, fields, resolve) {
+  constructor(app, title, fields, resolve, opts) {
     super(app);
     this.fieldDefs = fields;
     this.modalTitle = title;
     this.resolve = resolve;
     this.submitted = false;
     this.values = {};
+    this.validate = opts && typeof opts.validate === 'function' ? opts.validate : null;
+    // key -> the control the reader types into, for putting focus on it, and
+    // the row it sits in, for putting the message under it.
+    this.controls = {};
+    this.rows = {};
+    this.errEl = null;
+    this.badKey = null;
+  }
+  /* Called from every control's change handler. The message is about a value
+     the reader is now changing, so it goes — rather than sitting red over a
+     field that has since been fixed. A message that names no field goes on any
+     edit; one that names a field goes when that field is edited. */
+  touched(key) {
+    if (!this.errEl || !this.errEl.textContent) return;
+    if (this.badKey !== null && this.badKey !== key) return;
+    this.clearError();
+  }
+  clearError() {
+    if (this.errEl) this.errEl.textContent = '';
+    const c = this.badKey !== null ? this.controls[this.badKey] : null;
+    if (c && typeof c.removeAttribute === 'function') c.removeAttribute('aria-invalid');
+    this.badKey = null;
+  }
+  showError(bad) {
+    this.clearError();
+    this.errEl.textContent = bad.message;
+    const c = bad.field != null ? this.controls[bad.field] : null;
+    if (bad.field != null) this.badKey = bad.field;
+    /* Under the field it is about when one is named: in a form taller than the
+       window, focus scrolls to the field, and a message left above the buttons
+       would be out of sight at the other end. A message about the form as a
+       whole stays above the buttons. */
+    const row = bad.field != null ? this.rows[bad.field] : null;
+    if (row && typeof row.after === 'function') row.after(this.errEl);
+    if (c) {
+      if (typeof c.setAttribute === 'function') c.setAttribute('aria-invalid', 'true');
+      if (typeof c.focus === 'function') c.focus();
+    }
   }
   onOpen() {
     // Body-mounted, so outside the plugin root and its `lang` (i18n.js followLanguage).
@@ -145,6 +218,7 @@ class FieldModal extends Modal {
       // The field's label and hint, as ids every branch below binds to its
       // control (refIds, above).
       const ids = refIds(s, !!f.desc);
+      this.rows[f.key] = s.settingEl;
       if (f.type === 'toggles') {
         /* A set of independent yes/no choices under one heading — for
            "which of these do you want off", where a dropdown would force the
@@ -174,6 +248,7 @@ class FieldModal extends Modal {
               if (now) cur.push(o.value);
               this.values[f.key] = cur;
               publish(now);
+              this.touched(f.key);
             });
           });
         }
@@ -193,7 +268,8 @@ class FieldModal extends Modal {
           if (f.placeholder) t.setPlaceholder(f.placeholder);
           t.inputEl.rows = f.rows || 5;
           nameControl(t.inputEl, f.label, [ids.name], [ids.desc]);
-          t.onChange(v => { this.values[f.key] = v; });
+          this.controls[f.key] = t.inputEl;
+          t.onChange(v => { this.values[f.key] = v; this.touched(f.key); });
         });
       } else if (f.type === 'select') {
         this.values[f.key] = f.value ?? f.options[0];
@@ -201,7 +277,8 @@ class FieldModal extends Modal {
           for (const o of f.options) d.addOption(o.value ?? o, o.label ?? o);
           d.setValue(this.values[f.key]);
           nameControl(d.selectEl, f.label, [ids.name], [ids.desc]);
-          d.onChange(v => { this.values[f.key] = v; });
+          this.controls[f.key] = d.selectEl;
+          d.onChange(v => { this.values[f.key] = v; this.touched(f.key); });
         });
       } else {
         this.values[f.key] = String(f.value ?? '');
@@ -211,14 +288,22 @@ class FieldModal extends Modal {
           if (f.type === 'number') { t.inputEl.type = 'number'; t.inputEl.step = '0.01'; }
           if (f.type === 'date') t.inputEl.type = 'date';
           nameControl(t.inputEl, f.label, [ids.name], [ids.desc]);
-          t.onChange(v => { this.values[f.key] = v; });
+          this.controls[f.key] = t.inputEl;
+          t.onChange(v => { this.values[f.key] = v; this.touched(f.key); });
           firstInputs.push(t.inputEl);
         });
       }
     }
+    /* Only a form that has a hook can refuse, so only that form gets the
+       element; role=alert has the refusal read out when it appears. Above the
+       buttons, where the eye is when it has just pressed one. */
+    if (this.validate) {
+      this.errEl = el('div', { class: 'budget-split-foot is-off', role: 'alert' });
+      this.contentEl.append(this.errEl);
+    }
     new Setting(this.contentEl)
-      .addButton(b => b.setButtonText('Cancel').onClick(() => this.close()))
-      .addButton(b => b.setButtonText('OK').setCta().onClick(() => this.submit()));
+      .addButton(b => b.setButtonText(i18n.t('bx.cancel')).onClick(() => this.close()))
+      .addButton(b => b.setButtonText(i18n.t('modal.ok')).setCta().onClick(() => this.submit()));
     /* Enter submits from a field you type a value into, and is left alone
        everywhere it already means something (enterSubmits, above).
 
@@ -233,15 +318,23 @@ class FieldModal extends Modal {
     });
     if (firstInputs[0]) window.setTimeout(() => firstInputs[0].focus(), 10);
   }
-  submit() { this.submitted = true; this.close(); }
+  submit() {
+    if (this.validate) {
+      const bad = readVerdict(this.validate(cloneValues(this.values)));
+      if (bad) { this.showError(bad); return; }
+    }
+    this.submitted = true;
+    this.close();
+  }
   onClose() {
     this.contentEl.empty();
     this.resolve(this.submitted ? this.values : null);
   }
 }
 
-function askFields(app, title, fields) {
-  return new Promise(res => new FieldModal(app, title, fields, res).open());
+/* `opts.validate(values)` — see "a form that says what is wrong" above. */
+function askFields(app, title, fields, opts) {
+  return new Promise(res => new FieldModal(app, title, fields, res, opts).open());
 }
 
 /* Yes/no confirmation. Resolves true only if the user clicks the confirm
@@ -268,7 +361,7 @@ class ConfirmModal extends Modal {
   onOpen() {
     // Body-mounted, so outside the plugin root and its `lang` (i18n.js followLanguage).
     i18n.followLanguage(this.modalEl);
-    const { title, message, confirmText = 'Discard', cancelText = 'Cancel', primary = 'confirm' } = this.opts;
+    const { title, message, confirmText = 'Discard', cancelText = i18n.t('bx.cancel'), primary = 'confirm' } = this.opts;
     const safeFirst = primary === 'cancel';
     if (title) this.titleEl.setText(title);
     this.contentEl.createEl('p', { text: message });
@@ -334,7 +427,7 @@ class SplitModal extends Modal {
     // Body-mounted, so outside the plugin root and its `lang` (i18n.js followLanguage).
     i18n.followLanguage(this.modalEl);
     const { tx, money } = this.opts;
-    this.titleEl.setText('Split transaction');
+    this.titleEl.setText(i18n.t('tx.split.title'));
     const c = this.contentEl;
 
     c.append(el('div', { class: 'budget-split-head' },
@@ -345,7 +438,7 @@ class SplitModal extends Modal {
     this.partsEl = el('div', { class: 'budget-split-parts' });
     c.append(this.partsEl);
 
-    const addBtn = el('button', { type: 'button', class: 'budget-split-add' }, '＋ Add part');
+    const addBtn = el('button', { type: 'button', class: 'budget-split-add' }, i18n.t('tx.split.addPart'));
     // Seed the new part with what's still unallocated: adding a part is nearly
     // always "and the rest goes here", so this usually balances in one click.
     addBtn.addEventListener('click', () => {
@@ -357,16 +450,13 @@ class SplitModal extends Modal {
 
     this.footEl = el('div', { class: 'budget-split-foot', role: 'status' });
     c.append(this.footEl);
-    c.append(el('div', { class: 'budget-split-hint' },
-      'Amounts are entered as positive — the split keeps the original’s direction. ' +
-      'The original line stays in the file marked Excluded, so the totals are unchanged ' +
-      'and re-importing this statement will not duplicate it.'));
+    c.append(el('div', { class: 'budget-split-hint' }, i18n.t('tx.split.hint')));
 
     const foot = new Setting(c);
-    foot.addButton(b => b.setButtonText('Cancel').onClick(() => this.close()));
+    foot.addButton(b => b.setButtonText(i18n.t('bx.cancel')).onClick(() => this.close()));
     foot.addButton(b => {
       this.okBtn = b;
-      b.setButtonText('Split').setCta().onClick(() => this.submit());
+      b.setButtonText(i18n.t('tx.split.submit')).setCta().onClick(() => this.submit());
     });
 
     this.renderParts();
@@ -408,14 +498,14 @@ class SplitModal extends Modal {
       });
 
       const cat = el('select', { class: 'budget-split-cat', 'aria-label': i18n.t('tx.split.aria.category', { n: i + 1 }) });
-      cat.append(el('option', { value: '' }, '— none —'));
+      cat.append(el('option', { value: '' }, i18n.t('tx.field.none')));
       for (const name of this.opts.categories) cat.append(el('option', { value: name }, name));
       cat.value = p.cat;
       cat.addEventListener('change', () => { p.cat = cat.value; });
 
       const note = el('input', {
         type: 'text', class: 'budget-split-note', value: p.note,
-        placeholder: 'Note (optional)', 'aria-label': i18n.t('tx.split.aria.note', { n: i + 1 }),
+        placeholder: i18n.t('tx.split.notePlaceholder'), 'aria-label': i18n.t('tx.split.aria.note', { n: i + 1 }),
       });
       note.addEventListener('input', () => { p.note = note.value; });
 
@@ -447,10 +537,10 @@ class SplitModal extends Modal {
     /* The message names the actual blocker. "Balanced" while the Split button
        sits disabled (the seeded second part is still 0) reads as a bug. */
     this.footEl.textContent = !balanced
-      ? `Unallocated: ${money(this.sign * rem)}`
+      ? i18n.t('tx.split.unallocated', { amount: money(this.sign * rem) })
       : allPositive
-        ? `Allocated ${money(this.sign * this.total)} — balanced`
-        : 'Every part needs an amount';
+        ? i18n.t('tx.split.balanced', { amount: money(this.sign * this.total) })
+        : i18n.t('tx.split.needAmount');
     this.footEl.classList.toggle('is-balanced', balanced && allPositive);
     this.footEl.classList.toggle('is-off', !(balanced && allPositive));
     if (this.okBtn) this.okBtn.setDisabled(!(balanced && allPositive));
@@ -494,7 +584,18 @@ function askSplit(app, opts) {
    file before touching it, so agreeing here is recoverable.
 
    Every deletion is listed, not a sample: a truncated list would mean the one
-   rule the user cared about is the one they could not see. */
+   rule the user cared about is the one they could not see.
+
+   Conflicts are listed too, though nothing is ever removed for one. Two rules
+   with the same pattern and different categories are not a duplicate: the later
+   one is already dead, but which of the two the household MEANT is theirs to
+   say, so the app names the pair, says which one wins today, and says that it
+   will not choose (2026-11-25 audit, RUL-11 follow-up). Before this the dialog
+   could open on "all 40 rules earn their place" over a file that contradicted
+   itself. Like the rest of this dialog the wording is English-only: the
+   preview was never keyed, and one keyed sentence among forty plain ones would
+   read as a half-translated dialog rather than a finished one. (Its Cancel and
+   Close buttons are the exception: the generic ones every dialog shares.) */
 class RulesCleanupModal extends Modal {
   constructor(app, report, resolve) {
     super(app);
@@ -507,15 +608,23 @@ class RulesCleanupModal extends Modal {
     // Body-mounted, so outside the plugin root and its `lang` (i18n.js followLanguage).
     i18n.followLanguage(this.modalEl);
     const { remove, redundant, blank, dormant, kept, checked, total } = this.report;
+    // Absent on a report from before conflicts were reported: none to show.
+    const conflicts = this.report.conflicts || [];
     this.titleEl.setText('Tidy categorisation rules');
     const c = this.contentEl;
 
     if (!remove.length) {
+      /* "All N rules earn their place" is a claim about every rule, and a
+         conflict is two rules that cannot both be right — so with any, the
+         sentence is not printed at all, not printed with a caveat after it. */
       c.append(el('p', { class: 'budget-tidy-lead' },
         total === 0
           ? 'There are no categorisation rules yet. They get written as you categorise imported transactions.'
-          : `Nothing to remove — all ${total} rules earn their place against the ${checked} descriptions in your vault.`));
-      new Setting(c).addButton(b => b.setButtonText('Close').setCta().onClick(() => this.close()));
+          : conflicts.length
+            ? `Nothing to remove, but ${conflicts.length} ${conflicts.length === 1 ? 'pattern is' : 'patterns are'} given more than one category — see below.`
+            : `Nothing to remove — all ${total} rules earn their place against the ${checked} descriptions in your vault.`));
+      this.renderConflicts(c, conflicts);
+      new Setting(c).addButton(b => b.setButtonText(i18n.t('modal.close')).setCta().onClick(() => this.close()));
       return;
     }
 
@@ -550,12 +659,36 @@ class RulesCleanupModal extends Modal {
         + 'for one, and this cannot tell that apart from a rule you have finished with.'));
     }
 
+    this.renderConflicts(c, conflicts);
+
     new Setting(c)
-      .addButton(b => b.setButtonText('Cancel').onClick(() => this.close()))
+      .addButton(b => b.setButtonText(i18n.t('bx.cancel')).onClick(() => this.close()))
       .addButton(b => b
         .setButtonText(`Remove ${remove.length} ${remove.length === 1 ? 'rule' : 'rules'}`)
         .setWarning()
         .onClick(() => { this.answer = true; this.close(); }));
+  }
+
+  /* One row per pattern the file answers with more than one category. The
+     winner is the FIRST category listed: both rules match the same text, and
+     matchRule takes the earlier line (rules.js), so the first category in
+     `categories` — they come in file order — is the one every statement is
+     filed under today. Said plainly, since a reader who has not seen the file
+     in months cannot be expected to know which line comes first. */
+  renderConflicts(c, conflicts) {
+    if (!conflicts.length) return;
+    c.append(el('p', { class: 'budget-tidy-hint' },
+      `${conflicts.length === 1 ? 'This pattern is' : 'These patterns are'} given more than one category. `
+      + 'The earlier line wins today. The app will not choose between them, and nothing here removes them: '
+      + 'open Data/Categorisation Rules.csv and keep the line you mean.'));
+    const list = el('div', { class: 'budget-tidy-list' });
+    for (const k of conflicts) {
+      list.append(el('div', { class: 'budget-tidy-row' },
+        el('div', { class: 'budget-tidy-pattern' }, k.pattern),
+        el('div', { class: 'budget-tidy-why' },
+          `→ ${k.categories.map(n => n || '(no category)').join(' · ')} · “${k.categories[0] || '(no category)'}” comes first, so it wins today`)));
+    }
+    c.append(list);
   }
 
   onClose() { this.contentEl.empty(); this.resolve(this.answer); }
@@ -598,7 +731,7 @@ class BudgetResliceModal extends Modal {
 
     if (!rows.length) {
       c.append(el('p', { class: 'budget-tidy-lead' }, 'That budget has no amounts to bring across.'));
-      new Setting(c).addButton(b => b.setButtonText('Close').setCta().onClick(() => this.close()));
+      new Setting(c).addButton(b => b.setButtonText(i18n.t('modal.close')).setCta().onClick(() => this.close()));
       return;
     }
 
@@ -660,7 +793,7 @@ class BudgetResliceModal extends Modal {
     };
 
     new Setting(c)
-      .addButton(b => b.setButtonText('Cancel').onClick(() => this.close()))
+      .addButton(b => b.setButtonText(i18n.t('bx.cancel')).onClick(() => this.close()))
       .addButton(b => {
         applyBtn = b;
         b.setCta().onClick(() => {

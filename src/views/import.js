@@ -20,14 +20,14 @@ const i18n = require('../i18n');
 const { el, tableCells, refocus, caveatChip } = require('../dom');
 const { normalizeAmount, inferGrouping, readAmountColumn } = require('../amount');
 const { parseStatement, decodeStatement, parseStatementDate, detectStatementColumns, reconcileAmounts, reconcileFeesBesideAmount, applyCounterparties,
-  statementAccountNumber, sameAccountNumber, TRANSFER_LEG_DAYS } = require('../statement');
+  transferLegStanding, statementAccountNumber, sameAccountNumber, TRANSFER_LEG_DAYS, balanceStepVerdicts, isBalanceCarry, drCrOf } = require('../statement');
 const { prepareRules, autoCategorise, matchRule } = require('../rules');
 const { buildIndex, addToIndex, flagItems } = require('../dedupe');
 const { confirmModal } = require('../modal');
 const { splitRole, SPLIT_PARENT, splitPartsOf, splitParentsSharingKey } = require('../tx-role');
 const { isCreditCard } = require('../committed');
-const { symbolOf, isForeign } = require('../currency');
-const { todayIso, isoDayNumber } = require('../dates');
+const { symbolOf, isForeign, formatSigned } = require('../currency');
+const { todayIso, isoDayNumber, nowLocalMinute } = require('../dates');
 const { decimalText } = require('../locale');
 const { detectMilesExport, milesRows, milesRate, milesFilenameNumber } = require('../miles');
 
@@ -93,6 +93,29 @@ module.exports = function registerImport(ctx) {
      single-currency vault — nearly all of them — is on the same formatter as
      the rest of the app. */
   let previewMoney = v => money(v);
+  /* The same row's amount as a FLOW (2026-11-25 audit, VIS-5): "−R 812.40" and
+     "+R 410.00", the form Transactions prints these very lines in a tap later
+     (transactions.js rowFlow), rather than the balance form "R -812.40".
+     rowFlow is private to that view, so the rule is rebuilt here from the same
+     two public pieces it is made of — currency.js formatSigned, and a plus
+     exactly where formatSigned would have put a minus on the negation, so a
+     figure that rounds to nothing carries neither. Rebound with previewMoney,
+     for the same reason: the symbol is the destination account's. */
+  let previewFlow = v => flowIn((S.settings || {}).currency, v);
+  function flowIn(sym, v) {
+    const n = Number.isFinite(Number(v)) ? Number(v) : 0;
+    const loc = locale();
+    const text = formatSigned(sym, n, 2, loc);
+    return n > 0 && formatSigned(sym, -n, 2, loc) !== text ? `+${text}` : text;
+  }
+  /* A counter, not the object: each statement put on the review gets the next
+     number, and a receipt remembers the number of the import it was written
+     for — so a retry after a stopped import can add to its OWN receipt and
+     never to another file's (commitImport). */
+  let importSeq = 0;
+  /* What is writing right now: 'commit', 'undo' or null (2026-11-25 audit,
+     IMP-2). See runExclusive. */
+  let inFlight = null;
 
   /* Static-ish view chrome that varies by country — banner blurb + drop hint. */
   function renderImport() {
@@ -118,6 +141,67 @@ module.exports = function registerImport(ctx) {
     const idx = typeof ctx.accountIndex === 'function' ? ctx.accountIndex() : new Map();
     return acct => (idx.get(acct) || {}).rows || [];
   }
+
+  /* THE OTHER HALF, STILL COUNTED (2026-11-25 audit, IMP-5). applyCounterparties
+     excludes the row coming in when the vault holds its other leg; that vault
+     leg went in counted, when its partner did not exist yet, and nothing came
+     back for it. So after every counterparty pass each row that found a leg
+     asks where that leg stands (statement.js transferLegStanding) and keeps
+     the answer for the review and the commit:
+
+       it.legState   'counted' | 'split' | null (nothing to say)
+       it.legKey     the S.txFiles key of the leg's month file
+       it.legAcct    the leg's account, as the reader knows it
+
+     Only a row that will be written can speak for a leg: a duplicate is
+     already in the vault and writes nothing. A leg in a non-budget account is
+     outside every budget total whatever its tick says, so there is nothing
+     still counted to name. A leg that is no longer in any month file of this
+     load (deleted since the pass) is not named either.
+
+     Asked again at commit, so the vault the leg is judged against is the one
+     about to be written — a leg the reader excluded on the Transactions page
+     meanwhile is not offered twice. One row → file map per call, built only
+     when some row found a leg. */
+  function judgeLegs(p) {
+    let fileOf = null;
+    for (const it of p.items) {
+      it.legState = null; it.legKey = ''; it.legAcct = '';
+      const leg = it.transferLegRow;
+      /* A row an earlier, stopped attempt already wrote is a duplicate of
+         itself by now, and still owes its leg the mark (`legOwed`). */
+      if (!leg || (it.dup && !it.legOwed)) continue;
+      if (!fileOf) {
+        fileOf = new Map();
+        for (const [key, f] of Object.entries(S.txFiles)) for (const r of f.rows) fileOf.set(r, key);
+      }
+      const key = fileOf.get(leg);
+      const file = key ? S.txFiles[key] : null;
+      if (!file) continue;
+      const acct = accountForLabel(file.label);
+      if (acct && !acct.in_budget) continue;
+      const standing = transferLegStanding(leg, file.rows);
+      if (standing === 'excluded') continue;
+      it.legState = standing; it.legKey = key; it.legAcct = acct ? acct.name : file.label;
+    }
+  }
+  /* A row the import will write EXCLUDED, as a transfer, whose leg is still
+     counted: the rows the review speaks about. A row the reader unticked, or
+     counts after all (Exclude off), has made no claim that it is a transfer,
+     so it makes no claim on its other half either. */
+  const speaksForLeg = it => !!it.legState && it.include && !it.dup && !!it.excluded;
+  /* ...and of those, the legs the commit will mark: an ordinary row, with the
+     choice left ticked (`keepLegCounted` is the reader's untick). */
+  const legToExclude = it => speaksForLeg(it) && it.legState === 'counted' && !it.keepLegCounted;
+  /* A row this import has already written whose leg is still to be marked —
+     the retry's share of the work (commitImport). */
+  const legOwedNow = it => !!it.legOwed && !it.legDone && it.legState === 'counted' && !!it.excluded && !it.keepLegCounted;
+  /* The leg row's own amount in its own account's currency, flow form. */
+  const legFlow = it => {
+    const acct = accountForLabel((S.txFiles[it.legKey] || {}).label || '');
+    const home = (S.settings || {}).currency;
+    return flowIn(isForeign(acct, home) ? symbolOf(acct, home) : home, it.transferLegRow.amount);
+  };
   /* `nonBudgetOnly` is for a Discovery Miles file and nothing else. Its filename
      (`DiscoveryBankMiles_<n>_…`) matches the very pattern the other Discovery
      exports route by, and nothing says <n> differs from the cheque account's
@@ -296,6 +380,18 @@ module.exports = function registerImport(ctx) {
     const amountCol = iAmount !== -1 ? readAmountColumn(dataRows.map(r => r[iAmount]), numOpts) : null;
     /* The rows whose amount the rule negated, with what they read as before. */
     const creditRule = [];
+    /* A Dr/Cr marker column beside the Amount (statement.js DRCR_COLS; 2026-11-25
+       audit, IMP-1). Where one is mapped, EACH ROW's marker says which way its
+       amount went, by the importer's own pair rule: a debit is money out
+       whatever sign the cell carries, a credit is read as written — so a
+       "-30.00 Cr" reversal stays money out, as it does in a Credit column.
+       It replaces the credit-marked column rule (amount.js) for this file: the
+       marker is the explicit statement that rule could only infer. A row with
+       no marker is read as written. The balance column still judges the result
+       (signVerdict): the marker is the file's claim, the balances its proof.
+       `map.iDrCr` is absent on a map made before the field existed. */
+    const iDrCr = map.iDrCr == null || iAmount === -1 || !amountCol ? -1 : map.iDrCr;
+    let drCrMarked = 0;
     /* ISSUE 62. Which way round the day and month are is a property of the
        FILE, and the file says so: a statement is written in date order, so the
        reading under which its dates go backwards is the wrong reading. The
@@ -334,7 +430,14 @@ module.exports = function registerImport(ctx) {
       /* Amount: a single signed column when present, else credit (positive) /
          debit (negated — statements list debits as positive numbers). */
       let amount = amountCol ? amountCol.values[i] : null;
-      const wasAmount = amountCol && amountCol.applied && amount !== amountCol.plain[i] ? amountCol.plain[i] : null;
+      let wasAmount = amountCol && amountCol.applied && amount !== amountCol.plain[i] ? amountCol.plain[i] : null;
+      if (iDrCr !== -1) {
+        const plain = amountCol.plain[i];
+        const mark = drCrOf(r[iDrCr]);
+        amount = plain == null ? null : mark === 'debit' ? -Math.abs(plain) : plain;
+        if (mark && plain != null) drCrMarked++;
+        wasAmount = null;
+      }
       // A non-blank amount cell that normalizeAmount refused: the only thing a
       // row is "unparseable" FOR, as far as the money goes (see below).
       const unreadable = [iAmount, iDebit, iCredit, iFee].some(i => i !== -1 && (r[i] || '').trim() !== '' && num(r[i]) == null);
@@ -384,6 +487,15 @@ module.exports = function registerImport(ctx) {
       }
       const ledgerEntry = iBalance !== -1 && amount != null ? { amount, balance: num(r[iBalance]), fee: feeBeside } : null;
       if (ledgerEntry) ledger.push(ledgerEntry);
+      /* A balance carried in or out (statement.js isBalanceCarry; 2026-11-25
+         audit, IMP-4): its balance is the point the next row is measured from
+         and its own movement is NOTHING, so the ledger carries it as 0. Read at
+         face value it was the one row nothing tested at the top of a statement
+         (R5 000 of "income" under the green banner), and a pair the file lost
+         at the bottom. The row itself is kept and unticked below, not dropped:
+         the reader may know it was a real first deposit. */
+      const carry = !!ledgerEntry && isBalanceCarry(desc, amount, ledgerEntry.balance);
+      if (carry) { ledgerEntry.amount = 0; ledgerEntry.carry = true; }
       const rule = wasAmount != null ? { was: wasAmount, entry: ledgerEntry, item: null } : null;
       if (rule) creditRule.push(rule);
       const carrier = feeBeside ? { fee: feeBeside, date: null, desc, entry: ledgerEntry, at: -1, noted: false } : null;
@@ -402,9 +514,13 @@ module.exports = function registerImport(ctx) {
            names. See renderImportReview's category cell, which renders
            matchedPattern as a muted hint under the select. */
         const matched = matchRule(desc, rules);
+        /* `ledgerAt` ties the item to its balance step, so signVerdict can ask
+           whether THIS row's step agrees with the sign it is given; -1 when the
+           row has no step (no balance column, or no balance on the row). */
         items.push({ date, desc, amount: parseFloat(amount.toFixed(2)), cat: matched ? matched.category : '',
           matchedPattern: matched ? matched.p : '',
-          include: true, excluded: false, transferTo: '' });
+          include: true, excluded: false, transferTo: '',
+          ledgerAt: ledgerEntry ? ledger.length - 1 : -1, carry });
         if (rule) rule.item = items[items.length - 1];
       } else if (date && desc && (amount === 0 || (amount == null && !unreadable))) {
         /* A dated, described line with NO MONEY on it: the 0.00 an FNB
@@ -449,12 +565,13 @@ module.exports = function registerImport(ctx) {
       else {
         const asRead = ledger.map(e => ({ amount: e.amount, balance: e.balance }));
         const before = ledger.map(e => ({ amount: e.amount, balance: e.balance }));
-        for (const k of creditRule) if (k.entry) before[ledger.indexOf(k.entry)].amount = k.was;
+        // A carried balance moves nothing under either reading (see `carry`).
+        for (const k of creditRule) if (k.entry && !k.entry.carry) before[ledger.indexOf(k.entry)].amount = k.was;
         creditMarked = reconcileAmounts(asRead).verified && !reconcileAmounts(before).verified;
       }
       if (!creditMarked) {
         for (const k of creditRule) {
-          if (k.entry) k.entry.amount = k.was;
+          if (k.entry && !k.entry.carry) k.entry.amount = k.was;
           if (k.item) k.item.amount = parseFloat(k.was.toFixed(2));
         }
       }
@@ -477,10 +594,19 @@ module.exports = function registerImport(ctx) {
           k.entry.amount = parseFloat((k.entry.amount + fee).toFixed(2));
           if (!(k.date && k.desc)) continue;
           const feeDesc = `${k.desc} (fee)`;
-          const matched = matchRule(feeDesc, rules);
+          /* Only a rule that answers for the FEE (2026-11-25 audit, RUL-6). The
+             merchant's name is a substring of "<merchant> (fee)", so matching
+             the fee row against every rule handed it the merchant's category —
+             a R5 ATM fee filed as "Cash withdrawal". A rule that also matches
+             the merchant row on its own is the merchant's, and is set aside;
+             what is left can only have matched the fee wording (a rule on
+             "(fee)", or one written for this exact fee row). Nothing left:
+             uncategorised, for the reader to pick on the review. */
+          const feeRules = rules.filter(rule => !matchRule(k.desc, [rule]));
+          const matched = matchRule(feeDesc, feeRules);
           items.splice(k.at, 0, { date: k.date, desc: feeDesc, amount: parseFloat(fee.toFixed(2)),
             cat: matched ? matched.category : '', matchedPattern: matched ? matched.p : '',
-            include: true, excluded: false, transferTo: '', feeOf: k.desc });
+            include: true, excluded: false, transferTo: '', feeOf: k.desc, ledgerAt: -1, carry: false });
           // A row with an amount of 0 was counted as "no amount" above; it has
           // a fee row now, so it is not that any more.
           if (k.noted) noted--;
@@ -530,7 +656,11 @@ module.exports = function registerImport(ctx) {
        applying the verdict twice, or after the reader corrects the account,
        lands on the same numbers rather than negating them again. */
     for (const it of items) it.amount0 = it.amount;
-    const rec = signVerdict(items, ledger, iBalance, iAmount, acct0);
+    /* Which column the signs came from, by the name the file gives it, for the
+       review to say so — or null when no row carried a marker it could read. */
+    const drCrName = iDrCr !== -1 && map.headerIdx >= 0 ? String((rows[map.headerIdx] || [])[iDrCr] || '').trim() : '';
+    const drCr = drCrMarked ? { name: drCrName || 'Dr/Cr', marked: drCrMarked } : null;
+    const rec = signVerdict(items, ledger, iBalance, iAmount, acct0, drCr);
     applyCounterparties(items, S.accounts, label0, legsOfAccounts());
     /* The same verdict on a Debit/Credit PAIR, where it cannot be acted on.
        `verified && flip` means the file only reconciles with every amount
@@ -553,6 +683,10 @@ module.exports = function registerImport(ctx) {
       else { if (it.date < range.min) range.min = it.date; if (it.date > range.max) range.max = it.date; }
     }
     S.pendingImport = { items, label: label0, index, range, skipped, noted, filename: file.name, feeNote,
+      // Which pending import a receipt belongs to (see commitImport).
+      importId: ++importSeq,
+      // The Dr/Cr marker column the signs were read from, or null.
+      drCr,
       // What the FILE says it is, kept beside what the user picked — the two
       // are compared on every render and again at commit. See acctIdentity().
       acctNumber: statementAccountNumber(rows, map),
@@ -607,6 +741,7 @@ module.exports = function registerImport(ctx) {
       index: dedupIndex(), range, skipped, noted: zero + tooSmall, filename: file.name,
       acctNumber: '', reconcile: null, dateReading: null, iBalance: -1, iAmount: -1,
       miles: { rate, total: miles, zero, tooSmall, number: milesFilenameNumber(file.name) },
+      importId: ++importSeq, drCr: null,
       rows, map, file };
     $('#importMap').classList.add('hidden');
     importShown = IMPORT_PAGE;
@@ -654,6 +789,10 @@ module.exports = function registerImport(ctx) {
     { key: 'iDesc', label: 'Description', required: true, hint: 'The payee or reference' },
     { key: 'iExtra', label: 'Extra detail', required: false, hint: 'Optional second text column — added to the description' },
     { key: 'iAmount', label: 'Amount', required: false, hint: 'One signed column: negative is money out' },
+    /* 2026-11-25 audit, IMP-1. The marker column the detector recognises by
+       heading (statement.js DRCR_COLS), offered here for a heading it does not
+       know. Only read beside an Amount column (runImport). */
+    { key: 'iDrCr', label: 'Dr/Cr marker', required: false, hint: 'Optional — a column saying which way each Amount went (Dr/Cr, Debit/Credit, D/C)' },
     { key: 'iDebit', label: 'Money out', required: false, hint: 'Use instead of Amount when out and in are separate columns' },
     { key: 'iCredit', label: 'Money in', required: false, hint: 'The partner column to Money out' },
     { key: 'iFee', label: 'Fee', required: false, hint: 'A third amount column for bank charges (Capitec) — read when the other two are empty' },
@@ -795,7 +934,54 @@ module.exports = function registerImport(ctx) {
      page at a time; the checkboxes below operate on p.items, not on the DOM, so
      selecting all still covers rows that were never rendered. */
   const IMPORT_PAGE = 200;
+  /* Why a row arrives unticked, for the two holds renderImportReview adds
+     (balance-carry rows, 2026-11-25 audit IMP-4; rows whose balance step
+     contradicts their sign, IMP-1). Printed under the description and at the
+     end of the tick box's name. */
+  const CARRY_WHY = 'Described as a balance carried in or out, and its amount equals the balance beside it — a balance, not money moving. Tick to import it anyway if it really was a deposit.';
+  const STEP_WHY = 'The balance beside this row does not move by this amount the way it does for the rest of the statement, so the row is left as the file wrote it. Check it against your statement, then tick to import it.';
   let importShown = IMPORT_PAGE;
+
+  /* The sentence under a transfer whose other half is still counted (IMP-5;
+     see judgeLegs). Named in full — account, date, description, amount — so
+     the reader can find the row on the Transactions page without this screen.
+
+     An ordinary leg gets the choice, ticked: marking it excluded is what the
+     incoming row's own Exclude tick already says about the money, and left
+     unticked the sentence stays as the warning it is. The tick is in a
+     `tbl-tick` label like the row's own two, for the same 44px phone target,
+     and it is its own visible label, so it needs no accessible name of its
+     own (tests/accessible-names-keyed.test.cjs holds those to i18n keys;
+     visible copy on this page is English, see heldWhy).
+
+     A split leg gets the sentence only. Its parts are the reader's slices
+     under their own categories, and which of them were the transfer is not a
+     question an import can answer; the Transactions page is where they are. */
+  function legNote(it, i, onChoice) {
+    const leg = it.transferLegRow;
+    const what = `“${leg.desc}” on ${leg.date}, ${legFlow(it)}`;
+    if (it.legState === 'split') {
+      return el('div', { class: 'imp-near-why' },
+        `The other half of this transfer is in ${it.legAcct} (${what}), split into parts that are still counted. `
+        + 'Split rows are left as they are — if those parts are this transfer, exclude them on the Transactions page.');
+    }
+    // The choice on a line of its own, tick first, as the row's own ticks sit.
+    return el('div', { class: 'imp-near-why' },
+      `The other half of this transfer is still counted in ${it.legAcct}: ${what}.`,
+      el('div', {}, el('label', { class: 'tbl-tick' }, el('input', { type: 'checkbox', 'data-focus-key': `leg:${i}`,
+        ...(it.keepLegCounted ? {} : { checked: '' }),
+        onchange: e => { it.keepLegCounted = !e.target.checked; onChoice(); } }),
+      ` Mark it excluded in ${it.legAcct} with this import`)));
+  }
+  /* A tick that changes whether a row speaks for its leg (Import, Exclude)
+     redraws the review, so the sentence and its choice come and go with it;
+     no other row pays for that. Focus is handed back to the tick that was
+     pressed (dom.js refocus — the redraw removed it). */
+  function legRedraw(it, key) {
+    if (!it.legState) return;
+    renderImportReview();
+    refocus($('#impTable'), [key]);
+  }
 
   /* ISSUE 53. THE ONE PLACE the sign verdict is decided, and the reason it is a
      function rather than four lines inside runImport.
@@ -821,9 +1007,10 @@ module.exports = function registerImport(ctx) {
      every account switch, however many times — cannot double-negate. The old
      code negated `amount` in place, which is why recomputation was not simply a
      matter of calling it twice. */
-  function signVerdict(items, ledger, iBalance, iAmount, account) {
+  function signVerdict(items, ledger, iBalance, iAmount, account, drCr) {
+    const liability = isCreditCard(account);
     const rec = iBalance !== -1
-      ? reconcileAmounts(ledger, { liability: isCreditCard(account) })
+      ? reconcileAmounts(ledger, { liability })
       : null;
     const flipped = !!rec && rec.verified && rec.flip && iAmount !== -1;
     /* `verified && flip` on a Debit/Credit PAIR, where it cannot be acted on:
@@ -833,8 +1020,31 @@ module.exports = function registerImport(ctx) {
        but the verdict must still reach the banner rather than falling through
        to "amounts check out". */
     const inverted = !!rec && rec.verified && rec.flip && iAmount === -1;
-    for (const it of items) it.amount = flipped ? -it.amount0 : it.amount0;
-    if (rec) return { ...rec, flipped, inverted };
+    /* THE ROWS THE MAJORITY WOULD CARRY ALONG (2026-11-25 audit, IMP-1). A
+       verdict is a judgement on the FILE with 80% slack, and on a statement of
+       six purchases and one salary, all positive, "every amount negated" fits
+       five pairs of six: the salary was flipped into spending with the rest,
+       under "checked and corrected", though its own balance step said it went
+       UP. So wherever the verdict SET the signs — a whole-file flip, or a
+       Dr/Cr marker column the balances are now judging — each row's own step
+       is asked too (statement.js balanceStepVerdicts, the same step rule), and
+       a row it contradicts is left exactly as the file wrote it and marked
+       `stepFlag`; renderImportReview unticks it and says why. Not re-signed to
+       fit: that would be the app correcting one row on a guess, the one thing
+       this function exists not to do. Recomputed on every call, so a flag
+       follows the account the reader picks. A file whose signs nobody changed
+       is not second-guessed row by row here; the banner covers it, as before. */
+    const steps = rec && rec.verified && (flipped || (drCr && iAmount !== -1))
+      ? balanceStepVerdicts(ledger, { order: rec.order, flip: rec.flip, liability })
+      : null;
+    let disputed = 0;
+    for (const it of items) {
+      const doubt = !!steps && it.ledgerAt != null && it.ledgerAt >= 0 && steps[it.ledgerAt] === false && !it.carry;
+      it.stepFlag = doubt;
+      if (doubt) disputed++;
+      it.amount = flipped && !doubt ? -it.amount0 : it.amount0;
+    }
+    if (rec) return { ...rec, flipped, inverted, disputed };
     /* ISSUE 95. No balance column means the check cannot be MADE — which is a
        thing to say, not a reason to go quiet. Returning null hid the banner
        entirely, so the one file the importer could not verify was also the one
@@ -914,7 +1124,7 @@ module.exports = function registerImport(ctx) {
        transfer as income. One render now gives the final state. */
     if (p.ledger) {
       p.reconcile = signVerdict(p.items, p.ledger, p.iBalance, p.iAmount,
-        p.label ? accountForLabel(p.label) : null);
+        p.label ? accountForLabel(p.label) : null, p.drCr);
     }
     /* Pre-excluded transfers follow from the account AND the decided signs —
        see the note on applyCounterparties. */
@@ -953,35 +1163,85 @@ module.exports = function registerImport(ctx) {
        exports — see src/dedupe.js for both. Near-dups are unticked and labelled,
        never skipped: the user sees what each collided with and can override. */
     const { dupes, nears, pendings } = flagItems(p.items, p.index, lab, p.range);
+    /* The two other reasons a row arrives unticked, applied AFTER flagItems so
+       neither can be undone by its re-include of a row that stopped being a
+       duplicate: a balance carried in or out (`carry`, set once at parse time)
+       and a row whose own balance step contradicts the sign the verdict gave it
+       (`stepFlag`, re-decided by signVerdict above on every render). The same
+       untick-not-skip as the near and pending rows, with the reader's own tick
+       as the sticky bit: once they have ticked or unticked a row by hand
+       (`manualInclude`), no re-render overrides it. `heldAuto` records that
+       the untick was ours, so a flag that clears (the reader picked another
+       account) gives the row back — unless some other reason still holds it. */
+    let carried = 0, disputed = 0;
+    for (const it of p.items) {
+      const hold = !it.dup && (it.carry || it.stepFlag);
+      if (hold) { if (it.carry) carried++; else disputed++; }
+      if (it.manualInclude) continue;
+      if (hold) { it.include = false; it.heldAuto = true; }
+      else if (it.heldAuto) {
+        it.heldAuto = false;
+        if (!it.dup && !it.near && !it.pending) it.include = true;
+      }
+    }
+    /* Where each proven transfer's other half stands (IMP-5) — after
+       flagItems, because a duplicate writes nothing and speaks for no leg. */
+    judgeLegs(p);
     const newOnes = p.items.filter(i => !i.dup);
     const auto = newOnes.filter(i => i.cat).length;
     const cur = currentPeriod();
     const curRange = periodRange(cur);
     const inCurrent = it => it.date >= curRange.start && it.date <= curRange.end;
     const curCount = p.items.filter(inCurrent).length;
+    const shown = Math.min(importShown, p.items.length);
     /* No account yet means no duplicate check has been made — flagItems ran
        against an empty label and "0 duplicates skipped" would read as a clean
        result for a question nobody has asked. Said plainly instead; the count
-       appears with the first pick. */
-    $('#impStats').textContent =
-      `${p.filename} — ${p.items.length} rows` +
-      (p.label
-        ? ` · ${newOnes.length} new · ${dupes} duplicates skipped`
-        : ' · choose an account to check which of these are already in the vault') +
-      (nears ? ` · ${nears} likely re-dated/re-worded (unticked)` : '') +
-      (pendings ? ` · ${pendings} still pending (unticked)` : '') +
-      ` · ${auto} auto-categorised` +
-      (p.skipped ? ` · ${p.skipped} unparseable` : '') +
-      (p.noted ? ` · ${p.noted} with no amount (not imported)` : '') +
-      /* An exact duplicate is the one decision on this screen the reader
-         cannot override — it renders a "dup" badge instead of a checkbox,
-         with no explanation. The dedupe itself is sound and this is
-         deliberately not an offer to import them anyway (see flagItems in
-         src/dedupe.js for what "exact" means here) — but a bare count with
-         nothing said about WHY reads as "these rows vanished", which for a
-         statement the reader chose on purpose looks like data loss rather
-         than the plugin correctly recognising rows it already has. */
-      (dupes ? ' · already in the vault — check the Transactions page if you expected to see them' : '');
+       appears with the first pick.
+
+       "new" and "will import" are both the number commitImport WRITES — ticked
+       and not a duplicate (2026-11-25 audit, IMP-7). "new" used to count the
+       unticked near-duplicates as well, and "all N will import" every row on
+       the statement, duplicates included, so the two figures the reader is
+       about to act on were the two that did not match what Import rows does.
+       A function rather than one assignment so a tick, which re-renders
+       nothing, can bring the line up to date (the row's onchange below). */
+    const writeStats = () => {
+      const writes = p.items.filter(i => i.include && !i.dup).length;
+      /* The other halves (IMP-5), counted over EVERY row, not the rendered
+         page: a leg named on row 340 of a long statement is still marked at
+         commit, and the line the reader acts on has to say so. */
+      const legsMarked = p.items.filter(i => legToExclude(i) || legOwedNow(i)).length;
+      const legsLeft = p.items.filter(i => speaksForLeg(i) && !legToExclude(i)).length;
+      $('#impStats').textContent =
+        `${p.filename} — ${p.items.length} rows` +
+        (p.label
+          ? ` · ${writes} new · ${dupes} duplicates skipped`
+          : ' · choose an account to check which of these are already in the vault') +
+        (nears ? ` · ${nears} likely re-dated/re-worded (unticked)` : '') +
+        (pendings ? ` · ${pendings} still pending (unticked)` : '') +
+        (carried ? ` · ${carried} balance carried in or out (unticked)` : '') +
+        (disputed ? ` · ${disputed} disagree with the balance column (unticked)` : '') +
+        (legsMarked ? ` · ${legsMarked} transfer${legsMarked === 1 ? '’s other half' : 's’ other halves'} in another account will be marked excluded` : '') +
+        (legsLeft ? ` · ${legsLeft} transfer${legsLeft === 1 ? '’s other half stays' : 's’ other halves stay'} counted in another account` : '') +
+        ` · ${auto} auto-categorised` +
+        (p.skipped ? ` · ${p.skipped} unparseable` : '') +
+        (p.noted ? ` · ${p.noted} with no amount (not imported)` : '') +
+        /* An exact duplicate is the one decision on this screen the reader
+           cannot override — it renders a "dup" badge instead of a checkbox,
+           with no explanation. The dedupe itself is sound and this is
+           deliberately not an offer to import them anyway (see flagItems in
+           src/dedupe.js for what "exact" means here) — but a bare count with
+           nothing said about WHY reads as "these rows vanished", which for a
+           statement the reader chose on purpose looks like data loss rather
+           than the plugin correctly recognising rows it already has. */
+        (dupes ? ' · already in the vault — check the Transactions page if you expected to see them' : '') +
+        /* Say so out loud — a silent cap reads as "these are all the rows",
+           and the user is about to press a button that imports the ones
+           off-screen too. */
+        (p.items.length > shown ? ` · showing ${shown}, all ${writes} will import` : '');
+    };
+    writeStats();
     $('#impLegend').empty();
     $('#impLegend').append(
       el('span', { class: 'imp-legend-swatch' }),
@@ -1014,17 +1274,30 @@ module.exports = function registerImport(ctx) {
     recEl.empty();
     recEl.classList.toggle('hidden', !rec);
     recEl.classList.toggle('imp-reconcile-warn', !!rec && (!rec.verified || rec.inverted));
+    /* A Dr/Cr marker column set the signs (runImport; 2026-11-25 audit,
+       IMP-1). Every sentence below says so when it did, because "the amounts
+       check out" means something different when the file named each row's
+       direction itself — and when the balance column then DISAGREES with those
+       names, that is a fact about the file the reader has to see, not a
+       correction to report as routine. */
+    const dc = p.drCr ? `“${p.drCr.name}”` : '';
     if (rec && rec.unchecked) {
-      recEl.textContent = rec.oneSign
-        ? 'This statement has no balance column, so these amounts could not be checked against anything — and every one of them has the same sign, which usually means a money-in and money-out pair was read as a single column. Check the + and − signs below, and use “Columns wrong?” if they are.'
-        : 'This statement has no balance column, so these amounts could not be checked against it. Spot-check a few rows below before importing, especially the + and − signs.';
-    } else if (rec) recEl.textContent = rec.flipped
-      ? 'This statement lists money out as positive. Checked against its balance column and corrected — money out shows as negative below.'
-      : rec.inverted
-        ? 'This statement’s balance column says the money-in and money-out columns are the wrong way round — every amount below has the opposite sign to what the balances imply. Nothing has been corrected, because the signs came from the column names: open “Columns wrong?” and swap them before importing.'
-        : rec.verified
-          ? 'Amounts check out against this statement’s own balance column.'
-          : 'Could not check these amounts against the balance column — the balances don’t line up. Spot-check a few rows below before importing, especially the + and − signs.';
+      recEl.textContent = dc
+        ? `This statement has no balance column, so these amounts could not be checked against it. Their signs were read from its ${dc} column, row by row — spot-check a few rows below before importing.`
+        : rec.oneSign
+          ? 'This statement has no balance column, so these amounts could not be checked against anything — and every one of them has the same sign, which usually means a money-in and money-out pair was read as a single column. Check the + and − signs below, and use “Columns wrong?” if they are.'
+          : 'This statement has no balance column, so these amounts could not be checked against it. Spot-check a few rows below before importing, especially the + and − signs.';
+    } else if (rec) recEl.textContent = rec.flipped && dc
+      ? `This statement’s ${dc} column and its balance column disagree: read the way the ${dc} column says, the amounts move the balance the wrong way. The balance column was followed — money out shows as negative below. Check a few rows against the statement, and use “Columns wrong?” if the wrong column was read as ${dc}.`
+      : rec.flipped
+        ? 'This statement lists money out as positive. Checked against its balance column and corrected — money out shows as negative below.'
+        : rec.inverted
+          ? 'This statement’s balance column says the money-in and money-out columns are the wrong way round — every amount below has the opposite sign to what the balances imply. Nothing has been corrected, because the signs came from the column names: open “Columns wrong?” and swap them before importing.'
+          : rec.verified
+            ? 'Amounts check out against this statement’s own balance column.' + (dc ? ` Their signs were read from its ${dc} column, row by row.` : '')
+            : 'Could not check these amounts against the balance column — the balances don’t line up. Spot-check a few rows below before importing, especially the + and − signs.'
+              + (dc ? ` Their signs were read from its ${dc} column.` : '');
+    if (rec && rec.flipped && dc) recEl.classList.add('imp-reconcile-warn');
 
     /* The credit-marked column rule changes how a column is read, so the
        review says so, whatever the verdict above (runImport has the why). */
@@ -1048,6 +1321,9 @@ module.exports = function registerImport(ctx) {
     previewMoney = v => (isForeign(target, home) && typeof ctx.moneyIn === 'function'
       ? ctx.moneyIn(symbolOf(target, home), v)
       : money(v));
+    // The flow form of the same choice (see previewFlow's note).
+    const flowSym = isForeign(target, home) && typeof ctx.moneyIn === 'function' ? symbolOf(target, home) : home;
+    previewFlow = v => flowIn(flowSym, v);
     /* A fee printed BESIDE an amount (reconcileFeesBesideAmount). Said whichever
        way it went, because both outcomes change what lands in the vault:
 
@@ -1075,6 +1351,27 @@ module.exports = function registerImport(ctx) {
         recEl.classList.add('imp-reconcile-warn');
       }
     }
+    /* The rows signVerdict would not carry along with the rest (`stepFlag`):
+       counted here, reasoned on each row, unticked by the loop above. After
+       the fee sentence, which may replace the whole banner. */
+    /* `disputed` and `carried` are the counts the summary line uses (the loop
+       after flagItems), so the two can never disagree about a row that is also
+       a duplicate. */
+    if (rec && disputed) {
+      const n = disputed;
+      recEl.textContent += dc && !rec.flipped
+        ? ` ${n === 1 ? '1 row’s' : `${n} rows’`} ${dc} marker ${n === 1 ? 'disagrees' : 'disagree'} with the balance beside ${n === 1 ? 'it' : 'them'}, so ${n === 1 ? 'it was' : 'they were'} left as the marker says and unticked — check ${n === 1 ? 'it' : 'each'} below.`
+        : ` ${n === 1 ? '1 row’s' : `${n} rows’`} own balance step does not fit that, so ${n === 1 ? 'it was' : 'they were'} left as the file wrote ${n === 1 ? 'it' : 'them'} and unticked — check ${n === 1 ? 'it' : 'each'} below.`;
+      recEl.classList.add('imp-reconcile-warn');
+    }
+    /* Balance-carry rows (runImport `carry`). Said, so a row missing from the
+       ticks is not a mystery; not a warning, since nothing about the amounts
+       is in doubt. */
+    const carriedN = rec ? carried : 0;
+    if (carriedN) {
+      recEl.textContent += ` ${carriedN === 1 ? '1 row is' : `${carriedN} rows are`} described as a balance carried in or out, with an amount equal to the balance beside ${carriedN === 1 ? 'it' : 'them'}, so ${carriedN === 1 ? 'it arrives' : 'they arrive'} unticked: a balance is not money moving. Tick ${carriedN === 1 ? 'it' : 'one'} if it was a real deposit.`;
+    }
+
     const nbEl = $('#impNonBudget');
     const nonBudget = !!target && !target.in_budget;
     nbEl.classList.toggle('hidden', !nonBudget);
@@ -1122,7 +1419,7 @@ module.exports = function registerImport(ctx) {
     /* Off until an account is chosen (see the placeholder above) as well as
        on a mismatch; commitImport refuses an empty label too, so this is the
        tell and that is the backstop. */
-    $('#impCommit').disabled = ident.state === 'mismatch' || !p.label;
+    $('#impCommit').disabled = ident.state === 'mismatch' || !p.label || inFlight === 'commit';
 
     const t = $('#impTable'); t.empty();
     t.append(el('thead', {}, el('tr', {},
@@ -1145,18 +1442,31 @@ module.exports = function registerImport(ctx) {
       const pendingWhy = it.pending
         ? i18n.t('imp.pending.why')
         : '';
+      /* The two holds this screen adds itself (see the loop after flagItems):
+         a balance carried in or out, and a row whose balance step contradicts
+         its sign. Same shape as the two above, for the same reason — but in
+         English, like the rest of this page: tests/i18n.test.cjs holds an
+         untranslated view under ten visible keys until the whole page is
+         translated, so these wait for that pass rather than half-keying it. */
+      const heldWhy = it.dup ? '' : it.carry ? CARRY_WHY : it.stepFlag ? STEP_WHY : '';
+      const why = it.near ? nearWhy : it.pending ? pendingWhy : heldWhy;
       // Keyed by position as the landing for "Show more" below (dom.js refocus).
       body.append(el('tr', { class: cls.trim(), 'data-focus-key': `row:${i}` },
         /* Both ticks sit in a <label> so the phone card can give them a 44px
            target (statement/phone-tables.css); inert on a desktop. */
         el('td', {}, it.dup ? el('span', { class: 'category-badge badge-dup' }, 'dup') :
-          el('label', { class: 'tbl-tick' }, el('input', { type: 'checkbox', 'aria-label': it.near || it.pending
-            ? i18n.t('imp.aria.importRowWhy', { date: it.date, desc: it.desc, amount: previewMoney(it.amount), why: it.near ? nearWhy : pendingWhy })
-            : i18n.t('imp.aria.importRow', { date: it.date, desc: it.desc, amount: previewMoney(it.amount) }),
+          el('label', { class: 'tbl-tick' }, el('input', { type: 'checkbox', 'aria-label': why
+            ? i18n.t('imp.aria.importRowWhy', { date: it.date, desc: it.desc, amount: previewFlow(it.amount), why })
+            : i18n.t('imp.aria.importRow', { date: it.date, desc: it.desc, amount: previewFlow(it.amount) }),
             // nearAuto stays TRUE once we have auto-unticked: it records that the
             // untick already happened, so a re-render (account switch, "show
             // more") leaves the user's decision — either way — alone.
-            ...(it.include ? { checked: '' } : {}), onchange: e => it.include = e.target.checked }))),
+            /* manualInclude: the reader has decided, and the carry / balance-
+               step holds above leave the row alone from now on. The summary
+               line counts what will be written, so it follows the tick. */
+            ...(it.include ? { checked: '' } : {}),
+            'data-focus-key': `inc:${i}`,
+            onchange: e => { it.include = e.target.checked; it.manualInclude = true; writeStats(); legRedraw(it, `inc:${i}`); } }))),
         el('td', { class: 'text-muted', style: 'white-space:nowrap' }, it.date),
         el('td', {}, it.desc, ...(it.near ? [
           el('span', { class: 'category-badge badge-near', title: nearWhy }, 'likely dup'),
@@ -1168,6 +1478,13 @@ module.exports = function registerImport(ctx) {
         ] : []), ...(it.pending && !it.near ? [
           el('span', { class: 'category-badge badge-near', title: pendingWhy }, 'pending'),
           el('div', { class: 'imp-near-why' }, pendingWhy),
+        ] : []), ...(heldWhy && !it.near && !it.pending ? [
+          /* No `title` here, unlike the near and pending badges: those carry a
+             keyed reason, this one is English (see heldWhy), and an English
+             accessible name is the one thing tests/accessible-names-keyed.test.cjs
+             refuses. The reason is printed in full on the line below anyway. */
+          el('span', { class: 'category-badge badge-near' }, it.carry ? 'balance' : 'check'),
+          el('div', { class: 'imp-near-why' }, heldWhy),
         ] : []), ...(it.transferTo ? [
           // Named, not silent: a row that arrives excluded must say what made
           // it so, or the reader finds a missing figure later with no trail —
@@ -1191,8 +1508,8 @@ module.exports = function registerImport(ctx) {
               `The description quotes the number of your ${it.transferTo} account, but ${it.transferTo} has no matching amount the other way within ${TRANSFER_LEG_DAYS} days — and anyone paying you can type that number as their reference. `
                 + (it.excluded ? 'You have excluded it as a transfer.' : 'So it is counted as income or spend, not as a transfer; tick Exclude if it really was money moved between your own accounts.'),
               'category-badge badge-transfer badge-chip'),
-        ] : [])),
-        el('td', { class: `num${it.amount >= 0 ? ' text-success' : ''}`, style: 'white-space:nowrap;font-weight:600' }, previewMoney(it.amount)),
+        ] : []), ...(speaksForLeg(it) ? [legNote(it, i, writeStats)] : [])),
+        el('td', { class: `num${it.amount >= 0 ? ' text-success' : ''}`, style: 'white-space:nowrap;font-weight:600' }, previewFlow(it.amount)),
         el('td', {}, it.dup ? (it.cat || '') : deferredCatSelect(it.cat, v => { it.cat = v; it.manual = true; }, i18n.t('imp.aria.category', { desc: it.desc })),
           // Named, not silent: a rule that fires wrong is only fixable if the
           // reader can tell WHICH rule fired — otherwise the only way to find
@@ -1209,7 +1526,8 @@ module.exports = function registerImport(ctx) {
           // reader has ticked either way, switching account must not silently
           // undo it on the next render.
           ...(it.excluded ? { checked: '' } : {}),
-          onchange: e => { it.excluded = e.target.checked; it.manualExclude = true; } })))));
+          'data-focus-key': `exc:${i}`,
+          onchange: e => { it.excluded = e.target.checked; it.manualExclude = true; writeStats(); legRedraw(it, `exc:${i}`); } })))));
     }
     if (p.items.length > visible.length) {
       const rest = p.items.length - visible.length;
@@ -1223,9 +1541,6 @@ module.exports = function registerImport(ctx) {
       const revealedFrom = visible.length;
       more.addEventListener('click', () => { importShown += IMPORT_PAGE; renderImportReview(); refocus(t, [`row:${revealedFrom}`, 'more']); });
       body.append(el('tr', {}, el('td', { colspan: '6', style: 'padding:0' }, more)));
-      // Say so out loud — a silent cap reads as "these are all the rows", and
-      // the user is about to press a button that imports the ones off-screen too.
-      $('#impStats').textContent += ` · showing ${visible.length}, all ${p.items.length} will import`;
     }
     t.append(body);
     /* Phone width stacks each row into a card (statement/phone-tables.css):
@@ -1235,7 +1550,50 @@ module.exports = function registerImport(ctx) {
     tableCells(t, [null, 'Date', 'Description', 'Amount', 'Category', 'Excl.']);
   }
 
-  async function commitImport() {
+  /* ONE WRITE AT A TIME (2026-11-25 audit, IMP-2). Import rows and Undo
+     import both serialise whole month files from memory across several
+     awaited writes, and on an iCloud vault each write can take seconds. With
+     no guard a second tap on Import rows started a second commit over the same
+     review: memory got every row twice, and Undo then took one copy back and
+     reported success while the disk still held the rows. An Undo pressed
+     mid-commit would act on the PREVIOUS receipt while this one's files were
+     still being written.
+
+     So a call while either is running returns without doing anything — a
+     second tap of the same button silently, since the first is already doing
+     what was asked; the OTHER operation with a word, since that press would
+     otherwise look like a button that does nothing. The button that started it
+     is off for the duration and given back in `finally`, whatever happened in
+     between. The Import button is this view's; the Undo button belongs to the
+     Transactions page's bar, so it is found by its class and left alone if
+     that page has not drawn one. */
+  async function runExclusive(kind, button, work) {
+    if (inFlight) {
+      if (inFlight !== kind) toast('The last import is still being written — try again in a moment.', true);
+      return;
+    }
+    inFlight = kind;
+    const btn = button();
+    const was = btn ? btn.disabled : false;
+    if (btn) btn.disabled = true;
+    try { return await work(); }
+    finally {
+      inFlight = null;
+      /* Given back to what the review says it should be, not blindly to what
+         it was: a stopped import re-renders the review mid-flight, and an
+         account mismatch found there must keep the button off. */
+      if (btn) btn.disabled = kind === 'commit' && S.pendingImport ? commitBlocked(S.pendingImport) : was;
+    }
+  }
+  const commitBlocked = p => acctIdentity(p).state === 'mismatch' || !p.label;
+  const undoButton = () => {
+    const bar = $('#txUndoBar');
+    return bar && typeof bar.querySelector === 'function' ? bar.querySelector('.tx-undo-btn') : null;
+  };
+  const commitImport = () => runExclusive('commit', () => $('#impCommit'), commitImportNow);
+  const undoImport = () => runExclusive('undo', undoButton, undoImportNow);
+
+  async function commitImportNow() {
     const p = S.pendingImport;
     if (!p || !p.label) return toast('Pick an account first', true);
     // Resolve the label before it becomes a folder name — it can originate from
@@ -1245,7 +1603,18 @@ module.exports = function registerImport(ctx) {
     const label = txSegment(p.label);
     if (!label) return toast('Invalid account name for import', true);
     const toAdd = p.items.filter(i => i.include && !i.dup);
-    if (!toAdd.length) return toast('Nothing selected to import', true);
+    /* The other halves this commit is to mark excluded (IMP-5), judged
+       against the vault as it is now, not as it was at the last render. Two
+       kinds: the legs of rows about to be written, and the legs of rows an
+       earlier, stopped attempt of this same import wrote but did not get as
+       far as marking (`legOwed`, set as each row lands) — a retry finishes
+       those, or they would stay counted with nothing left on screen to say so. */
+    judgeLegs(p);
+    const owedLegs = () => p.items.filter(legOwedNow);
+    const legKeys = new Set([...toAdd.filter(legToExclude), ...owedLegs()].map(it => it.legKey));
+    // Named in the closing toast: the halves the reader chose to leave counted.
+    const legsKept = toAdd.filter(it => speaksForLeg(it) && !legToExclude(it));
+    if (!toAdd.length && !legKeys.size) return toast('Nothing selected to import', true);
     /* The review was built over this load's months, and the months below are
        written from them: every write is bound to it (io.js opWriter). A
        pending import counts as unsaved work, so switchBook() refuses over it
@@ -1267,10 +1636,13 @@ module.exports = function registerImport(ctx) {
        state the reader has to untangle, and nothing is lost by waiting — the
        review stays on screen exactly as it is, the edits stay unsaved. Asked
        before the account-number offer below, so a refused import writes
-       nothing at all. Only the months this import writes are looked at. */
+       nothing at all. Only the months this import writes are looked at —
+       which includes the month file of every other half it is to mark
+       excluded (IMP-5): that file is written whole too. */
     const unsaved = [...new Set(toAdd.map(it => it.date.slice(0, 7)))]
       .filter(month => (S.txFiles[`${label}/${month}`] || {}).dirty)
-      .map(month => txFileRel(label, month));
+      .map(month => txFileRel(label, month))
+      .concat([...legKeys].filter(k => (S.txFiles[k] || {}).dirty).map(k => txFileRel(S.txFiles[k].label, S.txFiles[k].month)));
     if (unsaved.length) {
       return toast(`${unsaved.join(', ')} ${unsaved.length === 1 ? 'has' : 'have'} changes you have not saved. `
         + 'Importing writes each month file whole, so it would save them too — Save or reload them on the '
@@ -1343,6 +1715,7 @@ module.exports = function registerImport(ctx) {
        undo then removes precisely what this import added, even where an
        identical line already existed in the same month. */
     const landed = [];
+    const legsLanded = [];   // the other halves marked excluded (IMP-5)
     try {
       for (const [key, { month, entries }] of additions) {
         const rows = entries.map(e => e.row);
@@ -1368,6 +1741,9 @@ module.exports = function registerImport(ctx) {
         // Neutralise the committed items and record them in the dedup snapshot so
         // a re-render / retry treats them as already-present (no re-import).
         for (const e of entries) {
+          // Asked before the tick goes: a landed row whose leg is to be
+          // marked owes that mark, even if the pass below never gets to it.
+          if (legToExclude(e.src)) e.src.legOwed = true;
           e.src.include = false;
           // Into BOTH layers: a retry must see the landed row as an exact dup,
           // and the near pass must be able to match a later rewrite of it.
@@ -1375,6 +1751,31 @@ module.exports = function registerImport(ctx) {
         }
         landed.push({ key, month, rows, created });
         done += rows.length;
+      }
+      /* THE OTHER HALVES (IMP-5), after this import's own rows, so a leg is
+         only ever marked for a row that is in the vault. One write per month
+         file, through the same `op` as the rows above, written from a model
+         and only then reflected in memory — the lockstep rule this loop
+         follows. `excluded` is the one field changed: the reader's category,
+         note and every other cell are the row as it was, and the live row
+         object is kept (mutated, not replaced) so anything holding it still
+         holds the row. Each lands in `legsLanded`, which the receipt keeps so
+         Undo can count exactly these rows again. */
+      const byFile = new Map();
+      for (const it of owedLegs()) {
+        if (!byFile.has(it.legKey)) byFile.set(it.legKey, []);
+        byFile.get(it.legKey).push(it);
+      }
+      for (const [key, its] of byFile) {
+        const file = S.txFiles[key];
+        if (!file) continue;
+        const mark = new Set(its.map(it => it.transferLegRow));
+        await op.writeFile(txFileRel(file.label, file.month),
+          serializeTxFile({ ...file, rows: file.rows.map(r => (mark.has(r) ? { ...r, excluded: true } : r)) }));
+        if (op.replaced()) throw new Error(op.replaced());
+        for (const r of mark) r.excluded = true;
+        for (const it of its) it.legDone = true;
+        legsLanded.push({ key, rows: [...mark] });
       }
     } catch (err) {
       // The rows that DID land are still undoable — the receipt is written on
@@ -1390,25 +1791,119 @@ module.exports = function registerImport(ctx) {
           + (done ? 'Those rows are saved in their month files, but the budget was read again meanwhile, so this import cannot be undone from here — check the Transactions page and delete any that should not be there.'
             : 'Nothing was imported.'), true);
       }
-      if (landed.length) S.lastImport = receipt(p, label, landed, done);
+      if (landed.length || legsLanded.length) S.lastImport = receipt(p, label, landed, done, legsLanded);
       renderImportReview();   // reflect what already landed; the rest stays selectable
-      return toast(`Import stopped after ${rows} (${err.message || err}). Saved rows kept — click Import rows again to retry the rest, or Undo it on the Transactions page.`, true);
+      /* Undo is offered only for what THIS file put in the vault (2026-11-25
+         audit, IMP-3). When the very first write failed and no earlier
+         attempt of this same import landed anything, S.lastImport is still
+         an EARLIER import's receipt — "Undo it" pointed at that other file.
+         Its receipt is left as it is (the Transactions bar names its own
+         file), and this toast does not offer it. */
+      const mine = S.lastImport && S.lastImport.importId === p.importId;
+      return toast(mine
+        ? `Import stopped after ${rows} (${err.message || err}). Saved rows kept — click Import rows again to retry the rest, or Undo it on the Transactions page.`
+        : `Import stopped before any row was saved (${err.message || err}). Nothing was imported — click Import rows again to retry.`, true);
     }
-    S.lastImport = receipt(p, label, landed, done);
+    S.lastImport = receipt(p, label, landed, done, legsLanded);
     const touched = additions;
-    let newRules = 0;
+    let newRules = 0, ruleNote = { updated: 0, note: '' };
     if ($('#impRemember').checked) {
-      newRules = await learnRules(toAdd.filter(it => it.manual && it.cat).map(it => ({ desc: it.desc, cat: it.cat })), op);
+      const pairs = toAdd.filter(it => it.manual && it.cat).map(it => ({ desc: it.desc, cat: it.cat }));
+      /* With what the learn skipped (categories.js learnRulesWithCorrections;
+         2026-11-25 audit, RUL-3). A ctx without it — a test that mounts this
+         view alone — learns as before and has nothing to ask. */
+      const learned = typeof ctx.learnRulesWithCorrections === 'function'
+        ? await ctx.learnRulesWithCorrections(pairs, op)
+        : { added: await learnRules(pairs, op), corrections: [], conflicts: [] };
+      newRules = learned === null || learned.added === null ? null : learned.added;
+      if (learned) ruleNote = await askRuleCorrections(learned, op);
     }
     S.pendingImport = null;
     $('#importReview').classList.add('hidden');
     /* learnRules says null when it learned nothing because the state was
        replaced since this import read it — said, rather than left out. */
-    toast(`Imported ${toAdd.length} transactions into ${touched.size} file${touched.size === 1 ? '' : 's'}` +
-          (newRules ? `, saved ${newRules} new rules` : '')
-          + (newRules === null ? '. ' + i18n.t('tx.savedNotLearned') : ''));
+    /* The other halves (IMP-5): what was marked, by account, and what the
+       reader chose to leave counted — said here as well as on the review,
+       because the review is gone the moment this toast appears. */
+    const n = k => `${k} transfer${k === 1 ? '' : 's'}`;
+    const acctsOf = keys => [...new Set(keys.map(k => { const f = S.txFiles[k]; const a = f && accountForLabel(f.label); return a ? a.name : (f ? f.label : k); }))].join(', ');
+    const marked = legsLanded.reduce((k, l) => k + l.rows.length, 0);
+    const legSaid = marked ? `, and marked the other half of ${n(marked)} excluded in ${acctsOf(legsLanded.map(l => l.key))}` : '';
+    const keptSaid = legsKept.length
+      ? ` The other half of ${n(legsKept.length)} is still counted in ${acctsOf(legsKept.map(it => it.legKey))}.` : '';
+    toast(`Imported ${toAdd.length} transactions into ${touched.size} file${touched.size === 1 ? '' : 's'}` + legSaid
+          + (newRules ? `, saved ${newRules} new rules` : '')
+          + (ruleNote.updated ? `, updated ${ruleNote.updated} rule${ruleNote.updated === 1 ? '' : 's'} to the ${ruleNote.updated === 1 ? 'category' : 'categories'} you chose` : '')
+          + '.'
+          + (newRules === null ? ' ' + i18n.t('tx.savedNotLearned') : '')
+          + ruleNote.note + keptSaid);
     ctx.switchView('transactions');
   }
+
+  /* THE RULES THE READER DISAGREED WITH (2026-11-25 audit, RUL-3). A row
+     refiled on the review whose pattern is already a rule pointing elsewhere
+     was dropped by learnRules without a word — rightly not overwritten, but
+     the toast only spoke about NEW rules, so the same wrong category came
+     back on every import with nothing to say why. Asked once per commit, the
+     Transactions page's own question (transactions.js offerRuleCorrection)
+     for a statement's worth of rows: the list, capped so the dialog stays
+     readable, then "and N more".
+
+     The same shape of answer, deliberately: "Keep the rules" is the cancel
+     side and drawn as the call to action, so Escape, a tap outside and every
+     other way of not answering leaves the file alone; "Update the rules" is
+     plain beside it, because it refiles every future import of those
+     merchants. Update repoints through categories.js correctRules — the
+     objects learnRules handed back, one write. A pattern two rows filed two
+     ways is listed and never repointed.
+
+     In English, like the rest of this page (tests/i18n.test.cjs holds an
+     untranslated view under ten visible keys until the whole page is
+     translated, and this view sits at that line) — the Transactions page's
+     tx.ruleFix.* wording is echoed rather than called for that reason.
+
+     Returns { updated, note } for the commit toast: how many rules were
+     repointed, and the sentences that follow — which rules were kept and
+     still point elsewhere, which patterns were left as conflicting. */
+  const RULE_LIST_CAP = 5;
+  async function askRuleCorrections({ corrections = [], conflicts = [] }, op) {
+    if (!corrections.length && !conflicts.length) return { updated: 0, note: '' };
+    const rows = n => `${n} row${n === 1 ? '' : 's'}`;
+    const listed = (items, say) => {
+      const shown = items.slice(0, RULE_LIST_CAP).map(say).join('; ');
+      return items.length > RULE_LIST_CAP ? `${shown}; and ${items.length - RULE_LIST_CAP} more` : shown;
+    };
+    const conflictSaid = conflicts.length
+      ? `${conflicts.length === 1 ? 'One rule is' : `${conflicts.length} rules are`} left as ${conflicts.length === 1 ? 'it is' : 'they are'}, because the rows matching ${conflicts.length === 1 ? 'it' : 'each'} were filed under different categories: `
+        + listed(conflicts, c => `"${c.pattern}" (the rule says ${c.category}; you chose ${c.chosen.map(x => `${x.cat} for ${rows(x.count)}`).join(' and ')})`) + '.'
+      : '';
+    if (!corrections.length) return { updated: 0, note: ` ${conflictSaid}` };
+    const go = await confirmModal(app, {
+      title: corrections.length === 1 ? 'Update the matching rule too?' : 'Update the matching rules too?',
+      message: `You filed rows differently from the ${corrections.length === 1 ? 'rule' : 'rules'} that matched them, so the next import would file them the old way again: `
+        + listed(corrections, c => `"${c.pattern}" (the rule says ${c.from}, you chose ${c.to} for ${rows(c.count)})`) + '. '
+        + `Update ${corrections.length === 1 ? 'the rule' : 'them'} only if every row matching ${corrections.length === 1 ? 'it' : 'each pattern'} belongs in the category you chose. `
+        + 'Your rows are filed as you chose either way.'
+        + (conflictSaid ? ` ${conflictSaid}` : ''),
+      cancelText: 'Keep the rules',
+      confirmText: corrections.length === 1 ? 'Update the rule' : 'Update the rules',
+      primary: 'cancel',
+    });
+    const names = corrections.slice(0, RULE_LIST_CAP).map(c => `"${c.pattern}"`).join(', ')
+      + (corrections.length > RULE_LIST_CAP ? ` and ${corrections.length - RULE_LIST_CAP} more` : '');
+    const kept = corrections.length === 1
+      ? ` The rule for ${names} still points to ${corrections[0].from}, so the next import files those rows that way again.`
+      : ` The rules for ${names} still point to their old categories, so the next import files those rows that way again.`
+      + (conflictSaid ? ` ${conflictSaid}` : '');
+    if (!go) return { updated: 0, note: kept };
+    /* The dialog is a window in which the state can be replaced (io.js
+       opWriter): the rule objects in hand would then belong to a load nobody
+       is looking at, and correctRules refuses on `op` — said, not dropped. */
+    const changed = await correctRules(corrections.map(c => ({ rule: c.rule, to: c.to })), op);
+    if (!changed) return { updated: 0, note: kept };
+    return { updated: changed, note: conflictSaid ? ` ${conflictSaid}` : '' };
+  }
+  const correctRules = (changes, op) => (typeof ctx.correctRules === 'function' ? ctx.correctRules(changes, op) : 0);
 
   /* ------------------------- taking an import back -------------------------
      A statement dropped into the wrong account is the mistake this app makes
@@ -1434,13 +1929,42 @@ module.exports = function registerImport(ctx) {
      `at` is a display string only. Stamped here rather than derived later so
      the banner can say WHICH import it is offering to take back — with two
      statements imported in a row, "the last one" is not enough to act on. */
-  function receipt(p, label, landed, count) {
+  /* One import, one receipt (2026-11-25 audit, IMP-3). A retry after a
+     stopped import is the SAME import finishing, so its rows join the receipt
+     the first attempt wrote rather than replacing it — replaced, Undo took back
+     only the retried rows and the first attempt's had no way back. Same
+     pending import (importId) and same destination only; anything else is a
+     new receipt, as before. A month both attempts wrote is one entry, so Undo
+     judges it whole: whether the import created it, and whether all its rows
+     are this import's, are questions about the file, not about one attempt.
+
+     `at` is LOCAL time (IMP-8), through dates.js nowLocalMinute, the one copy
+     of that rule: the UTC slice it replaced told a reader in Johannesburg that
+     an import made at 14:00 was made at 12:00. */
+  /* `legs` (IMP-5): [{ key, rows }] — the other halves of transfers this
+     import marked excluded in their own month files, as the row objects it
+     changed, so Undo counts exactly those rows again. A retry's join the
+     first attempt's, like its rows. */
+  function receipt(p, label, landed, count, legs = []) {
+    const prior = S.lastImport;
+    if (prior && p && prior.importId === p.importId && prior.label === label) {
+      for (const f of landed) {
+        const same = prior.files.find(x => x.key === f.key);
+        if (same) same.rows = same.rows.concat(f.rows);
+        else prior.files.push(f);
+      }
+      prior.legs = (prior.legs || []).concat(legs);
+      prior.count += count;
+      return prior;
+    }
     return {
       label,
       filename: (p && p.filename) || '',
-      at: new Date().toISOString().slice(11, 16),
+      at: nowLocalMinute().slice(11),
       count,
       files: landed,
+      legs,
+      importId: p ? p.importId : null,
     };
   }
 
@@ -1459,9 +1983,9 @@ module.exports = function registerImport(ctx) {
     if (S.pendingImport) S.pendingImport.index = dedupIndex();
   }
 
-  async function undoImport() {
+  async function undoImportNow() {
     const r = S.lastImport;
-    if (!r || !r.files.length) return;
+    if (!r || (!r.files.length && !(r.legs || []).length)) return;
     /* The load this receipt's row objects belong to. Every write below is
        bound to it (io.js opWriter), and it is asked again after the dialog. */
     const op = opWriterOf(ctx);
@@ -1517,7 +2041,26 @@ module.exports = function registerImport(ctx) {
         parts: partsGone.size, keptParts: partsKept.size });
     }
     const total = targets.reduce((n, t) => n + t.doomed.size, 0);
-    if (!total) {
+    /* The other halves this import marked excluded (IMP-5), counted again —
+       only those still exactly as the import left them: in the same file of
+       this load, still excluded, and not split since (a split parent's
+       Excluded tick is what keeps its money from being counted twice, and is
+       not this undo's to take off). A leg the reader has un-excluded, split
+       or deleted since is theirs now, and left. Grouped per file, so a file
+       is written once. */
+    const legBack = new Map();   // key -> { file, rows: Set }
+    for (const l of r.legs || []) {
+      const file = S.txFiles[l.key];
+      if (!file) continue;
+      const live = new Set(file.rows);
+      const rows = l.rows.filter(row => live.has(row) && row.excluded === true && !splitRole(row.split));
+      if (!rows.length) continue;
+      if (!legBack.has(l.key)) legBack.set(l.key, { file, rows: new Set() });
+      for (const row of rows) legBack.get(l.key).rows.add(row);
+    }
+    const legCount = [...legBack.values()].reduce((n, b) => n + b.rows.size, 0);
+    const legAccts = [...new Set([...legBack.values()].map(b => { const a = accountForLabel(b.file.label); return a ? a.name : b.file.label; }))].join(', ');
+    if (!total && !legCount) {
       S.lastImport = null;
       ctx.renderTransactions();
       return toast('Those rows are no longer in the app — nothing to undo', true);
@@ -1529,7 +2072,7 @@ module.exports = function registerImport(ctx) {
        going to the trash writes nothing, so it cannot carry an edit out. */
     const rewritten = targets.filter(t => !t.emptied).length;
     const trashed = targets.length - rewritten;
-    const alsoSaves = targets.some(t => t.dirty && !t.emptied);
+    const alsoSaves = targets.some(t => t.dirty && !t.emptied) || [...legBack.values()].some(b => b.file.dirty);
     const plural = (n, word) => `${n} ${word}${n === 1 ? '' : 's'}`;
     const acts = [];
     if (rewritten) acts.push(`rewrite ${plural(rewritten, 'monthly file')}`);
@@ -1544,17 +2087,25 @@ module.exports = function registerImport(ctx) {
     const keptSaid = keptParts
       ? `${plural(keptParts, 'split part')} could not be told apart from those of another split row with the same date and description that is not in this import, so ${keptParts === 1 ? 'it stays' : 'they stay'} in place — delete ${keptParts === 1 ? 'it' : 'them'} on the Transactions page if ${keptParts === 1 ? 'it is' : 'they are'} not wanted.`
       : '';
+    // The other halves (IMP-5), named by account so the reader knows which
+    // rows elsewhere are about to count again.
+    const legsSaid = legCount
+      ? `the other half of ${plural(legCount, 'transfer')} this import marked excluded in ${legAccts} will be counted again`
+      : '';
     const go = await confirmModal(app, {
       title: 'Undo this import',
-      message: `Remove the ${plural(total - parts, 'row')} imported into ${r.label}`
-        + (r.filename ? ` from ${r.filename}` : '')
-        + (parts ? `, plus the ${plural(parts, 'split part')} of rows you split afterwards` : '')
-        + `, and ${acts.join(', and ')}? `
+      message: (total
+        ? `Remove the ${plural(total - parts, 'row')} imported into ${r.label}`
+          + (r.filename ? ` from ${r.filename}` : '')
+          + (parts ? `, plus the ${plural(parts, 'split part')} of rows you split afterwards` : '')
+          + `, and ${acts.join(', and ')}? `
+          + (legsSaid ? `${legsSaid.charAt(0).toUpperCase() + legsSaid.slice(1)}. ` : '')
+        : `The rows imported into ${r.label} are already gone, but ${legsSaid}. Go ahead? `)
         + 'Categorisation rules learned during the import are kept — they cost nothing and '
         + 'are useful whichever account the statement really belongs to.'
         + (alsoSaves ? ' Unsaved edits you have made in those same months will be written out too.' : '')
         + (keptSaid ? ' ' + keptSaid.charAt(0).toUpperCase() + keptSaid.slice(1) : ''),
-      confirmText: `Remove ${total} row${total === 1 ? '' : 's'}`,
+      confirmText: total ? `Remove ${total} row${total === 1 ? '' : 's'}` : 'Count them again',
     });
     if (!go) return;
     /* The dialog is a window in which the state can be replaced under this
@@ -1581,7 +2132,7 @@ module.exports = function registerImport(ctx) {
       return toast(replaced || i18n.t('io.reloaded.message'), true);
     }
 
-    let undone = 0, files = 0;
+    let undone = 0, files = 0, legsUndone = 0;
     try {
       for (const t of targets) {
         if (t.emptied) {
@@ -1595,17 +2146,34 @@ module.exports = function registerImport(ctx) {
           if (S.txFiles[t.key] === t.file) delete S.txFiles[t.key];
         } else {
           const keep = t.file.rows.filter(row => !t.doomed.has(row));
+          /* A leg this undo counts again that sits in this same file goes in
+             the same write (IMP-5) — one write per file. */
+          const back = legBack.get(t.key);
+          legBack.delete(t.key);
           /* Written from a MODEL rather than by mutating first: a write that
              fails must leave the row in memory as well as on disk, or the app
              starts reporting a total the file does not hold. Same lockstep rule
              commitImport follows in the other direction. */
-          await op.writeFile(txFileRel(t.file.label, t.file.month), serializeTxFile({ ...t.file, rows: keep }));
+          await op.writeFile(txFileRel(t.file.label, t.file.month), serializeTxFile({ ...t.file,
+            rows: back ? keep.map(row => (back.rows.has(row) ? { ...row, excluded: false } : row)) : keep }));
           t.file.rows = keep;
+          if (back) { for (const row of back.rows) row.excluded = false; legsUndone += back.rows.size; }
           // Disk now matches memory for this file, including whatever unsaved
           // edits it carried — so it is genuinely clean, not merely written.
           t.file.dirty = false;
         }
         undone += t.doomed.size;
+        files++;
+      }
+      /* The other halves in files this undo removes nothing from (IMP-5):
+         the same model-first write, `excluded` the only field it touches. */
+      for (const [key, back] of legBack) {
+        await op.writeFile(txFileRel(back.file.label, back.file.month),
+          serializeTxFile({ ...back.file, rows: back.file.rows.map(row => (back.rows.has(row) ? { ...row, excluded: false } : row)) }));
+        for (const row of back.rows) row.excluded = false;
+        back.file.dirty = false;
+        legsUndone += back.rows.size;
+        legBack.delete(key);
         files++;
       }
     } catch (err) {
@@ -1626,6 +2194,7 @@ module.exports = function registerImport(ctx) {
     ctx.render();
     toast(`Undone — ${undone} row${undone === 1 ? '' : 's'} removed from ${files} file${files === 1 ? '' : 's'}`
       + (parts ? ` (${plural(parts, 'split part')} included)` : '')
+      + (legsUndone ? `, and the other half of ${plural(legsUndone, 'transfer')} in ${legAccts} counted again` : '')
       + (keptSaid ? `. ${keptSaid.charAt(0).toUpperCase() + keptSaid.slice(1)}` : ''));
   }
 

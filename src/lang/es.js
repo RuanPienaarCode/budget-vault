@@ -462,6 +462,10 @@ module.exports = {
     one: 'Copiada {count} categoría del periodo anterior',
     other: 'Copiadas {count} categorías del periodo anterior',
   },
+  'bud.copy.doneFrom': {
+    one: 'Copiada {count} categoría de {period}, el último periodo anterior con presupuesto',
+    other: 'Copiadas {count} categorías de {period}, el último periodo anterior con presupuesto',
+  },
   'bud.copy.nothing': 'Nada que copiar — todas las categorías ya tienen un valor',
 
   /* =========================== Transactions page ========================== */
@@ -554,8 +558,12 @@ module.exports = {
   },
   'tx.bulk.backup': 'Primero se escriben en {path}, así que se pueden recuperar — la papelera de la bóveda no puede deshacer esto por sí sola, porque los archivos mensuales se editan en vez de borrarse.',
   'tx.bulk.splits': {
-    one: '1 de ellas pertenece a una división cuyas otras filas quizá no estén seleccionadas.',
-    other: '{count} de ellas pertenecen a divisiones cuyas otras filas quizá no estén seleccionadas.',
+    one: 'Se va con ellas 1 fila más, {total} en total: una división se elimina entera —la línea original y todas sus partes— para que ninguna parte quede describiendo una línea que ya no existe.',
+    other: 'Se van con ellas {count} filas más, {total} en total: una división se elimina entera —la línea original y todas sus partes— para que ninguna parte quede describiendo una línea que ya no existe.',
+  },
+  'tx.bulk.splitsLeft': {
+    one: '1 fila que coincide se deja como está: pertenece a divisiones idénticas del mismo día cuyas partes no se pueden distinguir. Pon las partes de cada línea original justo debajo de ella en su archivo, sumando su importe, y vuelve a eliminar.',
+    other: '{count} filas que coinciden se dejan como están: pertenecen a divisiones idénticas del mismo día cuyas partes no se pueden distinguir. Pon las partes de cada línea original justo debajo de ella en su archivo, sumando su importe, y vuelve a eliminar.',
   },
   'tx.bulk.confirm': {
     one: 'Eliminar 1 fila',
@@ -591,13 +599,26 @@ module.exports = {
      split parent row (the why is in en.js) --- */
   'tx.split.chip': 'dividida en {count}',
   'tx.split.chipGap': '{amount} sin asignar',
+  'tx.split.chipMissing': 'dividida · partes no encontradas',
+  'tx.split.chipOver': '{amount} más que la línea',
+  'tx.split.chipTwice': 'ya no está excluida, contada dos veces',
+  'tx.split.ambiguous': 'Las partes de esta división no se pueden distinguir de las de otra división idéntica del mismo día, así que no se cambió nada. En {file}, pon las partes de cada línea original justo debajo de ella, sumando su importe, y vuelve a intentarlo.',
   'tx.aria.splitChip': 'Opciones de división para {desc} del {date}',
+  'tx.aria.splitChipTwice': 'Volver a marcar Excluded en {desc} del {date}: se cuenta dos veces',
 
   /* Accessible names (audit of 11 Nov 2026, task 19) — machine-assisted, not native-reviewed. */
   'tx.split.aria.amount': 'Importe de la parte {n}',
   'tx.split.aria.category': 'Categoría de la parte {n}',
   'tx.split.aria.note': 'Nota de la parte {n}',
   'tx.split.aria.remove': 'Quitar la parte {n}',
+  'tx.split.title': 'Dividir transacción',
+  'tx.split.addPart': '＋ Añadir parte',
+  'tx.split.submit': 'Dividir',
+  'tx.split.notePlaceholder': 'Nota (opcional)',
+  'tx.split.unallocated': 'Sin asignar: {amount}',
+  'tx.split.balanced': 'Asignado {amount} — cuadra',
+  'tx.split.needAmount': 'Cada parte necesita un importe',
+  'tx.split.hint': 'Los importes se escriben en positivo: la división mantiene el sentido del original. La línea original queda en el archivo marcada como Excluded, así que los totales no cambian y volver a importar este extracto no la duplicará.',
 
   'tx.unsplit.action': 'Deshacer división',
   'tx.unsplit.title': '¿Deshacer la división de esta transacción?',
@@ -605,6 +626,10 @@ module.exports = {
     one: 'Esto quita la 1 parte y devuelve {desc} como una sola transacción de {amount}.',
     other: 'Esto quita las {count} partes y devuelve {desc} como una sola transacción de {amount}.',
   },
+  'tx.unsplit.noParts': 'No se encontraron en {file} partes de división con la fecha y la descripción de esta línea, así que sigue dividida y fuera de los totales. Si se editó su fecha o su descripción, devuélvela a lo que coincide con sus partes; si se borraron sus partes, vacía las celdas Excluded y Split de esta línea en el archivo.',
+  'tx.reexclude.title': '¿Volver a excluir esta línea?',
+  'tx.reexclude.msg': '{desc} ({amount}) se dividió, pero se le quitó la marca de Excluded, así que se cuenta una vez como línea y otra a través de sus partes. Esto vuelve a poner la marca, de modo que solo cuenten las partes. Las partes no cambian.',
+  'tx.reexclude.action': 'Volver a excluirla',
 
   'tx.add.noAccount': 'Añade una cuenta primero — cada transacción pertenece a una',
   'tx.add.title': 'Añadir transacción',
@@ -705,6 +730,8 @@ module.exports = {
   'bx.folder': 'Guardar en la carpeta',
   'bx.folder.desc': 'Una carpeta en esta bóveda. Exportar la misma selección de nuevo reemplaza los archivos anteriores.',
   'bx.cancel': 'Cancelar',
+  'modal.ok': 'Aceptar',
+  'modal.close': 'Cerrar',
   'bx.go': 'Exportar',
   'bx.preview': {
     one: '{count} periodo · {range} · {cats} categorías',
@@ -814,6 +841,24 @@ module.exports = {
   /* Accessible names (audit of 11 Nov 2026, task 19) — machine-assisted, not native-reviewed. */
   'cat.aria.current': '{label} — actualmente {value}',
   'cat.aria.currentNone': '{label} — actualmente sin categoría',
+
+  'cat.delete.title': 'Eliminar categoría',
+  'cat.delete.confirm': 'Eliminar',
+  'cat.delete.lead': '¿Eliminar «{name}»?',
+  'cat.delete.unused': 'Ninguna transacción la usa. Los archivos de presupuesto anteriores no cambian.',
+  'cat.delete.used': {
+    one: '{count} transacción está archivada en ella.',
+    other: '{count} transacciones están archivadas en ella.',
+  },
+  'cat.delete.kindLost': 'El tipo de una categoría («{kind}») se lee de su archivo, así que al eliminarlo el dinero archivado en ella pierde ese tipo.',
+  'cat.delete.effect.income': 'El dinero que entró en ella deja de contar como ingreso, en todos los periodos, también los pasados, hasta que se vuelva a categorizar.',
+  'cat.delete.effect.transfer': 'El dinero que se movió en ella deja de ser una transferencia y cuenta como gasto sin categoría, en todos los periodos, también los pasados, hasta que se vuelva a categorizar.',
+  'cat.delete.effect.other': 'El dinero archivado en ella cuenta como gasto sin categoría en todos los periodos, también los pasados, hasta que se vuelva a categorizar.',
+  'cat.delete.rules': {
+    one: '{count} regla de categorización sigue archivando las importaciones nuevas en «{name}» y seguirá haciéndolo.',
+    other: '{count} reglas de categorización siguen archivando las importaciones nuevas en «{name}» y seguirán haciéndolo.',
+  },
+  'cat.delete.trash': 'El archivo de la categoría va a la papelera de tu bóveda.',
 
   'acct.err.exists': 'La cuenta ya existe',
   'acct.err.save': 'No se pudo guardar {name} ({error}) — no se escribió nada en el archivo; inténtalo de nuevo.',
@@ -1132,6 +1177,8 @@ module.exports = {
   'dash.hero.sub': '{spent} gastado de {budgeted} de presupuesto de gastos',
   'dash.hero.assumedIncluded': 'incluye {amount} ya gastado',
   'dash.hero.nettedOff': '{amount} en reembolsos sin descontar de esta cifra',
+  'dash.hero.importedTo': 'Extractos importados hasta el {date}',
+  'dash.hero.setUpBudget': 'Preparar el presupuesto de este periodo',
   'dash.stat.income': 'Ingresos totales',
   'dash.stat.budgeted': 'Presupuestado',
   'dash.stat.spent': 'Total gastado',
@@ -1141,6 +1188,7 @@ module.exports = {
   'dash.stat.setAside': '{amount} para ahorro',
   'dash.stat.setAsideMoved': '{moved} de {amount} ahorrado hasta ahora',
   'dash.stat.ofWhichSetAside': '{moved} de {amount} ahorrado hasta ahora',
+  'dash.stat.setAsideUnseen': '{amount} para ahorro — los extractos de los fondos terminan el {date}, así que aún no se ve lo ahorrado',
   'dash.scheduledAhead': 'Hasta hoy · {amount} más con fecha posterior en este periodo',
   'dash.fundedFromSavings': {
     one: '{amount} más salió de tus fondos ({count} movimiento), que este presupuesto no cuenta',
@@ -1244,6 +1292,10 @@ module.exports = {
     other: 'Promedio de tus últimos {count} períodos completados',
   },
   'dash.health.subNone': 'Aún no hay períodos completados para promediar',
+  'dash.health.leftOut': {
+    one: '{periods} queda fuera: los extractos terminan antes de que acabe',
+    other: '{periods} quedan fuera: los extractos terminan antes de que acaben',
+  },
   'dash.health.monthsUnit': 'meses',
   'dash.health.months': 'de gastos esenciales cubiertos',
   'dash.health.meterTip': {
@@ -1446,6 +1498,7 @@ module.exports = {
   'dash.left.cycleUnder': '{amount} de margen antes de la liquidación del {date}.',
   'dash.left.cycleOver': '{amount} MÁS que el ingreso que la liquida el {date}.',
   'dash.left.incoming': '{amount} entra el {date}',
+  'dash.left.incomingNotImported': '{amount} previsto el {date} — aún sin importar',
   'dash.left.incomingCovers': 'Eso cubre todo lo anterior y deja unos {amount}.',
   'dash.left.incomingShort': 'Incluso después te faltan {amount}.',
   'dash.left.days': {
@@ -1472,7 +1525,7 @@ module.exports = {
   'dash.left.asListed': 'según la lista, sin historial de cargos',
   'dash.left.settledInFull': 'liquidada por completo, saldo actual',
   'dash.left.contracted': 'cuota contratada',
-  'dash.left.source': 'Los importes son lo que se cobra normalmente (el valor central de los últimos tres cargos), no la cifra escrita en la página Servicios. Solo se leen de tu lista de Servicios y de la página Deudas — un cargo recurrente que no esté en ninguna de las dos no se cuenta aquí.',
+  'dash.left.source': 'Los importes son lo que se cobra normalmente (el valor central de los últimos tres cargos), no la cifra escrita en la página Servicios. Se cuentan: tu lista de Servicios, la página Deudas y las domiciliaciones que se cobran cada mes por el mismo importe más o menos el mismo día. Un pago que haces tú mismo en días distintos — el alquiler por transferencia, por ejemplo — no se cuenta salvo que esté en tu lista de Servicios.',
   'dash.split.colCat': 'Categoría',
   'dash.split.colSpent': 'Gastado',
   'dash.split.colChange': 'Cambio',
@@ -1824,6 +1877,7 @@ module.exports = {
   'plan.env.collapseAria': "Contraer {name}",
   'plan.env.deleteAria': "Quitar la bolsa de gasto {name}",
   'plan.actions.deleteAria': "Eliminar plan",
+  'plan.err.nameRequired': 'Necesita un nombre',
 
   /* Accessible names (audit of 11 Nov 2026, task 19) — machine-assisted, not native-reviewed. */
   'plan.pickerAria': 'Elegir un plan',
@@ -1940,6 +1994,10 @@ module.exports = {
     one: '1 fila se asignará a {cat}.',
     other: '{count} filas se asignarán a {cat}.',
   },
+  'tx.bulkCat.splitsSkipped': {
+    one: '1 fila que coincide pertenece a una división y conserva su categoría: cámbiala en su propia fila.',
+    other: '{count} filas que coinciden pertenecen a divisiones y conservan sus categorías: cámbialas en sus propias filas.',
+  },
   'tx.bulkCat.confirm': {
     one: 'Asignar categoría (1)',
     other: 'Asignar categoría ({count})',
@@ -1981,6 +2039,9 @@ module.exports = {
   },
   'ctl.toast.repointFailed': 'No se pudieron redirigir las notas por el cambio de nombre "{from}" → "{to}" ({error})',
   'ctl.notice.unsavedReloadSkipped': 'Presupuesto: cambios sin guardar — recarga omitida. Guarde (o use "Recargar desde el disco" para descartar) y vuelva a intentarlo.',
+  'ctl.reload.confirmTitle': 'Cambios sin guardar',
+  'ctl.reload.confirmMessage': 'Recargar desde el disco descartará los cambios sin guardar. ¿Continuar?',
+  'ctl.reload.confirmDiscard': 'Descartar y recargar',
   'ctl.toast.fileFailed': 'No se pudo procesar "{name}" ({error})',
   'ctl.toast.thatFile': 'ese archivo',
   'settings.exchangeRates.source': 'Fuente de los tipos de cambio',

@@ -910,7 +910,9 @@ for (const [cell, dayFirst, want, why] of [
   ['PURCHASE 0', true, null, 'nor is a description ending in a digit'],
   ['1 May', true, null, 'a day and a month with no year is not a date'],
   ['JUN 12', true, null, 'and this one disagreed about the year between engines'],
-  ['Mar 3 2026', true, null, 'Mon DD YYYY is unsupported — add an explicit rule, never guess'],
+  // Was null ("unsupported — add an explicit rule, never guess"); the explicit
+  // rule was added 2026-11-25 (audit IMP-6, tests/statement-date-forms.test.cjs).
+  ['Mar 3 2026', true, '2026-03-03', 'Mon DD YYYY now has an explicit rule'],
 
   /* Impossible calendar dates. The bounds check allowed any day up to 31 in any
      month, so these became real-looking ISO strings that were written to disk,

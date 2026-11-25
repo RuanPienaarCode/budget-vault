@@ -35,6 +35,10 @@ const { parseNum } = require('./amount');
 const BUDGET_HEADER = '| Category | Type | Amount | Notes |';
 const BUDGET_SEPARATOR = '|----------|------|-------:|-------|';
 
+/* The tags line's value, named once: BUDGET_FRONTMATTER below is born with it
+   and carriedFrontmatter() sets it. */
+const BUDGET_TAGS = '[finance, finance/budget, finance/budget/budgets]';
+
 /* The frontmatter a period file is BORN with, for the case where there is no
    existing block to patch.
 
@@ -65,7 +69,74 @@ const BUDGET_SEPARATOR = '|----------|------|-------:|-------|';
    an unknown key and gets appended BELOW the tags — leaving a household with
    two shapes of the same file depending on which month created which, forever,
    since every later save preserves the order it found. */
-const BUDGET_FRONTMATTER = 'period:\ntags: [finance, finance/budget, finance/budget/budgets]';
+const BUDGET_FRONTMATTER = 'period:\ntags: ' + BUDGET_TAGS;
+
+/* The frontmatter of a period file that is born as a COPY of an earlier
+   period's (Copy previous period, then Save) — 2026-11-25 audit, BUD-9.
+
+   The file was born from BUDGET_FRONTMATTER alone, so a key the source carried
+   (`hub: "[[Smart Budget]]"`, which some vaults use to join every budget file
+   to one note in the graph; an alias; a comment) was left behind, and the new
+   month dropped out of the graph the previous ones were in. The source's
+   block is the base, so every key, comment and block list rides along
+   verbatim (patchFrontmatter keeps what it does not model). Two keys are the
+   plugin's own and are set rather than copied: `period` is patched in by
+   serializeBudgetFile (its slot is put first here when the source has none, as
+   BUDGET_FRONTMATTER does), and `tags` is the plugin's default line — a source
+   written by an older build had none (see above), and copying that absence
+   would pass the missing tags down to every month after it.
+
+   A file made from scratch is not touched by any of this: it keeps
+   BUDGET_FRONTMATTER, which invents nothing. */
+function carriedFrontmatter(sourceRaw) {
+  if (!sourceRaw || !sourceRaw.trim()) return BUDGET_FRONTMATTER;
+  const fm = patchFrontmatter(sourceRaw, { tags: BUDGET_TAGS });
+  return /^period:/m.test(fm) ? fm : 'period:\n' + fm;
+}
+
+/* Whether a budget row reaches the file (2026-11-25 audit, BUD-8) — the ONE
+   answer, read by Save (views/budgets.js persistedRows) and by the plan
+   figures that ask whether the plan has an income row (figures.js
+   planFigures). They used two: Save wrote a row the reader had typed an
+   amount into, while the strip still read it as a zero row the draft had
+   seeded, and said "27% of income" (the wording for income that ARRIVED)
+   beside "Planned income R 45 000".
+
+   A row in the file, or one the reader gave an amount or a note; a draft's
+   untouched zero rows (inFile: false) stay display-only, so the period file
+   does not grow to every category. `inFile !== false` rather than a truthy
+   test because a SAVED row (S.budgets) carries no flag at all — it is in the
+   file by being there — while every draft row has one. A row with no category
+   is never written: the loader keeps those beside the rows (L3-12). */
+function rowIsWritten(r) {
+  return !!(r && r.category && (r.inFile !== false || r.amount || (r.notes && String(r.notes).trim())));
+}
+
+/* The most recent EARLIER period that has a budget (2026-11-25 audit, BUD-3):
+   what the new-period banner offers and Copy previous period copies. It used
+   to ask for exactly one period back, so a skipped month meant no banner and
+   "No budget found for the previous period" with an older budget on disk.
+
+   One pass over the keys already loaded — bounded by the number of budget
+   files, never a walk back through the calendar. `valid` keeps it to the
+   period-name shape in force (a budget under the other shape is the other-shape
+   banner's business, not a candidate). Keys of one shape compare as strings
+   in date order. Strictly earlier, so it never looks forward, and an empty
+   file is not a budget. Null when there is none. */
+/**
+ * @param {Record<string, unknown[]>} budgets  S.budgets
+ * @param {string} period
+ * @param {(key: string) => boolean} [valid]
+ * @returns {string | null}
+ */
+function earlierBudgetKey(budgets, period, valid = () => true) {
+  let best = null;
+  for (const k of Object.keys(budgets || {})) {
+    if (!(k < period) || !valid(k) || !(budgets[k] || []).length) continue;
+    if (best === null || k > best) best = k;
+  }
+  return best;
+}
 
 /* The sentence under the heading that says what window this period covers.
 
@@ -222,4 +293,4 @@ function serializeBudgetFile({ period, rawFrontmatter = '', rows = [], rangeNote
   return lines.join('\n');
 }
 
-module.exports = { serializeBudgetFile, budgetFileRows, budgetRangeNote, BUDGET_HEADER, BUDGET_FRONTMATTER };
+module.exports = { serializeBudgetFile, budgetFileRows, budgetRangeNote, carriedFrontmatter, rowIsWritten, earlierBudgetKey, BUDGET_HEADER, BUDGET_FRONTMATTER };

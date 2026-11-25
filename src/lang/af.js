@@ -460,6 +460,10 @@ module.exports = {
     one: '{count} kategorie uit die vorige tydperk gekopieer',
     other: '{count} kategorieë uit die vorige tydperk gekopieer',
   },
+  'bud.copy.doneFrom': {
+    one: '{count} kategorie uit {period} gekopieer, die jongste vroeëre tydperk met \'n begroting',
+    other: '{count} kategorieë uit {period} gekopieer, die jongste vroeëre tydperk met \'n begroting',
+  },
   'bud.copy.nothing': 'Niks om te kopieer nie — elke kategorie het reeds \'n waarde',
 
   /* =========================== Transactions page ========================== */
@@ -552,8 +556,12 @@ module.exports = {
   },
   'tx.bulk.backup': 'Hulle word eers na {path} geskryf sodat hulle teruggebring kan word — die kluis se asblik kan dit nie alleen ontdoen nie, want die maandlêers word geredigeer eerder as geskrap.',
   'tx.bulk.splits': {
-    one: '1 daarvan hoort by \'n verdeling waarvan die ander rye dalk nie gekies is nie.',
-    other: '{count} daarvan hoort by verdelings waarvan die ander rye dalk nie gekies is nie.',
+    one: "Nog 1 ry gaan saam, {total} altesaam: 'n verdeling word heel geskrap — die oorspronklike lyn en elke deel — sodat geen deel agterbly wat 'n lyn beskryf wat weg is nie.",
+    other: "Nog {count} rye gaan saam, {total} altesaam: 'n verdeling word heel geskrap — die oorspronklike lyn en elke deel — sodat geen deel agterbly wat 'n lyn beskryf wat weg is nie.",
+  },
+  'tx.bulk.splitsLeft': {
+    one: '1 passende ry word gelos: dit hoort by identiese verdelings op dieselfde dag waarvan die dele nie uitmekaar gehou kan word nie. Sit elke oorspronklike lyn se dele direk daaronder in sy lêer, sodat hulle daarby optel, en skrap dan weer.',
+    other: '{count} passende rye word gelos: hulle hoort by identiese verdelings op dieselfde dag waarvan die dele nie uitmekaar gehou kan word nie. Sit elke oorspronklike lyn se dele direk daaronder in sy lêer, sodat hulle daarby optel, en skrap dan weer.',
   },
   'tx.bulk.confirm': {
     one: 'Skrap 1 ry',
@@ -589,13 +597,26 @@ module.exports = {
      split parent row (the why is in en.js) --- */
   'tx.split.chip': 'verdeel in {count}',
   'tx.split.chipGap': '{amount} onverklaar',
+  'tx.split.chipMissing': 'verdeel · dele nie gevind nie',
+  'tx.split.chipOver': '{amount} meer as die reël',
+  'tx.split.chipTwice': 'nie meer uitgesluit nie, twee keer getel',
+  'tx.split.ambiguous': "Hierdie verdeling se dele kan nie uitmekaar gehou word van dié van 'n ander identiese verdeling op dieselfde dag nie, so niks is verander nie. Sit in {file} elke oorspronklike lyn se dele direk daaronder, sodat hulle daarby optel, en probeer dan weer.",
   'tx.aria.splitChip': 'Verdeelopsies vir {desc} op {date}',
+  'tx.aria.splitChipTwice': 'Sit die Excluded-merker terug op {desc} op {date}: dit word twee keer getel',
 
   /* Accessible names (audit of 11 Nov 2026, task 19) — machine-assisted, not native-reviewed. */
   'tx.split.aria.amount': 'Bedrag vir deel {n}',
   'tx.split.aria.category': 'Kategorie vir deel {n}',
   'tx.split.aria.note': 'Nota vir deel {n}',
   'tx.split.aria.remove': 'Verwyder deel {n}',
+  'tx.split.title': 'Verdeel transaksie',
+  'tx.split.addPart': '＋ Voeg deel by',
+  'tx.split.submit': 'Verdeel',
+  'tx.split.notePlaceholder': 'Nota (opsioneel)',
+  'tx.split.unallocated': 'Onverklaar: {amount}',
+  'tx.split.balanced': '{amount} toegewys — gebalanseer',
+  'tx.split.needAmount': 'Elke deel het ’n bedrag nodig',
+  'tx.split.hint': 'Bedrae word as positief ingevoer — die verdeling behou die oorspronklike se rigting. Die oorspronklike reël bly in die lêer as Excluded gemerk, so die totale bly dieselfde en om hierdie staat weer in te voer sal dit nie dupliseer nie.',
 
   'tx.unsplit.action': 'Verdeling ongedaan maak',
   'tx.unsplit.title': 'Maak hierdie transaksie se verdeling ongedaan?',
@@ -603,6 +624,10 @@ module.exports = {
     one: 'Dit verwyder die 1 deel en stel {desc} terug as een enkele transaksie van {amount}.',
     other: 'Dit verwyder die {count} dele en stel {desc} terug as een enkele transaksie van {amount}.',
   },
+  'tx.unsplit.noParts': 'Geen verdeelde dele met hierdie lyn se datum en beskrywing is in {file} gevind nie, so dit bly verdeel en buite die totale. As die datum of beskrywing verander is, verander dit terug sodat dit by die dele pas; as die dele geskrap is, maak hierdie lyn se Excluded- en Split-selle in die lêer leeg.',
+  'tx.reexclude.title': 'Hierdie reël weer uitsluit?',
+  'tx.reexclude.msg': '{desc} ({amount}) is verdeel, maar sy Excluded-merker is verwyder, so dit word een keer as homself getel en weer deur sy dele. Dit sit die merker terug, sodat net die dele tel. Die dele word nie verander nie.',
+  'tx.reexclude.action': 'Sluit dit weer uit',
 
   'tx.add.noAccount': 'Voeg eers \'n rekening by — elke transaksie hoort by een',
   'tx.add.title': 'Voeg transaksie by',
@@ -703,6 +728,8 @@ module.exports = {
   'bx.folder': 'Stoor na vouer',
   'bx.folder.desc': '\'n Vouer in hierdie kluis. Om dieselfde keuse weer uit te voer, vervang dit die vorige lêers.',
   'bx.cancel': 'Kanselleer',
+  'modal.ok': 'OK',
+  'modal.close': 'Sluit',
   'bx.go': 'Voer uit',
   'bx.preview': {
     one: '{count} tydperk · {range} · {cats} kategorieë',
@@ -812,6 +839,24 @@ module.exports = {
   /* Accessible names (audit of 11 Nov 2026, task 19) — machine-assisted, not native-reviewed. */
   'cat.aria.current': '{label} — tans {value}',
   'cat.aria.currentNone': '{label} — tans ongekategoriseer',
+
+  'cat.delete.title': 'Vee kategorie uit',
+  'cat.delete.confirm': 'Vee uit',
+  'cat.delete.lead': 'Vee "{name}" uit?',
+  'cat.delete.unused': 'Geen transaksie gebruik dit nie. Vorige begrotingslêers word nie verander nie.',
+  'cat.delete.used': {
+    one: '{count} transaksie is onder hierdie kategorie gêer.',
+    other: '{count} transaksies is onder hierdie kategorie gêer.',
+  },
+  'cat.delete.kindLost': '\'n Kategorie se soort ("{kind}") word uit sy lêer gelees, so as die lêer uitgevee word, verdwyn daardie soort van die geld wat daaronder gêer is.',
+  'cat.delete.effect.income': 'Geld wat daaronder inkom, tel nie meer as inkomste nie, in elke tydperk, ook vorige, totdat dit herkategoriseer word.',
+  'cat.delete.effect.transfer': 'Geld wat daaronder beweeg het, is nie meer \'n oordrag nie en tel as ongekategoriseerde besteding, in elke tydperk, ook vorige, totdat dit herkategoriseer word.',
+  'cat.delete.effect.other': 'Geld wat daaronder gêer is, tel as ongekategoriseerde besteding in elke tydperk, ook vorige, totdat dit herkategoriseer word.',
+  'cat.delete.rules': {
+    one: '{count} kategoriseringsreël sorteer nuwe invoere steeds onder "{name}" en sal dit bly doen.',
+    other: '{count} kategoriseringsreëls sorteer nuwe invoere steeds onder "{name}" en sal dit bly doen.',
+  },
+  'cat.delete.trash': 'Die kategorielêer gaan na jou kluis se asblik.',
 
   'acct.err.exists': 'Rekening bestaan reeds',
   'acct.err.save': 'Kon nie {name} stoor nie ({error}) — niks is na die lêer geskryf nie; probeer weer.',
@@ -1130,6 +1175,8 @@ module.exports = {
   'dash.hero.sub': '{spent} bestee van die bestedingsbegroting van {budgeted}',
   'dash.hero.assumedIncluded': 'sluit {amount} in wat reeds bestee is',
   'dash.hero.nettedOff': '{amount} aan terugbetalings nie van hierdie syfer afgetrek nie',
+  'dash.hero.importedTo': 'State ingevoer tot {date}',
+  'dash.hero.setUpBudget': 'Stel hierdie tydperk se begroting op',
   'dash.stat.income': 'Totale inkomste',
   'dash.stat.budgeted': 'Begroot',
   'dash.stat.spent': 'Totaal bestee',
@@ -1139,6 +1186,7 @@ module.exports = {
   'dash.stat.setAside': '{amount} vir spaar',
   'dash.stat.setAsideMoved': '{moved} van {amount} reeds gespaar',
   'dash.stat.ofWhichSetAside': '{moved} van {amount} reeds gespaar',
+  'dash.stat.setAsideUnseen': '{amount} vir spaar — die fondse se state hou op op {date}, so wat gespaar is, kan nog nie gesien word nie',
   'dash.scheduledAhead': 'Tot vandag · {amount} meer is later hierdie tydperk gedateer',
   'dash.fundedFromSavings': {
     one: '{amount} meer het uit jou fondse gegaan ({count} transaksie), wat hierdie begroting nie tel nie',
@@ -1242,6 +1290,10 @@ module.exports = {
     other: 'Gemiddeld oor jou laaste {count} voltooide tydperke',
   },
   'dash.health.subNone': 'Nog geen voltooide tydperke om oor te gemiddel nie',
+  'dash.health.leftOut': {
+    one: '{periods} uitgelaat: die state hou op voor dit geëindig het',
+    other: '{periods} uitgelaat: die state hou op voor hulle geëindig het',
+  },
   'dash.health.monthsUnit': 'maande',
   'dash.health.months': 'se noodsaaklike uitgawes gedek',
   'dash.health.meterTip': {
@@ -1444,6 +1496,7 @@ module.exports = {
   'dash.left.cycleUnder': '{amount} spasie oor voor die vereffening op {date}.',
   'dash.left.cycleOver': '{amount} MEER as die inkomste wat dit op {date} vereffen.',
   'dash.left.incoming': '{amount} kom op {date} in',
+  'dash.left.incomingNotImported': '{amount} verwag {date} — nog nie ingevoer nie',
   'dash.left.incomingCovers': 'Dit dek alles hierbo en laat sowat {amount} oor.',
   'dash.left.incomingShort': 'Selfs daarna kom jy {amount} kort.',
   'dash.left.days': {
@@ -1470,7 +1523,7 @@ module.exports = {
   'dash.left.asListed': 'soos gelys, geen heffingsgeskiedenis nie',
   'dash.left.settledInFull': 'ten volle vereffen, huidige saldo',
   'dash.left.contracted': 'gekontrakteerde paaiement',
-  'dash.left.source': 'Bedrae is wat gewoonlik gehef word (die middelste van die laaste drie heffings), nie die syfer wat op die Dienste-bladsy getik is nie. Dit lees net uit jou Dienste-lys en Skuld-bladsy — ’n herhalende heffing op nie een van die twee nie word nie hier getel nie.',
+  'dash.left.source': 'Bedrae is wat gewoonlik gehef word (die middelste van die laaste drie heffings), nie die syfer wat op die Dienste-bladsy getik is nie. Getel word: jou Dienste-lys, jou Skuld-bladsy, en debietorders wat elke maand vir dieselfde bedrag op omtrent dieselfde dag afgaan. ’n Betaling wat jy self op wisselende dae maak — huur per EFT, byvoorbeeld — word nie getel nie, tensy dit op jou Dienste-lys is.',
   'dash.split.colCat': 'Kategorie',
   'dash.split.colSpent': 'Bestee',
   'dash.split.colChange': 'Verandering',
@@ -1822,6 +1875,7 @@ module.exports = {
   'plan.env.collapseAria': "Vou {name} toe",
   'plan.env.deleteAria': "Verwyder bestedingsbak {name}",
   'plan.actions.deleteAria': "Verwyder plan",
+  'plan.err.nameRequired': 'Dit het ’n naam nodig',
 
   /* Accessible names (audit of 11 Nov 2026, task 19) — machine-assisted, not native-reviewed. */
   'plan.pickerAria': "Kies 'n plan",
@@ -1938,6 +1992,10 @@ module.exports = {
     one: '1 ry sal op {cat} gestel word.',
     other: '{count} rye sal op {cat} gestel word.',
   },
+  'tx.bulkCat.splitsSkipped': {
+    one: "1 passende ry hoort by 'n verdeling en hou sy kategorie — verander dit op sy eie ry.",
+    other: '{count} passende rye hoort by verdelings en hou hul kategorieë — verander dit op hul eie rye.',
+  },
   'tx.bulkCat.confirm': {
     one: 'Stel kategorie (1)',
     other: 'Stel kategorie ({count})',
@@ -1979,6 +2037,9 @@ module.exports = {
   },
   'ctl.toast.repointFailed': 'Kon nie notas herlei vir die hernoeming "{from}" → "{to}" nie ({error})',
   'ctl.notice.unsavedReloadSkipped': 'Begroting: ongestoorde wysigings — herlaai oorgeslaan. Stoor (of kies "Herlaai vanaf skyf" om weg te gooi) en probeer weer.',
+  'ctl.reload.confirmTitle': 'Wysigings nie gestoor nie',
+  'ctl.reload.confirmMessage': 'Herlaai vanaf skyf sal jou wysigings wat nie gestoor is nie weggooi. Gaan voort?',
+  'ctl.reload.confirmDiscard': 'Gooi weg en herlaai',
   'ctl.toast.fileFailed': 'Kon "{name}" nie verwerk nie ({error})',
   'ctl.toast.thatFile': 'daardie lêer',
   'settings.exchangeRates.source': 'Wisselkoersbron',

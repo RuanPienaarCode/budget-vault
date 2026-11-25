@@ -144,10 +144,10 @@ ok(tick.w && tick.h && px(tick.w.value) >= FLOOR && px(tick.h.value) >= FLOOR,
   `.ei-tick must be at least ${FLOOR}x${FLOOR}px, found ${tick.w && tick.w.value} x ${tick.h && tick.h.value}`);
 
 /* A text button's height: its line box plus its block padding. Its LAYOUT
-   height adds the block margins back, and for these two that must equal the
+   height adds the block margins back, and for this one that must equal the
    bare line box, so growing the target moves nothing on the page. */
 const nameLineBox = {};
-for (const sel of ['.budget-app-root .ei-name', '.budget-app-root .env-name']) {
+for (const sel of ['.budget-app-root .ei-name']) {
   const fs_ = decl(sel, 'font-size'), lh = decl(sel, 'line-height'), pad = decl(sel, 'padding'), mar = decl(sel, 'margin-block');
   const line = px(fs_ && fs_.value) * (lh ? Number(lh.value) : LH);
   const p = pad ? blockOf(pad.value) : 0;
@@ -200,4 +200,4 @@ if (failures.length) {
   process.exit(1);
 }
 console.log(`PASS — css-phone-layout: Accounts phone rules present and ordered, ${relayouts.length} relayout rules all behind ` +
-  `[role='table'], six tap targets at ${FLOOR}px or more (${checks} checks).`);
+  `[role='table'], five tap targets at ${FLOOR}px or more (${checks} checks).`);

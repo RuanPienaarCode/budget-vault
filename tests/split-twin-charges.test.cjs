@@ -12,16 +12,19 @@
    old rule (every part with that date and description). With a twin, a parent's
    parts are the contiguous run of `part` rows with its key directly under it —
    which is exactly where applySplit's caller splices them, and where Save and
-   Reload leave them. A twin with no run under it (a hand-reordered file) falls
-   back to "all of them" and splitPartsAmbiguous says so.
+   Reload leave them — trusted only when every twin's run adds up to its own
+   parent and the runs take every part (2026-11-25 audit, TXN-1: a
+   hand-reordered file grows runs by accident). Anything less falls back to
+   "all of them", splitPartsAmbiguous says so, and Delete and Un-split refuse.
 
      1. the lookup: single split unchanged; twin split told apart by position
-     2. the hand-reordered twin falls back and is flagged
+     2. the hand-reordered twin falls back and is flagged — both twins, in
+        every order the audit found, including runs that exist but do not add up
      3. the real Transactions view: split twice through splitTransaction, Save,
         reload from disk -> the order survives, each chip says 2 parts, no gap
      4. Un-split on one twin leaves the other split and still adding up
      5. Delete on one twin leaves the other's parts
-     6. the ambiguous file's dialogs say so; an unambiguous one's do not
+     6. on an ambiguous file Delete and Un-split refuse, change nothing, and say why
      7. the view keeps no private copy of the lookup
 
      node tests/split-twin-charges.test.cjs */
@@ -97,10 +100,45 @@ const amounts = rows => rows.map(r => r.amount);
   eq(T.splitPartsOf(rows, P1), [p1a, p1b, p2a, p2b], 'no run under a twin: all four, so nothing is stranded');
   eq(T.splitPartsAmbiguous(rows, P1), true, 'and the caller can tell it is the ambiguous answer');
   eq(T.splitPartsAmbiguous(rows, P2), true, 'for the other twin too');
-  // Parts all at the end of the file, under neither parent.
+  // Parts all at the end of the file, under neither parent — the file sorted
+  // by its Split column. The R50 parent HAS a run under it here (all four
+  // parts), and used to take it as its own with nothing flagged: Delete on it
+  // took the R100's parts too (2026-11-25 audit, TXN-1).
   const rows2 = [P1, P2, p1a, p1b, p2a, p2b];
   eq(T.splitPartsAmbiguous(rows2, P1), true, 'a parent with nothing directly under it is flagged');
+  eq(T.splitPartsAmbiguous(rows2, P2), true, 'and so is the twin whose "run" is all four parts: R150 of parts under a R50 parent is not its split');
   eq(T.splitPartsOf(rows2, P1).length, 4, 'and gets every part, as before');
+  eq(T.splitPartsOf(rows2, P2).length, 4, 'the twin too: the fallback, flagged, not a confident answer');
+
+  // Sorted by Amount: each parent has a run, neither adds up. R100 used to
+  // claim only the -60, so an un-split left the -40 behind, counted twice.
+  const rows3 = [P1, p1a, P2, p1b, p2a, p2b];
+  eq(T.splitPartsAmbiguous(rows3, P1), true, 'a run that does not add up to its parent (60 of 100) is not trusted');
+  eq(T.splitPartsAmbiguous(rows3, P2), true, 'nor its twin\'s (40 + 30 + 20 under a R50 parent)');
+  eq(T.splitPartsOf(rows3, P1), [p1a, p1b, p2a, p2b], 'both fall back to every part with the key');
+
+  // Every run adds up, but a part sits outside them all: it could be anyone's.
+  const stray = row(-5, 'part');
+  const rows4 = [P1, p1a, p1b, P2, p2a, p2b, stray];
+  eq(T.splitPartsAmbiguous(rows4, P1), true, 'a part no run claims makes the whole group ambiguous');
+  eq(T.splitPartsAmbiguous(rows4, P2), true, 'for both twins: never one confident answer beside a guess');
+
+  // One twin's parts deleted by hand: the other's run still adds up, but the
+  // group is not told apart, so neither is answered by position.
+  const rows5 = [P1, p1a, p1b, P2];
+  eq(T.splitPartsAmbiguous(rows5, P1) && T.splitPartsAmbiguous(rows5, P2), true,
+    'a twin with no run under it flags the whole group');
+
+  // To the cent, sign-aware: a run that is right in magnitude but wrong in
+  // sign does not add up.
+  const P3 = row(-100, 'parent'), P4 = row(-50, 'parent');
+  const rows6 = [P3, row(60, 'part'), row(40, 'part'), P4, row(-30, 'part'), row(-20, 'part')];
+  eq(T.splitPartsAmbiguous(rows6, P4), true, 'parts summing to +100 under a -100 parent do not add up');
+  // And the three-decimal amounts the schema keeps still balance by cents.
+  const P5 = row(-912.345, 'parent'), P6 = row(-50, 'parent');
+  const rows7 = [P5, row(-512.345, 'part'), row(-400, 'part'), P6, row(-30, 'part'), row(-20, 'part')];
+  eq(T.splitPartsAmbiguous(rows7, P5), false, 'a run summing to the parent in cents is trusted');
+  eq(amounts(T.splitPartsOf(rows7, P5)), [-512.345, -400], 'and is that parent\'s');
 }
 
 /* ---- 3-6. the real Transactions view ---- */
@@ -207,22 +245,43 @@ const parentOf = (S, amount) => file(S).rows.find(r => r.split === 'parent' && r
     eq(T.splitShortfall(keep, T.splitPartsOf(file(S).rows, keep)), 0, 'the R100 split is untouched and still adds up');
   }
 
-  /* ---- 6. the hand-reordered twin: fall back, and the dialogs say so ---- */
-  {
-    const { ctx, S, $ } = await mount(
-      line(-60, 'part') + line(-40, 'part') + line(-30, 'part') + line(-20, 'part') + line(-100, 'parent') + line(-50, 'parent'));
-    seen.confirms = []; seen.confirmAnswer = false;
-    await ctx.deleteTransaction(itemOf(S, parentOf(S, -100)), 0);
-    const del = seen.confirms[0].message;
-    ok(/Its 4 split parts go with it/.test(del), `falls back to every part: ${JSON.stringify(del)}`);
-    ok(/could not be told apart from another identical split/.test(del), `and the delete dialog says why the count is high: ${JSON.stringify(del)}`);
-    seen.confirms = [];
-    chips($)[0].click();
-    await flush();
-    const un = seen.confirms[0].message;
-    ok(/removes the 4 parts/.test(un), `un-split counts every part: ${JSON.stringify(un)}`);
-    ok(/could not be told apart from another identical split/.test(un), `and says they could not be told apart: ${JSON.stringify(un)}`);
-    eq(file(S).rows.length, 6, 'declining changes nothing');
+  /* ---- 6. the hand-reordered twin: Delete and Un-split refuse ----
+     They used to offer "Its 4 split parts go with it" with a sentence saying
+     the count was high, and confirming took the other split's parts too: that
+     parent stayed excluded with nothing describing it, out of every total
+     (2026-11-25 audit, TXN-1). A guess the reader agreed to is still a guess,
+     so neither opens a dialog on one. */
+  const ORDERS = {
+    'parts above both parents': [[-60, 'part'], [-40, 'part'], [-30, 'part'], [-20, 'part'], [-100, 'parent'], [-50, 'parent']],
+    'sorted by the Split column': [[-100, 'parent'], [-50, 'parent'], [-60, 'part'], [-40, 'part'], [-30, 'part'], [-20, 'part']],
+    'sorted by Amount': [[-100, 'parent'], [-60, 'part'], [-50, 'parent'], [-40, 'part'], [-30, 'part'], [-20, 'part']],
+  };
+  for (const [name, order] of Object.entries(ORDERS)) {
+    for (const target of [-100, -50]) {
+      const { ctx, S, $ } = await mount(order.map(([a, s]) => line(a, s)).join(''));
+      const before = shape(S);
+      seen.confirms = []; seen.confirmAnswer = true;
+      const toastsBefore = ctx._toasts.length;
+      await ctx.deleteTransaction(itemOf(S, parentOf(S, target)), 0);
+      eq(seen.confirms.length, 0, `${name}: Delete on the R${-target} parent opens no dialog on a guess`);
+      eq(shape(S), before, `${name}: and removes nothing`);
+      const said = ctx._toasts.slice(toastsBefore);
+      ok(said.length === 1 && said[0].bad && /cannot be told apart from those of another identical split/.test(said[0].msg)
+        && /Cheque\/2026-07/.test(said[0].msg), `${name}: it says why, and which file to fix: ${JSON.stringify(said)}`);
+
+      // Un-split through the chip itself, the way a reader reaches it.
+      const tr = descend($('#txTable')).filter(n => n.tagName === 'TR')
+        .find(row => descend(row).some(n => n.tagName === 'BUTTON' && /caveat-chip-btn/.test(n.className))
+          && new RegExp(`${-target}\\.00`).test(String(row.textContent)));
+      ok(!!tr, `${name}: the R${-target} parent's chip is on screen`);
+      const n = ctx._toasts.length;
+      descend(tr).find(x => x.tagName === 'BUTTON' && /caveat-chip-btn/.test(x.className)).click();
+      await flush();
+      eq(seen.confirms.length, 0, `${name}: Un-split on the R${-target} parent opens no dialog either`);
+      eq(shape(S), before, `${name}: and changes nothing — both parents stay excluded, every part stays`);
+      ok(file(S).rows.filter(r => r.split === 'parent').every(r => r.excluded === true), `${name}: no parent was un-excluded`);
+      ok(/cannot be told apart/.test((ctx._toasts[n] || {}).msg || ''), `${name}: the un-split refusal says why`);
+    }
   }
 
   /* ---- 7. one lookup, not two ---- */
