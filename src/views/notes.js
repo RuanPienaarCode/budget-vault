@@ -327,7 +327,11 @@ module.exports = function registerNotes(ctx) {
         desc: 'Pick an account, debt, service or period — or leave it general.' },
       { key: 'body', label: 'Note', type: 'textarea', rows: 6,
         placeholder: 'Write as much or as little as you like — you can carry on in Obsidian.' },
-    ]);
+    /* Checked by the dialog while it is still open. This used to run after it
+       had closed, so a note typed out in full but missing its title was thrown
+       away with a toast (2026-11-25 audit, FUN-1) — the one form here whose
+       other field is a paragraph of the reader's own writing. */
+    ], { validate: v => ((v.title || '').trim() ? null : { field: 'title', message: 'A note needs a title' }) });
     if (!r) return;
     if (op.replaced()) return toast(op.replaced(), true);
     const title = (r.title || '').trim();
