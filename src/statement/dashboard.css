@@ -83,6 +83,13 @@
   max-width: none;
 }
 .budget-app-root #heroCard .hero-meter i { border-radius: 999px; }
+/* A period with no budget yet: the ghost button that opens the Budget page
+   sits in the meter's slot, so it keeps the meter's gap above it, and is a
+   full finger's height where the pointer is a finger (2026-11-25, NUM-1). */
+.budget-app-root #heroCard .hero-next { margin-top: 20px; }
+@media (pointer: coarse) {
+  .budget-app-root #heroCard .hero-next { min-height: 44px; }
+}
 
 /* Total income / Budgeted / Total spent: a label on the left, a figure-small
    figure on the right, one fact per line under it. */

@@ -1130,6 +1130,8 @@ module.exports = {
   'dash.hero.sub': '{spent} terpakai dari anggaran pengeluaran {budgeted}',
   'dash.hero.assumedIncluded': 'termasuk {amount} yang sudah dibelanjakan',
   'dash.hero.nettedOff': '{amount} pengembalian dana tidak dikurangkan dari angka ini',
+  'dash.hero.importedTo': 'Rekening koran diimpor sampai {date}',
+  'dash.hero.setUpBudget': 'Siapkan anggaran periode ini',
   'dash.stat.income': 'Total pemasukan',
   'dash.stat.budgeted': 'Dianggarkan',
   'dash.stat.spent': 'Total pengeluaran',
@@ -1139,6 +1141,7 @@ module.exports = {
   'dash.stat.setAside': '{amount} untuk tabungan',
   'dash.stat.setAsideMoved': '{moved} dari {amount} sudah ditabung',
   'dash.stat.ofWhichSetAside': '{moved} dari {amount} sudah ditabung',
+  'dash.stat.setAsideUnseen': '{amount} untuk tabungan — rekening koran dana berhenti pada {date}, jadi yang ditabung belum terlihat',
   'dash.scheduledAhead': 'Sampai hari ini · {amount} lagi bertanggal lebih lanjut dalam periode ini',
   'dash.fundedFromSavings': {
     other: '{amount} lagi keluar dari dana Anda ({count} transaksi), yang tidak dihitung anggaran ini',
@@ -1235,6 +1238,9 @@ module.exports = {
     other: 'Rata-rata dari {count} periode terakhir Anda yang sudah selesai',
   },
   'dash.health.subNone': 'Belum ada periode selesai untuk dirata-ratakan',
+  'dash.health.leftOut': {
+    other: '{periods} tidak dihitung: rekening koran berhenti sebelum periodenya berakhir',
+  },
   'dash.health.monthsUnit': 'bulan',
   'dash.health.months': 'pengeluaran pokok yang tertutupi',
   'dash.health.meterTip': {
@@ -1426,6 +1432,7 @@ module.exports = {
   'dash.left.cycleUnder': '{amount} kelonggaran sebelum pelunasan {date}.',
   'dash.left.cycleOver': '{amount} LEBIH BANYAK daripada pemasukan yang melunasinya pada {date}.',
   'dash.left.incoming': '{amount} masuk pada {date}',
+  'dash.left.incomingNotImported': '{amount} diperkirakan {date} — belum diimpor',
   'dash.left.incomingCovers': 'Itu menutup semua yang di atas dan masih menyisakan sekitar {amount}.',
   'dash.left.incomingShort': 'Bahkan setelah itu Anda masih kurang {amount}.',
   'dash.left.days': {
@@ -1451,7 +1458,7 @@ module.exports = {
   'dash.left.asListed': 'sesuai yang tercatat, tanpa riwayat penagihan',
   'dash.left.contracted': 'cicilan sesuai kontrak',
   'dash.left.settledInFull': 'dilunasi penuh, saldo saat ini',
-  'dash.left.source': 'Angkanya adalah yang biasanya ditagih (nilai tengah dari tiga tagihan terakhir), bukan angka yang diketik di halaman Layanan. Dibaca hanya dari daftar Layanan dan halaman Utang Anda — tagihan berulang yang tidak ada di keduanya tidak dihitung di sini.',
+  'dash.left.source': 'Angkanya adalah yang biasanya ditagih (nilai tengah dari tiga tagihan terakhir), bukan angka yang diketik di halaman Layanan. Yang dihitung: daftar Layanan Anda, halaman Utang, dan autodebet dengan jumlah yang sama yang terlihat terpotong setiap bulan pada hari yang kurang lebih sama. Pembayaran yang Anda lakukan sendiri pada hari yang berbeda-beda — misalnya sewa yang dibayar lewat transfer — tidak dihitung kecuali ada di daftar Layanan Anda.',
   'dash.split.colCat': 'Kategori',
   'dash.split.colSpent': 'Pengeluaran',
   'dash.split.colChange': 'Perubahan',

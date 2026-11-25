@@ -1110,6 +1110,8 @@ module.exports = {
   'dash.hero.sub': '支出预算 {budgeted}，已花 {spent}',
   'dash.hero.assumedIncluded': '含已支出的 {amount}',
   'dash.hero.nettedOff': '退款 {amount} 未从此数字中扣除',
+  'dash.hero.importedTo': '对账单已导入至 {date}',
+  'dash.hero.setUpBudget': '设置本周期的预算',
   'dash.stat.income': '收入合计',
   'dash.stat.budgeted': '预算',
   'dash.stat.spent': '支出合计',
@@ -1119,6 +1121,7 @@ module.exports = {
   'dash.stat.setAside': '储蓄 {amount}',
   'dash.stat.setAsideMoved': '{amount} 中已储蓄 {moved}',
   'dash.stat.ofWhichSetAside': '{amount} 中已储蓄 {moved}',
+  'dash.stat.setAsideUnseen': '储蓄 {amount} — 储蓄账户的对账单止于 {date}，所以还看不到存入的金额',
   'dash.scheduledAhead': '截至今天 · 本期稍后还有 {amount}',
   'dash.fundedFromSavings': {
     other: '另有 {amount} 从您的专款支出（{count} 笔），本预算不计入',
@@ -1209,6 +1212,9 @@ module.exports = {
     other: '按最近 {count} 个已完成周期平均',
   },
   'dash.health.subNone': '尚无已完成的周期可供平均',
+  'dash.health.leftOut': {
+    other: '{periods} 未计入：对账单在该周期结束前就停止了',
+  },
   'dash.health.monthsUnit': '个月',
   'dash.health.months': '的必要支出已覆盖',
   'dash.health.meterTip': {
@@ -1400,6 +1406,7 @@ module.exports = {
   'dash.left.cycleUnder': '距 {date} 结清尚有 {amount} 余量。',
   'dash.left.cycleOver': '比 {date} 结清的收入多出 {amount}。',
   'dash.left.incoming': '{date} 将有 {amount} 入账',
+  'dash.left.incomingNotImported': '预计 {date} 入账 {amount} — 尚未导入',
   'dash.left.incomingCovers': '足以支付上述所有款项，并剩余约 {amount}。',
   'dash.left.incomingShort': '即便如此仍短缺 {amount}。',
   'dash.left.days': {
@@ -1425,7 +1432,7 @@ module.exports = {
   'dash.left.asListed': '按列表填写，无扣款记录',
   'dash.left.settledInFull': '全额结清，当前余额',
   'dash.left.contracted': '合同约定还款额',
-  'dash.left.source': '金额取自通常的扣款额（最近三次扣款的中间值），而不是你在“订阅服务”页面填写的数字。只读取你的订阅服务列表和负债页面 — 两者都没有的定期扣款不会计入这里。',
+  'dash.left.source': '金额取自通常的扣款额（最近三次扣款的中间值），而不是你在“订阅服务”页面填写的数字。计入的有：你的订阅服务列表、负债页面，以及每月大约同一天扣同样金额的代扣。在不同日子手动支付的款项（例如通过转账支付的房租）不计入，除非它在你的订阅服务列表中。',
   'dash.split.colCat': '类别',
   'dash.split.colSpent': '支出',
   'dash.split.colChange': '变化',

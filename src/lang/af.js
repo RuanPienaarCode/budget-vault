@@ -1159,6 +1159,8 @@ module.exports = {
   'dash.hero.sub': '{spent} bestee van die bestedingsbegroting van {budgeted}',
   'dash.hero.assumedIncluded': 'sluit {amount} in wat reeds bestee is',
   'dash.hero.nettedOff': '{amount} aan terugbetalings nie van hierdie syfer afgetrek nie',
+  'dash.hero.importedTo': 'State ingevoer tot {date}',
+  'dash.hero.setUpBudget': 'Stel hierdie tydperk se begroting op',
   'dash.stat.income': 'Totale inkomste',
   'dash.stat.budgeted': 'Begroot',
   'dash.stat.spent': 'Totaal bestee',
@@ -1168,6 +1170,7 @@ module.exports = {
   'dash.stat.setAside': '{amount} vir spaar',
   'dash.stat.setAsideMoved': '{moved} van {amount} reeds gespaar',
   'dash.stat.ofWhichSetAside': '{moved} van {amount} reeds gespaar',
+  'dash.stat.setAsideUnseen': '{amount} vir spaar — die fondse se state hou op op {date}, so wat gespaar is, kan nog nie gesien word nie',
   'dash.scheduledAhead': 'Tot vandag · {amount} meer is later hierdie tydperk gedateer',
   'dash.fundedFromSavings': {
     one: '{amount} meer het uit jou fondse gegaan ({count} transaksie), wat hierdie begroting nie tel nie',
@@ -1271,6 +1274,10 @@ module.exports = {
     other: 'Gemiddeld oor jou laaste {count} voltooide tydperke',
   },
   'dash.health.subNone': 'Nog geen voltooide tydperke om oor te gemiddel nie',
+  'dash.health.leftOut': {
+    one: '{periods} uitgelaat: die state hou op voor dit geëindig het',
+    other: '{periods} uitgelaat: die state hou op voor hulle geëindig het',
+  },
   'dash.health.monthsUnit': 'maande',
   'dash.health.months': 'se noodsaaklike uitgawes gedek',
   'dash.health.meterTip': {
@@ -1473,6 +1480,7 @@ module.exports = {
   'dash.left.cycleUnder': '{amount} spasie oor voor die vereffening op {date}.',
   'dash.left.cycleOver': '{amount} MEER as die inkomste wat dit op {date} vereffen.',
   'dash.left.incoming': '{amount} kom op {date} in',
+  'dash.left.incomingNotImported': '{amount} verwag {date} — nog nie ingevoer nie',
   'dash.left.incomingCovers': 'Dit dek alles hierbo en laat sowat {amount} oor.',
   'dash.left.incomingShort': 'Selfs daarna kom jy {amount} kort.',
   'dash.left.days': {
@@ -1499,7 +1507,7 @@ module.exports = {
   'dash.left.asListed': 'soos gelys, geen heffingsgeskiedenis nie',
   'dash.left.settledInFull': 'ten volle vereffen, huidige saldo',
   'dash.left.contracted': 'gekontrakteerde paaiement',
-  'dash.left.source': 'Bedrae is wat gewoonlik gehef word (die middelste van die laaste drie heffings), nie die syfer wat op die Dienste-bladsy getik is nie. Dit lees net uit jou Dienste-lys en Skuld-bladsy — ’n herhalende heffing op nie een van die twee nie word nie hier getel nie.',
+  'dash.left.source': 'Bedrae is wat gewoonlik gehef word (die middelste van die laaste drie heffings), nie die syfer wat op die Dienste-bladsy getik is nie. Getel word: jou Dienste-lys, jou Skuld-bladsy, en debietorders wat elke maand vir dieselfde bedrag op omtrent dieselfde dag afgaan. ’n Betaling wat jy self op wisselende dae maak — huur per EFT, byvoorbeeld — word nie getel nie, tensy dit op jou Dienste-lys is.',
   'dash.split.colCat': 'Kategorie',
   'dash.split.colSpent': 'Bestee',
   'dash.split.colChange': 'Verandering',

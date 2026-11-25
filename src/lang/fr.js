@@ -1173,6 +1173,8 @@ module.exports = {
   'dash.hero.sub': '{spent} dépensé sur {budgeted} de budget de dépenses',
   'dash.hero.assumedIncluded': 'dont {amount} déjà dépensé',
   'dash.hero.nettedOff': '{amount} de remboursements non déduits de ce chiffre',
+  'dash.hero.importedTo': 'Relevés importés jusqu\'au {date}',
+  'dash.hero.setUpBudget': 'Préparer le budget de cette période',
   'dash.stat.income': 'Revenus totaux',
   'dash.stat.budgeted': 'Budgété',
   'dash.stat.spent': 'Total dépensé',
@@ -1182,6 +1184,7 @@ module.exports = {
   'dash.stat.setAside': '{amount} pour l\'épargne',
   'dash.stat.setAsideMoved': '{moved} sur {amount} épargnés à ce jour',
   'dash.stat.ofWhichSetAside': '{moved} sur {amount} épargnés à ce jour',
+  'dash.stat.setAsideUnseen': '{amount} pour l\'épargne — les relevés des comptes d\'épargne s\'arrêtent au {date}, l\'épargne n\'est donc pas encore visible',
   'dash.scheduledAhead': 'Jusqu’à aujourd’hui · {amount} de plus sont datés plus tard dans cette période',
   'dash.fundedFromSavings': {
     one: '{amount} de plus est sorti de vos réserves ({count} opération), non comptés dans ce budget',
@@ -1285,6 +1288,10 @@ module.exports = {
     other: 'Moyenne sur vos {count} dernières périodes terminées',
   },
   'dash.health.subNone': 'Aucune période terminée à moyenner pour l’instant',
+  'dash.health.leftOut': {
+    one: '{periods} laissé de côté : les relevés s\'arrêtent avant la fin de la période',
+    other: '{periods} laissés de côté : les relevés s\'arrêtent avant la fin de ces périodes',
+  },
   'dash.health.monthsUnit': 'mois',
   'dash.health.months': 'de dépenses essentielles couverts',
   'dash.health.meterTip': {
@@ -1487,6 +1494,7 @@ module.exports = {
   'dash.left.cycleUnder': '{amount} de marge avant le règlement du {date}.',
   'dash.left.cycleOver': '{amount} de PLUS que le revenu qui la règle le {date}.',
   'dash.left.incoming': '{amount} arrive le {date}',
+  'dash.left.incomingNotImported': '{amount} prévu le {date} — pas encore importé',
   'dash.left.incomingCovers': 'Cela couvre tout ce qui précède et laisse environ {amount}.',
   'dash.left.incomingShort': 'Même après cela, il vous manque {amount}.',
   'dash.left.days': {
@@ -1513,7 +1521,7 @@ module.exports = {
   'dash.left.asListed': 'tel qu’indiqué, sans historique',
   'dash.left.settledInFull': 'soldée intégralement, solde actuel',
   'dash.left.contracted': 'mensualité contractuelle',
-  'dash.left.source': 'Les montants correspondent à ce qui est habituellement prélevé (la valeur médiane des trois derniers prélèvements), pas au chiffre saisi sur la page Services. Lus uniquement depuis ta liste de Services et la page Dettes — un prélèvement récurrent absent des deux n’est pas compté ici.',
+  'dash.left.source': 'Les montants correspondent à ce qui est habituellement prélevé (la valeur médiane des trois derniers prélèvements), pas au chiffre saisi sur la page Services. Sont comptés : ta liste de Services, la page Dettes, et les prélèvements constatés chaque mois pour le même montant à peu près le même jour. Un paiement fait à la main à des dates variables — un loyer réglé par virement, par exemple — n’est pas compté, sauf s’il figure dans ta liste de Services.',
   'dash.split.colCat': 'Catégorie',
   'dash.split.colSpent': 'Dépensé',
   'dash.split.colChange': 'Écart',

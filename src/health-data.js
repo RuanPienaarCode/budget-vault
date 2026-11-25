@@ -17,9 +17,10 @@ const { poolAccounts, isSetAsideType } = require('./vocabulary');
    about which rows are real. */
 const { supersededBySplit } = require('./tx-role');
 const { daysBetween, isRealIsoDate, todayIso } = require('./dates');
-/* One definition of "how far is this account's record known" (committed.js),
-   so the Score's idea of an imported account and the Dashboard's cannot drift. */
-const { knownTo } = require('./committed');
+/* One definition of "how far do the statements reach" (committed.js, through
+   its knownTo), so the Score's idea of an imported account and the Dashboard's
+   cannot drift. */
+const { statementReach: reachOf } = require('./committed');
 
 /* Account types that make up the savings pool, and the category types that
    mark a movement WITHIN it. One set, used for both, because they are the same
@@ -51,6 +52,23 @@ const { isForeign } = require('./currency');
    month or a double rent payment, and short enough that a household still
    recognises the answer as its own. */
 const TRAILING_MONTHS = 6;
+
+/* ADR-0007 · How far the statements reach, one rule. The default window is the
+   health card's own — the trailing periods before the current one — so the
+   Dashboard hero, the API and the averages read one answer. Takes any ctx that
+   carries the period and index helpers, so the headless API can ask it too. */
+/** @param {any} c @param {{ windowStart?: string, idx?: Map<any, any>, today?: string }} [opts] */
+function statementReachFor(c, opts = {}) {
+  const { windowStart, idx, today } = opts;
+  const day = isRealIsoDate(today) ? today : todayIso();
+  const from = windowStart != null ? windowStart
+    : c.periodRange(c.shiftPeriod(c.currentPeriod(), -c.periodsForMonths(TRAILING_MONTHS))).start;
+  const index = idx || c.accountIndex();
+  return reachOf({
+    accounts: c.S.accounts, rowsOf: a => (index.get(a) || {}).rows || [],
+    currency: c.S.settings.currency, windowStart: from, today: day, manual: c.S.settings.input_mode === 'manual',
+  });
+}
 
 module.exports = function registerHealthData(ctx) {
   const {
@@ -87,6 +105,10 @@ module.exports = function registerHealthData(ctx) {
        a week before the window pair, but only what landed inside it counts. */
     return transfersIntoFunds(rows, saverLabels, window.start);
   }
+
+  /* The one rule is committed.js statementReach; statementReachFor (above the
+     registration) hands it this ctx's rows and the health card's window. */
+  const statementReach = opts => statementReachFor(ctx, opts);
 
   function healthSnapshot() {
     /* Which categories the household has declared it cannot stop paying. A Set
@@ -156,34 +178,10 @@ module.exports = function registerHealthData(ctx) {
       });
     }
 
-    /* L1-04 / L2a-N04: leave an incompletely imported period OUT of the averages.
-       `counted` is "the household did anything in it", which a period whose
-       statements stop weeks before its end satisfies: the Score jumped seven points
-       the morning a period closed, with no file changed. Complete = every
-       household-currency, in-budget account that has rows (and a row inside the
-       window, so a closed account cannot block every period) is imported to or
-       past the period's last day. importedTo only, not the balance-confirmed leg
-       of knownTo: a typed balance brings no rows in. Strict by design. */
-    const today = todayIso();
-    /* Manual entry has no import to be behind: the newest row is simply the
-       last thing typed, which says nothing about whether the period is whole
-       (a household typing expenses by hand rarely has one dated the last day). */
-    const importing = S.settings.input_mode !== 'manual';
+    /* ADR-0007 · A period joins the health averages only once its accounts are
+       imported to its end. Which accounts, and how far, is statementReach's. */
     const windowStart = spans.reduce((m, s) => (s.start < m ? s.start : m), spans.length ? spans[0].start : '');
-    const feeders = [];
-    for (const a of importing ? (S.accounts || []) : []) {
-      if (a.in_budget === false || isForeign(a, S.settings.currency)) continue;
-      const e = idx.get(a);
-      if (!e || !e.rows.length) continue;
-      let newest = '', inWindow = false;
-      for (const r of e.rows) {
-        if (!isRealIsoDate(r.date) || r.date > today) continue;
-        if (r.date > newest) newest = r.date;
-        if (r.date >= windowStart) inWindow = true;
-      }
-      if (!inWindow) continue;
-      feeders.push({ name: a.name, through: knownTo({ importedTo: newest }, today) || '' });
-    }
+    const { feeders } = statementReach({ windowStart, idx });
     const incompletePeriods = [];
     periods.forEach((per, i) => {
       if (!per.counted) return;
@@ -264,5 +262,6 @@ module.exports = function registerHealthData(ctx) {
     };
   }
 
-  ctx.provide({ healthSnapshot, savingContribution });
+  ctx.provide({ healthSnapshot, savingContribution, statementReach });
 };
+module.exports.statementReachFor = statementReachFor;

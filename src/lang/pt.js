@@ -1180,6 +1180,8 @@ module.exports = {
   'dash.hero.sub': '{spent} gastos de {budgeted} de orçamento de gastos',
   'dash.hero.assumedIncluded': 'inclui {amount} já gastos',
   'dash.hero.nettedOff': '{amount} em estornos não abatidos deste valor',
+  'dash.hero.importedTo': 'Extratos importados até {date}',
+  'dash.hero.setUpBudget': 'Montar o orçamento deste período',
   'dash.stat.income': 'Renda total',
   'dash.stat.budgeted': 'Orçado',
   'dash.stat.spent': 'Total gasto',
@@ -1189,6 +1191,7 @@ module.exports = {
   'dash.stat.setAside': '{amount} para poupança',
   'dash.stat.setAsideMoved': '{moved} de {amount} poupado até agora',
   'dash.stat.ofWhichSetAside': '{moved} de {amount} poupado até agora',
+  'dash.stat.setAsideUnseen': '{amount} para poupança — os extratos dos fundos param em {date}, por isso o que foi poupado ainda não aparece',
   'dash.scheduledAhead': 'Até hoje · mais {amount} com data posterior neste período',
   'dash.fundedFromSavings': {
     one: 'mais {amount} saiu dos seus fundos ({count} lançamento), que este orçamento não conta',
@@ -1292,6 +1295,10 @@ module.exports = {
     other: 'Média dos seus últimos {count} períodos concluídos',
   },
   'dash.health.subNone': 'Ainda não há períodos concluídos para tirar a média',
+  'dash.health.leftOut': {
+    one: '{periods} ficou de fora: os extratos param antes do fim do período',
+    other: '{periods} ficaram de fora: os extratos param antes do fim dos períodos',
+  },
   'dash.health.monthsUnit': 'meses',
   'dash.health.months': 'de gastos essenciais cobertos',
   'dash.health.meterTip': {
@@ -1494,6 +1501,7 @@ module.exports = {
   'dash.left.cycleUnder': '{amount} de folga antes do pagamento de {date}.',
   'dash.left.cycleOver': '{amount} A MAIS do que a renda que o quita em {date}.',
   'dash.left.incoming': '{amount} entram em {date}',
+  'dash.left.incomingNotImported': '{amount} previsto para {date} — ainda não importado',
   'dash.left.incomingCovers': 'Isso cobre tudo o que está acima e ainda deixa cerca de {amount}.',
   'dash.left.incomingShort': 'Mesmo depois disso ainda faltam {amount}.',
   'dash.left.days': {
@@ -1520,7 +1528,7 @@ module.exports = {
   'dash.left.asListed': 'conforme listado, sem histórico de cobranças',
   'dash.left.contracted': 'parcela contratada',
   'dash.left.settledInFull': 'quitado integralmente, saldo atual',
-  'dash.left.source': 'Os valores são o que normalmente é cobrado (o valor do meio das últimas três cobranças), não o número digitado na página Serviços. Lidos apenas da sua lista de Serviços e da página Dívidas — uma cobrança recorrente que não esteja em nenhuma das duas não é contada aqui.',
+  'dash.left.source': 'Os valores são o que normalmente é cobrado (o valor do meio das últimas três cobranças), não o número digitado na página Serviços. Contam: a sua lista de Serviços, a página Dívidas e os débitos automáticos do mesmo valor que aparecem todo mês mais ou menos no mesmo dia. Um pagamento feito por você em dias variados — o aluguel pago por transferência, por exemplo — não é contado, a menos que esteja na sua lista de Serviços.',
   'dash.split.colCat': 'Categoria',
   'dash.split.colSpent': 'Gasto',
   'dash.split.colChange': 'Variação',
