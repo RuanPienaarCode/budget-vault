@@ -552,8 +552,12 @@ module.exports = {
   },
   'tx.bulk.backup': 'Hulle word eers na {path} geskryf sodat hulle teruggebring kan word — die kluis se asblik kan dit nie alleen ontdoen nie, want die maandlêers word geredigeer eerder as geskrap.',
   'tx.bulk.splits': {
-    one: '1 daarvan hoort by \'n verdeling waarvan die ander rye dalk nie gekies is nie.',
-    other: '{count} daarvan hoort by verdelings waarvan die ander rye dalk nie gekies is nie.',
+    one: "Nog 1 ry gaan saam, {total} altesaam: 'n verdeling word heel geskrap — die oorspronklike lyn en elke deel — sodat geen deel agterbly wat 'n lyn beskryf wat weg is nie.",
+    other: "Nog {count} rye gaan saam, {total} altesaam: 'n verdeling word heel geskrap — die oorspronklike lyn en elke deel — sodat geen deel agterbly wat 'n lyn beskryf wat weg is nie.",
+  },
+  'tx.bulk.splitsLeft': {
+    one: '1 passende ry word gelos: dit hoort by identiese verdelings op dieselfde dag waarvan die dele nie uitmekaar gehou kan word nie. Sit elke oorspronklike lyn se dele direk daaronder in sy lêer, sodat hulle daarby optel, en skrap dan weer.',
+    other: '{count} passende rye word gelos: hulle hoort by identiese verdelings op dieselfde dag waarvan die dele nie uitmekaar gehou kan word nie. Sit elke oorspronklike lyn se dele direk daaronder in sy lêer, sodat hulle daarby optel, en skrap dan weer.',
   },
   'tx.bulk.confirm': {
     one: 'Skrap 1 ry',
@@ -589,6 +593,8 @@ module.exports = {
      split parent row (the why is in en.js) --- */
   'tx.split.chip': 'verdeel in {count}',
   'tx.split.chipGap': '{amount} onverklaar',
+  'tx.split.chipMissing': 'verdeel · dele nie gevind nie',
+  'tx.split.ambiguous': "Hierdie verdeling se dele kan nie uitmekaar gehou word van dié van 'n ander identiese verdeling op dieselfde dag nie, so niks is verander nie. Sit in {file} elke oorspronklike lyn se dele direk daaronder, sodat hulle daarby optel, en probeer dan weer.",
   'tx.aria.splitChip': 'Verdeelopsies vir {desc} op {date}',
 
   /* Accessible names (audit of 11 Nov 2026, task 19) — machine-assisted, not native-reviewed. */
@@ -603,6 +609,7 @@ module.exports = {
     one: 'Dit verwyder die 1 deel en stel {desc} terug as een enkele transaksie van {amount}.',
     other: 'Dit verwyder die {count} dele en stel {desc} terug as een enkele transaksie van {amount}.',
   },
+  'tx.unsplit.noParts': 'Geen verdeelde dele met hierdie lyn se datum en beskrywing is in {file} gevind nie, so dit bly verdeel en buite die totale. As die datum of beskrywing verander is, verander dit terug sodat dit by die dele pas; as die dele geskrap is, maak hierdie lyn se Excluded- en Split-selle in die lêer leeg.',
 
   'tx.add.noAccount': 'Voeg eers \'n rekening by — elke transaksie hoort by een',
   'tx.add.title': 'Voeg transaksie by',
@@ -1937,6 +1944,10 @@ module.exports = {
   'tx.bulkCat.msg': {
     one: '1 ry sal op {cat} gestel word.',
     other: '{count} rye sal op {cat} gestel word.',
+  },
+  'tx.bulkCat.splitsSkipped': {
+    one: "1 passende ry hoort by 'n verdeling en hou sy kategorie — verander dit op sy eie ry.",
+    other: '{count} passende rye hoort by verdelings en hou hul kategorieë — verander dit op hul eie rye.',
   },
   'tx.bulkCat.confirm': {
     one: 'Stel kategorie (1)',

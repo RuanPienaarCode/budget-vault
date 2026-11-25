@@ -534,7 +534,10 @@ module.exports = {
   },
   'tx.bulk.backup': '它们会先写入 {path}，因此可以找回 — 月度文件是被修改而非删除，库的回收站无法单独撤销这一步。',
   'tx.bulk.splits': {
-    other: '其中 {count} 行属于拆分，其配套行未必在筛选范围内。',
+    other: '拆分会整体删除，因此还会一并删除 {count} 行，共 {total} 行（原始行及其所有拆分行），不会留下指向已删除行的拆分行。',
+  },
+  'tx.bulk.splitsLeft': {
+    other: '符合条件的 {count} 行保持不变：它们属于同一天的相同拆分，无法分辨哪些拆分行属于哪一笔。请在文件中把每个原始行的拆分行放在它的正下方，并使其合计等于原始金额，然后再删除。',
   },
   'tx.bulk.confirm': {
     other: '删除 {count} 行',
@@ -563,6 +566,8 @@ module.exports = {
      split parent row (the why is in en.js) --- */
   'tx.split.chip': '拆分为 {count} 笔',
   'tx.split.chipGap': '{amount} 未分配',
+  'tx.split.chipMissing': '已拆分 · 未找到拆分行',
+  'tx.split.ambiguous': '这次拆分的拆分行无法与同一天另一笔相同拆分的拆分行区分开，因此没有做任何更改。请在 {file} 中把每个原始行的拆分行放在它的正下方，并使其合计等于原始金额，然后重试。',
   'tx.aria.splitChip': '{date} {desc} 的拆分选项',
 
   /* Accessible names (audit of 11 Nov 2026, task 19) — machine-assisted, not native-reviewed. */
@@ -576,6 +581,7 @@ module.exports = {
   'tx.unsplit.msg': {
     other: '这会删除拆分出的 {count} 行，并把 {desc} 恢复为一笔 {amount} 的交易。',
   },
+  'tx.unsplit.noParts': '在 {file} 中没有找到与这一行日期和描述相同的拆分行，因此它仍保持拆分状态，不计入合计。如果改过它的日期或描述，请改回与拆分行一致；如果拆分行已被删除，请在文件中清空这一行的 Excluded 和 Split 单元格。',
 
   'tx.add.noAccount': '请先添加一个账户 — 每笔交易都要归属于某个账户',
   'tx.add.title': '添加交易',
@@ -1850,6 +1856,9 @@ module.exports = {
   'tx.bulkCat.title': '设置这些行的分类',
   'tx.bulkCat.msg': {
     other: '{count} 行将被设置为 {cat}。',
+  },
+  'tx.bulkCat.splitsSkipped': {
+    other: '符合条件的 {count} 行属于拆分，保留原有分类 — 请在各自的行上修改。',
   },
   'tx.bulkCat.confirm': {
     other: '设置分类（{count}）',

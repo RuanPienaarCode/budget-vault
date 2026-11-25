@@ -601,8 +601,12 @@ module.exports = {
   },
   'tx.bulk.backup': 'They are written to {path} first, so they can be brought back — the vault trash cannot undo this on its own, because the monthly files are edited rather than deleted.',
   'tx.bulk.splits': {
-    one: '1 of them belongs to a split, whose other rows the filters may not have selected.',
-    other: '{count} of them belong to splits, whose other rows the filters may not have selected.',
+    one: '1 more row goes with them, {total} in all: a split is deleted whole — its original line and every part — so no part is left describing a line that is gone.',
+    other: '{count} more rows go with them, {total} in all: a split is deleted whole — its original line and every part — so no part is left describing a line that is gone.',
+  },
+  'tx.bulk.splitsLeft': {
+    one: "1 matching row is left alone: it belongs to identical splits on the same day whose parts cannot be told apart. Put each original line's parts directly under it in its file, adding up to it, then delete again.",
+    other: "{count} matching rows are left alone: they belong to identical splits on the same day whose parts cannot be told apart. Put each original line's parts directly under it in its file, adding up to it, then delete again.",
   },
   'tx.bulk.confirm': {
     one: 'Delete 1 row',
@@ -645,6 +649,8 @@ module.exports = {
      and this app argues rather than quietly absorbing the difference. */
   'tx.split.chip': 'split into {count}',
   'tx.split.chipGap': '{amount} unaccounted',
+  'tx.split.chipMissing': 'split · parts not found',
+  'tx.split.ambiguous': "This split's parts cannot be told apart from those of another identical split on the same day, so nothing was changed. In {file}, put each original line's parts directly under it, adding up to it, then try again.",
   'tx.aria.splitChip': 'Split options for {desc} on {date}',
 
   /* The split dialog (modal.js SplitModal). Its three fields per part carry no
@@ -661,6 +667,7 @@ module.exports = {
     one: 'This removes the 1 part and puts {desc} back as a single transaction of {amount}.',
     other: 'This removes the {count} parts and puts {desc} back as a single transaction of {amount}.',
   },
+  'tx.unsplit.noParts': "No split parts with this line's date and description were found in {file}, so it stays split and out of the totals. If its date or description was edited, change it back to match its parts; if its parts were deleted, clear this line's Excluded and Split cells in the file.",
 
   'tx.add.noAccount': 'Add an account first — every transaction belongs to one',
   'tx.add.title': 'Add transaction',
@@ -2269,6 +2276,10 @@ module.exports = {
   'tx.bulkCat.msg': {
     one: '1 row will be set to {cat}.',
     other: '{count} rows will be set to {cat}.',
+  },
+  'tx.bulkCat.splitsSkipped': {
+    one: '1 matching row belongs to a split and keeps its category — change it on its own row.',
+    other: '{count} matching rows belong to splits and keep their categories — change them on their own rows.',
   },
   'tx.bulkCat.confirm': {
     one: 'Set category (1)',

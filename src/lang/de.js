@@ -553,8 +553,12 @@ module.exports = {
   },
   'tx.bulk.backup': 'Sie werden zuerst nach {path} geschrieben und lassen sich so zurückholen — der Papierkorb des Tresors kann das nicht allein rückgängig machen, weil die Monatsdateien bearbeitet und nicht gelöscht werden.',
   'tx.bulk.splits': {
-    one: '1 davon gehört zu einer Aufteilung, deren übrige Zeilen die Filter womöglich nicht erfassen.',
-    other: '{count} davon gehören zu Aufteilungen, deren übrige Zeilen die Filter womöglich nicht erfassen.',
+    one: '1 weitere Zeile wird mitgelöscht, insgesamt {total}: Eine Aufteilung wird nur als Ganzes gelöscht — die Originalzeile mit allen Teilen —, damit kein Teil eine Zeile beschreibt, die es nicht mehr gibt.',
+    other: '{count} weitere Zeilen werden mitgelöscht, insgesamt {total}: Eine Aufteilung wird nur als Ganzes gelöscht — die Originalzeile mit allen Teilen —, damit kein Teil eine Zeile beschreibt, die es nicht mehr gibt.',
+  },
+  'tx.bulk.splitsLeft': {
+    one: '1 passende Zeile bleibt stehen: Sie gehört zu gleichen Aufteilungen am selben Tag, deren Teile sich nicht auseinanderhalten lassen. Setzen Sie in der Datei die Teile jeder Originalzeile direkt darunter, sodass sie deren Betrag ergeben, und löschen Sie dann erneut.',
+    other: '{count} passende Zeilen bleiben stehen: Sie gehören zu gleichen Aufteilungen am selben Tag, deren Teile sich nicht auseinanderhalten lassen. Setzen Sie in der Datei die Teile jeder Originalzeile direkt darunter, sodass sie deren Betrag ergeben, und löschen Sie dann erneut.',
   },
   'tx.bulk.confirm': {
     one: '1 Zeile löschen',
@@ -590,6 +594,8 @@ module.exports = {
      split parent row (the why is in en.js) --- */
   'tx.split.chip': 'auf {count} aufgeteilt',
   'tx.split.chipGap': '{amount} nicht zugeordnet',
+  'tx.split.chipMissing': 'aufgeteilt · Teile nicht gefunden',
+  'tx.split.ambiguous': 'Die Teile dieser Aufteilung lassen sich nicht von denen einer gleichen Aufteilung am selben Tag unterscheiden, daher wurde nichts geändert. Setzen Sie in {file} die Teile jeder Originalzeile direkt darunter, sodass sie deren Betrag ergeben, und versuchen Sie es dann erneut.',
   'tx.aria.splitChip': 'Aufteilungsoptionen für {desc} vom {date}',
 
   /* Accessible names (audit of 11 Nov 2026, task 19) — machine-assisted, not native-reviewed. */
@@ -604,6 +610,7 @@ module.exports = {
     one: 'Das entfernt den 1 Teil und stellt {desc} wieder als einzelne Transaktion über {amount} her.',
     other: 'Das entfernt die {count} Teile und stellt {desc} wieder als einzelne Transaktion über {amount} her.',
   },
+  'tx.unsplit.noParts': 'In {file} wurden keine Aufteilungsteile mit Datum und Beschreibung dieser Zeile gefunden, daher bleibt sie aufgeteilt und außerhalb der Summen. Wurde Datum oder Beschreibung geändert, stellen Sie sie passend zu den Teilen wieder her; wurden die Teile gelöscht, leeren Sie die Zellen Excluded und Split dieser Zeile in der Datei.',
 
   'tx.add.noAccount': 'Lege zuerst ein Konto an — jede Transaktion gehört zu einem',
   'tx.add.title': 'Transaktion hinzufügen',
@@ -1938,6 +1945,10 @@ module.exports = {
   'tx.bulkCat.msg': {
     one: '1 Zeile wird auf {cat} gesetzt.',
     other: '{count} Zeilen werden auf {cat} gesetzt.',
+  },
+  'tx.bulkCat.splitsSkipped': {
+    one: '1 passende Zeile gehört zu einer Aufteilung und behält ihre Kategorie — ändern Sie sie in ihrer eigenen Zeile.',
+    other: '{count} passende Zeilen gehören zu Aufteilungen und behalten ihre Kategorien — ändern Sie sie jeweils in der eigenen Zeile.',
   },
   'tx.bulkCat.confirm': {
     one: 'Kategorie setzen (1)',

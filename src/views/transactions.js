@@ -13,7 +13,7 @@ const { transactionsCsv, categoriesCsv, transactionsMarkdown, categoriesMarkdown
 const { ISO_DATE, todayIso, nowLocalMinute } = require('../dates');
 const { symbolOf, formatSigned } = require('../currency');
 const { localeFor } = require('../locale');
-const { applySplit, splitRole, splitShortfall, SPLIT_PARENT, isSplitPart, splitPartsOf, splitPartsAmbiguous, amountCents } = require('../tx-role');
+const { applySplit, splitRole, splitShortfall, SPLIT_PARENT, isSplitPart, splitPartsOf, splitPartsAmbiguous, amountCents, wholeSplits } = require('../tx-role');
 const { prepareRules, matchRule } = require('../rules');
 /* Namespace import: this file binds `t` as a local (`const t = $('#txTable')`). */
 const i18n = require('../i18n');
@@ -944,9 +944,19 @@ module.exports = function registerTransactions(ctx) {
 
        Zero is the common case and says nothing at all. A chip that appended
        "R0.00 unaccounted" to every healthy split would teach the reader to
-       stop reading the clause that matters. */
-    const label = i18n.t('tx.split.chip', { count: parts.length })
-      + (gap ? ' · ' + i18n.t('tx.split.chipGap', { amount: rowMoney(Math.abs(gap), item) }) : '');
+       stop reading the clause that matters.
+
+       NO parts at all is a different fact, and says so (2026-11-25 audit,
+       TXN-2). A part carries no id back to its parent, only its date and
+       description, so a parent whose description or date was edited by hand
+       finds none — while its parts sit in the file unchanged, still counted.
+       "split into 0 · R 1000.00 unaccounted" read as money missing when the
+       money is all there under the old name. "Parts not found" is the true
+       sentence; Un-split (below) refuses on it rather than un-excluding a line
+       whose parts would then count it twice. */
+    const label = !parts.length ? i18n.t('tx.split.chipMissing')
+      : i18n.t('tx.split.chip', { count: parts.length })
+        + (gap ? ' · ' + i18n.t('tx.split.chipGap', { amount: rowMoney(Math.abs(gap), item) }) : '');
     /* A real <button>, so it is in the tab order and takes the focus ring for
        free. caveat-chip-btn rather than a class of its own: it is dom.js's own
        pill button, already legible in both themes with a :focus-visible
@@ -957,6 +967,30 @@ module.exports = function registerTransactions(ctx) {
       'aria-label': i18n.t('tx.aria.splitChip', { desc: r.desc, date: r.date }) }, label);
     b.addEventListener('click', () => unsplitTransaction(item, i));
     return b;
+  }
+
+  /* Two refusals before the dialog, both because un-excluding the parent is
+     only safe once the rows that carry its money are gone.
+
+     NO parts found (2026-11-25 audit, TXN-2): the parent's description or date
+     was edited, so its parts no longer match it, but they are still in the
+     file and still counted. The dialog used to offer "This removes the 0
+     parts", remove nothing, and untick the parent — the charge counted twice,
+     once as the restored line and once as the parts nobody could see were
+     its. Refused, and the toast says what to look for in the file. No
+     guessing at which orphaned parts were this line's: a guess that is wrong
+     deletes a reader's own categories.
+
+     AMBIGUOUS parts (TXN-1): two identical splits on one day that position
+     cannot tell apart. The guess is every part with the key, so un-splitting
+     on it removed the other split's parts too and left that one excluded with
+     nothing describing it. Refused for the same reason. */
+  function refuseSplitEdit(item) {
+    const r = item._row, f = item._file;
+    const file = txFileRel(f.label, f.month);
+    if (!splitPartsOf(f.rows, r).length) { toast(i18n.t('tx.unsplit.noParts', { file }), true); return true; }
+    if (splitPartsAmbiguous(f.rows, r)) { toast(i18n.t('tx.split.ambiguous', { file }), true); return true; }
+    return false;
   }
 
   /* Un-split — the reversal src/tx-role.js documents as "untick Excluded,
@@ -982,15 +1016,17 @@ module.exports = function registerTransactions(ctx) {
      been left without a toast: that is a wording decision of its own, not
      something to slip into a wave about other strings. The row itself is the
      feedback here in a way it is not after a delete: the chip is replaced by an
-     ordinary unticked checkbox, the parts are visibly gone, and Save lights up. */
+     ordinary unticked checkbox, the parts are visibly gone, and Save lights up.
+     The refusals in refuseSplitEdit DO toast: they change nothing on screen,
+     so without one the press would look ignored. */
   async function unsplitTransaction(item, i) {
     const r = item._row, f = item._file;
+    if (refuseSplitEdit(item)) return;
     const parts = splitPartsOf(f.rows, r);
     const op = opWriterOf(ctx);
     const go = await confirmModal(app, {
       title: i18n.t('tx.unsplit.title'),
-      message: i18n.t('tx.unsplit.msg', { count: parts.length, desc: r.desc, amount: rowFlow(r.amount, item) })
-        + ambiguousNote(f.rows, r),
+      message: i18n.t('tx.unsplit.msg', { count: parts.length, desc: r.desc, amount: rowFlow(r.amount, item) }),
       confirmText: i18n.t('tx.unsplit.action'),
     });
     if (!go || afterDialog(op)) return;
@@ -1067,19 +1103,23 @@ module.exports = function registerTransactions(ctx) {
      identical charges on one day are both split, tells their parts apart by
      position — see that function for the rule and its limit.
 
-     When it cannot (a hand-reordered file), it returns every part with the key
-     and the count in the dialog is high. That is the one case the dialog says so
-     in words, since the reader is about to agree to a number. English only:
-     this sentence has no key in the twelve tables yet (the lang files are
-     outside the lane that wrote it). */
-  const AMBIGUOUS_PARTS = 'These parts could not be told apart from another identical split\'s on the same day, so they are all counted here.';
-  const ambiguousNote = (rows, parent) => splitPartsAmbiguous(rows, parent) ? ' ' + AMBIGUOUS_PARTS : '';
-
+     When it cannot (a hand-reordered file), it returns every part with the key.
+     The dialog used to delete them all after a sentence saying the count was
+     high, and that took the OTHER split's parts with it: that parent stayed
+     excluded with nothing describing it, out of every total (2026-11-25
+     audit, TXN-1). A warning the reader agrees to does not make the act
+     safe, so a parent whose parts are ambiguous is refused instead, with the
+     same toast Un-split gives (refuseSplitEdit above). A parent with NO parts
+     found still deletes as an ordinary row: nothing else goes with it, and
+     the re-import sentence is the one that is true of it. */
   async function deleteTransaction(item, i) {
     const r = item._row, f = item._file;
     const role = splitRole(r.split);
+    if (role === 'parent' && splitPartsAmbiguous(f.rows, r)) {
+      return toast(i18n.t('tx.split.ambiguous', { file: txFileRel(f.label, f.month) }), true);
+    }
     const parts = role === 'parent' ? splitPartsOf(f.rows, r) : [];
-    const detail = role === 'parent' && parts.length ? i18n.t('tx.delete.parent', { count: parts.length }) + ambiguousNote(f.rows, r)
+    const detail = role === 'parent' && parts.length ? i18n.t('tx.delete.parent', { count: parts.length })
       : role === 'part' ? i18n.t('tx.delete.part')
         : i18n.t('tx.delete.reimport');
     const op = opWriterOf(ctx);
@@ -1179,20 +1219,34 @@ module.exports = function registerTransactions(ctx) {
     if (!values) return;
     const cat = values.cat || '';
 
+    /* Rows that belong to a split are left as they are (2026-11-25 audit,
+       TXN-5 / RUL-8). A search for the merchant matches the parent and every
+       part, since they share its description, and overwriting them all put
+       one category on slices the reader had just divided between several in
+       the split dialog — with nothing in the confirmation to say so. A part's
+       category is changed on its own row; a parent's is the line the bank
+       printed, which no total reads. Counted and said, in the pattern of the
+       bulk delete's own splits sentence. */
+    const targets = rows.filter(item => !splitRole(item._row.split));
+    const skipped = rows.length - targets.length;
+    const skippedNote = skipped ? i18n.t('tx.bulkCat.splitsSkipped', { count: skipped }) : '';
+    if (!targets.length) return toast(skippedNote, true);
+
     const go = await confirmModal(app, {
       title: i18n.t('tx.bulkCat.title'),
-      message: i18n.t('tx.bulkCat.msg', { count: rows.length, cat: cat || i18n.t('tx.uncategorised') }),
-      confirmText: i18n.t('tx.bulkCat.confirm', { count: rows.length }),
+      message: i18n.t('tx.bulkCat.msg', { count: targets.length, cat: cat || i18n.t('tx.uncategorised') })
+        + (skippedNote ? ' ' + skippedNote : ''),
+      confirmText: i18n.t('tx.bulkCat.confirm', { count: targets.length }),
     });
     if (!go || afterDialog(op)) return;
 
-    for (const item of rows) {
+    for (const item of targets) {
       item._row.cat = cat;
       item._file.dirty = true;
     }
     $('#txSave').disabled = false;
     renderTransactions();
-    toast(i18n.t('tx.bulkCat.done', { count: rows.length }));
+    toast(i18n.t('tx.bulkCat.done', { count: targets.length }));
   }
 
   /* Built once and inserted beside the real #txDeleteFiltered button — there
@@ -1227,10 +1281,46 @@ module.exports = function registerTransactions(ctx) {
     if (!filters.length) return toast(i18n.t('tx.bulk.needFilter'), true);
     if (!rows.length) return toast(i18n.t('tx.bulk.none'), true);
 
-    // Split rows in the selection are called out by number: the filters that
-    // select a parent need not select its parts (they carry finer categories),
-    // and parts left behind describe a line that no longer exists.
-    const splits = rows.filter(t => splitRole(t._row.split)).length;
+    /* Whole splits only (2026-11-25 audit, TXN-3). The filters that select a
+       parent need not select its parts — they carry finer categories — and
+       this used to delete exactly what was selected, with a sentence saying
+       the other rows "may not have" been selected. A category filter left a
+       split's other parts behind with no parent: still counted, so the
+       account total kept money for a line that was gone, and the parent's
+       dedup key went with it, so a re-import re-added the whole line on top.
+       tx-role.js wholeSplits widens the selection the way the single-row
+       Delete already does — a parent brings its parts, a part brings its
+       parent and siblings — and the dialog states how many that added.
+
+       Twins whose parts cannot be told apart are LEFT rather than guessed at
+       (unless every row of that group is selected, when deleting all of it
+       splits nothing). Of the two safe answers this is the less obstructive:
+       refusing the whole action would also block the job this button exists
+       for — removing a statement imported into the wrong account — over rows
+       it can delete or leave without harm. The rows left are counted in the
+       dialog, BEFORE the reader agrees, with what to fix in the file. */
+    const plan = new Map(), extra = [];
+    let left = 0;
+    {
+      const picked = new Map();
+      for (const t of rows) {
+        if (!picked.has(t._file)) picked.set(t._file, []);
+        picked.get(t._file).push(t._row);
+      }
+      for (const [f, mine] of picked) {
+        const { take, left: held } = wholeSplits(f.rows, mine);
+        left += held.length;
+        if (!take.length) continue;
+        plan.set(f, new Set(take));
+        const chosen = new Set(mine);
+        for (const r of take) if (!chosen.has(r)) extra.push({ ...r, label: f.label, _file: f, _row: r });
+      }
+    }
+    /* What goes, in the order the reader saw it, then the rows the splits
+       brought in: the log is read top-down by someone looking for a row. */
+    const doomedItems = rows.filter(t => plan.has(t._file) && plan.get(t._file).has(t._row)).concat(extra);
+    const leftNote = left ? i18n.t('tx.bulk.splitsLeft', { count: left }) : '';
+    if (!doomedItems.length) return toast(leftNote || i18n.t('tx.bulk.none'), true);
     /* The load these row objects belong to: every write below is bound to it
        (io.js opWriter), and it is asked again straight after the dialog. */
     const op = opWriterOf(ctx);
@@ -1238,8 +1328,9 @@ module.exports = function registerTransactions(ctx) {
       title: i18n.t('tx.bulk.title'),
       message: i18n.t('tx.bulk.msg', { count: rows.length, range, filters: labels.join(', ') })
         + ' ' + i18n.t('tx.bulk.backup', { path: DELETED_LOG })
-        + (splits ? ' ' + i18n.t('tx.bulk.splits', { count: splits }) : ''),
-      confirmText: i18n.t('tx.bulk.confirm', { count: rows.length }),
+        + (extra.length ? ' ' + i18n.t('tx.bulk.splits', { count: extra.length, total: doomedItems.length }) : '')
+        + (leftNote ? ' ' + leftNote : ''),
+      confirmText: i18n.t('tx.bulk.confirm', { count: doomedItems.length }),
     });
     if (!go) return;
     /* A book switch (the headless API, a second view, a popout) can land while
@@ -1269,22 +1360,18 @@ module.exports = function registerTransactions(ctx) {
        imported straight back in, which matches columns by name too. */
     try {
       const existing = await readFile(DELETED_LOG);
-      await op.writeFile(DELETED_LOG, appendTransactionsLog(existing, rows, rowSymbol));
+      await op.writeFile(DELETED_LOG, appendTransactionsLog(existing, doomedItems, rowSymbol));
     } catch (e) {
       return toast(i18n.t('tx.bulk.backupFailed', { error: (e && e.message) || e }), true);
     }
 
-    // Grouped per file so each one is written once. The row OBJECTS are what
-    // identifies a row here — two identical lines in one month are two rows,
-    // and only the one the filter selected may go.
-    const perFile = new Map();
-    for (const t of rows) {
-      if (!perFile.has(t._file)) perFile.set(t._file, new Set());
-      perFile.get(t._file).add(t._row);
-    }
+    // Grouped per file so each one is written once (`plan`, above). The row
+    // OBJECTS are what identifies a row here — two identical lines in one
+    // month are two rows, and only the one the filter selected (or its own
+    // split brought in) may go.
     let removed = 0, files = 0;
     try {
-      for (const [f, doomed] of perFile) {
+      for (const [f, doomed] of plan) {
         const keep = f.rows.filter(x => !doomed.has(x));
         await op.writeFile(txFileRel(f.label, f.month), serializeTxFile({ ...f, rows: keep }));
         f.rows = keep;

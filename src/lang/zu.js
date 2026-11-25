@@ -572,8 +572,12 @@ module.exports = {
   },
   'tx.bulk.backup': 'Ibhalwa ku-{path} kuqala, ngakho ingabuyiswa — udoti wevolti awukwazi ukuhlehlisa lokhu ngokwawo, ngoba amafayela enyanga ayahlelwa esikhundleni sokususwa.',
   'tx.bulk.splits': {
-    one: 'Owodwa kuyo ngowokuhlukanisa, lapho eminye imigqa yawo kungenzeka ingakhethwanga izihlungi.',
-    other: 'Emingu-{count} kuyo ingeyokuhlukanisa, lapho eminye imigqa yayo kungenzeka ingakhethwanga izihlungi.',
+    one: 'Omunye umugqa uhamba nawo, engu-{total} isiyonke: ukuhlukanisa kususwa kuphelele — umugqa wokuqala nazo zonke izingxenye — ukuze kungasali ngxenye echaza umugqa ongasekho.',
+    other: 'Eminye imigqa engu-{count} ihamba nawo, engu-{total} isiyonke: ukuhlukanisa kususwa kuphelele — umugqa wokuqala nazo zonke izingxenye — ukuze kungasali ngxenye echaza umugqa ongasekho.',
+  },
+  'tx.bulk.splitsLeft': {
+    one: 'Umugqa owodwa ovumelanayo ushiywa unjalo: ungowokuhlukanisa okufanayo ngosuku olufanayo, lapho izingxenye zingahlukaniseki. Efayeleni lawo, beka izingxenye zomugqa ngamunye wokuqala ngqo ngaphansi kwawo, zihlangane zibe yinani lawo, bese uyasusa futhi.',
+    other: 'Imigqa engu-{count} evumelanayo ishiywa injalo: ingeyokuhlukanisa okufanayo ngosuku olufanayo, lapho izingxenye zingahlukaniseki. Efayeleni layo, beka izingxenye zomugqa ngamunye wokuqala ngqo ngaphansi kwawo, zihlangane zibe yinani lawo, bese uyasusa futhi.',
   },
   'tx.bulk.confirm': {
     one: 'Susa umugqa owodwa',
@@ -609,6 +613,8 @@ module.exports = {
      split parent row (the why is in en.js) --- */
   'tx.split.chip': 'kuhlukaniswe kwaba ngu-{count}',
   'tx.split.chipGap': '{amount} engabalwanga',
+  'tx.split.chipMissing': 'kuhlukanisiwe · izingxenye azitholakalanga',
+  'tx.split.ambiguous': 'Izingxenye zalokhu kuhlukanisa azikwazi ukuhlukaniswa nezokunye ukuhlukanisa okufanayo ngosuku olufanayo, ngakho akukho okushintshiwe. Ku-{file}, beka izingxenye zomugqa ngamunye wokuqala ngqo ngaphansi kwawo, zihlangane zibe yinani lawo, bese uzama futhi.',
   'tx.aria.splitChip': 'Izinketho zokuhlukanisa {desc} ngomhla {date}',
 
   /* Accessible names (audit of 11 Nov 2026, task 19) — machine-assisted, not native-reviewed. */
@@ -623,6 +629,7 @@ module.exports = {
     one: 'Lokhu kususa ingxenye eyodwa, bese {desc} ibuyela ibe umsebenzi wemali owodwa ka-{amount}.',
     other: 'Lokhu kususa izingxenye ezingu-{count}, bese {desc} ibuyela ibe umsebenzi wemali owodwa ka-{amount}.',
   },
+  'tx.unsplit.noParts': 'Azikho izingxenye zokuhlukanisa ezinosuku nencazelo yalo mugqa ezitholakele ku-{file}, ngakho uhlala uhlukanisiwe futhi ungaphandle kwamasamba. Uma usuku noma incazelo yawo ishintshiwe, yibuyisele ivumelane nezingxenye zawo; uma izingxenye zawo zisusiwe, sula amaseli e-Excluded ne-Split alo mugqa efayeleni.',
 
   'tx.add.noAccount': 'Engeza i-akhawunti kuqala — wonke umsebenzi wemali unewakhe',
   'tx.add.title': 'Engeza umsebenzi wemali',
@@ -1965,6 +1972,10 @@ module.exports = {
   'tx.bulkCat.msg': {
     one: 'Umugqa owodwa uzosethwa ku-{cat}.',
     other: 'Imigqa engu-{count} izosethwa ku-{cat}.',
+  },
+  'tx.bulkCat.splitsSkipped': {
+    one: 'Umugqa owodwa ovumelanayo ungowokuhlukanisa futhi ugcina isigaba sawo — sishintshe emugqeni wawo.',
+    other: 'Imigqa engu-{count} evumelanayo ingeyokuhlukanisa futhi igcina izigaba zayo — zishintshe emigqeni yayo.',
   },
   'tx.bulkCat.confirm': {
     one: 'Setha isigaba (1)',

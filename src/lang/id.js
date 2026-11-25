@@ -545,7 +545,10 @@ module.exports = {
   },
   'tx.bulk.backup': 'Baris-baris itu ditulis dulu ke {path}, jadi masih bisa dikembalikan — tempat sampah vault tidak bisa membatalkan ini sendiri, karena berkas bulanannya disunting, bukan dihapus.',
   'tx.bulk.splits': {
-    other: '{count} di antaranya milik transaksi yang dipecah, yang baris-baris lainnya mungkin tidak ikut terpilih oleh penyaring.',
+    other: '{count} baris lagi ikut terhapus, total {total}: transaksi yang dipecah dihapus utuh — baris asli dan semua bagiannya — agar tidak ada bagian yang tersisa untuk baris yang sudah tidak ada.',
+  },
+  'tx.bulk.splitsLeft': {
+    other: '{count} baris yang cocok dibiarkan: baris itu milik pecahan identik pada hari yang sama, yang bagian-bagiannya tidak dapat dibedakan. Letakkan bagian-bagian setiap baris asli tepat di bawahnya di berkasnya, berjumlah sama dengan baris itu, lalu hapus lagi.',
   },
   'tx.bulk.confirm': {
     other: 'Hapus {count} baris',
@@ -576,6 +579,8 @@ module.exports = {
      split parent row (the why is in en.js) --- */
   'tx.split.chip': 'dipecah menjadi {count}',
   'tx.split.chipGap': '{amount} belum tercatat',
+  'tx.split.chipMissing': 'dipecah · bagian tidak ditemukan',
+  'tx.split.ambiguous': 'Bagian-bagian pecahan ini tidak dapat dibedakan dari bagian pecahan lain yang identik pada hari yang sama, jadi tidak ada yang diubah. Di {file}, letakkan bagian-bagian setiap baris asli tepat di bawahnya, berjumlah sama dengan baris itu, lalu coba lagi.',
   'tx.aria.splitChip': 'Opsi pecahan untuk {desc} pada {date}',
 
   /* Accessible names (audit of 11 Nov 2026, task 19) — machine-assisted, not native-reviewed. */
@@ -589,6 +594,7 @@ module.exports = {
   'tx.unsplit.msg': {
     other: 'Ini menghapus {count} bagian dan mengembalikan {desc} menjadi satu transaksi sebesar {amount}.',
   },
+  'tx.unsplit.noParts': 'Tidak ada bagian pecahan dengan tanggal dan deskripsi baris ini di {file}, jadi baris ini tetap dipecah dan di luar total. Jika tanggal atau deskripsinya diubah, kembalikan agar cocok dengan bagian-bagiannya; jika bagian-bagiannya dihapus, kosongkan sel Excluded dan Split baris ini di berkas.',
 
   'tx.add.noAccount': 'Tambahkan rekening dulu — setiap transaksi menempel pada satu rekening',
   'tx.add.title': 'Tambah transaksi',
@@ -1871,6 +1877,9 @@ module.exports = {
   'tx.bulkCat.title': 'Atur kategori untuk baris ini',
   'tx.bulkCat.msg': {
     other: '{count} baris akan diatur ke {cat}.',
+  },
+  'tx.bulkCat.splitsSkipped': {
+    other: '{count} baris yang cocok termasuk pecahan dan kategorinya tetap — ubah di barisnya masing-masing.',
   },
   'tx.bulkCat.confirm': {
     other: 'Atur kategori ({count})',

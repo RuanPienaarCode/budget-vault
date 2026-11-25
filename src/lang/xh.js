@@ -567,8 +567,12 @@ module.exports = {
   },
   'tx.bulk.backup': 'Ibhalwa ku-{path} kuqala, ngoko inokubuyiswa — inkunkuma yevolti ayikwazi ukurhoxisa oku ngokwayo, kuba iifayile zenyanga ziyahlelwa endaweni yokucinywa.',
   'tx.bulk.splits': {
-    one: 'Omnye kuyo ungowokwahlulwa, apho eminye imigca yakhona isenokungakhethwanga zizihluzi.',
-    other: 'Emingu-{count} kuyo ngeyokwahlulwa, apho eminye imigca yayo isenokungakhethwanga zizihluzi.',
+    one: 'Omnye umgca uhamba nayo, ingu-{total} iyonke: ukwahlulwa kucinywa kupheleleyo — umgca wokuqala neenxalenye zonke — ukuze kungabikho nxalenye eshiyekayo ichaza umgca ongasekho.',
+    other: 'Eminye imigca engu-{count} ihamba nayo, ingu-{total} iyonke: ukwahlulwa kucinywa kupheleleyo — umgca wokuqala neenxalenye zonke — ukuze kungabikho nxalenye eshiyekayo ichaza umgca ongasekho.',
+  },
+  'tx.bulk.splitsLeft': {
+    one: 'Umgca omnye ohambelanayo ushiywa unjalo: ungowokwahlulwa okufanayo ngomhla omnye, apho iinxalenye zingenakwahlulwa. Kwifayile yawo, beka iinxalenye zomgca ngamnye wokuqala ngqo phantsi kwawo, zidibane zibe lixabiso lawo, uze ucime kwakhona.',
+    other: 'Imigca engu-{count} ehambelanayo ishiywa injalo: ngeyokwahlulwa okufanayo ngomhla omnye, apho iinxalenye zingenakwahlulwa. Kwifayile yayo, beka iinxalenye zomgca ngamnye wokuqala ngqo phantsi kwawo, zidibane zibe lixabiso lawo, uze ucime kwakhona.',
   },
   'tx.bulk.confirm': {
     one: 'Cima umgca omnye',
@@ -604,6 +608,8 @@ module.exports = {
      split parent row (the why is in en.js) --- */
   'tx.split.chip': 'yahlulwe yaba ngu-{count}',
   'tx.split.chipGap': '{amount} engabalwanga',
+  'tx.split.chipMissing': 'yahlulwe · iinxalenye azifumanekanga',
+  'tx.split.ambiguous': 'Iinxalenye zolu kwahlulwa azinakwahlulwa kwezolunye ukwahlulwa olufanayo ngomhla omnye, ngoko akukho nto itshintshiweyo. Ku-{file}, beka iinxalenye zomgca ngamnye wokuqala ngqo phantsi kwawo, zidibane zibe lixabiso lawo, uze uzame kwakhona.',
   'tx.aria.splitChip': 'Iindlela zokwahlula {desc} ngomhla {date}',
 
   /* Accessible names (audit of 11 Nov 2026, task 19) — machine-assisted, not native-reviewed. */
@@ -618,6 +624,7 @@ module.exports = {
     one: 'Oku kususa inxalenye enye, ize {desc} ibuyele ibe yintengiselwano enye ka-{amount}.',
     other: 'Oku kususa iinxalenye ezingu-{count}, ize {desc} ibuyele ibe yintengiselwano enye ka-{amount}.',
   },
+  'tx.unsplit.noParts': 'Akukho nxalenye zokwahlulwa ezinomhla nenkcazo yalo mgca ezifunyenweyo ku-{file}, ngoko uhlala wahlulwe kwaye ungaphandle kweetotali. Ukuba umhla okanye inkcazo yawo itshintshiwe, yibuyisele ihambelane neenxalenye zawo; ukuba iinxalenye zawo zicinyiwe, coca iiseli ze-Excluded ne-Split zalo mgca kwifayile.',
 
   'tx.add.noAccount': 'Yongeza iakhawunti kuqala — yonke intengiselwano ineyayo',
   'tx.add.title': 'Yongeza intengiselwano',
@@ -1960,6 +1967,10 @@ module.exports = {
   'tx.bulkCat.msg': {
     one: 'Umgca omnye uya kumiselwa ku-{cat}.',
     other: 'Imigca engu-{count} iya kumiselwa ku-{cat}.',
+  },
+  'tx.bulkCat.splitsSkipped': {
+    one: 'Umgca omnye ohambelanayo ungowokwahlulwa kwaye ugcina udidi lwawo — lutshintshe kumgca walo.',
+    other: 'Imigca engu-{count} ehambelanayo ngeyokwahlulwa kwaye igcina iindidi zayo — zitshintshe kwimigca yayo.',
   },
   'tx.bulkCat.confirm': {
     one: 'Misela udidi (1)',
