@@ -332,11 +332,50 @@ module.exports = function registerCategories(ctx) {
      the caller can say the rules were NOT learned instead of reporting a save
      with none to learn (2026-11 final review). */
   async function learnRules(pairs, op) {
+    const res = await learnRulesWithCorrections(pairs, op);
+    return res === null ? null : res.added;
+  }
+
+  /* learnRules with what it did NOT do, said (2026-11-25 audit, RUL-3).
+
+     A pair whose pattern the file already holds is skipped — that is the
+     never-silently-overwritten rule above, and it stays. But on the import
+     review the skip was the end of it: a reader who refiled every
+     "CHECKERS RONDEBOSCH" row from Food to Liquor got "Imported 3
+     transactions", no rule, and Food again on every statement after. So the
+     skipped disagreements come back to the caller, which ASKS (views/import.js)
+     — the Transactions page's "Update the rule" offer, for a commit's worth of
+     rows at once. This function still changes no existing rule.
+
+     Returns { added, corrections, conflicts }, or null when the load was
+     replaced (see above):
+       corrections  [{ pattern, from, to, count, rule }] — every review pair
+                    with this pattern chose `to`, the rule says `from`. `rule`
+                    is the S.rules object itself, this load's, so correctRules
+                    can repoint exactly it and nothing it would have to search
+                    for again.
+       conflicts    [{ pattern, category, chosen: [{ cat, count }] }] — pairs
+                    with one pattern chose DIFFERENT categories. Never a
+                    correction: there is no one answer the rule could follow,
+                    and picking one would be the app deciding which of the
+                    reader's own choices was the exception.
+     Only rules that were in the file BEFORE this call count. A pattern first
+     learned earlier in this same batch is learnRules' own first-wins, as it
+     always was, and not a correction of anything the household wrote. The
+     first rule for a pattern is the one compared, the one matchRule's tie
+     goes to and the one governingRule hands the Transactions page. */
+  async function learnRulesWithCorrections(pairs, op) {
     if (op && op.replaced()) return null;
-    if (!rulesWritable()) return 0;
+    if (!rulesWritable()) return { added: 0, corrections: [], conflicts: [] };
     // ruleText: the matcher's own normalisation, so "already have it" means
     // exactly what prepareRules will make of the pattern.
     const have = new Set(S.rules.map(r => ruleText(r.pattern)));
+    const before = new Map();   // pattern key -> the first rule the file had for it
+    for (const r of S.rules) {
+      const k = ruleText(r.pattern);
+      if (k && !before.has(k)) before.set(k, r);
+    }
+    const chosen = new Map();   // pattern key -> Map(category -> pairs choosing it)
     // Prepared once, then extended as we go: a rule learned earlier in this
     // same batch must be able to make a later one redundant.
     const matcher = prepareRules(S.rules);
@@ -345,7 +384,14 @@ module.exports = function registerCategories(ctx) {
       if (!cat) continue;
       const pattern = learnPattern(desc);
       const key = ruleText(pattern);
-      if (!key || have.has(key)) continue;
+      if (!key) continue;
+      if (before.has(key)) {
+        if (!chosen.has(key)) chosen.set(key, new Map());
+        const m = chosen.get(key);
+        m.set(cat, (m.get(cat) || 0) + 1);
+        continue;
+      }
+      if (have.has(key)) continue;
       if (autoCategorise(pattern, matcher) === cat) { have.add(key); continue; }
       S.rules.push({ pattern, category: cat });
       matcher.push({ p: key, category: cat });
@@ -364,7 +410,17 @@ module.exports = function registerCategories(ctx) {
        is the household's, and a learned rule goes at the end, where it
        outranks nothing it ties with. */
     if (added) await writeRulesCsv(op);
-    return added;
+    const corrections = [], conflicts = [];
+    for (const [key, m] of chosen) {
+      const rule = before.get(key);
+      const cats = [...m];
+      if (cats.length > 1) {
+        conflicts.push({ pattern: rule.pattern, category: rule.category, chosen: cats.map(([cat, count]) => ({ cat, count })) });
+      } else if (cats[0][0] !== rule.category) {
+        corrections.push({ pattern: rule.pattern, from: rule.category, to: cats[0][0], count: cats[0][1], rule });
+      }
+    }
+    return { added, corrections, conflicts };
   }
 
   /* The rule CURRENTLY governing a description — the same winning rule
@@ -404,12 +460,24 @@ module.exports = function registerCategories(ctx) {
      never searches for one and never adds one, so it can't be reached by
      anything automatic. */
   async function correctRule(rule, newCat, op) {
-    if (!rule || !newCat || rule.category === newCat) return false;
-    if (op && op.replaced()) return false;
-    if (!rulesWritable()) return false;
-    rule.category = newCat;
+    return (await correctRules([{ rule, to: newCat }], op)) > 0;
+  }
+
+  /* correctRule for several rules at once — the import review's "Update the
+     rules" (2026-11-25 audit, RUL-3), which may repoint a dozen after one
+     statement. Same rules as correctRule: only rules the caller holds, never
+     a search, never an addition. And ONE write of the file for the lot, by
+     the one serializer, so the household's order and extra columns come back
+     exactly as they went in — a write per rule would rewrite the file a dozen
+     times on an iCloud vault for the same bytes. Returns how many changed. */
+  async function correctRules(changes, op) {
+    const todo = (changes || []).filter(c => c && c.rule && c.to && c.rule.category !== c.to);
+    if (!todo.length) return 0;
+    if (op && op.replaced()) return 0;
+    if (!rulesWritable()) return 0;
+    for (const c of todo) c.rule.category = c.to;
     await writeRulesCsv(op);
-    return true;
+    return todo.length;
   }
 
   /* One serializer for the rules file, so learning, tidying and the pre-tidy
@@ -549,5 +617,5 @@ module.exports = function registerCategories(ctx) {
   }
 
   ctx.provide({ fillCatOptions, promptCreateCategory, promptDeleteCategory, lazyCatSelect, deferredCatSelect,
-    learnRules, governingRule, correctRule, cleanupRules });
+    learnRules, learnRulesWithCorrections, governingRule, correctRule, correctRules, cleanupRules });
 };

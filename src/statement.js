@@ -17,7 +17,7 @@
 const { normalizeAmount } = require('./amount');
 const { isRealIsoDate, daysBetween } = require('./dates');
 const { parseDelimited, sniffDelimiter } = require('./csv');
-const { isSplitPart } = require('./tx-role');
+const { isSplitPart, splitRole, splitPartsOf, SPLIT_PARENT, SPLIT_PART } = require('./tx-role');
 
 /* Parse a foreign statement: sniff the delimiter, then read it. */
 const parseStatement = text => parseDelimited(text, sniffDelimiter(text));
@@ -303,8 +303,46 @@ function applyCounterparties(items, accounts, selfLabel, legsOf) {
     it.excluded = !!leg;
     it.transferTo = other ? (other.tx_label || other.name) : '';
     it.transferLeg = leg ? leg.date : '';
+    /* The vault row itself, so the review can ask whether that half is still
+       counted (transferLegStanding, below; 2026-11-25 audit, IMP-5). A
+       reference to the caller's row, never a copy and never written to here. */
+    it.transferLegRow = leg || null;
   }
   return items;
+}
+
+/* WHERE THE OTHER HALF STANDS (2026-11-25 audit, IMP-5). applyCounterparties
+   excludes the row coming IN when the vault already holds its other leg —
+   but that vault leg was imported first, when its partner did not exist yet,
+   so nothing excluded it then, and nothing reached back to it now. Import
+   Cheque, then Savings: the Savings half arrived excluded and the Cheque half
+   stayed counted, and spending carried the whole R5 000 transfer with no
+   screen saying so. This is the question the review asks of that vault row
+   before it says anything about it:
+
+     'excluded'  already out of the budget totals — nothing to say;
+     'counted'   an ordinary row the totals still count — the review names it
+                 and offers to mark it excluded with this import;
+     'split'     a split row: the bank's line is the parent, and what the
+                 totals count is its parts (tx-role.js). Named, never changed:
+                 the parts are the reader's own slices under their own
+                 categories, and which of them were "the transfer" is not a
+                 question this importer can answer for them. A parent whose
+                 Excluded tick was taken off by hand is counted itself, and is
+                 'split' for the same reason.
+
+   `fileRows` are the rows of the leg's OWN month file — the only place its
+   parts can be (splitPartsOf's join is date and description within one
+   file). Pure, and here beside oppositeLeg, which found the row. */
+function transferLegStanding(leg, fileRows) {
+  if (!leg) return 'excluded';
+  const role = splitRole(leg.split);
+  if (role === SPLIT_PARENT) {
+    const counted = !leg.excluded || splitPartsOf(fileRows || [], leg).some(p => !p.excluded);
+    return counted ? 'split' : 'excluded';
+  }
+  if (role === SPLIT_PART) return leg.excluded ? 'excluded' : 'split';
+  return leg.excluded ? 'excluded' : 'counted';
 }
 
 /* Check a statement's amounts against its own running-balance column, and say
@@ -1087,7 +1125,7 @@ function sameAccountNumber(a, b) {
 
 module.exports = {
   parseStatement, decodeStatement, parseStatementDate,
-  counterpartyAccount, applyCounterparties, oppositeLeg, TRANSFER_LEG_DAYS, reconcileAmounts, reconcileFeesBesideAmount,
+  counterpartyAccount, applyCounterparties, oppositeLeg, transferLegStanding, TRANSFER_LEG_DAYS, reconcileAmounts, reconcileFeesBesideAmount,
   balanceStepVerdicts, isBalanceCarry, drCrOf,
   detectHeaderlessColumns, detectStatementColumns, hasAmountColumn,
   statementAccountNumber, sameAccountNumber,
