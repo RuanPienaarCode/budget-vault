@@ -676,6 +676,7 @@ module.exports = {
 
   'tx.saved': { one: 'Salvamos {count} arquivo', other: 'Salvamos {count} arquivos' },
   'tx.savedLearned': { one: ' · aprendemos {count} regra nova', other: ' · aprendemos {count} regras novas' },
+  'tx.savedRuleUpdated': { one: ' · atualizamos {count} regra', other: ' · atualizamos {count} regras' },
 
   'tx.export.dirty': 'Salve as suas alterações primeiro — uma exportação de edições não salvas não bateria com o cofre',
   'tx.export.empty': 'Nada a exportar — nenhuma linha corresponde aos filtros atuais',

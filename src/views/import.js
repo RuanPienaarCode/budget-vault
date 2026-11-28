@@ -22,6 +22,7 @@ const { normalizeAmount, inferGrouping, readAmountColumn } = require('../amount'
 const { parseStatement, decodeStatement, parseStatementDate, detectStatementColumns, reconcileAmounts, reconcileFeesBesideAmount, applyCounterparties,
   transferLegStanding, statementAccountNumber, sameAccountNumber, TRANSFER_LEG_DAYS, balanceStepVerdicts, isBalanceCarry, drCrOf } = require('../statement');
 const { prepareRules, autoCategorise, matchRule } = require('../rules');
+const { setRowCategory, subcategoryOf } = require('../subcategories');
 const { buildIndex, addToIndex, flagItems } = require('../dedupe');
 const { confirmModal } = require('../modal');
 const { splitRole, SPLIT_PARENT, splitPartsOf, splitParentsSharingKey } = require('../tx-role');
@@ -81,6 +82,14 @@ function decideDayFirst(rawDates, householdDayFirst, today) {
     pick(spanH <= spanO, spanO <= spanH);
   if (verdict) return verdict;
   return { dayFirst: householdDayFirst, assumed: true };
+}
+
+/* The subcategory a matched rule sets with its category (ADR-0010 section 5),
+   as the field a row carries it in — and no field at all when the rule has
+   none, which is what a row loaded from a file with no Subcategory column
+   looks like. Spread into the review item beside `cat`. */
+function ruleLabel(matched) {
+  return matched && matched.subcategory ? { subcategory: matched.subcategory } : {};
 }
 
 module.exports = function registerImport(ctx) {
@@ -518,6 +527,7 @@ module.exports = function registerImport(ctx) {
            whether THIS row's step agrees with the sign it is given; -1 when the
            row has no step (no balance column, or no balance on the row). */
         items.push({ date, desc, amount: parseFloat(amount.toFixed(2)), cat: matched ? matched.category : '',
+          ...ruleLabel(matched),
           matchedPattern: matched ? matched.p : '',
           include: true, excluded: false, transferTo: '',
           ledgerAt: ledgerEntry ? ledger.length - 1 : -1, carry });
@@ -605,7 +615,7 @@ module.exports = function registerImport(ctx) {
           const feeRules = rules.filter(rule => !matchRule(k.desc, [rule]));
           const matched = matchRule(feeDesc, feeRules);
           items.splice(k.at, 0, { date: k.date, desc: feeDesc, amount: parseFloat(fee.toFixed(2)),
-            cat: matched ? matched.category : '', matchedPattern: matched ? matched.p : '',
+            cat: matched ? matched.category : '', ...ruleLabel(matched), matchedPattern: matched ? matched.p : '',
             include: true, excluded: false, transferTo: '', feeOf: k.desc, ledgerAt: -1, carry: false });
           // A row with an amount of 0 was counted as "no amount" above; it has
           // a fee row now, so it is not that any more.
@@ -1450,6 +1460,13 @@ module.exports = function registerImport(ctx) {
          translated, so these wait for that pass rather than half-keying it. */
       const heldWhy = it.dup ? '' : it.carry ? CARRY_WHY : it.stepFlag ? STEP_WHY : '';
       const why = it.near ? nearWhy : it.pending ? pendingWhy : heldWhy;
+      /* What the rule chose under the category, as text beside it (ADR-0010
+         section 5). Not a control: the review does not edit a subcategory, it is
+         changed on Transactions afterwards. It describes what will be written,
+         so it leaves the screen the moment the category changes, which is also
+         the moment the row stops carrying it (setRowCategory). */
+      const ruleSub = subcategoryOf(it);
+      const subNote = ruleSub ? el('span', { class: 'imp-rule-sub' }, ruleSub) : null;
       // Keyed by position as the landing for "Show more" below (dom.js refocus).
       body.append(el('tr', { class: cls.trim(), 'data-focus-key': `row:${i}` },
         /* Both ticks sit in a <label> so the phone card can give them a 44px
@@ -1510,7 +1527,14 @@ module.exports = function registerImport(ctx) {
               'category-badge badge-transfer badge-chip'),
         ] : []), ...(speaksForLeg(it) ? [legNote(it, i, writeStats)] : [])),
         el('td', { class: `num${it.amount >= 0 ? ' text-success' : ''}`, style: 'white-space:nowrap;font-weight:600' }, previewFlow(it.amount)),
-        el('td', {}, it.dup ? (it.cat || '') : deferredCatSelect(it.cat, v => { it.cat = v; it.manual = true; }, i18n.t('imp.aria.category', { desc: it.desc })),
+        el('td', {}, it.dup ? (it.cat || '') : deferredCatSelect(it.cat, v => {
+          /* setRowCategory, the one door for a category change: the rule's
+             subcategory belonged to the old category, so it goes with it. */
+          setRowCategory(it, v);
+          it.manual = true;
+          if (subNote && !subcategoryOf(it)) subNote.remove();
+        }, i18n.t('imp.aria.category', { desc: it.desc })),
+          ...(subNote ? [subNote] : []),
           // Named, not silent: a rule that fires wrong is only fixable if the
           // reader can tell WHICH rule fired — otherwise the only way to find
           // it is opening Data/Categorisation Rules.csv, which this screen
@@ -1687,15 +1711,18 @@ module.exports = function registerImport(ctx) {
       const month = it.date.slice(0, 7);
       const key = `${label}/${month}`;
       if (!additions.has(key)) additions.set(key, { month, entries: [] });
-      additions.get(key).entries.push({
+      const row = {
         /* A Miles row carries its facts in `note` (src/miles.js). The reader's
            own Excluded tick is appended AFTER them, so the Miles count stays the
            first thing in the cell for parseMilesNote. */
-        row: { date: it.date, desc: it.desc, cat: it.cat, amount: it.amount, excluded: it.excluded,
-          note: it.note ? (it.excluded ? `${it.note} \u00b7 Excluded during import` : it.note)
-            : it.excluded ? 'Excluded during import' : '' },
-        src: it,
-      });
+        date: it.date, desc: it.desc, cat: it.cat, amount: it.amount, excluded: it.excluded,
+        note: it.note ? (it.excluded ? `${it.note} \u00b7 Excluded during import` : it.note)
+          : it.excluded ? 'Excluded during import' : '' };
+      /* The subcategory a rule chose, through the one door so a label with no
+         category is never written. A row with none gets no field, and a month
+         file in which no row has one gets no Subcategory column. */
+      if (subcategoryOf(it)) setRowCategory(row, it.cat, subcategoryOf(it));
+      additions.get(key).entries.push({ row, src: it });
     }
     const TX_FM = 'tags: [finance, finance/budget, finance/budget/transactions]';
     // Same canonical form dedupIndex / renderImportReview key by (the txSegment'd
@@ -1808,7 +1835,13 @@ module.exports = function registerImport(ctx) {
     const touched = additions;
     let newRules = 0, ruleNote = { updated: 0, note: '' };
     if ($('#impRemember').checked) {
-      const pairs = toAdd.filter(it => it.manual && it.cat).map(it => ({ desc: it.desc, cat: it.cat }));
+      /* A pair carries the subcategory its row has, so a rule is taught the
+         pair the reader is looking at and not the category alone. The review
+         cannot set one itself: what a row carries here came from a rule and
+         survives only while the category is the rule's own. */
+      const pairs = toAdd.filter(it => it.manual && it.cat).map(it => (subcategoryOf(it)
+        ? { desc: it.desc, cat: it.cat, subcategory: subcategoryOf(it) }
+        : { desc: it.desc, cat: it.cat }));
       /* With what the learn skipped (categories.js learnRulesWithCorrections;
          2026-11-25 audit, RUL-3). A ctx without it — a test that mounts this
          view alone — learns as before and has nothing to ask. */

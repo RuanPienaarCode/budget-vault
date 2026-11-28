@@ -642,6 +642,7 @@ module.exports = {
 
   'tx.saved': { other: '{count} berkas tersimpan' },
   'tx.savedLearned': { other: ' · {count} aturan baru dipelajari' },
+  'tx.savedRuleUpdated': { other: ' · {count} aturan diperbarui' },
 
   'tx.export.dirty': 'Simpan dulu perubahan Anda — ekspor dari suntingan yang belum tersimpan tidak akan cocok dengan vault',
   'tx.export.empty': 'Tidak ada yang bisa diekspor — tidak ada baris yang cocok dengan penyaring saat ini',

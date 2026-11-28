@@ -112,6 +112,24 @@ function setRowCategory(row, cat, subcategory) {
   return changed;
 }
 
+/* THE way a categorisation rule's category is changed — setRowCategory's rule,
+   for the object the rules file holds (`category`, not `cat`). A rule's
+   subcategory belongs to its category exactly as a row's does, so repointing a
+   rule at another category must not leave the old one's label on it: the next
+   import would file a row under Home with Fuel, a name Home has never listed.
+
+   Delegates rather than repeats: the same function decides what "a change" is
+   and what a blank or a label with no category means, so a row and the rule
+   that files it cannot disagree. Returns whether the category changed. */
+function setRuleCategory(rule, category, subcategory) {
+  const view = { cat: rule.category };
+  if (typeof rule.subcategory === 'string') view.subcategory = rule.subcategory;
+  const changed = setRowCategory(view, category, subcategory);
+  rule.category = view.cat;
+  if (typeof view.subcategory === 'string') rule.subcategory = view.subcategory; else delete rule.subcategory;
+  return changed;
+}
+
 /* Every name rows carry, per category: Map(category -> sorted distinct names).
    `rows` is any iterable of raw rows. Built in one pass so a page drawing a
    hundred dropdowns asks once, not once per row. */
@@ -159,6 +177,6 @@ function matchesSubcategory(row, filter) {
 
 module.exports = {
   NO_SUBCATEGORY, parseSubcategories, formatSubcategories, checkSubcategoryName,
-  subcategoryOf, setRowCategory, inUseByCategory, offeredNames, bookUsesSubcategories,
+  subcategoryOf, setRowCategory, setRuleCategory, inUseByCategory, offeredNames, bookUsesSubcategories,
   matchesSubcategory,
 };

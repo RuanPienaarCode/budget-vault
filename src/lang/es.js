@@ -661,6 +661,7 @@ module.exports = {
 
   'tx.saved': { one: '{count} archivo guardado', other: '{count} archivos guardados' },
   'tx.savedLearned': { one: ' · aprendida {count} regla nueva', other: ' · aprendidas {count} reglas nuevas' },
+  'tx.savedRuleUpdated': { one: ' · actualizada {count} regla', other: ' · actualizadas {count} reglas' },
 
   'tx.export.dirty': 'Guarda tus cambios primero — una exportación con ediciones sin guardar no coincidiría con la bóveda',
   'tx.export.empty': 'Nada que exportar — ninguna fila coincide con los filtros actuales',

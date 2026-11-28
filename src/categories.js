@@ -5,9 +5,9 @@
 const { opWriterOf } = require('./io');
 const { el } = require('./dom');
 const { parseFrontmatter, yamlStr } = require('./markdown');
-const { checkSubcategoryName, formatSubcategories, offeredNames, inUseByCategory } = require('./subcategories');
+const { checkSubcategoryName, formatSubcategories, offeredNames, inUseByCategory, setRuleCategory } = require('./subcategories');
 const { csvCell } = require('./csv');
-const { learnPattern, prepareRules, autoCategorise, matchRule, ruleText } = require('./rules');
+const { learnPattern, prepareRules, matchRule, ruleText, answerKey, rulesSubColumn, ruleSubcategory } = require('./rules');
 const { safeSeg } = require('./vault-path');
 const { typeOrder, typeRank } = require('./groups');
 const { todayIso } = require('./dates');
@@ -463,7 +463,14 @@ module.exports = function registerCategories(ctx) {
      put a line in front of them that explains nothing. Measured on a real
      1,342-rule vault: 832 of them (62%) were already answered by a shorter
      rule pointing at the same category, so this is the difference between a
-     file that stabilises and one that grows with the history forever. */
+     file that stabilises and one that grows with the history forever.
+
+     "Answered" means the category AND the subcategory (ADR-0010 section 5,
+     issue #185): a shorter rule that files Car under Fuel does not answer a
+     longer description the reader filed under Car and Services, so two rules
+     for one category with different subcategories are both kept. Spoken
+     plainly, a pair is `{ desc, cat, subcategory? }` and a blank subcategory
+     is a pair that says the category alone. */
   /* `op`, when given, is the calling operation's writer (io.js opWriter): the
      pairs were read from ITS load, so if another load has replaced it since —
      another book opened while the save or import was writing — nothing is
@@ -472,7 +479,7 @@ module.exports = function registerCategories(ctx) {
      with none to learn (2026-11 final review). */
   async function learnRules(pairs, op) {
     const res = await learnRulesWithCorrections(pairs, op);
-    return res === null ? null : res.added;
+    return res === null ? null : res.added + res.updated;
   }
 
   /* learnRules with what it did NOT do, said (2026-11-25 audit, RUL-3).
@@ -484,10 +491,18 @@ module.exports = function registerCategories(ctx) {
      transactions", no rule, and Food again on every statement after. So the
      skipped disagreements come back to the caller, which ASKS (views/import.js)
      — the Transactions page's "Update the rule" offer, for a commit's worth of
-     rows at once. This function still changes no existing rule.
+     rows at once. This function still changes no existing rule's CATEGORY.
 
-     Returns { added, corrections, conflicts }, or null when the load was
-     replaced (see above):
+     Returns { added, updated, corrections, conflicts }, or null when the load
+     was replaced (see above):
+       updated      how many EXISTING rules were given a different
+                    subcategory. The one thing here that changes a rule the
+                    file already held, and only in the narrow case the issue
+                    asks for: the same pattern, the same category, and a pair
+                    that NAMES a subcategory different from the rule's. A pair
+                    with none never takes one away, because it says nothing
+                    about it; and a pair for another category is a correction
+                    (below), which this still does not apply.
        corrections  [{ pattern, from, to, count, rule }] — every review pair
                     with this pattern chose `to`, the rule says `from`. `rule`
                     is the S.rules object itself, this load's, so correctRules
@@ -505,7 +520,7 @@ module.exports = function registerCategories(ctx) {
      goes to and the one governingRule hands the Transactions page. */
   async function learnRulesWithCorrections(pairs, op) {
     if (op && op.replaced()) return null;
-    if (!rulesWritable()) return { added: 0, corrections: [], conflicts: [] };
+    if (!rulesWritable()) return { added: 0, updated: 0, corrections: [], conflicts: [] };
     // ruleText: the matcher's own normalisation, so "already have it" means
     // exactly what prepareRules will make of the pattern.
     const have = new Set(S.rules.map(r => ruleText(r.pattern)));
@@ -519,24 +534,35 @@ module.exports = function registerCategories(ctx) {
     // same batch must be able to make a later one redundant.
     const matcher = prepareRules(S.rules);
     let added = 0;
-    for (const { desc, cat } of pairs) {
+    const first = new Map();    // rule -> the subcategory it had before this batch
+    for (const { desc, cat, subcategory } of pairs) {
       if (!cat) continue;
+      const sub = String(subcategory ?? '').trim();
       const pattern = learnPattern(desc);
       const key = ruleText(pattern);
       if (!key) continue;
       if (before.has(key)) {
+        const rule = before.get(key);
+        if (sub && rule.category === cat && ruleSubcategory(rule) !== sub) {
+          if (!first.has(rule)) first.set(rule, ruleSubcategory(rule));
+          setRuleCategory(rule, cat, sub);
+          const e = matcher.find(m => m.p === key);
+          if (e) e.subcategory = sub;
+        }
         if (!chosen.has(key)) chosen.set(key, new Map());
         const m = chosen.get(key);
         m.set(cat, (m.get(cat) || 0) + 1);
         continue;
       }
       if (have.has(key)) continue;
-      if (autoCategorise(pattern, matcher) === cat) { have.add(key); continue; }
-      S.rules.push({ pattern, category: cat });
-      matcher.push({ p: key, category: cat });
+      const answer = sub ? { category: cat, subcategory: sub } : { category: cat };
+      if (answerKey(matchRule(pattern, matcher)) === answerKey(answer)) { have.add(key); continue; }
+      S.rules.push(sub ? { pattern, category: cat, subcategory: sub } : { pattern, category: cat });
+      matcher.push(sub ? { p: key, category: cat, subcategory: sub } : { p: key, category: cat });
       have.add(key);
       added++;
     }
+    const updated = [...first].filter(([rule, was]) => ruleSubcategory(rule) !== was).length;
     /* Appended, never re-sorted (2026-10-07 audit, L3-13). This sorted the
        whole set alphabetically before every write. But order decides which
        rule wins when two matches are the same length (rules.js matchRule
@@ -548,7 +574,7 @@ module.exports = function registerCategories(ctx) {
        and a description holding both moved to Liquor. The file's own order
        is the household's, and a learned rule goes at the end, where it
        outranks nothing it ties with. */
-    if (added) await writeRulesCsv(op);
+    if (added || updated) await writeRulesCsv(op);
     const corrections = [], conflicts = [];
     for (const [key, m] of chosen) {
       const rule = before.get(key);
@@ -559,7 +585,7 @@ module.exports = function registerCategories(ctx) {
         corrections.push({ pattern: rule.pattern, from: rule.category, to: cats[0][0], count: cats[0][1], rule });
       }
     }
-    return { added, corrections, conflicts };
+    return { added, updated, corrections, conflicts };
   }
 
   /* The rule CURRENTLY governing a description — the same winning rule
@@ -614,7 +640,11 @@ module.exports = function registerCategories(ctx) {
     if (!todo.length) return 0;
     if (op && op.replaced()) return 0;
     if (!rulesWritable()) return 0;
-    for (const c of todo) c.rule.category = c.to;
+    /* setRuleCategory, not an assignment: a rule's subcategory belongs to its
+       category, so a rule repointed at another one loses it (ADR-0010
+       section 1). A change may name the pair it sets, and none of today's
+       callers do. */
+    for (const c of todo) setRuleCategory(c.rule, c.to, c.subcategory);
     await writeRulesCsv(op);
     return todo.length;
   }
@@ -634,6 +664,19 @@ module.exports = function registerCategories(ctx) {
      cells up to the header's width and lines up with the rest. A loaded row
      that was shorter than the header is written back exactly as short. */
   const RULES_HEAD = ['pattern', 'category'];
+  /* The header a write of `rules` leaves. The file's own, unchanged, unless a
+     rule to be written carries a subcategory and the header names no column for
+     it: then `subcategory` is appended after every column the file already has
+     (ADR-0010 section 4's rule, for the rules file), capitalised like the first
+     header cell, so a household's `Pattern,Category` gets `Subcategory` and the
+     app's own `pattern,category` gets `subcategory`. A file whose rules carry
+     none is never given the column — a two-column file is two columns until a
+     rule needs a third (issue #185). */
+  function rulesHead(rules) {
+    const head = Array.isArray(S.rulesHeader) && S.rulesHeader.length ? S.rulesHeader : RULES_HEAD;
+    if (rulesSubColumn(head) >= 0 || !rules.some(r => ruleSubcategory(r))) return head;
+    return [...head, /^[A-Z]/.test(String(head[0] ?? '')) ? 'Subcategory' : 'subcategory'];
+  }
   /* 2026-10-14 audit, L3-03. A line the loader could not turn into a rule — a
      `# comment`, a pattern still waiting for its category, a category with no
      pattern — is written back exactly where it stood: after the rule it
@@ -643,7 +686,8 @@ module.exports = function registerCategories(ctx) {
      above it that survives (S.rulesLoaded is the file's own order), so a note
      a household left is never dropped because a neighbour was. */
   function rulesCsv(rules) {
-    const head = Array.isArray(S.rulesHeader) && S.rulesHeader.length ? S.rulesHeader : RULES_HEAD;
+    const head = rulesHead(rules);
+    const subAt = rulesSubColumn(head);
     const pad = Math.max(0, head.length - RULES_HEAD.length);
     const line = cells => cells.map(csvCell).join(',');
     const live = new Set(rules);
@@ -661,7 +705,18 @@ module.exports = function registerCategories(ctx) {
     }
     const body = [...(under.get(null) || [])];
     for (const r of rules) {
-      body.push(line([r.pattern, r.category, ...(Array.isArray(r.extra) ? r.extra : new Array(pad).fill(''))]));
+      const cells = Array.isArray(r.extra) ? r.extra.slice() : new Array(pad).fill('');
+      if (subAt >= 0) {
+        /* The cell is rewritten only when it no longer says what the rule says:
+           one the household typed (" Fuel ") goes back as typed, and a loaded
+           row with nothing there stays as short as it was. */
+        const at = subAt - RULES_HEAD.length, want = ruleSubcategory(r), typed = cells[at];
+        if (typed === undefined ? want : String(typed).trim() !== want) {
+          while (cells.length < at) cells.push('');
+          cells[at] = want;
+        }
+      }
+      body.push(line([r.pattern, r.category, ...cells]));
       if (under.has(r)) body.push(...under.get(r));
     }
     return line(head) + '\n' + (body.length ? body.join('\n') + '\n' : '');
@@ -681,7 +736,15 @@ module.exports = function registerCategories(ctx) {
 
   async function writeRulesCsv(op) {
     if (!rulesWritable()) return;
-    return (op ? op.writeFile : writeFile)('Data/Categorisation Rules.csv', rulesCsv(S.rules));
+    const head = rulesHead(S.rules);
+    const wrote = await (op ? op.writeFile : writeFile)('Data/Categorisation Rules.csv', rulesCsv(S.rules));
+    /* The file now has a subcategory column, so the state says so: the next
+       write in this session must find it by header rather than add it again,
+       and a tidy that removes the last rule using one must not drop it. Not
+       when the load was replaced under the write — what is in memory then is
+       another load's, and it reads its own header from the file. */
+    if (rulesSubColumn(head) >= 0 && rulesSubColumn(S.rulesHeader) < 0 && !(op && op.replaced())) S.rulesHeader = head;
+    return wrote;
   }
 
   /* Remove the rules that have stopped earning their place — see

@@ -734,6 +734,7 @@ module.exports = {
 
   'tx.saved': { one: 'Saved {count} file', other: 'Saved {count} files' },
   'tx.savedLearned': { one: ' · learned {count} new rule', other: ' · learned {count} new rules' },
+  'tx.savedRuleUpdated': { one: ' · updated {count} rule', other: ' · updated {count} rules' },
 
   'tx.export.dirty': 'Save your changes first — an export of unsaved edits would not match the vault',
   'tx.export.empty': 'Nothing to export — no rows match the current filters',

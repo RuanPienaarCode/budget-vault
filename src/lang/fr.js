@@ -673,6 +673,7 @@ module.exports = {
 
   'tx.saved': { one: '{count} fichier enregistré', other: '{count} fichiers enregistrés' },
   'tx.savedLearned': { one: ' · {count} nouvelle règle apprise', other: ' · {count} nouvelles règles apprises' },
+  'tx.savedRuleUpdated': { one: ' · {count} règle mise à jour', other: ' · {count} règles mises à jour' },
 
   'tx.export.dirty': 'Enregistrez d\'abord vos modifications — un export de modifications non enregistrées ne correspondrait pas au coffre',
   'tx.export.empty': 'Rien à exporter — aucune ligne ne correspond aux filtres actuels',

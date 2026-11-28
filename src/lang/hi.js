@@ -675,6 +675,7 @@ module.exports = {
 
   'tx.saved': { one: '{count} फ़ाइल सहेजी', other: '{count} फ़ाइलें सहेजीं' },
   'tx.savedLearned': { one: ' · {count} नया नियम सीखा', other: ' · {count} नए नियम सीखे' },
+  'tx.savedRuleUpdated': { one: ' · {count} नियम अपडेट किया', other: ' · {count} नियम अपडेट किए' },
 
   'tx.export.dirty': 'पहले अपने बदलाव सहेजें — बिना सहेजे बदलावों का निर्यात वॉल्ट से मेल नहीं खाएगा',
   'tx.export.empty': 'निर्यात करने को कुछ नहीं — मौजूदा फ़िल्टर से कोई पंक्ति मेल नहीं खाती',

@@ -659,6 +659,7 @@ module.exports = {
 
   'tx.saved': { one: '{count} lêer gestoor', other: '{count} lêers gestoor' },
   'tx.savedLearned': { one: ' · {count} nuwe reël geleer', other: ' · {count} nuwe reëls geleer' },
+  'tx.savedRuleUpdated': { one: ' · {count} reël opgedateer', other: ' · {count} reëls opgedateer' },
 
   'tx.export.dirty': 'Stoor eers jou veranderinge — \'n uitvoer van ongestoorde wysigings sal nie by die kluis pas nie',
   'tx.export.empty': 'Niks om uit te voer nie — geen rye pas by die huidige filters nie',
