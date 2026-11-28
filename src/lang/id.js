@@ -519,6 +519,8 @@ module.exports = {
   'tx.title.split': 'Pecah ke beberapa kategori',
   'tx.aria.delete': 'Hapus transaksi {desc} pada {date}',
   'tx.title.delete': 'Hapus baris ini',
+  'tx.aria.copy': 'Salin transaksi {desc} pada {date} ke entri baru',
+  'tx.title.copy': 'Salin ke transaksi baru',
   'tx.delete.title': 'Hapus transaksi',
   'tx.delete.msg': '{date} · {desc} · {amount} — dihapus dari {file} saat Anda menyimpan.',
   'tx.delete.reimport': 'Baris ini membawa kunci yang mencegah impor ulang rekening koran yang sama menambahkannya dua kali, jadi mengimpor rekening koran itu lagi nanti akan memunculkannya kembali.',

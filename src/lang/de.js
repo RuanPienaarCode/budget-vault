@@ -524,6 +524,8 @@ module.exports = {
   'tx.title.split': 'Auf Kategorien aufteilen',
   'tx.aria.delete': 'Transaktion {desc} vom {date} löschen',
   'tx.title.delete': 'Diese Zeile löschen',
+  'tx.aria.copy': 'Transaktion {desc} vom {date} in einen neuen Eintrag kopieren',
+  'tx.title.copy': 'In eine neue Transaktion kopieren',
   'tx.delete.title': 'Transaktion löschen',
   'tx.delete.msg': '{date} · {desc} · {amount} — wird beim Speichern aus {file} entfernt.',
   'tx.delete.reimport': 'Diese Zeile trägt den Schlüssel, der verhindert, dass ein erneuter Import desselben Auszugs sie ein zweites Mal anlegt — ein späterer Import dieses Auszugs fügt sie also wieder hinzu.',

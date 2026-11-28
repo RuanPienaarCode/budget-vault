@@ -567,6 +567,8 @@ module.exports = {
   'tx.title.split': 'Split into categories',
   'tx.aria.delete': 'Delete the {desc} transaction on {date}',
   'tx.title.delete': 'Delete this row',
+  'tx.aria.copy': 'Copy the {desc} transaction on {date} into a new entry',
+  'tx.title.copy': 'Copy into a new transaction',
   'tx.delete.title': 'Delete transaction',
   'tx.delete.msg': '{date} · {desc} · {amount} — removed from {file} when you save.',
   'tx.delete.reimport': 'This row carries the key that stops a re-import of the same statement adding it twice, so importing that statement again later will re-add the line.',

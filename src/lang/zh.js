@@ -508,6 +508,8 @@ module.exports = {
   'tx.title.split': '拆分到多个分类',
   'tx.aria.delete': '删除 {date} 的 {desc} 交易',
   'tx.title.delete': '删除此行',
+  'tx.aria.copy': '将 {date} 的 {desc} 交易复制为新交易',
+  'tx.title.copy': '复制为新交易',
   'tx.delete.title': '删除交易',
   'tx.delete.msg': '{date} · {desc} · {amount} — 保存时将从 {file} 中移除。',
   'tx.delete.reimport': '这一行带着防止同一份对账单重复导入的标识；删除后，日后再导入那份对账单会把它重新加回来。',

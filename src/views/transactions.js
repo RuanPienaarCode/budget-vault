@@ -14,6 +14,7 @@ const { ISO_DATE, todayIso, nowLocalMinute } = require('../dates');
 const { symbolOf, formatSigned } = require('../currency');
 const { localeFor } = require('../locale');
 const { applySplit, splitRole, splitShortfall, SPLIT_PARENT, isSplitPart, splitPartsOf, splitPartsAmbiguous, amountCents, wholeSplits } = require('../tx-role');
+const { canCopyRow, copyDraft } = require('../tx-copy');
 const { prepareRules, matchRule } = require('../rules');
 const { NO_SUBCATEGORY, setRowCategory, subcategoryOf, matchesSubcategory, inUseByCategory, offeredNames, bookUsesSubcategories } = require('../subcategories');
 /* Namespace import: this file binds `t` as a local (`const t = $('#txTable')`). */
@@ -716,7 +717,7 @@ module.exports = function registerTransactions(ctx) {
       el('th', { scope: 'col', title: i18n.t('tx.title.excl') }, i18n.t('tx.col.excl')),
       el('th', { scope: 'col' }, i18n.t('tx.col.note')),
       /* One header for the whole action cell rather than one per button. Split
-         and Delete share that cell deliberately: a ninth column costs width the
+         and Delete (and since #188 Copy) share that cell deliberately: a ninth column costs width the
          phone does not have, and both colspans on this page — the empty state
          and the show-more row — would have to be kept in step with it. */
       el('th', { scope: 'col' }, el('span', { class: 'sr-only' }, i18n.t('tx.col.actions'))))));
@@ -832,7 +833,10 @@ module.exports = function registerTransactions(ctx) {
         el('td', {}, el('input', { type: 'text', class: 'form-control form-control-sm', value: r.note, style: 'width:130px',
           'aria-label': i18n.t('tx.aria.note', { date: r.date, desc: r.desc }),
           onchange: e => { r.note = e.target.value; mark(); } })),
-        el('td', {}, splitButton(item, i), deleteButton(item, i))));
+        /* Split first, as it always was; Copy between it and Delete, which stays
+           last (its rose hover is `:last-child`). A split parent has no Copy, so
+           its cell is the two it always held. */
+        el('td', {}, ...[splitButton(item, i), copyButton(item, i), deleteButton(item, i)].filter(Boolean))));
       drawSub();
     }
     if (!list.length) body.append(el('tr', {}, el('td', { colspan: '8', class: 'text-muted' }, i18n.t('tx.none'))));
@@ -859,6 +863,59 @@ module.exports = function registerTransactions(ctx) {
        table semantics (dom.js tableCells). The actions column goes unlabelled. */
     tableCells(t, [i18n.t('tx.col.date'), i18n.t('tx.col.desc'), i18n.t('tx.col.account'), i18n.t('tx.col.category'),
       i18n.t('tx.col.amount'), i18n.t('tx.col.excl'), i18n.t('tx.col.note'), null]);
+  }
+
+  /* ------------------------------- copying ---------------------------------
+     A repeat entry — the same shop, the same cash payment — is one tap and a
+     date change instead of retyping (#188). It matters most to the people who
+     type their entries in rather than import statements.
+
+     The action opens the Add transaction dialog filled from the row and does
+     nothing else. It reuses addTransaction's own pre-fill (`addDraft`, the
+     mechanism that returns a refused entry to the reader) instead of a second
+     dialog, so the copy is validated, month-checked and written by exactly the
+     code a typed entry goes through, and nothing exists until the dialog is
+     confirmed: cancelling leaves no row and no draft. addTransaction takes the
+     draft the moment it opens and clears it, so a cancelled copy cannot fill
+     the next ordinary Add.
+
+     What is filled, and what is not, is src/tx-copy.js's (today's date; account,
+     description, category, subcategory, amount, direction and note; not
+     excluded; not a split). A split PARENT is not offered the button at all.
+     The button sits between Split and Delete in the actions cell. */
+  function copyButton(item, i) {
+    const r = item._row;
+    if (!canCopyRow(r)) return null;
+    const b = el('button', {
+      type: 'button', class: 'btn-ghost btn-ghost-sm', 'data-focus-key': `copy:${i}`,
+      'aria-label': i18n.t('tx.aria.copy', { date: r.date, desc: r.desc }), title: i18n.t('tx.title.copy'),
+    }, icoEl(['copy', 'files']));
+    b.addEventListener('click', () => copyTransaction(item));
+    return b;
+  }
+
+  /* The row is read live (item._row), not from the item's spread copy, so a
+     category the reader has just changed in the table is the category copied.
+     The account is the file the row sits in: the label Add's own account list
+     is built from. Today's date is todayIso(), not defaultAddDate(): that one
+     moves a new entry into the period on screen, and a copy is a new
+     occurrence of today (decided with the issue) — the toast names the month it
+     lands in, as it does for any entry.
+
+     Focus: the dialog returns it to the button on cancel. On confirm the table
+     is rebuilt and the new row sorts by date, so the button's own position
+     (`copy:i`) may now be another row's; the reader lands on Add instead, where
+     a typed entry leaves them. refocus does nothing while focus is still live. */
+  async function copyTransaction(item) {
+    const draft = copyDraft(item._row, item._file.label, todayIso());
+    if (!draft) return;
+    addDraft = draft;
+    await addTransaction();
+    /* addTransaction clears the draft when it opens the dialog. Still ours
+       afterwards means it returned before opening (no account to file under):
+       a copy nobody saw must not fill the next ordinary Add. */
+    if (addDraft === draft) addDraft = null;
+    refocus($('#txTable'), [$('#txAdd')]);
   }
 
   /* ------------------------------- splitting -------------------------------
@@ -2146,6 +2203,6 @@ module.exports = function registerTransactions(ctx) {
      against the flat namespace before publishing — ctx.provide throws at mount
      on a collision, so a name only fails on the device. */
   ctx.provide({ renderTransactions, serializeTxFile, saveTransactions, addTransaction, splitTransaction,
-    deleteTransaction, deleteFilteredTransactions, categoriseFilteredTransactions,
+    copyTransaction, deleteTransaction, deleteFilteredTransactions, categoriseFilteredTransactions,
     exportTransactions, syncOptions, filteredRows, setTxInBudgetOnly, ruleReach });
 };
