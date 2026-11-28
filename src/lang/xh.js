@@ -794,6 +794,7 @@ module.exports = {
   'bx.doc.date': 'Umhla',
   'bx.doc.description': 'Inkcazo',
   'bx.doc.account': 'Iakhawunti',
+  'bx.doc.subcategory': 'Udidi olungaphantsi',
   'bx.doc.currency': 'Imali',
   'bx.doc.amount': 'Isixa',
   'bx.doc.flag': 'Uphawu',

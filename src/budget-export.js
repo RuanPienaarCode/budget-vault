@@ -38,6 +38,7 @@ const { budgetRowStatus, budgetSpent } = require('./money-flow');
 const { splitRole } = require('./tx-role');
 const { stamp, LENSES } = require('./ledger');
 const { EXPORT_DIR, safeName, transactionsCsv } = require('./exporter');
+const { subcategoryOf } = require('./subcategories');
 /* The share rule every "% used" in the app follows — see modelToDoc's Used
    column (2026-10-20 audit, D2-09). */
 const { sharePercentLabel } = require('./share-percents');
@@ -268,7 +269,7 @@ function flagKeys(t, stamped, today) {
    really cover: today, when the range runs on into the future, because the
    ledger counts what has happened and schedules the rest. `txs` replace the
    per-period lists, so the transactions are the exact-date ones too. */
-function buildModel({ periods, content, categories, includeTx, generated, currency, inProgress, exact, typeOrder, env, today }) {
+function buildModel({ periods, content, categories, includeTx, generated, currency, inProgress, exact, typeOrder, env, today, subcategories }) {
   const list = nameRepeats(periods || []);
   const only = Array.isArray(categories) ? new Set(categories) : null;
   const keep = cat => !only || only.has(cat);
@@ -379,6 +380,12 @@ function buildModel({ periods, content, categories, includeTx, generated, curren
   return {
     content: content === 'full' ? 'full' : 'summary',
     generated, currency: currency || '',
+    /* The open BOOK uses subcategories (ADR-0010 section 6), so the
+       transaction listing in the workbook and the CSV gains its Subcategory
+       column. Said by the caller, who can see the whole book: this model holds
+       only the rows being exported, and a category filter can leave none of them
+       carrying one in a book that has plenty. The PDF reads nothing of it. */
+    subcategories: !!subcategories,
     filtered: !!only, categories: only ? [...only] : null,
     periods: list.map(p => ({ key: p.key, name: p.name, title: p.title, start: p.start, end: p.end })),
     /* A date-range export is named for its DATES: the periods that happen to
@@ -484,7 +491,7 @@ function modelToCsv(model, { symbolFor } = {}) {
       text: csvLines(['Period', 'From', 'To', 'Category', 'Type', 'Currency', 'Budget', 'Actual', 'Remaining', 'Notes'], body),
     });
   }
-  if (model.transactions) files.push({ kind: 'transactions', text: transactionsCsv(model.transactions, symbolFor) });
+  if (model.transactions) files.push({ kind: 'transactions', text: transactionsCsv(model.transactions, symbolFor, { subcategory: model.subcategories }) });
   return files;
 }
 
@@ -494,7 +501,7 @@ const LABELS = {
   title: 'Budget', titleSummary: 'Budget summary',
   category: 'Category', type: 'Type', total: 'Total', average: 'Average', budgeted: 'Budgeted',
   period: 'Period', from: 'From', to: 'To', budget: 'Budget', actual: 'Actual', remaining: 'Remaining', used: 'Used', notes: 'Notes',
-  date: 'Date', description: 'Description', account: 'Account', currency: 'Currency', amount: 'Amount', flag: 'Flag',
+  date: 'Date', description: 'Description', account: 'Account', subcategory: 'Subcategory', currency: 'Currency', amount: 'Amount', flag: 'Flag',
   excluded: 'excluded', splitParent: 'split parent', splitPart: 'split part',
   flagTransfer: 'transfer', flagOutside: 'non-budget account', flagForeign: 'other currency',
   flagFund: 'paid from a fund', flagScheduled: 'scheduled', inProgress: '(in progress)', assumedRow: 'already spent', assumedNone: 'no transaction expected',
@@ -670,9 +677,17 @@ function modelToSheets(model, { symbolFor, labels } = {}) {
     sheets.push({ name: L.sheetBudget, rows, freezeRows: 1, widths: [18, 12, 12, 28, 12, 14, 14, 14, 40] });
   }
   if (model.transactions) {
-    const rows = [head([L.date, L.description, L.account, L.category, L.currency, L.amount, L.flag, L.notes])];
-    for (const t of model.transactions) rows.push([t.date, t.desc || '', t.label || '', t.cat || '', sym(t), m(t.amount), txFlag(t, L), t.note || '']);
-    sheets.push({ name: L.sheetTransactions, rows, freezeRows: 1, widths: [12, 40, 18, 22, 9, 14, 14, 30] });
+    /* Subcategory directly after Category (ADR-0010 section 6): this sheet
+       names its columns and has no positional history, unlike the CSV, where it
+       goes last. Present only when the book uses them; off, the sheet is the one
+       it always was. */
+    const sub = !!model.subcategories;
+    const at = (cells, extra) => (sub ? [...cells.slice(0, 4), extra, ...cells.slice(4)] : cells);
+    const rows = [head(at([L.date, L.description, L.account, L.category, L.currency, L.amount, L.flag, L.notes], L.subcategory))];
+    for (const t of model.transactions) {
+      rows.push(at([t.date, t.desc || '', t.label || '', t.cat || '', sym(t), m(t.amount), txFlag(t, L), t.note || ''], subcategoryOf(t)));
+    }
+    sheets.push({ name: L.sheetTransactions, rows, freezeRows: 1, widths: at([12, 40, 18, 22, 9, 14, 14, 30], 18) });
   }
   /* THE HEADLINE, as numbers (2026-10-20 audit, M2-04). The PDF prints each
      period's "Income · Spent · Uncategorised" line over its table; the

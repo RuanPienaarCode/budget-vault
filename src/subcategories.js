@@ -170,6 +170,17 @@ function bookUsesSubcategories(categories, rows) {
   return false;
 }
 
+/* The same question of a loaded book: `state` is the plugin's S, whose
+   categories and per-month transaction files (S.txFiles, { key: { rows } }) are
+   the whole book. The exports ask it, and the Transactions page asks the same of
+   the same two lists, so a book that shows a Subcategory control also exports the
+   column and one that does not never does. Never throws on a state with neither. */
+function bookUsesSubcategoriesIn(state) {
+  const s = state || {};
+  function* rows() { for (const f of Object.values(s.txFiles || {})) for (const r of (f && f.rows) || []) yield r; }
+  return bookUsesSubcategories(s.categories, rows());
+}
+
 /* The Transactions subcategory filter. '' keeps every row; NO_SUBCATEGORY keeps
    the rows with none (uncategorised rows included — they have none); any other
    value is an exact name. */
@@ -225,6 +236,6 @@ function printedRows(rows, printed) {
 
 module.exports = {
   NO_SUBCATEGORY, parseSubcategories, formatSubcategories, checkSubcategoryName,
-  subcategoryOf, setRowCategory, setRuleCategory, inUseByCategory, offeredNames, bookUsesSubcategories,
+  subcategoryOf, setRowCategory, setRuleCategory, inUseByCategory, offeredNames, bookUsesSubcategories, bookUsesSubcategoriesIn,
   matchesSubcategory, breakdownOf, printedRows,
 };

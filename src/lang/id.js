@@ -755,6 +755,7 @@ module.exports = {
   'bx.doc.date': 'Tanggal',
   'bx.doc.description': 'Keterangan',
   'bx.doc.account': 'Rekening',
+  'bx.doc.subcategory': 'Subkategori',
   'bx.doc.currency': 'Mata uang',
   'bx.doc.amount': 'Jumlah',
   'bx.doc.flag': 'Penanda',

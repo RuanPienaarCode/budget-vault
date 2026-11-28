@@ -742,6 +742,7 @@ module.exports = {
   'bx.doc.date': '日期',
   'bx.doc.description': '摘要',
   'bx.doc.account': '账户',
+  'bx.doc.subcategory': '子分类',
   'bx.doc.currency': '货币',
   'bx.doc.amount': '金额',
   'bx.doc.flag': '标记',

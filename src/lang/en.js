@@ -857,6 +857,7 @@ module.exports = {
   'bx.doc.date': 'Date',
   'bx.doc.description': 'Description',
   'bx.doc.account': 'Account',
+  'bx.doc.subcategory': 'Subcategory',
   'bx.doc.currency': 'Currency',
   'bx.doc.amount': 'Amount',
   'bx.doc.flag': 'Flag',

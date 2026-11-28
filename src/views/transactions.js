@@ -2098,7 +2098,12 @@ module.exports = function registerTransactions(ctx) {
     const generated = nowLocalMinute();
     let written;
     try {
-      written = await writeVaultFile(paths.txCsv, transactionsCsv(rows, rowSymbol));
+      /* The open BOOK decides whether the exports carry a Subcategory column
+         (ADR-0010 section 6), not the filtered rows being written: a filter that
+         leaves none carrying one must not change the file's shape. One answer
+         for both files. */
+      const withSub = bookUsesSubcategories(S.categories, allRows());
+      written = await writeVaultFile(paths.txCsv, transactionsCsv(rows, rowSymbol, { subcategory: withSub }));
       /* The SAME rowSymbol both files resolve through, injected rather than
          stamped onto copies of the rows. It used to be stamped as `_symbol`
          here for the markdown while the CSV called rowSymbol directly — one
@@ -2106,7 +2111,7 @@ module.exports = function registerTransactions(ctx) {
          to be missing the Currency cell the CSV was already writing. One
          resolver, handed to both writers. */
       await writeVaultFile(paths.txMd, transactionsMarkdown(rows,
-        { range, filters, generated, household: S.settings.currency, env: ctx.ledgerEnv() }, rowMoney, rowSymbol));
+        { range, filters, generated, household: S.settings.currency, env: ctx.ledgerEnv(), subcategory: withSub }, rowMoney, rowSymbol));
       await writeVaultFile(paths.catCsv, categoriesCsv(S.categories));
       await writeVaultFile(paths.catMd, categoriesMarkdown(S.categories, generated));
     } catch (e) {

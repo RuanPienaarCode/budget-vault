@@ -780,6 +780,7 @@ module.exports = {
   'bx.doc.date': 'Datum',
   'bx.doc.description': 'Beschreibung',
   'bx.doc.account': 'Konto',
+  'bx.doc.subcategory': 'Unterkategorie',
   'bx.doc.currency': 'Währung',
   'bx.doc.amount': 'Betrag',
   'bx.doc.flag': 'Markierung',
