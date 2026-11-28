@@ -15,6 +15,7 @@ const { symbolOf, formatSigned } = require('../currency');
 const { localeFor } = require('../locale');
 const { applySplit, splitRole, splitShortfall, SPLIT_PARENT, isSplitPart, splitPartsOf, splitPartsAmbiguous, amountCents, wholeSplits } = require('../tx-role');
 const { canCopyRow, copyDraft } = require('../tx-copy');
+const { pickedCreate, typedValues, createdValue, draftAfterCreate } = require('../add-create');
 const { prepareRules, matchRule } = require('../rules');
 const { NO_SUBCATEGORY, setRowCategory, subcategoryOf, matchesSubcategory, inUseByCategory, offeredNames, bookUsesSubcategories } = require('../subcategories');
 /* Namespace import: this file binds `t` as a local (`const t = $('#txTable')`). */
@@ -1839,31 +1840,101 @@ module.exports = function registerTransactions(ctx) {
     return null;
   }
 
+  /* ----------------- creating what Add is missing (issue #189) -------------
+     Account, Category and Subcategory each end in a create entry. Picking one
+     does not open a second dialog over Add: Add CLOSES with everything typed
+     kept as a draft (addDraft, the same one a copy or a refused entry uses), the
+     existing creation dialog opens alone, and Add REOPENS pre-filled once that
+     has finished saving -- with the new item selected if it landed, and with
+     everything as typed if it was cancelled, refused or failed (decided with the
+     issue, 2026-11-28; the pure rules are src/add-create.js's).
+
+     That is also what makes "Add cannot be confirmed while a create is still
+     saving" hold: there is no Add on screen during the save. The one gap is the
+     page itself, which is not covered by a dialog while the save runs, so a
+     second Add started then would open beside the one that is about to reopen
+     and the two would fight over the draft. `creatingFromAdd` is true from the
+     moment Add closes until the create has settled, and addTransaction returns
+     at once while it is. */
+  let creatingFromAdd = false;
+  const REOPEN = 'reopen';
+
+  /* Run the existing creation dialog for the field whose entry was picked, and
+     answer the VALUE it created (for the dropdown to select), or null when
+     nothing landed. All three creators already say why when they refuse; what
+     none of them does is catch a write that throws (promptCreateCategory lets it
+     out, and changing how categories are created is out of scope), so that is
+     caught here and said, and the reader's entry comes back either way.
+
+     The account is made with a bank account preselected, as the Transactions
+     toolbar's own New account does: a statement's account is not a savings one. */
+  async function createFor(key, typed) {
+    creatingFromAdd = true;
+    try {
+      let made = null;
+      if (key === 'label') made = typeof ctx.addAccount === 'function' ? await ctx.addAccount({ type: 'checking' }) : null;
+      else if (key === 'cat') made = typeof ctx.promptCreateCategory === 'function' ? await ctx.promptCreateCategory() : null;
+      else if (key === 'subcategory') made = typed.cat && typeof ctx.promptNewSubcategory === 'function' ? await ctx.promptNewSubcategory(typed.cat) : null;
+      return createdValue(key, made);
+    } catch (err) {
+      toast(i18n.t('tx.add.createFailed', { error: (err && err.message) || err }), true);
+      return null;
+    } finally {
+      creatingFromAdd = false;
+    }
+  }
+
+  /* Add transaction. Opens the dialog, and reopens it for as long as the reader
+     keeps leaving it to create something (addTransactionOnce says REOPEN). */
   async function addTransaction() {
-    const labels = [...new Set([
-      ...S.accounts.map(a => a.tx_label || a.name),
-      ...Object.values(S.txFiles).map(f => f.label)])].sort();
-    if (!labels.length) return toast(i18n.t('tx.add.noAccount'), true);
-    const draft = addDraft;
-    addDraft = null;
-    const kept = (key, fallback) => (draft && draft[key] != null ? draft[key] : fallback);
+    if (creatingFromAdd) return;
+    while ((await addTransactionOnce()) === REOPEN) { /* Add closed for a create; the draft is waiting */ }
+  }
+
+  async function addTransactionOnce() {
     /* The row is typed against the book on screen; a switch while the form is
        open must not file it in the next one (afterDialog). */
     const op = opWriterOf(ctx, { book: true });   // bound to the BOOK, not the exact load: this only creates from what is typed (io.js opWriter({ book: true }))
+    const labels = [...new Set([
+      ...S.accounts.map(a => a.tx_label || a.name),
+      ...Object.values(S.txFiles).map(f => f.label)])].sort();
+    if (!labels.length) {
+      /* No account to file under. Add used to stop here with a message and send
+         the reader off to make one. It now leads with making one: straight into
+         the New account dialog, and Add opens once there is an account. Not an
+         Add whose Account dropdown holds only the create entry -- a one-entry
+         <select> cannot fire `change`, so nothing could pick it, and a form that
+         can never be confirmed is no place to start. Nothing has been typed, so
+         going to the creation first loses nothing; cancel ends it, as any
+         cancelled dialog does. Without the account dialog on the ctx (a page
+         mounted without the Accounts view) the old message stands. */
+      if (typeof ctx.addAccount !== 'function') return toast(i18n.t('tx.add.noAccount'), true);
+      const made = await createFor('label', {});
+      if (!made || op.replaced()) return;
+      addDraft = draftAfterCreate(addDraft || {}, 'label', made);
+      return REOPEN;
+    }
+    const draft = addDraft;
+    addDraft = null;
+    const kept = (key, fallback) => (draft && draft[key] != null ? draft[key] : fallback);
     const r = await askFields(app, i18n.t('tx.add.title'), [
       { key: 'date', label: i18n.t('tx.field.date'), type: 'date', value: kept('date', defaultAddDate()) },
       { key: 'desc', label: i18n.t('tx.field.desc'), type: 'text', placeholder: i18n.t('tx.field.descPlaceholder'), value: kept('desc', undefined) },
       { key: 'label', label: i18n.t('tx.field.account'), type: 'select', options: labels,
-        value: draft && labels.includes(draft.label) ? draft.label : ($('#txAccount').value || labels[0]) },
+        value: draft && labels.includes(draft.label) ? draft.label : ($('#txAccount').value || labels[0]),
+        create: { label: i18n.t('tx.add.newAccount') } },
       { key: 'dir', label: i18n.t('tx.field.direction'), type: 'select', value: kept('dir', 'out'), options: [
         { value: 'out', label: i18n.t('tx.dir.out') }, { value: 'in', label: i18n.t('tx.dir.in') }] },
       { key: 'amount', label: i18n.t('tx.field.amount'), type: 'number', placeholder: '0.00', desc: i18n.t('tx.field.amountDesc'), value: kept('amount', undefined) },
       { key: 'cat', label: i18n.t('tx.field.category'), type: 'select', options: [
-        { value: '', label: i18n.t('tx.field.none') }, ...S.categories.map(c => ({ value: c.name, label: c.name }))], value: kept('cat', '') },
+        { value: '', label: i18n.t('tx.field.none') }, ...S.categories.map(c => ({ value: c.name, label: c.name }))], value: kept('cat', ''),
+        create: { label: i18n.t('tx.add.newCategory') } },
       /* ADR-0010: under Category, empty and disabled until a category that has
          subcategories is chosen — and only in a book that uses them at all. */
       ...(bookUsesSubcategories(S.categories, allRows()) ? [{
         key: 'subcategory', label: i18n.t('tx.field.subcategory'), type: 'select', follows: 'cat', value: kept('subcategory', ''),
+        // The table's own entry, reused verbatim (slice 1 left it out of this dialog).
+        create: { label: i18n.t('tx.subcategory.new') },
         optionsFor: catName => {
           const none = { value: '', label: i18n.t('tx.field.none') };
           return catName ? [none, ...subcategoryNamesFor(catName).map(n => ({ value: n, label: n }))] : [none];
@@ -1872,6 +1943,23 @@ module.exports = function registerTransactions(ctx) {
       { key: 'note', label: i18n.t('tx.field.note'), type: 'text', placeholder: i18n.t('tx.field.notePlaceholder'), value: kept('note', undefined) },
     ], { validate: checkNewTransaction });
     if (!r) return;
+    /* A create entry was picked: Add has closed with what was typed. Run the
+       creation on its own, then reopen. Nothing is validated or written here --
+       the form was left, not submitted.
+
+       If the book changed meanwhile the draft is dropped, not kept the way a
+       refused entry's is: that one is kept for the SAME book's next Add, and
+       this was typed for a book that is no longer on screen -- its account and
+       category names would be offered by nothing in the new one. The creation
+       dialogs have already refused to write into it (and said so). */
+    const picked = pickedCreate(r);
+    if (picked) {
+      const typed = typedValues(r);
+      const made = await createFor(picked, typed);
+      if (op.replaced()) { renderTransactions(); return; }
+      addDraft = draftAfterCreate(typed, picked, made);
+      return REOPEN;
+    }
     if (afterDialog(op)) { addDraft = r; return; }
     const bad = checkNewTransaction(r);
     if (bad) return toast(bad.message, true);

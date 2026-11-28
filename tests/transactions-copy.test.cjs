@@ -280,11 +280,13 @@ const valueOf = (ask, key) => ask.fields.find(f => f.key === key).value;
 
   /* ---- a copy that never reached the dialog leaves no draft either ---------------------- */
   {
-    // No account and no month file: addTransaction says so and returns before it opens the form.
+    // No account and no month file: addTransaction returns before it opens the form. Since #189 it leads with the New
+    // account dialog instead of a refusal; the reader cancels that, so Add itself is still never shown.
     const M = await open({ [`${B}/Settings.md`]: '---\nmonth_start_day: 1\ncurrency: "R"\ncountry: za\n---\n' });
     const n = asked.length;
+    script.askFields.push(null);
     await M.ctx.copyTransaction({ _row: { date: '2026-08-14', desc: 'Orphan', cat: '', amount: -5, note: '' }, _file: { label: 'Ghost' } });
-    eq(asked.length, n, 'fixture: with nowhere to file it, the dialog never opened');
+    eq(asked.slice(n).map(a => a.title), [i18n.t('acct.new.title')], 'fixture: with nowhere to file it, Add never opened -- only the New account dialog did (#189), and it was cancelled');
     M.S.txFiles['Cheque/2026-08'] = { label: 'Cheque', month: '2026-08', rows: [], dirty: false };
     script.askFields.push(null);
     await M.ctx.addTransaction();
