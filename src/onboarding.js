@@ -1426,10 +1426,10 @@ class OnboardingWizard extends Modal {
 
      Manual mode never shows the account step, and creates one silently instead
      of none. That is not a convenience: every manual transaction has to land in
-     an account (the Transactions page refuses with tx.add.noAccount when there
-     is none), so a manual household finishing this wizard with no account would
-     hit that wall on their very first action — the one moment the whole path
-     exists to make painless. Checking, zero balance, no institution: nothing is
+     an account (since #189 the Transactions page's Add goes straight into the
+     New account dialog when there is none), so a manual household finishing
+     this wizard with no account would meet that detour on their very first
+     action — the one moment the whole path exists to make painless. Checking, zero balance, no institution: nothing is
      claimed about a bank the wizard never asked about, and the balance is a
      figure the household can state later on the Accounts page. */
   accountName() {

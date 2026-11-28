@@ -3,6 +3,86 @@
 All notable changes to Budget Vault. Versions match the plugin version in
 `manifest.json` and the release tag exactly (no `v` prefix).
 
+## 1.62.0 — 2026-11-28
+
+Subcategories arrive: a transaction can carry one optional label under its
+category, such as fuel, services or tolls under Car. It can be set by hand
+or by an import rule, it opens up on the Dashboard, and it goes out in the
+exports. A transaction can now be copied into Add, and Add can create a
+missing account or category without starting over. This release also fixes
+a battery drain on the locked Enter budget screen, and the defects found by
+three audits of Import, Transactions, Budget and Food.
+
+### Added
+
+- **Subcategories.** Each category can list subcategories on its note,
+  managed from a new Subcategories button on the Budget page. On
+  Transactions a row whose category has subcategories shows a second
+  dropdown, which ends in "＋ New subcategory…". The page also gains a
+  subcategory filter (with "No subcategory") and search by subcategory.
+  Changing a row's category clears its subcategory. A book that uses no
+  subcategories looks and saves exactly as before: no column is added to a
+  month file until a row uses one. (#184)
+- **Import rules learn subcategories.** A rule can set a subcategory as well
+  as a category, and saving a row with both teaches the pair. The import
+  review shows the subcategory a rule chose. A rules file with two columns
+  is left as it is until a rule needs a third. (#185)
+- **The Dashboard breaks a category down.** In "Where it went", a category
+  with subcategorised spending opens in place into its subcategories, and
+  the amounts add up to the category's own figure. Each one opens
+  Transactions filtered to it, and "All transactions" does what the click
+  did before. (#186)
+- **Exports carry the subcategory.** The transactions CSV and Markdown, the
+  budget export's workbook and CSV, and the report's JSON gain a
+  Subcategory column when the book uses subcategories. A book without them
+  exports exactly what it did before, and the PDF is unchanged. The
+  bulk-delete log keeps a deleted row's subcategory too. (#187)
+- **Copy a transaction.** A Copy action beside Split and Delete opens Add
+  filled in from the row and dated today. Nothing is written until you
+  confirm. (#188)
+- **Create from inside Add.** The Account, Category and Subcategory
+  dropdowns in Add end in an entry that creates a new one and comes back to
+  Add with everything you typed. With no account yet, Add starts by creating
+  one instead of refusing. (#189)
+
+### Fixed
+
+- **The Enter budget screen no longer keeps the computer busy.** Its
+  drifting background ran forever, so with the budget left locked the
+  window redrew itself non-stop. On one laptop that took power from about
+  7 W to 17 W. The background now drifts once and then holds still. (#194)
+- **Drill-throughs clear a stale subcategory filter.** The Uncategorised
+  tile and an account's "See transactions" no longer land on an empty list
+  under a filter left over from before.
+- **Import.** These fixes come from three audits:
+  - Statements with a Dr/Cr column beside the amount import with the right
+    signs.
+  - A second tap on Import or Undo while it is saving no longer acts twice.
+  - Undo after a retried import takes back every row.
+  - Opening and closing balance rows arrive unticked instead of importing
+    as income.
+  - A fee beside an amount becomes its own row.
+  - A headerless balance column is no longer read as the amount.
+  - Dates like 22/11/26 and 22-Nov-26 import.
+  - The review's counts match what is written.
+  - The second half of a transfer between your own accounts points out the
+    first. (#191, #192, #193)
+- **Transactions and splits.**
+  - A bulk delete takes whole splits.
+  - Bulk Set category leaves split rows alone and says so.
+  - Twin same-day splits are no longer told apart by a guess.
+  - Undo removes every part of an undone split.
+  - A form with a missing or mistyped field stays open and says what is
+    wrong instead of discarding what you typed.
+  - Add opens on a day inside the period you are looking at.
+- **Budget, Plan and Food.**
+  - Assume-spent amounts that are set aside no longer count as spent.
+  - A failed budget save keeps what you had.
+  - Plan's "Add the rest" is right when you are overspent.
+  - A period change with unsaved edits asks once.
+  - Receipt lines with pack sizes, quantities, a trailing minus or words
+    like "Cake Mix" are read correctly.
+
 ## 1.61.0 — 2026-11-16
 
 The Plan page is rebuilt around two words: money in, and allocated. It
