@@ -167,8 +167,82 @@ function rowLineWithExtras(schema, row, extraCols) {
   const known = schema.columns.map(c => c.write(row));
   const extra = row.extraCells || [];
   const named = extraCols.headers.map((_, i) => extra[i] ?? '');
+  /* A column the schema locates by header is written from the row, not from the
+     cell it was read out of — and an unchanged one goes back as it was typed.
+     `unescMd` trims, so the escape pair does not reproduce every cell a
+     household can type ("Fuel<br>" reads as "Fuel" and would be written "Fuel"):
+     a file that merely passed through a save must not change a byte of a column
+     nobody touched. */
+  for (const col of schema.byHeader || []) {
+    const at = headerIndex(col, extraCols);
+    if (at < 0) continue;
+    const typed = extra[at];
+    named[at] = typed !== undefined && String(col.read(typed)[col.key] ?? '') === String(row[col.key] ?? '')
+      ? typed : col.write(row);
+  }
   const surplus = extra.length > extraCols.headers.length ? extra.slice(extraCols.headers.length) : [];
   return `| ${known.concat(named, surplus).join(' | ')} |`;
+}
+
+/* ADR-0010 §4. A column LOCATED BY ITS HEADER, not by position.
+
+   Every column in `columns` is positional, and the frozen prefix is history
+   (see the top of this file). A transaction file's Subcategory is the one
+   exception, and the reason is Split: it is itself optional, so a positional
+   Subcategory would have to sit behind it and every file that uses a
+   subcategory without ever having split would grow an empty Split column to
+   hold the place. A hand-added "Subcategory" column already survives load and
+   save as an unknown extra, directly after Note, and moves one place right the
+   day a split is first made in that file — so three shapes of file already
+   exist, and only a header lookup reads all of them.
+
+   It therefore lives in `byHeader`, beside `columns` and not in it: a column
+   there is never read by position (rowToObject cannot reach it), never counted
+   in the frozen-prefix tripwire or the truncation sweep, and never exported by
+   a consumer that maps `columns` (exporter.js) — an export column is a later
+   slice's decision. Found among a file's EXTRA columns, wherever it sits after
+   the known ones, by trimmed case-folded header text — the rule knownColumns
+   applies to the optional tail. Where it is found it stays; the first time a
+   file needs one it is appended after every column the file already has. */
+function headerIndex(col, extraCols) {
+  const want = col.header.toLowerCase();
+  const headers = (extraCols && extraCols.headers) || [];
+  for (let i = 0; i < headers.length; i++) {
+    if (String(headers[i] ?? '').trim().toLowerCase() === want) return i;
+  }
+  return -1;
+}
+
+/* Reads each located column off the rows' extra cells, in place. A blank cell
+   yields no field at all, so a row that has none is the row a file with no such
+   column produces. Called once per file from load.js, after extraColsOf. */
+function attachByHeader(schema, rows, extraCols) {
+  for (const col of schema.byHeader || []) {
+    const at = headerIndex(col, extraCols);
+    if (at < 0) continue;
+    for (const r of rows) Object.assign(r, col.read(r.extraCells ? r.extraCells[at] : undefined));
+  }
+  return rows;
+}
+
+/* The extra columns a save writes: the file's own, plus a located column the
+   rows now use that the file has no header for, appended last. The same object
+   back when nothing is added — the common case, and every byte it was. Never
+   mutates its argument: Add transaction serializes a clone so a failed write
+   leaves the live model alone, and the same holds here. */
+function withByHeaderColumns(schema, extraCols, rows) {
+  let out = extraCols;
+  for (const col of schema.byHeader || []) {
+    if (headerIndex(col, out) >= 0) continue;
+    if (!(rows || []).some(r => String(col.write(r) ?? '').trim() !== '')) continue;
+    const width = col.header.length + 2;
+    out = {
+      ...(out || {}),
+      headers: [...(out ? out.headers : []), col.header],
+      sep: [...(out ? out.sep : []), col.align === 'right' ? '-'.repeat(width - 1) + ':' : '-'.repeat(width)],
+    };
+  }
+  return out;
 }
 
 /* Shared shapes. Each helper pairs a read with the write that reverses it,
@@ -488,6 +562,15 @@ const currency = () => ({
   write: r => escMd(r.currency || ''),
 });
 
+/* The Subcategory column — see headerIndex above. `read` yields NO field for a
+   blank cell, which is what keeps the truncation sweep and every comparison of
+   a loaded row exactly as they were; `write` is the escape pair's other half. */
+const SUBCATEGORY_COLUMN = {
+  key: 'subcategory', header: 'Subcategory', align: 'left',
+  read: c => { const v = unescMd(c || ''); return v === '' ? {} : { subcategory: v }; },
+  write: r => (typeof r.subcategory === 'string' ? escMd(r.subcategory) : ''),
+};
+
 const SCHEMAS = {
   /* Assets.md — every column after Item is additive, so a hand-written file
      with nothing but a name and a value loads. */
@@ -698,6 +781,8 @@ const SCHEMAS = {
         },
       },
     ],
+    /* Located by header, not by position: ADR-0010 §4, headerIndex above. */
+    byHeader: [SUBCATEGORY_COLUMN],
   },
 
   /* Receipts/<YYYY-MM>/<date> <store> <time>.md — one row per product line
@@ -885,4 +970,5 @@ module.exports = {
   SCHEMAS, headerLines, rowLine, rowToObject, mdTableFile, usedColumns, CYCLES,
   attachExtraCells, extraColsOf, headerLinesWithExtras, rowLineWithExtras,
   knownColumns, lineEndingOf, keepsDigits,
+  headerIndex, attachByHeader, withByHeaderColumns,
 };

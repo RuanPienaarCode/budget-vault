@@ -272,10 +272,13 @@
   .budget-app-root .bud-table thead th,
   .budget-app-root .bud-table tbody td { padding-inline: 12px; }
 
-  /* Row buttons live in four slots, left to right: assume spent, fixed, clear,
-     delete. A row that has fewer buttons keeps the ones it has in THEIR slots
-     (income and transfers have no assume/fixed, an unsaved row has no clear),
-     so the delete button is always in the last slot and the column lines up.
+  /* Row buttons live in five slots, left to right: assume spent, fixed, clear,
+     subcategories, delete. A row that has fewer buttons keeps the ones it has in
+     THEIR slots (income and transfers have no assume/fixed, an unsaved row has
+     no clear), so the delete button is always in the last slot and the column
+     lines up. Subcategories and Delete come and go together (both need the
+     category's note), so the gap a missing button leaves is always in front of
+     the subcategories button, never between it and Delete.
      --bud-slot is one button plus its margin. */
   .budget-app-root .bud-table { --bud-slot: 36px; }
   .budget-app-root .bud-table .bud-act {
@@ -292,9 +295,9 @@
   /* The ink, not the fill: see .bud-fixed-on in src/styles.css (2.77:1 -> 5.93:1 in light). */
   .budget-app-root .bud-table .bud-act.bud-fixed-on { color: var(--color-info-ink); }
   .budget-app-root .bud-table .bud-act-delete:hover { color: var(--color-danger-ink); }
-  .budget-app-root .bud-table .bud-act-fixed + .bud-act-delete { margin-left: var(--bud-slot); }
+  .budget-app-root .bud-table .bud-act-fixed + .bud-act-subcats { margin-left: var(--bud-slot); }
   .budget-app-root .bud-table .bud-act-clear:first-child { margin-left: calc(var(--bud-slot) * 2); }
-  .budget-app-root .bud-table .bud-act-delete:first-child { margin-left: calc(var(--bud-slot) * 3); }
+  .budget-app-root .bud-table .bud-act-subcats:first-child { margin-left: calc(var(--bud-slot) * 3); }
 }
 /* A touch screen at tablet width: the buttons are 44px, so the slot is too. */
 @media (min-width: 601px) and (pointer: coarse) {

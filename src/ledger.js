@@ -30,6 +30,7 @@
 const { isSetAsideType } = require('./vocabulary');
 const { roundCents } = require('./amount');
 const { supersededBySplit, isSplitPart } = require('./tx-role');
+const { subcategoryOf } = require('./subcategories');
 
 /* ------------------------------------------------------------------------
    Stamps
@@ -316,6 +317,44 @@ function tally(stamped, lens) {
   };
 }
 
+/* ADR-0010 §2. A category's figure, split by subcategory — and PARTITIONED:
+   for every category, its subcategories plus the rows that have none are the
+   category's own figure, refunds signed, to the cent.
+
+   It takes `kept`, the rows a tally() already settled on, rather than stamping
+   and vetoing again. That is the whole guarantee: the rows behind these figures
+   are the rows behind byCat, chosen once by the lens, so no second reading of
+   "which rows count" can drift from the first. It sums in the same order as
+   tally's byCat and rounds the same way, so `total` IS byCat[category], not a
+   figure that happens to match it.
+
+   Returns { [category]: { total, none, subs: [{ name, amount }] } }, subs sorted
+   by name. `none` is the rows without a subcategory — every row of an
+   uncategorised bucket, which cannot have one (subcategoryOf). Signed like
+   byCat: spending is negative, a refund positive. Nothing reads this but the
+   new surfaces; no figure that existed before moved. */
+function subcategoryTotals(kept) {
+  const raw = Object.create(null);
+  for (const s of kept || []) {
+    const sub = subcategoryOf(s.row);
+    const c = raw[s.cat] || (raw[s.cat] = { total: 0, none: 0, subs: new Map() });
+    c.total += s.amount;
+    if (sub) c.subs.set(sub, (c.subs.get(sub) || 0) + s.amount);
+    else c.none += s.amount;
+  }
+  const cents = v => roundCents(v) || 0;
+  const out = Object.create(null);
+  for (const [cat, c] of Object.entries(raw)) {
+    out[cat] = {
+      total: cents(c.total),
+      none: cents(c.none),
+      subs: [...c.subs].map(([name, amount]) => ({ name, amount: cents(amount) }))
+        .sort((a, b) => a.name.localeCompare(b.name)),
+    };
+  }
+  return out;
+}
+
 /* The rows two lenses disagree about, by name — what a test asserts a
    difference against, and what a page could one day list. */
 function lensDifference(stamped, a, b) {
@@ -328,4 +367,4 @@ function lensDifference(stamped, a, b) {
   return out;
 }
 
-module.exports = { stamp, tally, LENSES, lensDifference, passthroughPairs, keeps, dropsAnyOf, isRefund };
+module.exports = { stamp, tally, subcategoryTotals, LENSES, lensDifference, passthroughPairs, keeps, dropsAnyOf, isRefund };

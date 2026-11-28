@@ -5,6 +5,7 @@
 const { opWriterOf } = require('./io');
 const { el } = require('./dom');
 const { parseFrontmatter, yamlStr } = require('./markdown');
+const { checkSubcategoryName, formatSubcategories, offeredNames, inUseByCategory } = require('./subcategories');
 const { csvCell } = require('./csv');
 const { learnPattern, prepareRules, autoCategorise, matchRule, ruleText } = require('./rules');
 const { safeSeg } = require('./vault-path');
@@ -17,7 +18,7 @@ const { supersededBySplit } = require('./tx-role');
 const i18n = require('./i18n');
 
 module.exports = function registerCategories(ctx) {
-  const { S, app, vault, toast, writeFile, fileAt, pathTaken, mdFilesIn, mdFilesUnder, trashFile } = ctx;
+  const { S, app, vault, toast, writeFile, readFile, fileAt, pathTaken, mdFilesIn, mdFilesUnder, trashFile } = ctx;
 
   /* Bumped whenever the category list changes (create/delete). Selects built
      earlier compare against this on open and rebuild their options if stale —
@@ -179,6 +180,144 @@ module.exports = function registerCategories(ctx) {
       sel.focus();
       // Open the picker straight away so the swap costs no extra interaction on
       // desktop; mobile ignores this and shows the control ready to tap.
+      if (typeof sel.showPicker === 'function') {
+        try { sel.showPicker(); } catch (e) { /* not allowed outside a user gesture */ }
+      }
+    };
+    btn.addEventListener('click', swap);
+    btn.addEventListener('focus', swap);
+    wrap.append(btn);
+    return wrap;
+  }
+
+  /* ---------------------------- subcategories ----------------------------
+     ADR-0010. The names a transaction may carry under a category live on the
+     category's own note, `subcategories:` in its frontmatter — the same
+     comma-list shape `groups:` has in Settings.md — because the list belongs
+     to the category and travels with it. Everything here that writes one goes
+     through saveSubcategories, so the note, the open book and the page agree. */
+
+  /* Every name a category's transactions carry, listed or not, as of right now
+     (a scan of the open book's rows, so a name set a moment ago in an unsaved
+     edit counts). */
+  function subcategoriesInUse(catName) {
+    function* rows() { for (const f of Object.values(S.txFiles || {})) for (const r of f.rows) yield r; }
+    return inUseByCategory(rows()).get(catName) || [];
+  }
+  /* What a dropdown for this category offers: the listed names in the order
+     written, then any a row carries that the list does not. */
+  function subcategoryNamesFor(catName) {
+    const cat = (S.categories || []).find(c => c.name === catName);
+    return offeredNames(cat && cat.subcategories, subcategoriesInUse(catName));
+  }
+
+  /* Write the category's list to its note and into the open book. Resolves true
+     only if the note was written. `names` is the WHOLE list; none removes the
+     key, so a note that never had one never gains an empty one. Only the
+     frontmatter key is patched — the body and every other key stay as they were
+     (io.js patchFile). A failure is said and nothing changes, the page keeps
+     showing what the file says (the rule toggleAssumeSpent follows).
+
+     Nothing here touches a transaction: removing a name from the list stops it
+     being offered and rewrites no row. */
+  async function saveSubcategories(catName, names) {
+    const cat = (S.categories || []).find(c => c.name === catName);
+    if (!cat || !cat.rel) { toast(i18n.t('subcat.err.noFile', { category: catName }), true); return false; }
+    /* `cat` is this load's; the read below is an await, so the patch is bound to
+       the load (io.js opWriter) and cannot land in another book's file of the
+       same name. */
+    const op = opWriterOf(ctx);
+    const text = await readFile(cat.rel);
+    if (text == null) { toast(i18n.t('subcat.err.noFile', { category: catName }), true); return false; }
+    const { raw, body } = parseFrontmatter(text);
+    const value = formatSubcategories(names);
+    try {
+      await op.patchFile(cat.rel, raw, body, { subcategories: value ? yamlStr(value) : null });
+    } catch (e) {
+      toast(i18n.t('subcat.err.save', { category: catName, error: (e && e.message) || e }), true);
+      return false;
+    }
+    cat.subcategories = [...names];
+    return true;
+  }
+
+  /* "＋ New subcategory…": ask for a name, save it to the category note straight
+     away, and hand it back (null when cancelled or not saved). Refused inside
+     the dialog while the reader is still looking at it: blank, a comma, a name
+     already listed. The name goes last, so the order written stays the order
+     offered. */
+  async function promptNewSubcategory(catName) {
+    const cat = (S.categories || []).find(c => c.name === catName);
+    const listed = (cat && cat.subcategories) || [];
+    const r = await askFields(app, i18n.t('tx.subcategory.newTitle', { category: catName }), [
+      { key: 'name', label: i18n.t('bud.subcat.addLabel'), type: 'text', placeholder: i18n.t('bud.subcat.placeholder') },
+    ], {
+      validate: v => {
+        const check = checkSubcategoryName(v.name, listed);
+        return check.error ? { field: 'name', message: i18n.t('subcat.err.' + check.error) } : null;
+      },
+    });
+    if (!r) return null;
+    const check = checkSubcategoryName(r.name, listed);
+    if (check.error) { toast(i18n.t('subcat.err.' + check.error), true); return null; }
+    if (!(await saveSubcategories(catName, [...listed, check.name]))) return null;
+    toast(i18n.t('subcat.added', { name: check.name, category: catName }));
+    return check.name;
+  }
+
+  /* The subcategory dropdown inside a Transactions row's category cell. Deferred
+     like the category control beside it — a button until first use, then a real
+     <select> — for the same reason (categories.js deferredCatSelect: a native
+     select is the priciest control in a mobile WebView, and a page is a hundred
+     rows). It reuses that control's button and select classes, so it takes the
+     same sizing, focus ring and 44px touch target on a phone, and adds only
+     `sub-cell` so the stylesheet can set it on its own line under the category
+     (phone cards show it as a second line in the category cell).
+
+     `current` is the name the row carries; `names()` the offered ones, read when
+     the list OPENS so a name made a moment ago on another row is there. The
+     list ends with "＋ New subcategory…", which asks for a name, saves it to the
+     category note and selects it — and on a cancel or a failed save puts the
+     control back on what the row carries. `onchange(name)` is called with ''
+     for none. */
+  function deferredSubSelect(catName, current, names, onchange, label) {
+    const wrap = el('span', { class: 'sub-cell' });
+    let value = current || '';
+    const aria = () => (!label ? undefined
+      : value ? i18n.t('cat.aria.current', { label, value }) : i18n.t('subcat.aria.currentNone', { label }));
+    const btn = el('button', {
+      type: 'button',
+      class: `cat-cell-btn sub-cell-btn${value ? '' : ' cat-cell-empty'}`,
+      'aria-label': aria(),
+    }, value || i18n.t('tx.field.none'));
+    let swapped = false;
+    const swap = () => {
+      if (swapped) return;          // click also focuses; swap exactly once
+      swapped = true;
+      const sel = el('select', { class: 'category-select sub-select', ...(label ? { 'aria-label': label } : {}) });
+      const fill = () => {
+        sel.empty();
+        sel.append(el('option', { value: '' }, i18n.t('tx.field.none')));
+        const offered = names();
+        /* The row's own name is always among them, so the select can show it
+           even if it was dropped from the list a moment ago. */
+        for (const n of value && !offered.includes(value) ? [...offered, value] : offered) sel.append(el('option', { value: n }, n));
+        sel.append(el('option', { value: '__new__' }, i18n.t('tx.subcategory.new')));
+        sel.value = value;
+      };
+      fill();
+      sel.addEventListener('change', async () => {
+        if (sel.value === '__new__') {
+          const made = await promptNewSubcategory(catName);
+          if (made) { value = made; fill(); onchange(made); }
+          else sel.value = value;
+          return;
+        }
+        value = sel.value;
+        onchange(value);
+      });
+      wrap.replaceChildren(sel);
+      sel.focus();
       if (typeof sel.showPicker === 'function') {
         try { sel.showPicker(); } catch (e) { /* not allowed outside a user gesture */ }
       }
@@ -617,5 +756,6 @@ module.exports = function registerCategories(ctx) {
   }
 
   ctx.provide({ fillCatOptions, promptCreateCategory, promptDeleteCategory, lazyCatSelect, deferredCatSelect,
+    saveSubcategories, promptNewSubcategory, deferredSubSelect, subcategoryNamesFor, subcategoriesInUse,
     learnRules, learnRulesWithCorrections, governingRule, correctRule, correctRules, cleanupRules });
 };

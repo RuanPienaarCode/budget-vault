@@ -1392,7 +1392,7 @@ function mountApp(view) {
   // views/report.js's header for why the brief moved it off a modal.
   $('#txReport').addEventListener('click', () => ctx.switchView('report'));
   $('#txDeleteFiltered').addEventListener('click', ctx.deleteFilteredTransactions);
-  for (const id of ['txAccount', 'txCategory', 'txWholeHistory']) $('#' + id).addEventListener('change', ctx.renderTransactions);
+  for (const id of ['txAccount', 'txCategory', 'txSubcategory', 'txWholeHistory']) $('#' + id).addEventListener('change', ctx.renderTransactions);
   $('#txSearch').addEventListener('input', () => { clearTimeout(S._q); S._q = setTimeout(ctx.renderTransactions, 200); });
   $('#budSave').addEventListener('click', ctx.saveBudget);
   $('#budCopyPrev').addEventListener('click', ctx.copyPreviousBudget);

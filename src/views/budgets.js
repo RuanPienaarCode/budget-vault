@@ -16,7 +16,7 @@ const { serializeBudgetFile, budgetFileRows, budgetRangeNote, carriedFrontmatter
 const { typeOrder, typeRank } = require('../groups');
 /* The one parser for a hand-typed money cell — see the amount input below. */
 const { normalizeAmount } = require('../amount');
-const { askBudgetReslice, confirmModal } = require('../modal');
+const { askBudgetReslice, askSubcategories, confirmModal } = require('../modal');
 const { inferIntervalFromKeys, resliceBudget } = require('../reslice');
 const { ISO_DATE, isoDayNumber } = require('../dates');
 const { sharePercentLabel } = require('../share-percents');
@@ -1085,6 +1085,18 @@ module.exports = function registerBudgets(ctx) {
                a reader is most likely to try it on. The smaller of the two
                honest options: Clear (above) is what takes such a row out of
                this period's budget, and it needs no new words or look. */
+            /* ADR-0010 — the category's Subcategories dialog, beside Delete: the
+               names a transaction may carry under it. On EVERY category with a
+               note, whatever its type (income and transfer may have them too),
+               and whether or not the book uses subcategories yet: this dialog is
+               how the first one is made, the one control that exists before any
+               dropdown does. `list-tree` is in Obsidian's bundled lucide set
+               (read out of obsidian.asar's app.js, not lucide.dev, which lags
+               it), with `list` and `layers` behind it. */
+            !S.categories.some(c => c.name === d.category) ? '' : el('button', { class: 'btn-ghost btn-ghost-sm bud-act bud-act-subcats', type: 'button',
+              'aria-label': i18n.t('bud.aria.subcats', { category: d.category }), title: i18n.t('bud.title.subcats'), 'data-focus-key': `subs:${cat}`,
+              onclick: async () => { await openSubcategories(d.category); refocus(t, `subs:${cat}`); },
+            }, icoEl(['list-tree', 'list', 'layers'])),
             !S.categories.some(c => c.name === d.category) ? '' : el('button', { class: 'btn-ghost btn-ghost-sm bud-act bud-act-delete', 'aria-label': i18n.t('bud.aria.delete', { category: d.category }), title: i18n.t('bud.title.delete'), 'data-focus-key': `del:${cat}`, onclick: async () => {
               if (await promptDeleteCategory(d.category)) {
                 const draft = budgetDraft();
@@ -1226,6 +1238,23 @@ module.exports = function registerBudgets(ctx) {
   /* The parts of a period file's shape load.js recorded beside its rows. */
   function budgetFileShape(meta) {
     return { order: (meta && meta.order) || null, unnamed: (meta && meta.unnamed) || [], extraCols: (meta && meta.extraCols) || null };
+  }
+
+  /* The Subcategories dialog for one category (ADR-0010). The dialog saves each
+     add and remove to the category's note as it happens (saveSubcategories),
+     so nothing here waits for the page's Save and nothing is left unsaved when
+     it closes. It touches no transaction: removing a name only stops it being
+     offered. `inUse` is every name the category's transactions carry, so the
+     dialog can say which of them are not on the list. */
+  async function openSubcategories(name) {
+    const cat = S.categories.find(c => c.name === name);
+    if (!cat) return;
+    await askSubcategories(app, {
+      category: name,
+      names: [...(cat.subcategories || [])],
+      inUse: ctx.subcategoriesInUse(name),
+      save: names => ctx.saveSubcategories(name, names),
+    });
   }
 
   /* Flip a category's assume-spent flag and persist it to its own note.

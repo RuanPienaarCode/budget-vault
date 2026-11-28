@@ -4455,6 +4455,14 @@ body.is-phone .budget-app-root .drawer-book:not(.hidden) { display: block; }
 }
 .budget-app-root .cat-cell-empty { color: var(--text-light); font-style: italic; }
 .budget-app-root .cat-cell .category-select { width: 100%; }
+/* Subcategory (ADR-0010): the second control in a Transactions row's category
+   cell, on a line of its own under the category. It is the category control's
+   own button and select classes (so it takes their sizing, focus ring and 44px
+   touch target), plus these two, which only stack it and make the select fill
+   the cell as the category's does. Present only on a row whose category has
+   subcategories, and only in a book that uses them. */
+.budget-app-root .sub-cell { display: block; min-width: 130px; }
+.budget-app-root .sub-cell .sub-select { width: 100%; }
 
 /* ============================================================
    PRIVACY SPLASH GATE

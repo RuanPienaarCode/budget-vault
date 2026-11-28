@@ -38,7 +38,7 @@ If it can be pure, it is: no DOM, no `require('obsidian')`, `today` injected
 rather than read off the clock — so it runs in bare node under a guard test.
 Existing ones: `dates` `amount` `markdown` `csv` `debt-math` `loan-math`
 `savings-math` `owed-math` `reconcile` `recurring` `worth` `dedupe` `tx-role`
-`misfiled` `render-pass`.
+`misfiled` `render-pass` `subcategories`.
 
 **Nothing derived is kept across a moment the reader could have edited in.** A
 figure must move on an edit that never reloads (an unsaved row, an account
@@ -95,7 +95,10 @@ because the page embeds real balances and rows.
 `Date | Description | Category | Amount | Excluded | Note | Split`.
 Appending is safe (a short row yields `undefined`); inserting or reordering
 shifts every later value into the wrong field. `Debts.md`'s twelve positional
-columns are the cautionary tale.
+columns are the cautionary tale. The ONE exception is `Subcategory`
+(ADR-0010 §4): it is declared in `byHeader`, beside `columns` and not in them,
+and is found by its header among a file's extra columns — never by position,
+because `Split` is optional.
 
 **`excluded` means "out of the budget totals", not "ignore this row".** The money
 still moved, so everything measuring the *account* rather than the budget
