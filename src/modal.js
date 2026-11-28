@@ -9,6 +9,7 @@ const { normalizeAmount } = require('./amount');
 const i18n = require('./i18n');
 const { amountCents } = require('./tx-role');
 const { checkSubcategoryName } = require('./subcategories');
+const { CREATE_OPTION, CREATE_KEY } = require('./add-create');
 
 /* Does Enter, pressed with focus on `target`, mean "I am done with this form"?
 
@@ -180,6 +181,27 @@ class FieldModal extends Modal {
     this.followers = {};
     this.errEl = null;
     this.badKey = null;
+    // The key of the field whose create entry was picked (see pickCreate).
+    this.createKey = null;
+  }
+  /* A select field's `create: { label }` entry was picked (issue #189): the
+     reader wants something that does not exist yet, and making it is the
+     caller's job, not the form's. The dialog LEAVES -- it closes and resolves
+     the values as typed plus CREATE_KEY naming this field (src/add-create.js) --
+     so the caller can run the existing creation dialog on its own and reopen
+     this form pre-filled. Nothing is stacked, and nothing is validated: an
+     unfinished form is a fine thing to leave behind, and refusing it would
+     trap the reader in a dialog whose way out is the entry they just picked.
+
+     The control is put back on what it held before the dialog closes, so the
+     entry is never what the form says was chosen (a screen reader would
+     otherwise read it out as the answer) and the values handed back are the
+     ones on screen. */
+  pickCreate(key, restore) {
+    if (this.createKey !== null) return;
+    restore();
+    this.createKey = key;
+    this.close();
   }
   /* Called from every control's change handler. The message is about a value
      the reader is now changing, so it goes — rather than sitting red over a
@@ -296,13 +318,23 @@ class FieldModal extends Modal {
             const opts = offered();
             d.selectEl.empty();
             for (const o of opts) d.addOption(o.value, o.label);
-            d.selectEl.disabled = opts.length <= 1;
+            /* The create entry, only while the followed field has a value: there
+               is nothing to create a subcategory UNDER until a category is
+               chosen. And it alone keeps the control enabled -- a category with
+               no subcategories yet offers only "none", which used to disable the
+               dropdown, and the entry is how the first one gets made. */
+            const creatable = !!f.create && !!this.values[f.follows];
+            if (creatable) d.addOption(CREATE_OPTION, f.create.label);
+            d.selectEl.disabled = opts.length <= 1 && !creatable;
           };
           fill();
           d.setValue(this.values[f.key]);
           nameControl(d.selectEl, f.label, [ids.name], [ids.desc]);
           this.controls[f.key] = d.selectEl;
-          d.onChange(v => { this.values[f.key] = v; this.touched(f.key); });
+          d.onChange(v => {
+            if (v === CREATE_OPTION) { this.pickCreate(f.key, () => d.setValue(this.values[f.key])); return; }
+            this.values[f.key] = v; this.touched(f.key);
+          });
           (this.followers[f.follows] = this.followers[f.follows] || []).push(() => {
             this.values[f.key] = '';
             fill();
@@ -313,10 +345,12 @@ class FieldModal extends Modal {
         this.values[f.key] = f.value ?? f.options[0];
         s.addDropdown(d => {
           for (const o of f.options) d.addOption(o.value ?? o, o.label ?? o);
+          if (f.create) d.addOption(CREATE_OPTION, f.create.label);
           d.setValue(this.values[f.key]);
           nameControl(d.selectEl, f.label, [ids.name], [ids.desc]);
           this.controls[f.key] = d.selectEl;
           d.onChange(v => {
+            if (v === CREATE_OPTION) { this.pickCreate(f.key, () => d.setValue(this.values[f.key])); return; }
             this.values[f.key] = v;
             for (const follow of this.followers[f.key] || []) follow();
             this.touched(f.key);
@@ -370,11 +404,18 @@ class FieldModal extends Modal {
   }
   onClose() {
     this.contentEl.empty();
-    this.resolve(this.submitted ? this.values : null);
+    this.resolve(this.submitted ? this.values
+      : this.createKey !== null ? { ...cloneValues(this.values), [CREATE_KEY]: this.createKey }
+        : null);
   }
 }
 
-/* `opts.validate(values)` — see "a form that says what is wrong" above. */
+/* A select field may carry `create: { label }`: the dropdown then ends in that
+   entry, and picking it closes the form and resolves its values with the key of
+   the field (pickCreate, above; src/add-create.js). A form that has no such
+   field resolves exactly as it always did.
+
+   `opts.validate(values)` — see "a form that says what is wrong" above. */
 function askFields(app, title, fields, opts) {
   return new Promise(res => new FieldModal(app, title, fields, res, opts).open());
 }
