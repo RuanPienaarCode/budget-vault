@@ -4483,7 +4483,27 @@ body.is-phone .budget-app-root .drawer-book:not(.hidden) { display: block; }
    edges: the transforms move them by a few percent, and a layer sized to the
    box exactly would swing a hard edge into view. Animating `transform` only
    (never background-position or the gradient stops) keeps this on the
-   compositor — it costs nothing on a phone and can't repaint the text above. */
+   compositor — it costs nothing on a phone and can't repaint the text above.
+
+   EACH LAYER DRIFTS ONCE (out and back) AND THEN STAYS AT REST — never
+   `infinite` (issue #194). The gate exists, un-entered, for as long as the
+   reader leaves the Budget view alone, and an infinite animation there keeps
+   the window repainting for that whole time: the reporter measured a Linux
+   desktop going from 7.4 W to 17.1 W and the GPU from 0% to 80% with the gate
+   merely sitting in a pane, and 7.07 W again with the animation off. Pausing it
+   while the view is hidden was considered and rejected: Obsidian (1.15 app.js)
+   DETACHES a background tab's content (the tab group swaps its one visible
+   container in place) and a display:none gate runs no animation either, so
+   those cases cost nothing already; what is left is a gate that IS attached
+   and rendered but that nobody is watching, and for that (a window covered by
+   another, on another workspace, or simply ignored) the page has no signal at
+   all —
+   document.visibilityState stays "visible" on Linux compositors that do not
+   report occlusion. A bound on the run is the only fix that does not depend on
+   such a signal, needs no listener to unregister, and cannot be left running by
+   a missed event. 0% and 100% of both keyframes are the same pose and `forwards`
+   holds the last frame, so the layer settles without a snap; a new lock shows
+   the gate again (display:none to flex) and starts a fresh pass. */
 .budget-app-root .splash-gate::before,
 .budget-app-root .splash-gate::after {
   content: "";
@@ -4496,13 +4516,13 @@ body.is-phone .budget-app-root .drawer-book:not(.hidden) { display: block; }
   background-image:
     radial-gradient(38% 42% at 22% 26%, rgba(var(--glow-accent-rgb),.30), transparent 62%),
     radial-gradient(42% 40% at 78% 22%, rgba(var(--glow-primary-rgb),.26), transparent 60%);
-  animation: bud-splash-drift-a 26s ease-in-out infinite;
+  animation: bud-splash-drift-a 26s ease-in-out 1 forwards;
 }
 .budget-app-root .splash-gate::after {
   background-image:
     radial-gradient(40% 38% at 68% 74%, rgba(var(--glow-deep-rgb),.24), transparent 62%),
     radial-gradient(34% 34% at 26% 80%, rgba(var(--glow-gold-rgb),.16), transparent 62%);
-  animation: bud-splash-drift-b 34s ease-in-out infinite;
+  animation: bud-splash-drift-b 34s ease-in-out 1 forwards;
 }
 /* Light mode carries the same hues at lower strength — the tints are mixed
    against white there, so the dark-mode opacities read as muddy wash. */
