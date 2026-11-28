@@ -3212,6 +3212,35 @@ body.is-phone .budget-app-root .drawer-book:not(.hidden) { display: block; }
    file, where the parity guard can see them — not inline. */
 .budget-app-root .donut-legend .dl-link:focus-visible,
 .budget-app-root .donut-legend .dl-note:focus-visible { outline: 2px solid var(--color-primary); outline-offset: 2px; border-radius: 6px; }
+/* A category expanded into its subcategories (issue #186). The row is still one
+   <li>; the list is a second flex line inside it, so the category's own border
+   closes the whole group. Rows are buttons for the same reason .dl-link is: the
+   whole row is the tap target. Their classes are their own (dl-sub-*), never
+   .dl-name or .dl-val, which the legend's readers use to find a category's
+   figures. The chevron sits in the name's flexing column, so the figures to its
+   right stay aligned with the rows that have none. */
+.budget-app-root .donut-legend li.dl-has-subs { flex-wrap: wrap; }
+.budget-app-root .donut-legend .dl-subs { list-style: none; margin: 0 0 6px; padding: 0; flex: 0 0 100%; min-width: 0; }
+.budget-app-root .donut-legend .dl-subs li { padding: 0; border-bottom: 0; gap: 0; }
+.budget-app-root .donut-legend .dl-sub {
+  display: flex; align-items: center; gap: 10px;
+  width: 100%; min-width: 0;
+  font: inherit; font-size: 13px; color: inherit; text-align: left;
+  background: none; border: 0; margin: 0; padding: 6px 34px 6px 20px;
+  cursor: pointer; border-radius: 6px;
+}
+.budget-app-root .donut-legend .dl-sub-name { flex: 1; min-width: 0; overflow-wrap: break-word; color: var(--text-primary); }
+.budget-app-root .donut-legend .dl-sub-val { flex: none; color: var(--text-muted); white-space: nowrap; font-variant-numeric: tabular-nums lining-nums; }
+/* The action row is a link in all but element: quieter than the parts, so it is
+   not read as one more of them. */
+.budget-app-root .donut-legend .dl-sub-all .dl-sub-name { color: var(--text-muted); font-weight: 500; }
+.budget-app-root .donut-legend .dl-chev { flex: none; display: inline-flex; align-items: center; color: var(--ink-faint); }
+.budget-app-root .donut-legend .dl-chev svg { width: 14px; height: 14px; }
+.budget-app-root .donut-legend .dl-expand[aria-expanded="true"] .dl-chev { transform: rotate(90deg); }
+@media (hover: hover) {
+  .budget-app-root .donut-legend .dl-sub:hover .dl-sub-name { color: var(--color-primary); }
+}
+.budget-app-root .donut-legend .dl-sub:focus-visible { outline: 2px solid var(--color-primary); outline-offset: 2px; border-radius: 6px; }
 /* Wedges drill through too. Pointer only — they are inside a role="img" svg,
    so the legend buttons are the keyboard and screen-reader path. */
 .budget-app-root svg.donut .donut-slice { cursor: pointer; }
@@ -4234,6 +4263,7 @@ body.is-phone .budget-app-root .drawer-book:not(.hidden) { display: block; }
   .budget-app-root .acct-recon-btn,
   .budget-app-root .kpi-caveat-btn,
   .budget-app-root .donut-legend .dl-link,
+  .budget-app-root .donut-legend .dl-sub,
   .budget-app-root .note-title { min-height: 44px; }
   /* .cat-cell-btn grows too, but its rule lives beside its base rule below:
      that base rule also sets min-height, and at equal specificity the later
@@ -4374,6 +4404,7 @@ body.is-phone .budget-app-root .drawer-book:not(.hidden) { display: block; }
   .budget-app-root .import-help summary:focus { outline: 2px solid var(--text-muted); outline-offset: 2px; border-radius: 4px; }
   .budget-app-root .cat-cell-btn:focus { outline: 2px solid var(--color-accent); outline-offset: 1px; }
   .budget-app-root .donut-legend .dl-link:focus,
+  .budget-app-root .donut-legend .dl-sub:focus,
   .budget-app-root .donut-legend .dl-note:focus { outline: 2px solid var(--color-primary); outline-offset: 2px; border-radius: 6px; }
 
   /* Plan. Seven controls, and the slider matters most of the three kinds here:

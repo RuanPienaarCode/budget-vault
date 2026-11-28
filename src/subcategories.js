@@ -16,7 +16,9 @@
        that the list does not, because the plugin never hides what a file says;
      - whether the open book uses them at all, which is what keeps every control
        out of sight for the household that never wants them;
-     - the filter's one sentinel.
+     - the filter's one sentinel;
+     - the rows a Dashboard category expands into, and the whole-unit figures
+       printed beside them.
 
    Names match by exact text, as category names do. There is no rename: a
    category has none either, and a rename is a rewrite of many month files in one
@@ -26,6 +28,8 @@
    can (checkSubcategoryName refuses one, and the list is comma-separated), so it
    can never be mistaken for a name the reader has used. */
 const NO_SUBCATEGORY = '__no,subcategory__';
+
+const { largestRemainder } = require('./share-percents');
 
 const QUOTE_PAIRS = [['"', '"'], ["'", "'"]];
 
@@ -175,8 +179,52 @@ function matchesSubcategory(row, filter) {
   return filter === NO_SUBCATEGORY ? sub === '' : sub === filter;
 }
 
+/* The rows a Dashboard category expands into (issue #186). `entry` is one value
+   of ledger.subcategoryTotals(): the category's own figure split by subcategory,
+   in byCat's sign. Taken from the ledger rather than recounted here, so the rows
+   are the rows behind the category's printed figure, chosen once by the lens —
+   and they add up to it, the ADR-0010 section 2 partition.
+
+   Null unless at least one KEPT row carries a subcategory: a category whose only
+   labelled rows are excluded, or sit in an account the budget holds out, is not
+   expanded, because the figure being explained does not contain them. Such a
+   category behaves exactly as it did before.
+
+   Rows come back in the legend's own sign (money out positive) and order
+   (biggest first, a tie by name so the order is the same on every render), with
+   the rows that have none last: they are the remainder, not a part the reader
+   chose. A subcategory that nets to nothing is still a row, because it has rows;
+   the "none" row is shown only when what is left nets to something, since the
+   ledger keeps no count to say otherwise. A refund-heavy subcategory is a
+   negative amount, signed in rather than dropped. Never throws. */
+function breakdownOf(entry) {
+  if (!entry || typeof entry !== 'object' || !Array.isArray(entry.subs) || !entry.subs.length) return null;
+  const spend = v => (v ? -v : 0);               // -0 would print as a sign
+  const subs = entry.subs
+    .filter(s => s && typeof s.name === 'string' && s.name)
+    .map(s => ({ kind: 'sub', name: s.name, amount: spend(s.amount) }))
+    .sort((a, b) => b.amount - a.amount || a.name.localeCompare(b.name));
+  if (!subs.length) return null;
+  const none = spend(entry.none);
+  if (none) subs.push({ kind: 'none', name: '', amount: none });
+  return subs;
+}
+
+/* The whole-unit figures printed beside those rows, so the rows add up to the
+   category's own printed figure AS PRINTED. Each amount rounded alone can miss
+   the category by a unit, and the reader adding the rows up would find a figure
+   the legend never claimed — the trap the legend's own money column closes the
+   same way (dashboard.js, rowMoney). `printed` is that column's value for the
+   category, which is itself an allocation and not necessarily round(x); the
+   parts are distributed to it by largest remainder, so each stays within a unit
+   of its own amount and the sum is exact. Input untouched; same order. */
+function printedRows(rows, printed) {
+  const shown = largestRemainder(rows.map(r => r.amount), printed);
+  return rows.map((r, i) => ({ ...r, shown: shown[i] || 0 }));
+}
+
 module.exports = {
   NO_SUBCATEGORY, parseSubcategories, formatSubcategories, checkSubcategoryName,
   subcategoryOf, setRowCategory, setRuleCategory, inUseByCategory, offeredNames, bookUsesSubcategories,
-  matchesSubcategory,
+  matchesSubcategory, breakdownOf, printedRows,
 };

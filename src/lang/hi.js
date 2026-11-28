@@ -1301,6 +1301,12 @@ module.exports = {
   'dash.split.aria': '{month} का ख़र्च बँटवारा: ',
   'dash.split.sliceAria': '{cat}: {amount}, ख़र्च का {pct}% — लेन-देन दिखाएँ',
   'dash.split.noteAria': '{cat} श्रेणी का नोट खोलें',
+  'dash.split.expandAria': '{cat}: {amount}, ख़र्च का {pct}% — उप-श्रेणियाँ दिखाएँ',
+  'dash.split.subsAria': '{cat} की उप-श्रेणियाँ',
+  'dash.split.subAria': '{cat}, {sub}: {amount} — लेन-देन दिखाएँ',
+  'dash.split.subNoneAria': '{cat}, कोई उप-श्रेणी नहीं: {amount} — लेन-देन दिखाएँ',
+  'dash.split.subAllAria': '{cat} के सभी लेन-देन दिखाएँ',
+  'dash.split.subAll': 'सभी लेन-देन',
   'dash.split.noteMissing': '"{cat}" के लिए कोई श्रेणी नोट नहीं मिला',
   'dash.split.centerLabel': 'श्रेणीबद्ध ख़र्च',
 

@@ -53,10 +53,11 @@ const { remainingText, typeGroupLabel } = require('./budgets');
 /* `keeps`/`dropsAnyOf` are the lens row tests — ledger()/LENSES come off ctx (period.js
    provides them), but the predicate itself is a pure module export. */
 const { keeps, dropsAnyOf, isRefund } = require('../ledger');
+const { printedRows, NO_SUBCATEGORY } = require('../subcategories');
 const { poolAccounts } = require('../vocabulary');
 
 module.exports = function registerDashboard(ctx) {
-  const { S, $, app, root, plugin, money, toast, fileAt, periodSummary, budgetTotals, budgetUsed, budgetVsActualRows, categorySpendRows, categoryGap, planFigures, bookFigures, periodTitle, periodMonthName, periodShortLabel, dayLabel, dateText, periodRange, shiftPeriod, currentPeriod, txInPeriod, catType, catAssumeSpent, movedToFunds, accountForLabel, periodsForMonths, trendPeriods, historySpan, elapsedDays, periodSpend, compareTotals, healthSnapshot, locale, ledger, LENSES, periodFigures } = ctx;
+  const { S, $, app, root, plugin, money, toast, fileAt, periodSummary, budgetTotals, budgetUsed, budgetVsActualRows, categorySpendRows, categorySplitBreakdowns, categoryGap, planFigures, bookFigures, periodTitle, periodMonthName, periodShortLabel, dayLabel, dateText, periodRange, shiftPeriod, currentPeriod, txInPeriod, catType, catAssumeSpent, movedToFunds, accountForLabel, periodsForMonths, trendPeriods, historySpan, elapsedDays, periodSpend, compareTotals, healthSnapshot, locale, ledger, LENSES, periodFigures } = ctx;
 
   /* Arrival motion — figures count up and glow in their own colour, motes
      float up through the score tile, the bars grow and spark. Decoration over text that is
@@ -2587,6 +2588,13 @@ module.exports = function registerDashboard(ctx) {
      second ranked list: the table below already ranks categories against their
      budgets, and what that cannot show is proportion of the whole. */
   const SPLIT_SLICES = 8;
+  /* Which categories of "Where it went" are expanded into their subcategories
+     (ADR-0010, issue #186). NOT remembered: it is emptied on arriving at the
+     Dashboard (see replayDashMotion in the provide below), so a visit starts
+     collapsed. It does survive a re-render in place — a range pill, a theme
+     flip, a vault change — which would otherwise shut the row under the reader's
+     finger. A name with no expansion in the new render is simply not open. */
+  const splitOpen = new Set();
 
   function catColor(name) {
     return S.categories.find(c => c.name === name)?.color || '#888';
@@ -2877,6 +2885,13 @@ module.exports = function registerDashboard(ctx) {
        Math.round(total) — the contract largestRemainder's other two callers
        (money-flow.js, health-math.js) already rely on. */
     const rowMoney = largestRemainder(shown.map(x => x.amount), Math.round(total));
+    /* What each category is made of, where it has subcategorised spending in
+       the window (figures.js). A category absent from here is not expandable,
+       and everything about its row is as it was before subcategories existed. */
+    const breakdowns = categorySplitBreakdowns(S.period);
+    /* cat -> its legend row's toggle, filled as the legend is built below, so
+       the wedge (drawn first) can reach the row it stands for. */
+    const expanders = new Map();
 
     const W = 320, H = 320, cx = W / 2, cy = H / 2, rOut = 140, rIn = 88;
     const { svg, add } = createChart({
@@ -2899,7 +2914,12 @@ module.exports = function registerDashboard(ctx) {
          be a tab stop no screen reader can announce. The legend below carries
          the same two actions as real buttons — that is the keyboard and AT
          path, and the wedge is the convenience one for a mouse or thumb. */
-      if (!x.other) seg.addEventListener('click', () => openCategory(x.cat));
+      /* A category that expands is opened by its wedge, not navigated to: the
+         wedge does what its legend row's own click does. */
+      if (!x.other) seg.addEventListener('click', () => {
+        const row = expanders.get(x.cat);
+        if (row) row.toggle(); else openCategory(x.cat);
+      });
       a += sweep;
     });
 
@@ -2965,24 +2985,79 @@ module.exports = function registerDashboard(ctx) {
       /* "Other" is a bucket of categories, so neither action has a single
          target to point at — it stays an inert row. */
       if (x.other) { legend.append(el('li', {}, face())); return; }
-      legend.append(el('li', {},
-        /* aria-label rather than the row's own text: read as-is a screen
-           reader gets "Groceries 4 200 32", three unlabelled fragments. */
-        el('button', {
-          type: 'button', class: 'dl-link',
-          'aria-label': i18n.t('dash.split.sliceAria', { cat: x.cat, amount: money(x.amount), pct }),
-          onclick: () => openCategory(x.cat),
-        }, face()),
-        el('button', {
-          type: 'button', class: 'dl-note',
-          'aria-label': i18n.t('dash.split.noteAria', { cat: x.cat }),
-          title: i18n.t('dash.split.noteAria', { cat: x.cat }),
-          onclick: () => openCategoryFile(x.cat),
-          /* An ARRAY, not the 'a|b' string the shell's data-ico attributes
-             use — icoEl walks a list, and only controller.js splits on the
-             pipe. Passed as a string the whole thing is treated as one icon
-             name, setIcon silently draws nothing, and the button ships empty. */
-        }, icoEl(['file-text', 'file']))));
+      const noteBtn = () => el('button', {
+        type: 'button', class: 'dl-note',
+        'aria-label': i18n.t('dash.split.noteAria', { cat: x.cat }),
+        title: i18n.t('dash.split.noteAria', { cat: x.cat }),
+        onclick: () => openCategoryFile(x.cat),
+        /* An ARRAY, not the 'a|b' string the shell's data-ico attributes
+           use — icoEl walks a list, and only controller.js splits on the
+           pipe. Passed as a string the whole thing is treated as one icon
+           name, setIcon silently draws nothing, and the button ships empty. */
+      }, icoEl(['file-text', 'file']));
+
+      const parts = breakdowns[x.cat] ? printedRows(breakdowns[x.cat], rowMoney[i]) : null;
+      if (!parts) {
+        legend.append(el('li', {},
+          /* aria-label rather than the row's own text: read as-is a screen
+             reader gets "Groceries 4 200 32", three unlabelled fragments. */
+          el('button', {
+            type: 'button', class: 'dl-link',
+            'aria-label': i18n.t('dash.split.sliceAria', { cat: x.cat, amount: money(x.amount), pct }),
+            onclick: () => openCategory(x.cat),
+          }, face()),
+          noteBtn()));
+        return;
+      }
+
+      /* A category with subcategorised spending: the row opens in place instead
+         of leaving the page, and "All transactions" inside it is the click it
+         used to be. Built in place and toggled in place — never by re-rendering
+         the card — so the reader's focus is still on the button they pressed.
+         The rows are in the tree while closed but display:none, which takes them
+         out of the tab order and the accessibility tree until they are wanted.
+
+         The amounts are the legend's whole-unit allocation carried one level
+         down (printedRows), so the rows the reader adds up are the figure on the
+         row above. "All transactions" prints no figure: it is the action, and a
+         total under its own parts reads as one more part to add. */
+      const listId = `dash-split-subs-${i}`;
+      const setOpen = on => {
+        if (on) splitOpen.add(x.cat); else splitOpen.delete(x.cat);
+        main.setAttribute('aria-expanded', on ? 'true' : 'false');
+        list.classList.toggle('hidden', !on);
+      };
+      /* The chevron sits between the name and the figures, in the one column
+         that flexes, so the rows around it keep their figures aligned. */
+      const faceParts = face();
+      faceParts.splice(2, 0, icoEl(['chevron-right'], 'dl-chev'));
+      const open0 = splitOpen.has(x.cat);
+      const main = el('button', {
+        type: 'button', class: 'dl-link dl-expand',
+        'aria-expanded': open0 ? 'true' : 'false', 'aria-controls': listId,
+        'aria-label': i18n.t('dash.split.expandAria', { cat: x.cat, amount: money(x.amount), pct }),
+        onclick: () => setOpen(!splitOpen.has(x.cat)),
+      }, faceParts);
+      const list = el('ul', {
+        class: `dl-subs${open0 ? '' : ' hidden'}`, id: listId,
+        'aria-label': i18n.t('dash.split.subsAria', { cat: x.cat }),
+      },
+      parts.map(r => el('li', {}, el('button', {
+        type: 'button', class: 'dl-sub',
+        'aria-label': r.kind === 'none'
+          ? i18n.t('dash.split.subNoneAria', { cat: x.cat, amount: money(r.amount) })
+          : i18n.t('dash.split.subAria', { cat: x.cat, sub: r.name, amount: money(r.amount) }),
+        onclick: () => openCategory(x.cat, r.kind === 'none' ? NO_SUBCATEGORY : r.name),
+      },
+      el('span', { class: 'dl-sub-name' }, r.kind === 'none' ? i18n.t('tx.noSubcategory') : r.name),
+      el('span', { class: 'dl-sub-val num' }, money(r.shown, 0))))),
+      el('li', {}, el('button', {
+        type: 'button', class: 'dl-sub dl-sub-all',
+        'aria-label': i18n.t('dash.split.subAllAria', { cat: x.cat }),
+        onclick: () => openCategory(x.cat),
+      }, el('span', { class: 'dl-sub-name' }, i18n.t('dash.split.subAll')))));
+      expanders.set(x.cat, { toggle: () => setOpen(!splitOpen.has(x.cat)) });
+      legend.append(el('li', { class: 'dl-has-subs' }, main, noteBtn(), list));
     });
     wrap.append(svg, legend);
 
@@ -3019,7 +3094,7 @@ module.exports = function registerDashboard(ctx) {
      them back. Excluded rows are NOT hidden: they are held out of the figure
      too, but "still listed everywhere transactions are shown" (CONTEXT.md), so
      the reader can see the ones they vetoed. */
-  function openCategory(cat) {
+  function openCategory(cat, sub) {
     ctx.switchView('transactions');
     const sel = $('#txCategory');
     /* Always assigned. A name with no <option> used to leave the select at
@@ -3035,8 +3110,23 @@ module.exports = function registerDashboard(ctx) {
     $('#txAccount').value = '';
     $('#txSearch').value = '';
     $('#txWholeHistory').checked = false;
+    /* The subcategory filter is cleared for the same reason, and for one more:
+       "Fuel" left over from a visit to Car is still on offer under Car, so
+       nothing would drop it, and "All transactions" would land on a third of the
+       category it just printed the whole of (ADR-0010 section 6). */
+    const subSel = $('#txSubcategory');
+    if (subSel) subSel.value = '';
     if (typeof ctx.setTxInBudgetOnly === 'function') ctx.setTxInBudgetOnly(known ? cat : null);
     ctx.renderTransactions();
+    /* A subcategory can only be chosen once the select offers it, and what it
+       offers follows the category: the render above has just rebuilt it for
+       `cat`. So the second render is not a repeat — it is the one that applies
+       the choice. NO_SUBCATEGORY is always offered; a name is on the list
+       because a kept row carries it. */
+    if (sub && known && subSel) {
+      subSel.value = sub;
+      if (subSel.value === sub) ctx.renderTransactions();
+    }
   }
   /* The "Missing categories" tile: category names on rows that no category file
      answers to. Selects the Transactions page's own option for them - the same
@@ -3090,7 +3180,13 @@ module.exports = function registerDashboard(ctx) {
      views/report.js is the obvious candidate and does not need it today —
      its Net Worth section is built from worth(), which reads stated balances
      and never calls reconcile(). */
-  ctx.provide({ renderDashboard, renderTrend: guardedTrend, renderSplit: guardedSplit, unreadableNote, replayDashMotion: motion.replay });
+  /* controller.js calls replayDashMotion() on arriving at the Dashboard and on
+     no other occasion, which makes it the one signal for "a new visit" — the
+     moment the expansion in "Where it went" is let go of (issue #186: not
+     remembered). Wrapped here rather than given a second hook in the
+     controller, so the controller does not learn what the Dashboard keeps. */
+  const replayDashMotion = () => { splitOpen.clear(); motion.replay(); };
+  ctx.provide({ renderDashboard, renderTrend: guardedTrend, renderSplit: guardedSplit, unreadableNote, replayDashMotion });
 };
 
 /* The qualifiers the hero prints beside its figure, as ONE list (2026-10-07

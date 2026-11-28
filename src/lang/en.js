@@ -1435,6 +1435,12 @@ module.exports = {
   'dash.split.aria': 'Spending split for {month}: ',
   'dash.split.sliceAria': '{cat}: {amount}, {pct}% of spending — show transactions',
   'dash.split.noteAria': 'Open the {cat} category note',
+  'dash.split.expandAria': '{cat}: {amount}, {pct}% of spending — show its subcategories',
+  'dash.split.subsAria': '{cat} subcategories',
+  'dash.split.subAria': '{cat}, {sub}: {amount} — show transactions',
+  'dash.split.subNoneAria': '{cat}, no subcategory: {amount} — show transactions',
+  'dash.split.subAllAria': 'Show all {cat} transactions',
+  'dash.split.subAll': 'All transactions',
   'dash.split.noteMissing': 'No category note found for "{cat}"',
   /* The donut's centre figure, NOT "Total spent" — that's the hero tile's
      gross figure above it. This one is categorised spend with refunds netted

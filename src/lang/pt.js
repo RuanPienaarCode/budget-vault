@@ -1302,6 +1302,12 @@ module.exports = {
   'dash.split.aria': 'Divisão dos gastos de {month}: ',
   'dash.split.sliceAria': '{cat}: {amount}, {pct}% dos gastos — mostrar transações',
   'dash.split.noteAria': 'Abrir a nota da categoria {cat}',
+  'dash.split.expandAria': '{cat}: {amount}, {pct}% dos gastos — mostrar subcategorias',
+  'dash.split.subsAria': 'Subcategorias de {cat}',
+  'dash.split.subAria': '{cat}, {sub}: {amount} — mostrar transações',
+  'dash.split.subNoneAria': '{cat}, sem subcategoria: {amount} — mostrar transações',
+  'dash.split.subAllAria': 'Mostrar todas as transações de {cat}',
+  'dash.split.subAll': 'Todas as transações',
   'dash.split.noteMissing': 'Nenhuma nota de categoria encontrada para "{cat}"',
   'dash.split.centerLabel': 'Gasto categorizado',
 
