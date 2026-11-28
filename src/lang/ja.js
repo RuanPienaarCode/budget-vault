@@ -742,6 +742,7 @@ module.exports = {
   'bx.doc.date': '日付',
   'bx.doc.description': '摘要',
   'bx.doc.account': '口座',
+  'bx.doc.subcategory': 'サブカテゴリ',
   'bx.doc.currency': '通貨',
   'bx.doc.amount': '金額',
   'bx.doc.flag': 'フラグ',

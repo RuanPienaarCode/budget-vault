@@ -44,13 +44,14 @@ const { symbolOf } = require('../currency');
 const { nowLocalMinute, todayIso, isRealIsoDate } = require('../dates');
 const { typeOrder } = require('../groups');
 const i18n = require('../i18n');
+const { bookUsesSubcategoriesIn } = require('../subcategories');
 
 /* Every label budget-export.js prints into a document, from the active
    language. Keyed exactly as that module's own LABELS so a key missing here
    falls back to its English rather than to `undefined` on a page. */
 const DOC_LABEL_KEYS = [
   'title', 'titleSummary', 'category', 'type', 'total', 'average', 'budgeted', 'period', 'from', 'to',
-  'budget', 'actual', 'remaining', 'used', 'notes', 'date', 'description', 'account', 'currency', 'amount',
+  'budget', 'actual', 'remaining', 'used', 'notes', 'date', 'description', 'account', 'subcategory', 'currency', 'amount',
   'flag', 'excluded', 'splitParent', 'splitPart', 'subtotal', 'summaryHeading', 'transactionsHeading',
   'flagTransfer', 'flagOutside', 'flagForeign', 'flagFund', 'flagScheduled', 'inProgress',
   'generated', 'range', 'categories', 'allCategories', 'periodLine', 'periodUncat',
@@ -264,6 +265,10 @@ module.exports = function registerBudgetExport(ctx) {
          ledger env (the BUDGET lens's vetoes) and today, which the running
          period's figures close at. The model owns no clock and no vault. */
       env: ledgerEnv(), today: todayIso(),
+      /* The whole open book, not the rows this export holds: a category filter
+         can leave none of them carrying a subcategory in a book that has them,
+         and the column belongs to the book (ADR-0010 section 6). */
+      subcategories: bookUsesSubcategoriesIn(S),
     });
   }
 

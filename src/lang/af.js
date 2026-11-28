@@ -779,6 +779,7 @@ module.exports = {
   'bx.doc.date': 'Datum',
   'bx.doc.description': 'Beskrywing',
   'bx.doc.account': 'Rekening',
+  'bx.doc.subcategory': 'Subkategorie',
   'bx.doc.currency': 'Geldeenheid',
   'bx.doc.amount': 'Bedrag',
   'bx.doc.flag': 'Vlag',

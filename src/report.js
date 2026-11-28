@@ -77,6 +77,7 @@ const { sharePercents, sharePercentLabel } = require('./share-percents');
    and exporter.js's "3b" test for the parent/transfer distinction a plain
    Excluded flag can never make on its own. */
 const { splitRole } = require('./tx-role');
+const { subcategoryOf } = require('./subcategories');
 /* roundCents — the ONE rounding every export shares (amount.js, L4A-04):
    half a cent away from zero on the decimal value, no binary residue. The JSON
    below rounds its money with it, once. */
@@ -1357,9 +1358,14 @@ const mjPairs = list => (list || []).map(o => ({ ...o, amount: mj(o.amount) }));
    a script summing this column needs a real number, and amountRaw is the
    loader's "could not strictly parse this cell" flag, not a value meant for
    arithmetic. */
-function jsonTransactionRow(r) {
+function jsonTransactionRow(r, withSubcategory) {
   return {
     date: r.date, description: r.desc, account: r.label, category: r.cat || '',
+    /* ADR-0010 section 6 / issue #187: directly after `category`, present only
+       when the open book uses subcategories (`data.subcategories`), so a book
+       with none produces the document it always did. '' for none, as `category`
+       is, and for a row with no category (subcategoryOf's reading). */
+    ...(withSubcategory ? { subcategory: subcategoryOf(r) } : {}),
     /* ISSUE 28: `currency` per row, beside the number it qualifies. The
        document declares a single top-level `currency` and used to carry rows
        in other currencies underneath it without a word, so a parser — this
@@ -1661,7 +1667,7 @@ function financialReportJson(data) {
         note: healthNote(),
       }
       : null,
-    transactions: (detail === 'detail' && transactions) ? transactions.map(jsonTransactionRow) : null,
+    transactions: (detail === 'detail' && transactions) ? transactions.map(r => jsonTransactionRow(r, !!data.subcategories)) : null,
   };
   return JSON.stringify(shape, null, 2) + '\n';
 }

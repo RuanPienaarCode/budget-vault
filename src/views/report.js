@@ -77,6 +77,7 @@ const {
    in this app imports i18n the same way regardless of whether `t` happens
    to be a local name in this particular file. */
 const i18n = require('../i18n');
+const { bookUsesSubcategoriesIn } = require('../subcategories');
 
 module.exports = function registerReport(ctx) {
   /* fileAtVaultPath/readVaultFile/folderAtVaultPath — NOT fileAt/readFile/
@@ -854,6 +855,10 @@ module.exports = function registerReport(ctx) {
           ...r, currency: symbolOf(ctx.accountForLabel(r.label), S.settings.currency),
         }))
         : null,
+      /* The open BOOK uses subcategories: the JSON's transaction rows gain a
+         `subcategory` field (ADR-0010 section 6). Not the Markdown detail table,
+         which is a different document with its own column set. */
+      subcategories: bookUsesSubcategoriesIn(S),
     };
   }
 

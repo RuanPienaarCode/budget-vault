@@ -508,6 +508,12 @@ module.exports = function registerAccounts(ctx) {
     if ([...sel.options].some(o => o.value === label)) sel.value = label;
     $('#txCategory').value = '';
     $('#txSearch').value = '';
+    /* The subcategory filter goes with the category one it sits beside: with
+       every category showing, the select offers every name in use, so a "Fuel"
+       left by an earlier visit would survive this drill and hide the account's
+       other rows (ADR-0010 section 6, issue #187; openCategory() clears it too). */
+    const subSel = $('#txSubcategory');
+    if (subSel) subSel.value = '';
     ctx.renderTransactions();
   }
 

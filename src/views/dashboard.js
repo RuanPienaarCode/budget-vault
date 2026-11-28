@@ -3147,6 +3147,12 @@ module.exports = function registerDashboard(ctx) {
     $('#txAccount').value = '';
     $('#txSearch').value = '';
     $('#txWholeHistory').checked = false;
+    /* Cleared as openCategory() clears it, and for the same reason: "Fuel" left
+       over from an earlier visit is still on offer with no category narrowing
+       the select, so nothing drops it, and the tile's own count would land on a
+       list its filter empties (ADR-0010 section 6, issue #187). */
+    const subSel = $('#txSubcategory');
+    if (subSel) subSel.value = '';
     /* The count on the tile is taken inside the budget, so the list is too —
        the same scope, and the same "N rows hidden" note, as openCategory(). */
     if (typeof ctx.setTxInBudgetOnly === 'function') ctx.setTxInBudgetOnly('__none__');

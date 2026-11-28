@@ -795,6 +795,7 @@ module.exports = {
   'bx.doc.date': 'तारीख़',
   'bx.doc.description': 'विवरण',
   'bx.doc.account': 'खाता',
+  'bx.doc.subcategory': 'उप-श्रेणी',
   'bx.doc.currency': 'मुद्रा',
   'bx.doc.amount': 'रकम',
   'bx.doc.flag': 'निशान',

@@ -65,6 +65,7 @@ const { splitRole } = require('./tx-role');
    the schema models — a transaction's account is which file it lives in, not
    a cell in it. */
 const { SCHEMAS } = require('./table-schema');
+const { subcategoryOf } = require('./subcategories');
 /* `Currency` is spliced in the same export-only way `Account` is, and
    immediately BEFORE Amount so the two are read together.
 
@@ -99,17 +100,42 @@ const TX_ALIGN = (() => {
   a.splice(TX_CURRENCY_AT, 0, 'left');
   return a;
 })();
+/* Subcategory (ADR-0010 section 6, issue #187). Declared once, in
+   SCHEMAS.transactions.byHeader beside `columns` and not in them (ADR-0010
+   section 4), so this is a read of that declaration and not a fifth spelling of
+   the header.
+
+   It is NOT part of TX_HEAD, deliberately: the column exists only when the open
+   book uses subcategories, and a book with none must export exactly the bytes it
+   always has. Every writer below takes a flag for it, defaulting to off, so the
+   callers that were never asked about it (the bulk-delete log, the Report's
+   detail table, which draws through the row template) are unchanged.
+
+   It goes LAST, after Split, for the reason every column of this file is
+   appended and never inserted (CLAUDE.md, "Transaction columns are
+   POSITIONAL"): no existing column moves, and a reader of a file written
+   before it was there finds the same nine where they were. (The budget export's
+   workbook is the one place it sits beside Category: that sheet is a different,
+   named-column layout with no such history.) */
+const SUB_COLUMN = SCHEMAS.transactions.byHeader[0];
+const SUB_HEAD = SUB_COLUMN.header;
+/* The cell: subcategories.js's reading of the row, so a row with no category has
+   none here exactly as it has none in every figure (ADR-0010 section 1) and the
+   text arrives trimmed. */
+const subCell = r => subcategoryOf(r);
 /* Same derivation as table-schema.js's own headerLines — dash count equals
    the header cell's width, a right-aligned column trades its last dash for
    the colon — kept as its own small copy rather than a call into that module
    because headerLines takes a `schema` (columns carry their own read/write),
    and TX_HEAD/TX_ALIGN describe a row shape table-schema.js was never asked
    to model (Account is on-screen, not a transaction-file column). */
-function txHeaderLines() {
-  const header = `| ${TX_HEAD.join(' | ')} |`;
-  const sep = '|' + TX_HEAD.map((h, i) => {
+function txHeaderLines(withSubcategory) {
+  const head = withSubcategory ? [...TX_HEAD, SUB_HEAD] : TX_HEAD;
+  const align = withSubcategory ? [...TX_ALIGN, SUB_COLUMN.align] : TX_ALIGN;
+  const header = `| ${head.join(' | ')} |`;
+  const sep = '|' + head.map((h, i) => {
     const width = h.length + 2;
-    return TX_ALIGN[i] === 'right' ? '-'.repeat(width - 1) + ':' : '-'.repeat(width);
+    return align[i] === 'right' ? '-'.repeat(width - 1) + ':' : '-'.repeat(width);
   }).join('|') + '|';
   return [header, sep];
 }
@@ -199,8 +225,8 @@ function amountCell(row) {
    disagree about a row's currency. */
 /* One row's finished cells, in TX_HEAD order — the one place the CSV row shape
    is spelled, shared by the export and the bulk-delete log below. */
-function txCsvCells(r, sym) {
-  return [
+function txCsvCells(r, sym, withSubcategory) {
+  const cells = [
     csvCell(r.date),
     csvCell(r.desc),
     csvCell(r.label),
@@ -211,12 +237,20 @@ function txCsvCells(r, sym) {
     csvCell(r.note || ''),
     csvCell(splitRole(r.split)),
   ];
+  if (withSubcategory) cells.push(csvCell(subCell(r)));
+  return cells;
 }
 
-function transactionsCsv(rows, symbolFor) {
-  const head = TX_HEAD;
+/* `opts.subcategory`: the open BOOK uses subcategories, so the file gains its
+   Subcategory column, last. The caller says so (a book is more than the rows
+   being exported: filtered to Fuel's category, no row of the export might carry
+   one and the column should still be there, and the reverse); off, the bytes are
+   what they have always been. */
+function transactionsCsv(rows, symbolFor, opts) {
+  const withSub = !!(opts && opts.subcategory);
+  const head = withSub ? [...TX_HEAD, SUB_HEAD] : TX_HEAD;
   const sym = symbolFor || (() => '');
-  const body = rows.map(r => txCsvCells(r, sym).join(','));
+  const body = rows.map(r => txCsvCells(r, sym, withSub).join(','));
   return [head.map(csvCell).join(','), ...body].join('\n') + '\n';
 }
 
@@ -315,9 +349,13 @@ function categoriesCsv(categories) {
    every reader renders as `$`. The symbol inside the Amount cell is
    `money()`'s output and is the view's formatter's to keep safe. Excluded and
    Split are the app's own values. */
-function transactionRow(r, money, symbolFor) {
+function transactionRow(r, money, symbolFor, withSubcategory) {
   const sym = symbolFor ? symbolFor(r) : (r && r._symbol) || '';
-  return `| ${escMdText(r.date)} | ${escMdText(r.desc)} | ${escMdText(r.label)} | ${escMdText(r.cat)} | ${escMdText(sym)} | ${money(r.amount, r)} | ${r.excluded ? 'yes' : ''} | ${escMdText(r.note)} | ${splitRole(r.split)} |`;
+  /* The Subcategory cell is a household's text like the rest, so it takes the
+     same escape; it is appended after Split, and only when asked for, so the
+     Report's detail table (which passes no flag) is the row it always was. */
+  return `| ${escMdText(r.date)} | ${escMdText(r.desc)} | ${escMdText(r.label)} | ${escMdText(r.cat)} | ${escMdText(sym)} | ${money(r.amount, r)} | ${r.excluded ? 'yes' : ''} | ${escMdText(r.note)} | ${splitRole(r.split)} |`
+    + (withSubcategory ? ` ${escMdText(subCell(r))} |` : '');
 }
 
 /* `money(amount, row)` is the view's own formatter, injected because the
@@ -329,6 +367,8 @@ function transactionRow(r, money, symbolFor) {
    `foreignSymbols` names the other currencies present, so the totals line can
    say what it does NOT cover — see the note built below. */
 function transactionsMarkdown(rows, meta, money, symbolFor) {
+  /* `meta.subcategory`: the open book uses subcategories, so the table gains its
+     Subcategory column, last (see transactionsCsv). */
   const { range, filters, generated } = meta;
   /* ONE symbol rule for this whole file — the totals line's "which rows may
      be added together", the Currency cell in every row, and the CSV sibling
@@ -387,12 +427,12 @@ function transactionsMarkdown(rows, meta, money, symbolFor) {
       ? [`Rows in ${foreignSymbols.map(escMdText).join(', ')} are listed in their own currency and are NOT included in the totals above — `
         + 'there is no exchange rate in this file to combine them with.', '']
       : []),
-    ...txHeaderLines(),
+    ...txHeaderLines(!!meta.subcategory),
   );
   // splitRole, not r.split raw: same reason serializeTxFile reads it this
   // way — only two strings are ever legal here, so the cell never needs
   // escMd, and a stray hand-typed word in the source column reads as ''.
-  for (const r of rows) out.push(transactionRow(r, money, sym));
+  for (const r of rows) out.push(transactionRow(r, money, sym, !!meta.subcategory));
   return out.join('\n') + '\n';
 }
 
