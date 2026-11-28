@@ -660,6 +660,7 @@ module.exports = {
 
   'tx.saved': { one: '{count} Datei gespeichert', other: '{count} Dateien gespeichert' },
   'tx.savedLearned': { one: ' · {count} neue Regel gelernt', other: ' · {count} neue Regeln gelernt' },
+  'tx.savedRuleUpdated': { one: ' · {count} Regel aktualisiert', other: ' · {count} Regeln aktualisiert' },
 
   'tx.export.dirty': 'Speichere zuerst deine Änderungen — ein Export ungespeicherter Bearbeitungen würde nicht zum Vault passen',
   'tx.export.empty': 'Nichts zu exportieren — keine Zeile passt zu den aktuellen Filtern',

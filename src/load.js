@@ -15,6 +15,7 @@ const { parseDelimited, sniffDelimiter, uncsvCell } = require('./csv');
    consumers of transaction rows still go through tx-role.js. */
 const { SCHEMAS, rowToObject, attachExtraCells, extraColsOf, attachByHeader, knownColumns, lineEndingOf, keepsDigits } = require('./table-schema');
 const { parseSubcategories } = require('./subcategories');
+const { rulesSubColumn } = require('./rules');
 const { PLAN_TABLES, TAX_TABLES } = require('./table-schema');
 const i18n = require('./i18n');
 const { setLanguage, defaultLanguage, resolveLanguage } = i18n;
@@ -691,6 +692,12 @@ module.exports = function registerLoad(ctx) {
       const rulesText = rulesCsv.charCodeAt(0) === 0xFEFF ? rulesCsv.slice(1) : rulesCsv;
       const rows = parseDelimited(rulesText, sniffDelimiter(rulesText)).map(row => row.map(uncsvCell));
       if (rows.length) T.rulesHeader = rows[0];
+      /* ADR-0010 section 5. The subcategory column is the one whose HEADER says
+         so, wherever it sits after the pattern and the category — never "the
+         third cell", which a household's own `why` column has always been free
+         to be. A file whose header does not name it is read as it always was,
+         and its rules carry no subcategory field at all. */
+      const subAt = rulesSubColumn(T.rulesHeader);
       let prev = null;
       for (const row of rows.slice(1)) {
         /* A line needs a pattern AND a category to be a rule. `pattern,` is what
@@ -701,6 +708,8 @@ module.exports = function registerLoad(ctx) {
            kept verbatim in rulesExtras and written back where it stood. */
         if (row.length >= 2 && row[0] && String(row[1]).trim()) {
           prev = { pattern: row[0], category: row[1], extra: row.slice(2) };
+          const sub = subAt >= 0 ? String(row[subAt] ?? '').trim() : '';
+          if (sub) prev.subcategory = sub;
           T.rules.push(prev);
         } else {
           T.rulesExtras.push({ prev, cells: row });

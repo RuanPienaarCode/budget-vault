@@ -52,7 +52,7 @@
 
    Pure: no vault, no DOM, no Obsidian. Tested directly.  */
 
-const { matchRule, autoCategorise, ruleText, patternMatches, patternCovers } = require('./rules');
+const { matchRule, autoCategorise, ruleText, patternMatches, patternCovers, answerKey, ruleSubcategory } = require('./rules');
 
 /* rules: [{pattern, category}] in file order (order decides ties).
    descriptions: every transaction description in the vault, dupes welcome.
@@ -77,7 +77,10 @@ function analyseRules(rules, descriptions) {
     const p = ruleText(r.pattern);
     // A blank pattern is already ignored by the matcher (prepareRules drops
     // it), so it is dead weight by definition rather than by measurement.
-    if (p) prepared.push({ p, category: r.category, i });
+    if (p) {
+      const sub = ruleSubcategory(r);
+      prepared.push(sub ? { p, category: r.category, subcategory: sub, i } : { p, category: r.category, i });
+    }
     else blank.push({ index: i, pattern: r.pattern ?? '', category: r.category, reason: 'blank' });
   });
 
@@ -104,6 +107,13 @@ function analyseRules(rules, descriptions) {
   }
 
   const base = descs.map(d => autoCategorise(d, prepared));
+  /* What each description answers today, subcategory included (ADR-0010
+     section 5). The replay below asks "does the answer survive this removal"
+     of THIS, not of `base`: a longer rule that files the same category under a
+     different subcategory changes the answer, so it is never the redundant one
+     (issue #185). `base` stays the category alone for `ambiguous`, which is a
+     question about kinds of spending and not about their labels. */
+  const baseKey = descs.map(d => answerKey(matchRule(d, prepared)));
 
   /* Is this cover ambiguous? Yes when any description it matches is in a
      category other than the cover's own, either by the full rule set's answer
@@ -151,7 +161,17 @@ function analyseRules(rules, descriptions) {
     if (!groups.has(r.p)) groups.set(r.p, []);
     groups.get(r.p).push(pi);
   });
-  const catOf = pi => String(prepared[pi].category ?? '').trim();
+  /* A line's answer, and how it is named when it has to be. A duplicate is the
+     same category AND the same subcategory; one pattern filed under one
+     category with two subcategories is a conflict like two categories, because
+     the later line is just as dead and which one the household meant is as much
+     theirs to say. The name is the category alone when there is no
+     subcategory, so a conflict of categories reads exactly as it did. */
+  const answerOf = pi => answerKey(prepared[pi]);
+  const labelOf = pi => {
+    const cat = String(prepared[pi].category ?? '').trim();
+    return prepared[pi].subcategory ? `${cat} / ${prepared[pi].subcategory}` : cat;
+  };
   const dupes = new Set();
   const inConflict = new Set();
   const conflicts = [];
@@ -159,14 +179,14 @@ function analyseRules(rules, descriptions) {
     if (members.length < 2) continue;
     const firstOf = new Map();
     for (const pi of members) {
-      const c = catOf(pi);
+      const c = answerOf(pi);
       if (firstOf.has(c)) dupes.add(pi); else firstOf.set(c, pi);
     }
     if (firstOf.size > 1) {
       members.forEach(pi => inConflict.add(pi));
       conflicts.push({
         pattern: p,
-        categories: [...firstOf.keys()],
+        categories: [...firstOf.values()].map(labelOf),
         indices: members.map(pi => prepared[pi].i),
       });
     }
@@ -210,7 +230,7 @@ function analyseRules(rules, descriptions) {
        verdict used to change (RUL-11). */
     const won = hits.filter(di => matchRule(descs[di], working) === rule);
     working.splice(at, 1);
-    if (!hits.every(di => autoCategorise(descs[di], working) === base[di])) {
+    if (!hits.every(di => answerKey(matchRule(descs[di], working)) === baseKey[di])) {
       working.splice(at, 0, rule);   // same slot: order decides ties
       continue;
     }

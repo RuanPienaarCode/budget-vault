@@ -629,6 +629,7 @@ module.exports = {
 
   'tx.saved': { other: '{count} 件のファイルを保存しました' },
   'tx.savedLearned': { other: ' · 新しいルールを {count} 件学習しました' },
+  'tx.savedRuleUpdated': { other: ' · ルールを {count} 件更新しました' },
 
   'tx.export.dirty': '先に変更を保存してください — 未保存の編集を書き出すと保管庫の内容と一致しません',
   'tx.export.empty': '書き出すものがありません — 現在の絞り込みに該当する行がありません',

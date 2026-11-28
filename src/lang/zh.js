@@ -629,6 +629,7 @@ module.exports = {
 
   'tx.saved': { other: '已保存 {count} 个文件' },
   'tx.savedLearned': { other: ' · 学习了 {count} 条新规则' },
+  'tx.savedRuleUpdated': { other: ' · 更新了 {count} 条规则' },
 
   'tx.export.dirty': '请先保存更改 — 导出未保存的编辑将与仓库内容不一致',
   'tx.export.empty': '没有可导出的内容 — 当前筛选条件下没有匹配的行',

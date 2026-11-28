@@ -2764,6 +2764,8 @@ body.is-phone .budget-app-root .drawer-book:not(.hidden) { display: block; }
 .budget-app-root #impTable tbody tr.imp-near td:first-child { box-shadow: inset 3px 0 0 var(--color-warning); }
 .budget-app-root .badge-near { background: var(--color-warning-light); color: var(--color-warning-ink); margin-left: 6px; }
 .budget-app-root .imp-near-why { font-size: .78rem; color: var(--text-muted); margin-top: 2px; max-width: 46ch; }
+/* The subcategory a rule chose, as text beside the category on the import review. Text, not a control. */
+.budget-app-root .imp-rule-sub { margin-left: .5rem; font-size: .85em; color: var(--text-muted); }
 /* Rows in the current financial period get an emerald accent + faint tint. */
 .budget-app-root #impTable tbody tr.imp-current td:first-child { box-shadow: inset 3px 0 0 var(--color-primary); }
 .budget-app-root #impTable tbody tr.imp-current { background: color-mix(in srgb, var(--color-primary) 7%, transparent); }

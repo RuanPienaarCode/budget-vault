@@ -674,6 +674,7 @@ module.exports = {
 
   'tx.saved': { one: 'Kugcinwe ifayile engu-{count}', other: 'Kugcinwe iifayile ezingu-{count}' },
   'tx.savedLearned': { one: ' · kufundwe umgaqo omtsha ongu-{count}', other: ' · kufundwe imigaqo emitsha engu-{count}' },
+  'tx.savedRuleUpdated': { one: ' · kuhlaziywe umgaqo ongu-{count}', other: ' · kuhlaziywe imigaqo engu-{count}' },
 
   'tx.export.dirty': 'Gcina utshintsho lwakho kuqala — ukukhupha ulwazi olungagcinwanga akuyi kungqinelana nevolti',
   'tx.export.empty': 'Akukho nto yokukhupha — akukho migca ihambelana nezihluzi zangoku',

@@ -169,6 +169,15 @@ module.exports = function registerTransactions(ctx) {
      import review): desc → category, flushed to the rules CSV on save. A Map
      so re-picking the same transaction keeps only the final choice. */
   const pendingLearns = new Map();
+  /* The subcategory half (ADR-0010 section 5): description -> { cat, sub },
+     written when a subcategory is picked on an ordinary row, dropped when it is
+     picked back to none or the row's category changes (the label belonged to
+     the old one). Kept apart from pendingLearns because the two are different
+     promises: pendingLearns is "this row ARRIVED uncategorised and was given a
+     category", and a subcategory is worth teaching on a row that arrived with
+     one too — a rule filed it Car, the reader says Car and Services. A Map for
+     the same reason: re-picking keeps only the final choice. */
+  const pendingSubs = new Map();
 
   /* How many of the vault's transactions a rule DECIDES: the rows whose
      description that rule would win if they were imported today. The number
@@ -755,6 +764,8 @@ module.exports = function registerTransactions(ctx) {
         const catName = r.cat;
         subHost = deferredSubSelect(catName, r.subcategory || '', () => subcategoryNamesFor(catName), v => {
           setRowCategory(r, r.cat, v);
+          /* A split part never teaches (see the category control below). */
+          if (!isSplitPart(r)) { if (v) pendingSubs.set(r.desc, { cat: r.cat, sub: v }); else pendingSubs.delete(r.desc); }
           mark();
         }, i18n.t('tx.aria.subcategory', { date: r.date, desc: r.desc }));
         catTd.append(subHost);
@@ -797,9 +808,11 @@ module.exports = function registerTransactions(ctx) {
           if (isSplitPart(r)) {
             // a part teaches nothing and asks nothing
           } else if (v && !origCat) {
+            pendingSubs.delete(r.desc);   // the label, if one was picked, belonged to the old category
             pendingLearns.set(r.desc, v);
           } else {
             pendingLearns.delete(r.desc);
+            pendingSubs.delete(r.desc);
             // A correction, not a first pick — offer to fix the RULE behind
             // it too, rather than teach a second, shadow one. See
             // offerRuleCorrection above.
@@ -1891,8 +1904,8 @@ module.exports = function registerTransactions(ctx) {
         ? i18n.t('tx.err.saveMany', { count: n, error: err.message || err })
         : i18n.t('tx.err.saveNone', { error: err.message || err }), true);
     }
-    let learned = 0;
-    if (pendingLearns.size) {
+    let learned = 0, updated = 0;
+    if (pendingLearns.size || pendingSubs.size) {
       /* Only what still stands. pendingLearns is written when a category is
          picked and nothing ever took a pair back out when the pick was later
          undone by a route that does not pass through the picker: "Reload from
@@ -1907,21 +1920,51 @@ module.exports = function registerTransactions(ctx) {
          that can change a row — a new route cannot forget to call it. */
       const standing = new Set();
       for (const f of Object.values(S.txFiles || {})) {
-        for (const r of f.rows) if (r.cat) standing.add(`${r.cat}\u0000${r.desc}`);
+        for (const r of f.rows) {
+          if (!r.cat) continue;
+          standing.add(`${r.cat}\u0000${r.desc}`);
+          const sub = subcategoryOf(r);
+          if (sub) standing.add(`${r.cat}\u0000${r.desc}\u0000${sub}`);
+        }
       }
-      const pairs = [...pendingLearns]
-        .filter(([desc, cat]) => standing.has(`${cat}\u0000${desc}`))
-        .map(([desc, cat]) => ({ desc, cat }));
-      learned = pairs.length ? await learnRules(pairs, op) : 0;
+      /* A pair is the category the reader picked and, when they picked one, the
+         subcategory — each held to the same test. A row that arrived
+         categorised has no category pick, so a subcategory pick brings its row's
+         own category (`sp.cat`); a subcategory the rows no longer carry is
+         dropped from the pair, and a pair left with nothing the reader added is
+         not a pair at all. */
+      const pairs = [];
+      for (const desc of new Set([...pendingLearns.keys(), ...pendingSubs.keys()])) {
+        const picked = pendingLearns.get(desc), sp = pendingSubs.get(desc);
+        const cat = picked !== undefined ? picked : sp && sp.cat;
+        if (!cat || !standing.has(`${cat}\u0000${desc}`)) continue;
+        const sub = sp && sp.cat === cat && standing.has(`${cat}\u0000${desc}\u0000${sp.sub}`) ? sp.sub : '';
+        if (picked === undefined && !sub) continue;
+        pairs.push(sub ? { desc, cat, subcategory: sub } : { desc, cat });
+      }
+      /* With what the learn UPDATED, said (ADR-0010 section 5): a later save of
+         the same description with another subcategory changes a rule the file
+         already held, and a change to the reader's own file is not made without
+         a word. A ctx without it — a test that mounts this view alone — learns
+         as before and has nothing to say. */
+      if (pairs.length) {
+        const res = typeof ctx.learnRulesWithCorrections === 'function'
+          ? await ctx.learnRulesWithCorrections(pairs, op)
+          : { added: await learnRules(pairs, op), updated: 0 };
+        learned = res === null || res.added === null ? null : res.added;
+        updated = res ? res.updated || 0 : 0;
+      }
       /* Cleared either way: null means the state was replaced while this save
          was writing (another book, or the same one re-read), and these pairs
          were read off rows of a load nobody is looking at — keeping them for
          the next Save could teach them to another book. Said, not dropped. */
       pendingLearns.clear();
+      pendingSubs.clear();
     }
     clearSaveButton();
     toast(i18n.t('tx.saved', { count: n })
       + (learned ? i18n.t('tx.savedLearned', { count: learned }) : '')
+      + (updated ? i18n.t('tx.savedRuleUpdated', { count: updated }) : '')
       + (learned === null ? '. ' + i18n.t('tx.savedNotLearned') : ''));
   }
 

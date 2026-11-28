@@ -679,6 +679,7 @@ module.exports = {
 
   'tx.saved': { one: 'Kulondolozwe ifayela eli-{count}', other: 'Kulondolozwe amafayela angu-{count}' },
   'tx.savedLearned': { one: ' · kufundwe umthetho omusha ongu-{count}', other: ' · kufundwe imithetho emisha engu-{count}' },
+  'tx.savedRuleUpdated': { one: ' · kuvuselelwe umthetho ongu-{count}', other: ' · kuvuselelwe imithetho engu-{count}' },
 
   'tx.export.dirty': 'Londoloza izinguquko zakho kuqala — ukukhipha izinguquko ezingalondoloziwe ngeke kuvumelane nevolti',
   'tx.export.empty': 'Akukho lutho lokukhipha — ayikho imigqa evumelana nezihlungi zamanje',

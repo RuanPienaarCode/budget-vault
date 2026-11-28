@@ -107,9 +107,51 @@ function prepareRules(rules) {
     .map(r => {
       const p = ruleText(r.pattern);
       const alt = withoutCountrySuffix(p);
-      return alt ? { p, alt, category: r.category } : { p, category: r.category };
+      const out = alt ? { p, alt, category: r.category } : { p, category: r.category };
+      /* ADR-0010 section 5. Carried only when the rule has one, so a rule
+         without a subcategory is prepared exactly as it always was and nothing
+         that compares or prints a prepared rule can tell the difference. */
+      const sub = ruleSubcategory(r);
+      if (sub) out.subcategory = sub;
+      return out;
     })
     .filter(r => r.p);
+}
+
+/* The label a rule sets with its category, '' for none. Trimmed, and a cell of
+   spaces is none: the same reading subcategories.js subcategoryOf gives a row,
+   because a rule's label ends up on a row. */
+function ruleSubcategory(r) {
+  return r && typeof r.subcategory === 'string' ? r.subcategory.trim() : '';
+}
+
+/* What a rule answers, as one comparable value: its category and subcategory.
+   Two rules "give the same answer" only when both agree, which is the question
+   learnRules (is this pair already answered?) and rule-cleanup (does the
+   shorter rule answer for the longer?) both ask. JSON rather than a joined
+   string, so no name can make two different pairs read as one. No rule is the
+   empty string, and so is a rule that says nothing at all, which is how
+   `autoCategorise` compared them when the answer was a category. */
+function answerKey(r) {
+  if (!r) return '';
+  const category = String(r.category ?? '').trim(), sub = ruleSubcategory(r);
+  return category || sub ? JSON.stringify([category, sub]) : '';
+}
+
+/* Where the rules file keeps the subcategory: the index of the header cell that
+   NAMES it, or -1. Found by header and never by position, for the reason
+   ADR-0010 section 4 gives for a transaction file and the rules file shares:
+   the third cell of a household's file is theirs. The round-trip test's own
+   file carries a `why` column there, and reading it as a subcategory would have
+   put a sentence like "weekly shop" on every transaction a rule filed. Cells 0
+   and 1 are the pattern and the category by position, as they always were, so
+   neither can be this column. */
+function rulesSubColumn(header) {
+  if (!Array.isArray(header)) return -1;
+  for (let i = 2; i < header.length; i++) {
+    if (String(header[i] ?? '').trim().toLowerCase() === 'subcategory') return i;
+  }
+  return -1;
 }
 
 /* The pattern as the IMPORTER would have left a description that ended the
@@ -240,7 +282,16 @@ function autoCategorise(desc, rules) {
   return r ? r.category : '';
 }
 
+/* autoCategorise with the subcategory the winning rule sets beside the
+   category. A rule with none answers the category alone, as every rule did
+   before the third column existed. */
+function autoCategoriseWithSub(desc, rules) {
+  const r = matchRule(desc, rules);
+  return r ? { category: r.category, subcategory: ruleSubcategory(r) } : { category: '', subcategory: '' };
+}
+
 module.exports = {
-  learnPattern, prepareRules, matchRule, autoCategorise,
+  learnPattern, prepareRules, matchRule, autoCategorise, autoCategoriseWithSub,
+  answerKey, rulesSubColumn, ruleSubcategory,
   ruleText, patternMatches, patternCovers, isReferenceToken,
 };
