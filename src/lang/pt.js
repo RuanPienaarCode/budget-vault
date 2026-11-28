@@ -540,6 +540,8 @@ module.exports = {
   'tx.title.split': 'Dividir em categorias',
   'tx.aria.delete': 'Excluir a transação {desc} de {date}',
   'tx.title.delete': 'Excluir esta linha',
+  'tx.aria.copy': 'Copiar a transação {desc} de {date} para um novo lançamento',
+  'tx.title.copy': 'Copiar para uma nova transação',
   'tx.delete.title': 'Excluir transação',
   'tx.delete.msg': '{date} · {desc} · {amount} — sai de {file} quando você salvar.',
   'tx.delete.reimport': 'Esta linha carrega a chave que impede que uma reimportação do mesmo extrato a some duas vezes, então importar aquele extrato de novo mais tarde vai trazê-la de volta.',

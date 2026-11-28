@@ -205,7 +205,7 @@
   font-size: var(--st-control-font-cell);
 }
 
-/* Split and Delete: quiet round icon buttons that show their edge on hover,
+/* Split, Copy and Delete: quiet round icon buttons that show their edge on hover,
    side by side (the cell no longer carries an inline nowrap). */
 .budget-app-root #view-transactions .table tbody td:last-child { white-space: nowrap; }
 .budget-app-root #view-transactions .table tbody td:last-child .btn-ghost-sm {

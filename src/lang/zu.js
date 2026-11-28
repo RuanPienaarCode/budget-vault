@@ -543,6 +543,8 @@ module.exports = {
   'tx.title.split': 'Hlukanisa ngezigaba',
   'tx.aria.delete': 'Susa umsebenzi wemali ka-{desc} ngomhla {date}',
   'tx.title.delete': 'Susa lo mugqa',
+  'tx.aria.copy': 'Kopela umsebenzi wemali ka-{desc} ngomhla {date} kokufakwayo okusha',
+  'tx.title.copy': 'Kopela emsebenzini omusha wemali',
   'tx.delete.title': 'Susa umsebenzi wemali',
   'tx.delete.msg': '{date} · {desc} · {amount} — ususwa ku-{file} uma ulondoloza.',
   'tx.delete.reimport': 'Lo mugqa uphethe ukhiye ovimbela ukuthi ukungenisa kabusha isitatimende esifanayo kuwungeze kabili, ngakho ukungenisa leso sitatimende futhi kamuva kuzowubuyisa lo mugqa.',

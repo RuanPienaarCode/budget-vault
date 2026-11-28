@@ -194,6 +194,12 @@ for (const id of ['debts', 'assets', 'services', 'tax', 'transactions']) {
   want('Owed row "+" repayment', owed, 'width', '34px');
   want('Owed row "+" repayment', owed, 'border-color', 'transparent');
   want('Transactions row Split', rowBtn(page('transactions'), 'split:3'), 'height', '34px');
+  // Copy (#188) is the third icon in that cell: the same quiet square, and 44px under a finger like its neighbours
+  for (const prop of ['width', 'height']) want('Transactions row Copy', rowBtn(page('transactions'), 'copy:3'), prop, '34px');
+  want('Transactions row Copy', rowBtn(page('transactions'), 'copy:3'), 'border-color', 'transparent');
+  want('375px touch Transactions row Copy', rowBtn(phonePage('transactions'), 'copy:0'), 'min-height', '44px', PHONE);
+  want('375px touch Transactions row Copy', rowBtn(phonePage('transactions'), 'copy:0'), 'min-width', '44px', PHONE);
+  want('375px touch Transactions row Split', rowBtn(phonePage('transactions'), 'split:0'), 'min-width', '44px', PHONE);
   // words stay a pill
   for (const [label, key] of [['Tax Upload', 'upload:2'], ['Food Open', 'open:2']]) {
     want(`${label} (a word, not an icon)`, rowBtn(page(label.split(' ')[0].toLowerCase()), key), 'width', v => v === undefined);

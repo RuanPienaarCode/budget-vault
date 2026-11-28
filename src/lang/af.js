@@ -523,6 +523,8 @@ module.exports = {
   'tx.title.split': 'Verdeel in kategorieë',
   'tx.aria.delete': 'Skrap die transaksie {desc} op {date}',
   'tx.title.delete': 'Skrap hierdie ry',
+  'tx.aria.copy': 'Kopieer die transaksie {desc} op {date} na \'n nuwe inskrywing',
+  'tx.title.copy': 'Kopieer na \'n nuwe transaksie',
   'tx.delete.title': 'Skrap transaksie',
   'tx.delete.msg': '{date} · {desc} · {amount} — word uit {file} verwyder wanneer jy stoor.',
   'tx.delete.reimport': 'Hierdie ry dra die sleutel wat keer dat \'n herinvoer van dieselfde staat die lyn \'n tweede keer byvoeg, so \'n latere invoer van daardie staat sal dit weer byvoeg.',

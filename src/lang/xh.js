@@ -538,6 +538,8 @@ module.exports = {
   'tx.title.split': 'Yahlula ngeendidi',
   'tx.aria.delete': 'Cima intengiselwano ka-{desc} ngomhla {date}',
   'tx.title.delete': 'Cima lo mgca',
+  'tx.aria.copy': 'Kopa intengiselwano ka-{desc} ngomhla {date} ukuze wenze entsha',
+  'tx.title.copy': 'Kopa kwintengiselwano entsha',
   'tx.delete.title': 'Cima intengiselwano',
   'tx.delete.msg': '{date} · {desc} · {amount} — isuswa kwi-{file} xa ugcina.',
   'tx.delete.reimport': 'Lo mgca uphethe isitshixo esithintela ukuba ukungenisa kwakhona esona sitheyitmenti kuwongeze kabini, ngoko ukungenisa eso sitheyitmenti kwakhona kamva kuya kuwubuyisa lo mgca.',

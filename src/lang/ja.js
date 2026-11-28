@@ -508,6 +508,8 @@ module.exports = {
   'tx.title.split': 'カテゴリに分割',
   'tx.aria.delete': '{date} の {desc} の取引を削除',
   'tx.title.delete': 'この行を削除',
+  'tx.aria.copy': '{date} の {desc} の取引を新しい取引にコピー',
+  'tx.title.copy': '新しい取引にコピー',
   'tx.delete.title': '取引を削除',
   'tx.delete.msg': '{date} · {desc} · {amount} — 保存時に {file} から削除されます。',
   'tx.delete.reimport': 'この行は同じ明細を再取り込みしたときの重複を防ぐ鍵を持っています。削除すると、あとで同じ明細を取り込んだ際に再び追加されます。',

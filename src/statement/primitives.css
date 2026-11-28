@@ -122,12 +122,15 @@
                                  Services, the three Tax tables, Transactions):
                                  an "✕" or a bin, never a word;
      - [data-focus-key^="split:"] the Transactions Split icon beside it;
+     - [data-focus-key^="copy:"]  the Transactions Copy icon (#188), between
+                                 Split and Delete in that cell;
      - .owed-acts > .btn-ghost-sm the Owed row's two icons ("+" repayment
                                  and Delete), which is all that box holds.
    The Budget table's own .bud-act squares are left to budget.css: they sit
    in fixed slots there, and that lane already draws them this way. */
 .budget-app-root .table tbody td .btn-ghost-sm[data-focus-key^="del:"]:not(.bud-act),
 .budget-app-root .table tbody td .btn-ghost-sm[data-focus-key^="split:"],
+.budget-app-root .table tbody td .btn-ghost-sm[data-focus-key^="copy:"],
 .budget-app-root .table tbody td .owed-acts > .btn-ghost-sm {
   width: 34px;
   height: 34px;
@@ -139,6 +142,7 @@
 @media (hover: hover) {
   .budget-app-root .table tbody td .btn-ghost-sm[data-focus-key^="del:"]:not(.bud-act):hover,
   .budget-app-root .table tbody td .btn-ghost-sm[data-focus-key^="split:"]:hover,
+  .budget-app-root .table tbody td .btn-ghost-sm[data-focus-key^="copy:"]:hover,
   .budget-app-root .table tbody td .owed-acts > .btn-ghost-sm:hover {
     background: var(--line-soft);
     border-color: var(--border-color);

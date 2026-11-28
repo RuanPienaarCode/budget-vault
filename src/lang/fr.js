@@ -529,6 +529,8 @@ module.exports = {
   'tx.title.split': 'Répartir en catégories',
   'tx.aria.delete': 'Supprimer la transaction {desc} du {date}',
   'tx.title.delete': 'Supprimer cette ligne',
+  'tx.aria.copy': 'Copier la transaction {desc} du {date} dans une nouvelle saisie',
+  'tx.title.copy': 'Copier dans une nouvelle transaction',
   'tx.delete.title': 'Supprimer la transaction',
   'tx.delete.msg': '{date} · {desc} · {amount} — retirée de {file} à l\'enregistrement.',
   'tx.delete.reimport': 'Cette ligne porte la clé qui empêche un réimport du même relevé de l\'ajouter une seconde fois : réimporter ce relevé plus tard la rajoutera donc.',
