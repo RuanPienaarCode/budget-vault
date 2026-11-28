@@ -272,18 +272,33 @@ function transactionsCsv(rows, symbolFor, opts) {
    the new column. One log, rather than a second file started whenever the
    layout differs: the delete's dialog names one path, and that is where the
    way back has to be. A log already in today's layout is appended to byte for
-   byte as it always was. */
+   byte as it always was, unless a row being logged carries a subcategory: then
+   Subcategory is the one column added, at the end, like any other. */
 function appendTransactionsLog(existing, rows, symbolFor) {
   const sym = symbolFor || (() => '');
-  if (!existing || !existing.trim()) return transactionsCsv(rows, sym);
+  /* Subcategory (ADR-0010; the log was left out of #187, which says so). It is
+     the way back from a delete, and a row logged without its label comes back
+     as plain "Car" with nothing to say Fuel was ever there. It is added only
+     when a row being logged carries one, as the other columns were added when
+     they were needed: a log that has never seen a subcategory keeps its header
+     and its bytes. Read through subcategoryOf, so a stale cell on an
+     uncategorised row is none here as it is in every figure. */
+  const needSub = rows.some(r => subCell(r) !== '');
+  if (!existing || !existing.trim()) return transactionsCsv(rows, sym, { subcategory: needSub });
   const cut = existing.indexOf('\n');
   const headLine = (cut < 0 ? existing : existing.slice(0, cut)).replace(/\r$/, '');
   const names = (parseCsv(headLine)[0] || []).map(n => String(n).trim());
-  const same = names.length === TX_HEAD.length && names.every((n, i) => n === TX_HEAD[i]);
-  const body = rows.map(r => txCsvCells(r, sym));
-  if (same) return existing.replace(/\n*$/, '\n') + body.map(c => c.join(',')).join('\n') + (body.length ? '\n' : '');
-  const header = names.concat(TX_HEAD.filter(h => !names.includes(h)));
-  const at = header.map(h => TX_HEAD.indexOf(h));
+  const same = !needSub && names.length === TX_HEAD.length && names.every((n, i) => n === TX_HEAD[i]);
+  /* Cells are always built with the Subcategory cell last, and found by name
+     below: a log that already has the column (this build's, or one the reader's
+     own tool put anywhere in the header) takes the value under it whether or
+     not THESE rows have one, and a log that does not is given it only when
+     needed, at the end. */
+  const FULL_HEAD = [...TX_HEAD, SUB_HEAD];
+  const body = rows.map(r => txCsvCells(r, sym, true));
+  if (same) return existing.replace(/\n*$/, '\n') + body.map(c => c.slice(0, TX_HEAD.length).join(',')).join('\n') + (body.length ? '\n' : '');
+  const header = names.concat(FULL_HEAD.filter(h => !names.includes(h) && (h !== SUB_HEAD || needSub)));
+  const at = header.map(h => FULL_HEAD.indexOf(h));
   const lines = body.map(cells => at.map(i => (i < 0 ? '' : cells[i])).join(','));
   const rest = cut < 0 ? '' : existing.slice(cut + 1);
   const head = header.length === names.length ? headLine : header.map(csvCell).join(',');

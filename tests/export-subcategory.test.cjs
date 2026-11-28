@@ -132,8 +132,10 @@ const cellsOfMd = text => parseMdTable(text).slice(1);
   eq(ex.txHeaderLines(true)[1].split('|').slice(-3, -1).join('|'), '-------|-------------', 'the separator row sizes the new column to its header');
   ok(md.includes('Money in **R 0.00**'), 'the totals line is unchanged');
 
-  /* the bulk-delete log is appended by header name and is not part of this slice */
-  eq(ex.appendTransactionsLog('', F.ROWS, F.symbolFor), OLD_CSV, 'the delete log still writes today\'s nine columns');
+  /* the bulk-delete log is appended by header name and was not part of this slice. It
+     takes the column only when a row it logs carries one (tests/transactions-delete-log-
+     subcategory.test.cjs): rows with none still make the nine columns they always did. */
+  eq(ex.appendTransactionsLog('', F.withoutSubcategories(F.ROWS), F.symbolFor), OLD_CSV, 'the delete log still writes today\'s nine columns when no row has a subcategory');
 
   /* a row with no category cannot carry one, whatever the cell says */
   eq(parseCsv(ex.transactionsCsv([{ ...F.ROWS[3] }], F.symbolFor, { subcategory: true }))[1][9], '', 'a stray subcategory on an uncategorised row reads blank');
