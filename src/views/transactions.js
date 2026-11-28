@@ -6,7 +6,7 @@ const { opWriterOf } = require('../io');
 const { el, icoEl, tableCells, caveatChip, refocus } = require('../dom');
 const { normalizeAmount } = require('../amount');
 const { patchFrontmatter, yamlStr, parseMdTableWithSeparator } = require('../markdown');
-const { SCHEMAS, headerLines, rowLine, headerLinesWithExtras, rowLineWithExtras } = require('../table-schema');
+const { SCHEMAS, headerLines, rowLine, headerLinesWithExtras, rowLineWithExtras, withByHeaderColumns } = require('../table-schema');
 const { csvCell } = require('../csv');
 const { askFields, askSplit, confirmModal } = require('../modal');
 const { transactionsCsv, categoriesCsv, transactionsMarkdown, categoriesMarkdown, exportPaths, appendTransactionsLog } = require('../exporter');
@@ -1604,11 +1604,19 @@ module.exports = function registerTransactions(ctx) {
        would shift the reader's own column into Split's old slot instead of
        merely losing an empty one. splitHeaderPresent now keeps the column for
        that reason and for L3-10's, with or without an extra column. */
-    const extraCols = f.extraCols;
     const keepSplit = hasSplit || !!f.splitHeaderPresent
       || f.rows.some(r => r.splitRaw != null && String(r.splitRaw).trim() !== '');
     const schema = keepSplit ? SCHEMAS.transactions
       : { ...SCHEMAS.transactions, columns: SCHEMAS.transactions.columns.slice(0, 6) };
+    /* ADR-0010 §4 — Subcategory, the column found by its header. A file that
+       has one keeps it where it is (it is one of f.extraCols, and the cell is
+       written from the row); a file whose rows first use one gets it appended
+       after every column the file already has, Split and household columns
+       included; a file that uses none is the same object back and the same
+       bytes. Computed here, per save, from the rows — never stored on the
+       model, so a clone serialized by Add transaction and a failed write leave
+       the live file exactly as it was. */
+    const extraCols = withByHeaderColumns(schema, f.extraCols, f.rows);
     const [header, defaultSep] = extraCols ? headerLinesWithExtras(schema, extraCols) : headerLines(schema);
     const sep = ownSeparator(f.sep, header) || defaultSep;
     const lines = [header, sep];

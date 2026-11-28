@@ -25,7 +25,7 @@ const { reconcile } = require('./reconcile');
 const { savedFromOutside, poolCatType } = require('./savings-math');
 const { budgetUsedShare, budgetSpent, assumedProvision } = require('./money-flow');
 const { SET_ASIDE_TYPES, isPoolAccount } = require('./vocabulary');
-const { stamp, tally, LENSES, keeps } = require('./ledger');
+const { stamp, tally, subcategoryTotals, LENSES, keeps } = require('./ledger');
 const { fileOutsideWindow, uncountedRows, summariseMisfiled } = require('./misfiled');
 const { makeRenderPass } = require('./render-pass');
 
@@ -540,6 +540,15 @@ module.exports = function registerPeriod(ctx) {
       foreign: t.foreign,
     };
   }
+  /* ADR-0010 §2. summaryInRange's `byCat`, split by subcategory: the same
+     window, the same BUDGET lens, the same kept rows. For every category its
+     subcategories plus the rows with none add up to summaryInRange(start,
+     end).byCat[category] (tests/subcategory-sum.test.cjs). A separate function
+     rather than a field of the summary: nothing that already reads the summary
+     is shown, or can be moved by, a figure it never asked for. */
+  function subcategoryTotalsInRange(start, end) {
+    return subcategoryTotals(tally(ledger(start, end), LENSES.BUDGET).kept);
+  }
   /* The env the ledger stamps rows against: every household fact a veto
      reads, resolved once per call. `fixedCats` rides along for the HOUSEHOLD
      lens's `fixed` slice. */
@@ -686,7 +695,7 @@ module.exports = function registerPeriod(ctx) {
     /* Published for figures.js's categoryActualsInRange — the budget export's
        exact-date window reads the SAME tally periodSummary does, rather than a
        second walk over the ledger. */
-    summaryInRange,
+    summaryInRange, subcategoryTotalsInRange,
     intervalDays, periodKeyValid, catAssumeSpent, catKnown, periodDeficit,
     /* ADR-0005. The one period-level "budget used" reading. */
     budgetUsed,

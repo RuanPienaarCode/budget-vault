@@ -13,7 +13,8 @@ const { parseDelimited, sniffDelimiter, uncsvCell } = require('./csv');
 /* One declaration per flat table drives this loader's reads AND the views'
    writes — ADR-0003. The generic reader is called here ONLY; downstream
    consumers of transaction rows still go through tx-role.js. */
-const { SCHEMAS, rowToObject, attachExtraCells, extraColsOf, knownColumns, lineEndingOf, keepsDigits } = require('./table-schema');
+const { SCHEMAS, rowToObject, attachExtraCells, extraColsOf, attachByHeader, knownColumns, lineEndingOf, keepsDigits } = require('./table-schema');
+const { parseSubcategories } = require('./subcategories');
 const { PLAN_TABLES, TAX_TABLES } = require('./table-schema');
 const i18n = require('./i18n');
 const { setLanguage, defaultLanguage, resolveLanguage } = i18n;
@@ -185,6 +186,16 @@ function parseTxText(text) {
   const splitCol = SCHEMAS.transactions.columns[6];
   const hasSplitHeader = !!(header && header[6] && header[6].trim().toLowerCase() === splitCol.header.toLowerCase());
   const known = hasSplitHeader ? 7 : 6;
+  const extraCols = extraColsOf(known, header, sep, dataRows);
+  /* ADR-0010 §4 — Subcategory is the one column found by its header rather
+     than its position: Split is optional, so a position behind it would force
+     an empty Split into every file that uses a subcategory without splitting.
+     It sits among the extra columns wherever the file put it (directly after
+     Note, after Split, after a household column), is read off the rows' extra
+     cells here, and is written back where it was found (serializeTxFile). A
+     file with no such header reads exactly as it did. */
+  const rows = dataRows.map(c => attachExtraCells(rowToObject(SCHEMAS.transactions, c.slice(0, known)), known, c));
+  attachByHeader(SCHEMAS.transactions, rows, extraCols);
   return {
     fmRaw: raw,
     /* CONTRACT 1, the loader's half: the prose around the table and the
@@ -192,7 +203,7 @@ function parseTxText(text) {
        rewrote (L3-02, L3-22). Exactly what each holds: verbatimAroundTable;
        tests/tx-file-lead-trail-sep.test.cjs pins them and the round trip. */
     lead: tx.lead, trail: tx.trail, sep: tx.sep,
-    extraCols: extraColsOf(known, header, sep, dataRows),
+    extraCols,
     /* ISSUE 69 — serializeTxFile decides per save whether a row still
        needs Split at all; when this file ALSO carries an extra column
        that decision must not move it, since the extra sits at position
@@ -208,8 +219,8 @@ function parseTxText(text) {
        `c.slice(0, known)`, not the raw row: rowToObject then sees an
        index past `known` as undefined, the same shape a short row has
        always read as, so a six-column file's own extra cell can never be
-       misread as Split — attachExtraCells below still gets the REAL `c`. */
-    rows: dataRows.map(c => attachExtraCells(rowToObject(SCHEMAS.transactions, c.slice(0, known)), known, c)),
+       misread as Split — attachExtraCells (above) still gets the REAL `c`. */
+    rows,
   };
 }
 
@@ -436,6 +447,11 @@ module.exports = function registerLoad(ctx) {
         /* ADR-0007 · fixed is its own flag, not derived from type. Rent is an ordinary expense
            (19.9% vs 44.4% of income committed). */
         fixed: fmBool(fm.fixed) === true,
+        /* ADR-0010 · the names a transaction may carry under this category, in the order
+           written. An array always, empty when the note has none: the reader never has to
+           ask whether the key exists. A name found on a transaction but missing here is
+           still shown and offered (subcategories.js offeredNames). */
+        subcategories: parseSubcategories(fm.subcategories),
         /* ADR-0007 · interest marks income a fund itself earned. ITEM 2 (2026-08-26); opt-in,
            read by savings-math.js's classifyRow. */
         interest: fmBool(fm.interest) === true,
