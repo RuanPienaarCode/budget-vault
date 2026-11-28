@@ -1246,6 +1246,12 @@ module.exports = {
   'dash.split.aria': 'Pembagian pengeluaran {month}: ',
   'dash.split.sliceAria': '{cat}: {amount}, {pct}% dari pengeluaran — tampilkan transaksi',
   'dash.split.noteAria': 'Buka catatan kategori {cat}',
+  'dash.split.expandAria': '{cat}: {amount}, {pct}% dari pengeluaran — tampilkan subkategori',
+  'dash.split.subsAria': 'Subkategori {cat}',
+  'dash.split.subAria': '{cat}, {sub}: {amount} — tampilkan transaksi',
+  'dash.split.subNoneAria': '{cat}, tanpa subkategori: {amount} — tampilkan transaksi',
+  'dash.split.subAllAria': 'Tampilkan semua transaksi {cat}',
+  'dash.split.subAll': 'Semua transaksi',
   'dash.split.noteMissing': 'Tidak ada catatan kategori untuk "{cat}"',
   'dash.split.centerLabel': 'Pengeluaran berkategori',
 

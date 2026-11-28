@@ -1220,6 +1220,12 @@ module.exports = {
   'dash.split.aria': '{month} の支出内訳: ',
   'dash.split.sliceAria': '{cat}: {amount}、支出の {pct}% — 取引を表示',
   'dash.split.noteAria': '{cat} のカテゴリノートを開く',
+  'dash.split.expandAria': '{cat}: {amount}、支出の {pct}% — サブカテゴリを表示',
+  'dash.split.subsAria': '{cat} のサブカテゴリ',
+  'dash.split.subAria': '{cat}、{sub}: {amount} — 取引を表示',
+  'dash.split.subNoneAria': '{cat}、サブカテゴリなし: {amount} — 取引を表示',
+  'dash.split.subAllAria': '{cat} のすべての取引を表示',
+  'dash.split.subAll': 'すべての取引',
   'dash.split.noteMissing': '「{cat}」のカテゴリノートが見つかりません',
   'dash.split.centerLabel': 'カテゴリ分け済み支出',
 

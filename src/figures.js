@@ -27,6 +27,7 @@ const { todayIso } = require('./dates');
 const { largestRemainder } = require('./share-percents');
 const { fileOutsideWindow } = require('./misfiled');
 const { rowIsWritten } = require('./budget-file');
+const { breakdownOf } = require('./subcategories');
 
 /* ADR-0007 · One readable-balance rule. The loader parses "about 300" to 0 and
    keeps the text in `balanceRaw`; only when normalizeAmount ALSO fails on that
@@ -260,6 +261,31 @@ module.exports = function registerFigures(ctx) {
     }
     spend.sort((a, b) => b.amount - a.amount);
     return spend;
+  }
+
+  /* What each donut category is made of, by subcategory (ADR-0010, issue #186):
+     { [category]: Row[] } for the categories of categorySpendRows(p) that have
+     subcategorised spending, and no key for the rest — an absent key is what
+     tells the legend a row is NOT expandable. Rows are subcategories.js
+     breakdownOf's: money out positive, biggest first, the rows with none last.
+
+     The window is the donut's own: periodSummary(p) closes a running period at
+     today and `asOf` says where, so a subcategory is counted over exactly the
+     days its category's printed figure is. Read through the same BUDGET lens
+     (period.js subcategoryTotalsInRange), so for every key the rows add up to
+     the row categorySpendRows hands back (tests/dashboard-subcategories.test.cjs
+     pins it on both households). Nothing that existed before reads this. */
+  function categorySplitBreakdowns(p) {
+    const rows = categorySpendRows(p);
+    if (!rows.length || typeof ctx.subcategoryTotalsInRange !== 'function') return {};
+    const { start } = periodRange(p);
+    const totals = ctx.subcategoryTotalsInRange(start, periodSummary(p).asOf);
+    const out = {};
+    for (const { cat } of rows) {
+      const b = breakdownOf(totals[cat]);
+      if (b) out[cat] = b;
+    }
+    return out;
   }
 
   /* What the split leaves out of gross spend, decomposed: uncategorised
@@ -504,7 +530,7 @@ module.exports = function registerFigures(ctx) {
     };
   }
 
-  ctx.provide({ categoryActualsInRange, budgetVsActualRows, categorySpendRows, categoryGap, planFigures, periodFigures, bookFigures });
+  ctx.provide({ categoryActualsInRange, budgetVsActualRows, categorySpendRows, categorySplitBreakdowns, categoryGap, planFigures, periodFigures, bookFigures });
 };
 module.exports.balanceReadable = balanceReadable;
 module.exports.liveBalance = liveBalance;

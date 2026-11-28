@@ -1220,6 +1220,12 @@ module.exports = {
   'dash.split.aria': '{month} 的支出占比：',
   'dash.split.sliceAria': '{cat}：{amount}，占支出的 {pct}% — 显示交易',
   'dash.split.noteAria': '打开 {cat} 的分类笔记',
+  'dash.split.expandAria': '{cat}：{amount}，占支出的 {pct}% — 显示子分类',
+  'dash.split.subsAria': '{cat} 的子分类',
+  'dash.split.subAria': '{cat}，{sub}：{amount} — 显示交易',
+  'dash.split.subNoneAria': '{cat}，无子分类：{amount} — 显示交易',
+  'dash.split.subAllAria': '显示 {cat} 的所有交易',
+  'dash.split.subAll': '所有交易',
   'dash.split.noteMissing': '找不到「{cat}」的分类笔记',
   'dash.split.centerLabel': '已分类支出',
 

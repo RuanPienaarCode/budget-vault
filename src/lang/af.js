@@ -1281,6 +1281,12 @@ module.exports = {
   'dash.split.aria': 'Bestedingsverdeling vir {month}: ',
   'dash.split.sliceAria': '{cat}: {amount}, {pct}% van besteding — wys transaksies',
   'dash.split.noteAria': 'Maak die {cat}-kategorienota oop',
+  'dash.split.expandAria': '{cat}: {amount}, {pct}% van besteding — wys subkategorieë',
+  'dash.split.subsAria': '{cat} se subkategorieë',
+  'dash.split.subAria': '{cat}, {sub}: {amount} — wys transaksies',
+  'dash.split.subNoneAria': '{cat}, geen subkategorie: {amount} — wys transaksies',
+  'dash.split.subAllAria': 'Wys alle {cat}-transaksies',
+  'dash.split.subAll': 'Alle transaksies',
   'dash.split.noteMissing': 'Geen kategorienota vir "{cat}" gevind nie',
   'dash.split.centerLabel': 'Gekategoriseerde besteding',
 
