@@ -580,6 +580,10 @@
   body.is-phone .budget-app-root #txTable tbody td:nth-child(4) .cat-cell {
     min-width: 0;
   }
+  /* Landscape phone card: the subcategory is the second line of this cell. */
+  body.is-phone .budget-app-root #txTable tbody td:nth-child(4) .sub-cell {
+    min-width: 0;
+  }
   body.is-phone .budget-app-root #txTable tbody td:nth-child(4) .cat-cell-btn {
     width: auto;
     justify-content: flex-end;

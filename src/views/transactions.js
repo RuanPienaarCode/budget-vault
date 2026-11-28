@@ -15,6 +15,7 @@ const { symbolOf, formatSigned } = require('../currency');
 const { localeFor } = require('../locale');
 const { applySplit, splitRole, splitShortfall, SPLIT_PARENT, isSplitPart, splitPartsOf, splitPartsAmbiguous, amountCents, wholeSplits } = require('../tx-role');
 const { prepareRules, matchRule } = require('../rules');
+const { NO_SUBCATEGORY, setRowCategory, subcategoryOf, matchesSubcategory, inUseByCategory, offeredNames, bookUsesSubcategories } = require('../subcategories');
 /* Namespace import: this file binds `t` as a local (`const t = $('#txTable')`). */
 const i18n = require('../i18n');
 
@@ -25,7 +26,7 @@ module.exports = function registerTransactions(ctx) {
   // lazyCatSelect (not catSelect): builds its full <option> list only on first
   // focus, so rendering up to 800 rows doesn't create ~20-30k option nodes up
   // front — the main source of jank on the phone at 5,700 transactions.
-  const { S, $, app, plugin, money, toast, readFile, writeFile, writeVaultFile, periodTitle, periodMonthName, txInPeriod, deferredCatSelect, learnRules, governingRule, correctRule, txSegment, txFileRel } = ctx;
+  const { S, $, app, plugin, money, toast, readFile, writeFile, writeVaultFile, periodTitle, periodMonthName, txInPeriod, deferredCatSelect, learnRules, governingRule, correctRule, txSegment, txFileRel, deferredSubSelect, subcategoryNamesFor } = ctx;
 
   /* A row's own currency symbol, resolved from the account whose folder it
      lives in. Every figure this view prints or exports goes through one of
@@ -364,6 +365,10 @@ module.exports = function registerTransactions(ctx) {
        branch already agreed on. */
     list.sort((a, b) => b.date.localeCompare(a.date));
     const acc = $('#txAccount').value, cat = $('#txCategory').value, q = $('#txSearch').value.trim().toLowerCase();
+    /* ADR-0010. Empty unless the reader chose one: the select is hidden, and has
+       no options, in a book that uses no subcategory. */
+    const subEl = $('#txSubcategory');
+    const sub = (subEl && subEl.value) || '';
     /* Self-healing, see inBudgetFor above. */
     if (inBudgetFor !== null && cat !== inBudgetFor) inBudgetFor = null;
     /* Everything the BUDGET lens holds out of the wedge, one reason each
@@ -389,9 +394,11 @@ module.exports = function registerTransactions(ctx) {
         else if (cat === MISSING) { if (!t.cat || known.has(t.cat)) return false; }
         else if (t.cat !== cat) return false;
       }
+      if (!matchesSubcategory(t, sub)) return false;
       /* The Note too: it is where a reader writes what the bank's description
-         does not say. */
-      if (q && ![t.desc, t.note].some(v => String(v || '').toLowerCase().includes(q))) return false;
+         does not say. And the subcategory, which is what a reader typing "fuel"
+         means to find (a row with no category has none to match: subcategoryOf). */
+      if (q && ![t.desc, t.note, subcategoryOf(t)].some(v => String(v || '').toLowerCase().includes(q))) return false;
       /* Counted only among the rows every OTHER filter kept, so the note says
          how many rows this one alone took away. */
       if (outside && outside.has(t.label)) { hiddenOutside++; return false; }
@@ -425,6 +432,11 @@ module.exports = function registerTransactions(ctx) {
     const catLabel = cat === '__none__' ? i18n.t('tx.uncategorised') : cat === MISSING ? i18n.t('dash.stat.missing') : cat;
     if (acc) { filters.push(`account: ${acc}`); names.push(`account ${acc}`); labels.push(i18n.t('tx.filter.account', { name: acc })); }
     if (cat) { filters.push(`category: ${catName}`); names.push(`category ${catName}`); labels.push(i18n.t('tx.filter.category', { name: catLabel })); }
+    if (sub) {
+      const name = sub === NO_SUBCATEGORY ? 'none' : sub;
+      filters.push(`subcategory: ${name}`); names.push(`subcategory ${name}`);
+      labels.push(i18n.t('tx.filter.subcategory', { name: sub === NO_SUBCATEGORY ? i18n.t('tx.noSubcategory') : sub }));
+    }
     if (q) {
       const typed = $('#txSearch').value.trim();
       filters.push(`search: "${typed}"`); names.push(`search ${q}`); labels.push(i18n.t('tx.filter.search', { text: typed }));
@@ -443,7 +455,7 @@ module.exports = function registerTransactions(ctx) {
       hiddenFuture,
       hiddenForeign,
       hiddenFund,
-      token: `${acc}|${cat}|${q}|${whole}|${S.period}|${inBudgetFor !== null ? 'in' : 'all'}`,
+      token: `${acc}|${cat}|${q}|${whole}|${S.period}|${inBudgetFor !== null ? 'in' : 'all'}${sub ? `|${sub}` : ''}`,
       range: whole ? i18n.t('tx.wholeHistory') : `${periodMonthName(S.period)} ${periodTitle(S.period)}`,
       /* The same range for a FILE NAME: literal English like `names` above.
          The month name and the period's dates are English already
@@ -478,6 +490,39 @@ module.exports = function registerTransactions(ctx) {
 
      Published on ctx so a test can drive the REAL function — same reason
      accounts.js publishes accountReconcile. Nothing else on ctx calls it. */
+  /* Every row of every loaded month, for the two questions that need the whole
+     book rather than the period on screen: which names are in use, and whether
+     the book uses subcategories at all. */
+  function* allRows() {
+    for (const f of Object.values(S.txFiles || {})) for (const r of f.rows) yield r;
+  }
+
+  /* The subcategory filter beside the category one (ADR-0010). Hidden, with no
+     options at all, until the open book uses a subcategory. Offers all,
+     "No subcategory", then names: the chosen category's own in the order its
+     note lists them (then any a row carries beyond the list), or — with no
+     category chosen — every name in the book, alphabetically, a name two
+     categories share being one entry (it filters by the name). A choice that is
+     no longer on offer falls back to all, as every filter here does. */
+  function syncSubcategoryFilter(uses, inUse) {
+    const sel = $('#txSubcategory');
+    if (!sel || !sel.options) return;
+    if (sel.classList) sel.classList.toggle('hidden', !uses);
+    if (!uses) return syncOptions(sel, [], []);
+    const cat = ($('#txCategory') || {}).value;
+    let names;
+    if (cat && cat !== '__none__' && cat !== MISSING) {
+      const c = (S.categories || []).find(x => x.name === cat);
+      names = offeredNames(c && c.subcategories, inUse.get(cat));
+    } else {
+      const all = new Set();
+      for (const c of S.categories || []) for (const n of c.subcategories || []) all.add(n);
+      for (const list of inUse.values()) for (const n of list) all.add(n);
+      names = [...all].sort((a, b) => a.localeCompare(b));
+    }
+    syncOptions(sel, names, [['', i18n.t('tx.allSubcategories')], [NO_SUBCATEGORY, i18n.t('tx.noSubcategory')]]);
+  }
+
   function syncOptions(sel, values, fixed) {
     const opts = [...sel.options];
     const current = opts.slice(fixed.length).map(o => o.value);
@@ -619,6 +664,12 @@ module.exports = function registerTransactions(ctx) {
     syncOptions($('#txCategory'), [...S.categories.map(c => c.name), ...[...orphaned].sort((a, b) => a.localeCompare(b))],
       [['', i18n.t('tx.allCategories')], ['__none__', i18n.t('tx.uncategorised')],
         ...(orphaned.size ? [[MISSING, i18n.t('dash.stat.missing')]] : [])]);
+    /* ADR-0010: nothing of subcategories shows until the open book has one — a
+       name on a category note or on a row. The filter is then hidden and holds
+       no options; the table is exactly what it was. */
+    const inUse = inUseByCategory(allRows());
+    const usesSubs = bookUsesSubcategories(S.categories, allRows());
+    syncSubcategoryFilter(usesSubs, inUse);
     const { rows: filtered, token: renderToken, hiddenOutside, hiddenFuture, hiddenForeign, hiddenFund } = filteredRows();
     renderScopeNote({ outside: hiddenOutside, foreign: hiddenForeign, fund: hiddenFund, future: hiddenFuture });
     require('./misfiled-note').renderMisfiledNote(ctx, $('#txScopeNote'), $('#txWholeHistory').checked ? null : S.period);
@@ -668,6 +719,7 @@ module.exports = function registerTransactions(ctx) {
        hex is let into a style attribute: anything else (a stray ";" or a
        url()) would otherwise write extra declarations. A category with no file,
        or no usable colour, simply gets no dot. */
+    const listedBy = new Map((S.categories || []).map(c => [c.name, c.subcategories || []]));
     const catDots = new Map();
     for (const c of S.categories || []) if (c && c.name && DOT_HEX.test(String(c.color || ''))) catDots.set(c.name, c.color);
     /* `i` is the row's position in what is on screen, and the focus keys
@@ -689,6 +741,24 @@ module.exports = function registerTransactions(ctx) {
          deferredCatSelect swaps to a real <select> and opens its picker the
          moment it takes focus (categories.js), so landing there would open a
          category list nobody asked for. */
+      /* ADR-0010 — the subcategory dropdown shares the category's cell, on its
+         own line under the category control, and exists only for a row whose
+         category has subcategories (listed, or carried by a row). Redrawn when
+         the category changes: the old one belongs to the old category, and the
+         new category brings its own names. In a book that uses none this never
+         runs, and the cell holds the category control alone. */
+      let catTd = null, subHost = null;
+      const drawSub = () => {
+        if (subHost) { subHost.remove(); subHost = null; }
+        if (!usesSubs || !catTd || !r.cat || typeof deferredSubSelect !== 'function') return;
+        if (!offeredNames(listedBy.get(r.cat), inUse.get(r.cat)).length) return;
+        const catName = r.cat;
+        subHost = deferredSubSelect(catName, r.subcategory || '', () => subcategoryNamesFor(catName), v => {
+          setRowCategory(r, r.cat, v);
+          mark();
+        }, i18n.t('tx.aria.subcategory', { date: r.date, desc: r.desc }));
+        catTd.append(subHost);
+      };
       body.append(el('tr', { 'data-focus-key': `row:${i}` },
         el('td', { class: 'text-muted' }, r.date),
         el('td', {}, r.desc),
@@ -696,8 +766,10 @@ module.exports = function registerTransactions(ctx) {
         // deferredCatSelect: a button until first use. See categories.js — at a
         // full page of rows this is the difference between 0 and 100 native
         // selects, and a select is the priciest control in a mobile WebView.
-        el('td', catDots.has(r.cat) ? { 'data-dot': '', style: `--cat-dot:${catDots.get(r.cat)}` } : {}, deferredCatSelect(r.cat, v => {
-          r.cat = v;
+        catTd = el('td', catDots.has(r.cat) ? { 'data-dot': '', style: `--cat-dot:${catDots.get(r.cat)}` } : {}, deferredCatSelect(r.cat, v => {
+          /* One door for a row's category (subcategories.js setRowCategory): a
+             subcategory belongs to one category, so any change clears it. */
+          setRowCategory(r, v);
           /* Learning is scoped to rows that arrived UNCATEGORISED, not every
              edit. This page is where a reader CORRECTS a category — often a
              rule's own mistake — and until now every correction here silently
@@ -734,6 +806,7 @@ module.exports = function registerTransactions(ctx) {
             if (v && origCat && v !== origCat) offerRuleCorrection(r.desc, v);
           }
           mark();
+          drawSub();
         }, i18n.t('tx.aria.category', { date: r.date, desc: r.desc }))),
         /* Weight and colour are the statement stylesheet's
            (src/statement/transactions.css): spending sits at 500 in the text
@@ -747,6 +820,7 @@ module.exports = function registerTransactions(ctx) {
           'aria-label': i18n.t('tx.aria.note', { date: r.date, desc: r.desc }),
           onchange: e => { r.note = e.target.value; mark(); } })),
         el('td', {}, splitButton(item, i), deleteButton(item, i))));
+      drawSub();
     }
     if (!list.length) body.append(el('tr', {}, el('td', { colspan: '8', class: 'text-muted' }, i18n.t('tx.none'))));
     if (total > list.length) {
@@ -1290,7 +1364,9 @@ module.exports = function registerTransactions(ctx) {
     if (!go || afterDialog(op)) return;
 
     for (const item of targets) {
-      item._row.cat = cat;
+      /* setRowCategory, the one door: a row that changes category loses its
+         subcategory; one that already had this category keeps it. */
+      setRowCategory(item._row, cat);
       item._file.dirty = true;
     }
     $('#txSave').disabled = false;
@@ -1714,6 +1790,15 @@ module.exports = function registerTransactions(ctx) {
       { key: 'amount', label: i18n.t('tx.field.amount'), type: 'number', placeholder: '0.00', desc: i18n.t('tx.field.amountDesc'), value: kept('amount', undefined) },
       { key: 'cat', label: i18n.t('tx.field.category'), type: 'select', options: [
         { value: '', label: i18n.t('tx.field.none') }, ...S.categories.map(c => ({ value: c.name, label: c.name }))], value: kept('cat', '') },
+      /* ADR-0010: under Category, empty and disabled until a category that has
+         subcategories is chosen — and only in a book that uses them at all. */
+      ...(bookUsesSubcategories(S.categories, allRows()) ? [{
+        key: 'subcategory', label: i18n.t('tx.field.subcategory'), type: 'select', follows: 'cat', value: kept('subcategory', ''),
+        optionsFor: catName => {
+          const none = { value: '', label: i18n.t('tx.field.none') };
+          return catName ? [none, ...subcategoryNamesFor(catName).map(n => ({ value: n, label: n }))] : [none];
+        },
+      }] : []),
       { key: 'note', label: i18n.t('tx.field.note'), type: 'text', placeholder: i18n.t('tx.field.notePlaceholder'), value: kept('note', undefined) },
     ], { validate: checkNewTransaction });
     if (!r) return;
@@ -1731,6 +1816,9 @@ module.exports = function registerTransactions(ctx) {
     const month = date.slice(0, 7);
     const key = `${label}/${month}`;
     const row = { date, desc, cat: r.cat, amount, excluded: false, note: (r.note || '').trim() };
+    /* Through the one door, so a subcategory with no category is never written:
+       a row with none cannot have one. */
+    if (r.subcategory) setRowCategory(row, r.cat, r.subcategory);
     const TX_FM = 'tags: [finance, finance/budget, finance/budget/transactions]';
     // Write first, then mirror into S.txFiles — memory never models a row the
     // disk doesn't have. serializeTxFile gets a cloned rows array (concat), so

@@ -8,6 +8,7 @@ const { normalizeAmount } = require('./amount');
 // Namespaced, as everywhere in src/ — `t` is a local in half these files.
 const i18n = require('./i18n');
 const { amountCents } = require('./tx-role');
+const { checkSubcategoryName } = require('./subcategories');
 
 /* Does Enter, pressed with focus on `target`, mean "I am done with this form"?
 
@@ -173,6 +174,10 @@ class FieldModal extends Modal {
     // the row it sits in, for putting the message under it.
     this.controls = {};
     this.rows = {};
+    /* key -> what to run when that select changes, for the dropdowns that
+       follow it (a field with `follows`). Filled as the followers are built, so
+       the field they follow only has to be earlier in the form. */
+    this.followers = {};
     this.errEl = null;
     this.badKey = null;
   }
@@ -271,6 +276,39 @@ class FieldModal extends Modal {
           this.controls[f.key] = t.inputEl;
           t.onChange(v => { this.values[f.key] = v; this.touched(f.key); });
         });
+      } else if (f.type === 'select' && f.follows && typeof f.optionsFor === 'function') {
+        /* A dropdown whose choices depend on another field's value — Add
+           transaction's Subcategory under Category (ADR-0010). `optionsFor(
+           value)` returns the {value, label} list for the followed field's
+           current value, the first entry being "none". It is rebuilt whenever
+           that field changes, the chosen value goes back to none (a
+           subcategory belongs to one category, so it must not follow the row
+           to another), and the control is disabled while only "none" is on
+           offer: empty and unreachable until there is something to choose.
+
+           A value the form opens with (a kept draft) is shown only if the
+           category on screen offers it. */
+        const offered = () => f.optionsFor(this.values[f.follows]);
+        const first = offered();
+        this.values[f.key] = first.some(o => o.value === f.value) ? f.value : '';
+        s.addDropdown(d => {
+          const fill = () => {
+            const opts = offered();
+            d.selectEl.empty();
+            for (const o of opts) d.addOption(o.value, o.label);
+            d.selectEl.disabled = opts.length <= 1;
+          };
+          fill();
+          d.setValue(this.values[f.key]);
+          nameControl(d.selectEl, f.label, [ids.name], [ids.desc]);
+          this.controls[f.key] = d.selectEl;
+          d.onChange(v => { this.values[f.key] = v; this.touched(f.key); });
+          (this.followers[f.follows] = this.followers[f.follows] || []).push(() => {
+            this.values[f.key] = '';
+            fill();
+            d.setValue('');
+          });
+        });
       } else if (f.type === 'select') {
         this.values[f.key] = f.value ?? f.options[0];
         s.addDropdown(d => {
@@ -278,7 +316,11 @@ class FieldModal extends Modal {
           d.setValue(this.values[f.key]);
           nameControl(d.selectEl, f.label, [ids.name], [ids.desc]);
           this.controls[f.key] = d.selectEl;
-          d.onChange(v => { this.values[f.key] = v; this.touched(f.key); });
+          d.onChange(v => {
+            this.values[f.key] = v;
+            for (const follow of this.followers[f.key] || []) follow();
+            this.touched(f.key);
+          });
         });
       } else {
         this.values[f.key] = String(f.value ?? '');
@@ -814,6 +856,113 @@ function askBudgetReslice(app, plan, opts) {
   return new Promise(res => new BudgetResliceModal(app, plan, opts || {}, res).open());
 }
 
+/* The Budget page's Subcategories dialog for one category (ADR-0010 §3): the
+   names a transaction may carry under it, added and removed here.
+
+   `opts`: { category, names, inUse, save }.
+     names   the list on the category's note, in the order written
+     inUse   every name transactions carry under this category, listed or not —
+             so the dialog can say which ones are not on the list, and keep
+             saying so after a name is removed from it
+     save    async (names) => boolean — writes the note and resolves true only
+             if it landed. The dialog shows what the note says: a name appears
+             or disappears only once save has answered true.
+
+   Nothing here touches a transaction. A removed name stops being OFFERED and
+   nothing else (a row that carries it still shows it), which the dialog says
+   in words because the other reading — that removing a name edits every row
+   that uses it — is the one a reader would otherwise assume. Added and removed
+   one at a time and saved at once, the way "＋ New subcategory…" is, so the
+   list in the dialog and the list in the file cannot disagree. One save at a
+   time: a second press while one is in flight is ignored, not queued. */
+class SubcategoriesModal extends Modal {
+  constructor(app, opts, resolve) {
+    super(app);
+    this.opts = opts;
+    this.resolve = resolve;
+    this.names = [...(opts.names || [])];
+    this.used = [...(opts.inUse || [])];
+    this.typed = '';
+    this.busy = false;
+    this.inputEl = null;
+  }
+  onOpen() {
+    // Body-mounted, so outside the plugin root and its `lang` (i18n.js followLanguage).
+    i18n.followLanguage(this.modalEl);
+    const { category } = this.opts;
+    this.titleEl.setText(i18n.t('bud.subcat.title', { category }));
+    this.contentEl.createEl('p', { text: i18n.t('bud.subcat.help') });
+    this.listEl = this.contentEl.createDiv();
+    this.noteEl = this.contentEl.createEl('p', { cls: 'setting-item-description' });
+    new Setting(this.contentEl)
+      .setName(i18n.t('bud.subcat.addLabel'))
+      .addText(t => {
+        this.inputEl = t.inputEl;
+        t.setPlaceholder(i18n.t('bud.subcat.placeholder'));
+        t.inputEl.setAttribute('aria-label', i18n.t('bud.subcat.addLabel'));
+        t.onChange(v => { this.typed = v; });
+      })
+      .addButton(b => b.setButtonText(i18n.t('bud.subcat.add')).setCta().onClick(() => this.add()));
+    this.errEl = el('div', { class: 'budget-split-foot is-off', role: 'alert' });
+    this.contentEl.append(this.errEl);
+    new Setting(this.contentEl)
+      .addButton(b => b.setButtonText(i18n.t('bud.subcat.done')).onClick(() => this.close()));
+    /* Enter in the name field adds it; on a button it is the button's own. */
+    this.scope.register([], 'Enter', evt => {
+      if (!this.inputEl || evt.target !== this.inputEl) return;
+      evt.preventDefault();
+      this.add();
+    });
+    this.render();
+    window.setTimeout(() => { if (this.inputEl) this.inputEl.focus(); }, 10);
+  }
+  render() {
+    this.listEl.empty();
+    if (!this.names.length) {
+      this.listEl.createEl('p', { text: i18n.t('bud.subcat.empty'), cls: 'setting-item-description' });
+    }
+    for (const name of this.names) {
+      new Setting(this.listEl).setName(name).addButton(b => {
+        b.setButtonText(i18n.t('bud.subcat.removeBtn'));
+        b.buttonEl.setAttribute('aria-label', i18n.t('bud.subcat.remove', { name }));
+        b.onClick(() => this.remove(name));
+      });
+    }
+    const unlisted = this.used.filter(n => !this.names.includes(n));
+    this.noteEl.setText(unlisted.length ? i18n.t('bud.subcat.unlisted', { names: unlisted.join(', ') }) : '');
+  }
+  /* `is-off` is the error colour (styles.css .budget-split-foot), set once at
+     build like FieldModal's own message line; an empty line shows nothing. */
+  setError(message) { this.errEl.textContent = message; }
+  /* Saves `next` and shows it only if the save landed. */
+  async attempt(next) {
+    if (this.busy) return false;
+    this.busy = true;
+    let landed = false;
+    try { landed = (await this.opts.save(next)) === true; } catch (e) { landed = false; }
+    this.busy = false;
+    if (landed) { this.names = next; this.render(); }
+    return landed;
+  }
+  async add() {
+    const check = checkSubcategoryName(this.typed, this.names);
+    if (check.error) { this.setError(i18n.t('subcat.err.' + check.error)); return; }
+    this.setError('');
+    if (await this.attempt([...this.names, check.name])) {
+      this.typed = '';
+      if (this.inputEl) this.inputEl.value = '';
+    }
+  }
+  async remove(name) {
+    this.setError('');
+    await this.attempt(this.names.filter(n => n !== name));
+  }
+  onClose() { this.contentEl.empty(); this.resolve(); }
+}
+function askSubcategories(app, opts) {
+  return new Promise(res => new SubcategoriesModal(app, opts, res).open());
+}
+
 /* The ask* wrappers are the interface: each opens its Modal and resolves with
    the reader's answer, so a caller never has to remember to .open() one or to
    hand it a callback. FieldModal and ConfirmModal had no caller outside this
@@ -821,5 +970,5 @@ function askBudgetReslice(app, plan, opts) {
    drive the class directly. */
 module.exports = {
   askFields, confirmModal, SplitModal, askSplit, RulesCleanupModal, askRulesCleanup,
-  BudgetResliceModal, askBudgetReslice,
+  BudgetResliceModal, askBudgetReslice, SubcategoriesModal, askSubcategories,
 };

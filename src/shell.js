@@ -332,6 +332,7 @@ const SHELL_HTML = `
             <div class="row tx-filters">
               <select id="txAccount" class="form-select form-select-sm"><option value="" data-i18n="tx.allAccounts">All accounts</option></select>
               <select id="txCategory" class="form-select form-select-sm"><option value="" data-i18n="tx.allCategories">All categories</option><option value="__none__" data-i18n="tx.uncategorised">Uncategorised</option></select>
+              <select id="txSubcategory" class="form-select form-select-sm hidden" aria-label="Subcategory" data-i18n-aria="tx.field.subcategory"></select>
               <input type="search" id="txSearch" class="form-control form-control-sm" placeholder="Search description…" data-i18n-placeholder="shell.tx.search">
               <label class="text-muted tx-whole"><input type="checkbox" id="txWholeHistory"> <span data-i18n="shell.tx.wholeHistory">whole history</span></label>
             </div>

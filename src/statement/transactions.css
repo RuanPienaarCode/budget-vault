@@ -126,6 +126,11 @@
 }
 .budget-app-root #view-transactions .table .cat-cell .category-select { flex: 1 1 auto; }
 
+/* Subcategory: a line under the category, in the same cell (ADR-0010). Its
+   button is the category's own (.cat-cell-btn), so colour, ellipsis and the
+   touch target are shared; the wrapper only puts it on its own line. */
+.budget-app-root #view-transactions .table .sub-cell { display: block; margin-top: 2px; }
+
 /* Amount: tabular, right-aligned, 16px. Spending is weight 500 in the text
    colour; income (the cell that already carries .text-success) is green, 600.
 
@@ -243,6 +248,10 @@
   body:not(.is-phone) .budget-app-root #txTable tbody td:nth-child(4) { white-space: normal; }
   body:not(.is-phone) .budget-app-root #txTable .cat-cell { min-width: 0; }
   body:not(.is-phone) .budget-app-root #txTable .cat-cell-btn { white-space: normal; }
+  /* The subcategory reads as the second line of the category: a size down. On a
+     phone card it keeps the category's own card size (below, and phone.css). */
+  body:not(.is-phone) .budget-app-root #txTable .sub-cell-btn { font-size: 12px; }
+  body:not(.is-phone) .budget-app-root #txTable .sub-cell { min-width: 0; }
   body:not(.is-phone) .budget-app-root #txTable thead th:nth-child(6) { white-space: normal; }
   body:not(.is-phone) .budget-app-root #txTable td:nth-child(7) input { max-width: 7rem; }
 }
@@ -381,6 +390,9 @@
     text-align: right;
   }
   .budget-app-root #txTable tbody td:nth-child(4) .cat-cell { min-width: 0; }
+  /* The phone card: the subcategory is a second line inside the category cell,
+     right-aligned with it, in the category's own card size. */
+  .budget-app-root #txTable tbody td:nth-child(4) .sub-cell { min-width: 0; }
   .budget-app-root #txTable tbody td:nth-child(4) .cat-cell-btn {
     width: auto;
     justify-content: flex-end;
