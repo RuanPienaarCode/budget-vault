@@ -3,6 +3,18 @@
 All notable changes to Budget Vault. Versions match the plugin version in
 `manifest.json` and the release tag exactly (no `v` prefix).
 
+## 1.61.1 — 2026-11-28
+
+A fix for battery drain while the budget sits locked.
+
+### Fixed
+
+- **The Enter budget screen no longer keeps the computer busy.** Its
+  drifting background ran forever, so with the budget left locked the
+  window redrew itself non-stop. On one laptop that took power from about
+  7 W to 17 W. The background now drifts once and then holds still, and a
+  new lock starts it again. (#194)
+
 ## 1.61.0 — 2026-11-16
 
 The Plan page is rebuilt around two words: money in, and allocated. It
